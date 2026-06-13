@@ -18,16 +18,24 @@ import 'features/subscriptions/presentation/bloc/subscription_bloc.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  debugPrint('Background FCM: ${message.notification?.title}');
+  try {
+    await Firebase.initializeApp();
+    debugPrint('Background FCM: ${message.notification?.title}');
+  } catch (e) {
+    debugPrint('Firebase background handler error: $e');
+  }
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  // Firebase (optional - app works without it)
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase initialization skipped: $e');
+  }
 
   // Dependency Injection
   await configureDependencies();

@@ -5,7 +5,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 class ApiClient {
   static const _baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://192.168.1.45:3001/api/v1', // PC LAN IP for real device
+    defaultValue: 'http://localhost:3001/api/v1', // Use localhost for web/emulator
   );
 
   late final Dio _dio;
