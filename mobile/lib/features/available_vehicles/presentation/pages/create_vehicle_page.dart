@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/vehicles_bloc.dart';
 
 class CreateVehiclePage extends StatefulWidget {
@@ -13,6 +15,7 @@ class CreateVehiclePage extends StatefulWidget {
 class _CreateVehiclePageState extends State<CreateVehiclePage> {
   final _formKey = GlobalKey<FormState>();
   final _currentCityCtrl = TextEditingController();
+  final _currentStateCtrl = TextEditingController();
   final _destCityCtrl = TextEditingController();
   final _vehicleNumberCtrl = TextEditingController();
   final _driverNameCtrl = TextEditingController();
@@ -26,7 +29,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
 
   @override
   void dispose() {
-    _currentCityCtrl.dispose(); _destCityCtrl.dispose();
+    _currentCityCtrl.dispose(); _currentStateCtrl.dispose(); _destCityCtrl.dispose();
     _vehicleNumberCtrl.dispose(); _driverNameCtrl.dispose();
     _driverMobileCtrl.dispose(); _notesCtrl.dispose();
     super.dispose();
@@ -35,11 +38,12 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_availableDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select available date')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select available date'), backgroundColor: AppColors.error));
       return;
     }
     context.read<VehiclesBloc>().add(CreateVehicleEvent({
       'currentCity': _currentCityCtrl.text.trim(),
+      'currentState': _currentStateCtrl.text.trim(),
       'destinationCity': _destCityCtrl.text.trim().isEmpty ? null : _destCityCtrl.text.trim(),
       'vehicleType': _vehicleType,
       'vehicleNumber': _vehicleNumberCtrl.text.trim().toUpperCase(),
@@ -54,91 +58,113 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Post Available Cab'), centerTitle: true),
+      backgroundColor: AppColors.background,
+      appBar: AppBar(title: Text('Post Available Cab', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<VehiclesBloc, VehiclesState>(
         listener: (context, state) {
           if (state is VehicleCreated) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vehicle listed!'), backgroundColor: Colors.green));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Vehicle listed!'), backgroundColor: AppColors.success));
             context.pop();
           }
           if (state is VehiclesError) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message), backgroundColor: Colors.red));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message), backgroundColor: AppColors.error));
           }
         },
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(16.r),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                    side: BorderSide(color: AppColors.border),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 12),
+                        Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                        SizedBox(height: 12.h),
                         TextFormField(
                           controller: _currentCityCtrl,
-                          decoration: const InputDecoration(labelText: 'Current City *', prefixIcon: Icon(Icons.my_location_outlined)),
+                          decoration: InputDecoration(labelText: 'Current City *', prefixIcon: Icon(Icons.my_location_outlined)),
                           validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12.h),
+                        TextFormField(
+                          controller: _currentStateCtrl,
+                          decoration: InputDecoration(labelText: 'Current State *', prefixIcon: Icon(Icons.map_outlined)),
+                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        ),
+                        SizedBox(height: 12.h),
                         TextFormField(
                           controller: _destCityCtrl,
-                          decoration: const InputDecoration(labelText: 'Available For (Destination City)', prefixIcon: Icon(Icons.location_on_outlined)),
+                          decoration: InputDecoration(labelText: 'Available For (Destination City)', prefixIcon: Icon(Icons.location_on_outlined)),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                    side: BorderSide(color: AppColors.border),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 12),
+                        Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                        SizedBox(height: 12.h),
                         DropdownButtonFormField<String>(
                           value: _vehicleType,
-                          decoration: const InputDecoration(labelText: 'Vehicle Type'),
-                          items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase()))).toList(),
+                          decoration: InputDecoration(labelText: 'Vehicle Type'),
+                          items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
                           onChanged: (v) => setState(() => _vehicleType = v!),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12.h),
                         TextFormField(
                           controller: _vehicleNumberCtrl,
                           textCapitalization: TextCapitalization.characters,
-                          decoration: const InputDecoration(labelText: 'Vehicle Number *', prefixIcon: Icon(Icons.badge_outlined)),
+                          decoration: InputDecoration(labelText: 'Vehicle Number *', prefixIcon: Icon(Icons.badge_outlined)),
                           validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                    side: BorderSide(color: AppColors.border),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Driver Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 12),
+                        Text('Driver Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                        SizedBox(height: 12.h),
                         TextFormField(
                           controller: _driverNameCtrl,
-                          decoration: const InputDecoration(labelText: 'Driver Name *', prefixIcon: Icon(Icons.person_outline)),
+                          decoration: InputDecoration(labelText: 'Driver Name *', prefixIcon: Icon(Icons.person_outline)),
                           validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12.h),
                         TextFormField(
                           controller: _driverMobileCtrl,
                           keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(labelText: 'Driver Mobile *', prefixIcon: Icon(Icons.phone_outlined)),
+                          decoration: InputDecoration(labelText: 'Driver Mobile *', prefixIcon: Icon(Icons.phone_outlined)),
                           validator: (v) {
                             if (v == null || v.isEmpty) return 'Required';
                             if (v.length != 10) return 'Enter 10 digit number';
@@ -149,22 +175,27 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                    side: BorderSide(color: AppColors.border),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 4),
+                        Text('Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                        SizedBox(height: 4.h),
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.calendar_today_outlined),
+                          leading: Icon(Icons.calendar_today_outlined, color: AppColors.textHint, size: 20.sp),
                           title: Text(_availableDate != null
                               ? '${_availableDate!.day}/${_availableDate!.month}/${_availableDate!.year}'
-                              : 'Select Available Date *'),
-                          trailing: const Icon(Icons.chevron_right),
+                              : 'Select Available Date *', style: TextStyle(fontFamily: 'Poppins')),
+                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
                           onTap: () async {
                             final d = await showDatePicker(
                               context: context,
@@ -177,9 +208,9 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                         ),
                         ListTile(
                           contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.access_time),
-                          title: Text(_availableTime != null ? _availableTime!.format(context) : 'Select Available Time'),
-                          trailing: const Icon(Icons.chevron_right),
+                          leading: Icon(Icons.access_time, color: AppColors.textHint, size: 20.sp),
+                          title: Text(_availableTime != null ? _availableTime!.format(context) : 'Select Available Time', style: TextStyle(fontFamily: 'Poppins')),
+                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
                           onTap: () async {
                             final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
                             if (t != null) setState(() => _availableTime = t);
@@ -189,32 +220,35 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16.r),
+                    side: BorderSide(color: AppColors.border),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(16.r),
                     child: TextFormField(
                       controller: _notesCtrl,
                       maxLines: 3,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Additional Notes (Optional)',
                         alignLabelWithHint: true,
-                        border: OutlineInputBorder(),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24.h),
                 BlocBuilder<VehiclesBloc, VehiclesState>(
                   builder: (context, state) => ElevatedButton(
                     onPressed: state is VehiclesLoading ? null : _submit,
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                     child: state is VehiclesLoading
-                        ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                        : const Text('Post Available Cab', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                        ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text('Post Available Cab', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 32.h),
               ],
             ),
           ),

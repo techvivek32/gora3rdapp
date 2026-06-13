@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/vehicles_bloc.dart';
 
 class VehiclesFeedPage extends StatefulWidget {
@@ -37,7 +39,9 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: TextField(
           controller: _searchCtrl,
           decoration: InputDecoration(
@@ -59,30 +63,35 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
       ),
       body: BlocBuilder<VehiclesBloc, VehiclesState>(
         builder: (context, state) {
-          if (state is VehiclesLoading) return const Center(child: CircularProgressIndicator());
-          if (state is VehiclesError) return Center(child: Text(state.message));
+          if (state is VehiclesLoading) {
+            return Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+          if (state is VehiclesError) {
+            return Center(child: Text(state.message, style: TextStyle(color: AppColors.textSecondary)));
+          }
           if (state is VehiclesLoaded) {
             if (state.vehicles.isEmpty) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.local_taxi_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No vehicles available', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                    SizedBox(height: 8),
-                    Text('Be the first to post your available cab', style: TextStyle(color: Colors.grey)),
+                    Icon(Icons.local_taxi_outlined, size: 64.sp, color: AppColors.textHint),
+                    SizedBox(height: 16.h),
+                    Text('No vehicles available', style: TextStyle(fontSize: 18.sp, color: AppColors.textSecondary)),
+                    SizedBox(height: 8.h),
+                    Text('Be the first to post your available cab', style: TextStyle(color: AppColors.textHint)),
                   ],
                 ),
               );
             }
             return RefreshIndicator(
+              color: AppColors.primary,
               onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
               child: ListView.separated(
                 controller: _scrollController,
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(16.r),
                 itemCount: state.vehicles.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
                 itemBuilder: (_, i) => _VehicleCard(vehicle: state.vehicles[i]),
               ),
             );
@@ -91,9 +100,10 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.primary,
         onPressed: () => context.push('/vehicles/create'),
-        icon: const Icon(Icons.add),
-        label: const Text('Post Vehicle'),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Post Vehicle', style: TextStyle(color: Colors.white)),
       ),
     );
   }
@@ -106,11 +116,16 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = vehicle['status'] as String? ?? 'available';
-    final statusColor = status == 'available' ? Colors.green : Colors.grey;
+    final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
 
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.r),
+        side: BorderSide(color: AppColors.border, width: 1),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: EdgeInsets.all(14.r),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -119,51 +134,51 @@ class _VehicleCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     vehicle['listingId'] as String? ?? '',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(fontSize: 12.sp, color: AppColors.textHint),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 10.sp, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10.h),
             Row(
               children: [
-                const Icon(Icons.location_on, color: Colors.green, size: 16),
-                const SizedBox(width: 4),
+                Icon(Icons.location_on, color: AppColors.success, size: 16.sp),
+                SizedBox(width: 4.w),
                 Expanded(child: Text('${vehicle['currentCity']} → ${vehicle['destinationCity'] ?? 'Any'}',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15.sp, color: AppColors.textPrimary))),
               ],
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: 6.h),
             Row(
               children: [
-                Icon(Icons.directions_car, color: Colors.grey.shade500, size: 16),
-                const SizedBox(width: 4),
+                Icon(Icons.directions_car, color: AppColors.textHint, size: 16.sp),
+                SizedBox(width: 4.w),
                 Text((vehicle['vehicleType'] as String? ?? '').toUpperCase(),
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                const SizedBox(width: 16),
-                Icon(Icons.badge_outlined, color: Colors.grey.shade500, size: 16),
-                const SizedBox(width: 4),
-                Text(vehicle['vehicleNumber'] as String? ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)),
+                SizedBox(width: 16.w),
+                Icon(Icons.badge_outlined, color: AppColors.textHint, size: 16.sp),
+                SizedBox(width: 4.w),
+                Text(vehicle['vehicleNumber'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)),
               ],
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: 6.h),
             Row(
               children: [
-                Icon(Icons.person_outline, color: Colors.grey.shade500, size: 16),
-                const SizedBox(width: 4),
-                Text(vehicle['driverName'] as String? ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                Icon(Icons.person_outline, color: AppColors.textHint, size: 16.sp),
+                SizedBox(width: 4.w),
+                Text(vehicle['driverName'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)),
                 const Spacer(),
-                Icon(Icons.calendar_today_outlined, color: Colors.grey.shade500, size: 14),
-                const SizedBox(width: 4),
-                Text(vehicle['availableDate'] as String? ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                Icon(Icons.calendar_today_outlined, color: AppColors.textHint, size: 14.sp),
+                SizedBox(width: 4.w),
+                Text(vehicle['availableDate'] as String? ?? '', style: TextStyle(color: AppColors.textHint, fontSize: 12.sp)),
               ],
             ),
           ],

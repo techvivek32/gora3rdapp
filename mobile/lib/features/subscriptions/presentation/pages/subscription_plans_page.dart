@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/subscription_bloc.dart';
 
 class SubscriptionPlansPage extends StatefulWidget {
@@ -15,10 +17,10 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   String? _pendingPlanId;
 
   static const _membershipColors = {
-    'active': Color(0xFF3B82F6),
-    'verified': Color(0xFF10B981),
-    'premium': Color(0xFFF59E0B),
-    'golden': Color(0xFFEF4444),
+    'active': AppColors.memberActive,
+    'verified': AppColors.memberVerified,
+    'premium': AppColors.memberPremium,
+    'golden': AppColors.memberGolden,
   };
 
   @override
@@ -40,7 +42,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
 
   void _onPaymentError(PaymentFailureResponse response) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: Colors.red),
+      SnackBar(content: Text('Payment failed: ${response.message}'), backgroundColor: AppColors.error),
     );
   }
 
@@ -58,14 +60,11 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Membership Plans'),
+        title: Text('Membership Plans', style: TextStyle(fontFamily: 'Poppins')),
         centerTitle: true,
-        flexibleSpace: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
-          ),
-        ),
+        backgroundColor: AppColors.primary,
       ),
       body: BlocConsumer<SubscriptionBloc, SubscriptionState>(
         listener: (context, state) {
@@ -85,34 +84,34 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           }
           if (state is PaymentVerified) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Membership activated!'), backgroundColor: Colors.green),
+              SnackBar(content: Text('Membership activated!'), backgroundColor: AppColors.success),
             );
             Navigator.pop(context);
           }
           if (state is SubscriptionError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message), backgroundColor: Colors.red),
+              SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
             );
           }
         },
         builder: (context, state) {
-          if (state is SubscriptionLoading) return const Center(child: CircularProgressIndicator());
+          if (state is SubscriptionLoading) return Center(child: CircularProgressIndicator(color: AppColors.primary));
           if (state is PlansLoaded) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16.r),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const _HeaderBanner(),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16.h),
                   ...state.plans.map((plan) => _PlanCard(plan: plan, onSelect: () => _purchasePlan(plan))),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32.h),
                   _FeatureComparisonTable(),
                 ],
               ),
             );
           }
-          return const Center(child: Text('No plans available'));
+          return Center(child: Text('No plans available', style: TextStyle(fontFamily: 'Poppins')));
         },
       ),
     );
@@ -124,18 +123,18 @@ class _HeaderBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.r),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFFF97316), Color(0xFFEA580C)]),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+        borderRadius: BorderRadius.circular(12.r),
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.workspace_premium, color: Colors.white, size: 48),
-          SizedBox(height: 8),
-          Text('Unlock Premium Features', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-          SizedBox(height: 4),
-          Text('Get access to contact details, post more listings, and grow your network', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+          Icon(Icons.workspace_premium, color: Colors.white, size: 48.sp),
+          SizedBox(height: 8.h),
+          Text('Unlock Premium Features', style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+          SizedBox(height: 4.h),
+          Text('Get access to contact details, post more listings, and grow your network', textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontFamily: 'Poppins')),
         ],
       ),
     );
@@ -147,10 +146,10 @@ class _PlanCard extends StatelessWidget {
   final VoidCallback onSelect;
 
   static const _membershipColors = {
-    'active': Color(0xFF3B82F6),
-    'verified': Color(0xFF10B981),
-    'premium': Color(0xFFF59E0B),
-    'golden': Color(0xFFEF4444),
+    'active': AppColors.memberActive,
+    'verified': AppColors.memberVerified,
+    'premium': AppColors.memberPremium,
+    'golden': AppColors.memberGolden,
   };
 
   const _PlanCard({required this.plan, required this.onSelect});
@@ -158,26 +157,27 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final membership = plan['membershipType'] as String? ?? 'active';
-    final color = _membershipColors[membership] ?? Colors.blue;
+    final color = _membershipColors[membership] ?? AppColors.info;
     final isPopular = plan['isPopular'] as bool? ?? false;
     final price = plan['price'] as num? ?? 0;
     final discountedPrice = plan['discountedPrice'] as num?;
     final features = List<String>.from(plan['features'] as List? ?? []);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: EdgeInsets.only(bottom: 16.h),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: isPopular ? color : Colors.grey.shade200, width: isPopular ? 2 : 1),
+        borderRadius: BorderRadius.circular(16.r),
+        color: Colors.white,
+        border: Border.all(color: isPopular ? color : AppColors.border, width: isPopular ? 2.w : 1.w),
         boxShadow: isPopular ? [BoxShadow(color: color.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 4))] : null,
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16.r),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(14.r)),
             ),
             child: Row(
               children: [
@@ -187,13 +187,13 @@ class _PlanCard extends StatelessWidget {
                     children: [
                       if (isPopular)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          margin: const EdgeInsets.only(bottom: 4),
-                          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-                          child: const Text('MOST POPULAR', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                          margin: EdgeInsets.only(bottom: 4.h),
+                          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8.r)),
+                          child: Text('MOST POPULAR', style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                         ),
-                      Text(plan['name'] as String? ?? '', style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)),
-                      Text(plan['description'] as String? ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      Text(plan['name'] as String? ?? '', style: TextStyle(color: color, fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                      Text(plan['description'] as String? ?? '', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp, fontFamily: 'Poppins')),
                     ],
                   ),
                 ),
@@ -201,29 +201,29 @@ class _PlanCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     if (discountedPrice != null && discountedPrice < price)
-                      Text('₹${price.toInt()}', style: TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey.shade400)),
-                    Text('₹${(discountedPrice ?? price).toInt()}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-                    Text('/ ${plan['duration'] ?? 'month'}', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+                      Text('₹${price.toInt()}', style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontFamily: 'Poppins')),
+                    Text('₹${(discountedPrice ?? price).toInt()}', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: color, fontFamily: 'Poppins')),
+                    Text('/ ${plan['duration'] ?? 'month'}', style: TextStyle(color: AppColors.textHint, fontSize: 12.sp, fontFamily: 'Poppins')),
                   ],
                 ),
               ],
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16.r),
             child: Column(
               children: [
                 ...features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.only(bottom: 8.h),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle, color: color, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(f, style: const TextStyle(fontSize: 14))),
+                      Icon(Icons.check_circle, color: color, size: 18.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(child: Text(f, style: TextStyle(fontSize: 14.sp, fontFamily: 'Poppins'))),
                     ],
                   ),
                 )),
-                const SizedBox(height: 12),
+                SizedBox(height: 12.h),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -231,10 +231,9 @@ class _PlanCard extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
                     ),
-                    child: Text('Get ${plan['name']}', style: const TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text('Get ${plan['name']}', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
               ],
@@ -259,39 +258,44 @@ class _FeatureComparisonTable extends StatelessWidget {
   ];
 
   final _plans = ['Free', 'Active', 'Premium', 'Golden'];
-  final _colors = [Colors.grey, Color(0xFF3B82F6), Color(0xFFF59E0B), Color(0xFFEF4444)];
+  final _colors = [AppColors.textHint, AppColors.memberActive, AppColors.memberPremium, AppColors.memberGolden];
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.r),
+        side: BorderSide(color: AppColors.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16.r),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Feature Comparison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 12),
+            Text('Feature Comparison', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins')),
+            SizedBox(height: 12.h),
             Table(
               columnWidths: const {0: FlexColumnWidth(2)},
               children: [
                 TableRow(
                   children: [
-                    const SizedBox(),
+                    SizedBox(),
                     ..._plans.asMap().entries.map((e) => Center(
-                      child: Text(_plans[e.key], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: _colors[e.key])),
+                      child: Text(_plans[e.key], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.sp, color: _colors[e.key], fontFamily: 'Poppins')),
                     )),
                   ],
                 ),
                 ..._features.map((row) => TableRow(
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text(row[0] as String, style: const TextStyle(fontSize: 13)),
+                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      child: Text(row[0] as String, style: TextStyle(fontSize: 13.sp, fontFamily: 'Poppins')),
                     ),
                     ...List.generate(4, (i) => Center(
                       child: row[i + 1] as bool
-                          ? Icon(Icons.check, color: _colors[i], size: 18)
-                          : const Icon(Icons.close, color: Colors.grey, size: 18),
+                          ? Icon(Icons.check, color: _colors[i], size: 18.sp)
+                          : Icon(Icons.close, color: AppColors.textHint, size: 18.sp),
                     )),
                   ],
                 )),

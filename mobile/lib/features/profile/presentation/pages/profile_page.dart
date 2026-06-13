@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   static const _membershipConfig = {
-    'new': {'label': 'New Member', 'color': Color(0xFF6B7280), 'icon': Icons.person},
-    'active': {'label': 'Active', 'color': Color(0xFF3B82F6), 'icon': Icons.verified_user},
-    'verified': {'label': 'Verified', 'color': Color(0xFF10B981), 'icon': Icons.verified},
-    'premium': {'label': 'Premium', 'color': Color(0xFFF59E0B), 'icon': Icons.star},
-    'golden': {'label': 'Golden', 'color': Color(0xFFEF4444), 'icon': Icons.workspace_premium},
+    'new': {'label': 'New Member', 'color': AppColors.memberNew, 'icon': Icons.person},
+    'active': {'label': 'Active', 'color': AppColors.memberActive, 'icon': Icons.verified_user},
+    'verified': {'label': 'Verified', 'color': AppColors.memberVerified, 'icon': Icons.verified},
+    'premium': {'label': 'Premium', 'color': AppColors.memberPremium, 'icon': Icons.star},
+    'golden': {'label': 'Golden', 'color': AppColors.memberGolden, 'icon': Icons.workspace_premium},
   };
 
   @override
@@ -24,11 +26,13 @@ class ProfilePage extends StatelessWidget {
         final color = config['color'] as Color;
 
         return Scaffold(
+          backgroundColor: AppColors.background,
           body: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 200,
+                expandedHeight: 200.h,
                 pinned: true,
+                backgroundColor: AppColors.primary,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
                     decoration: BoxDecoration(
@@ -43,22 +47,22 @@ class ProfilePage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircleAvatar(
-                            radius: 44,
+                            radius: 44.r,
                             backgroundColor: Colors.white,
                             backgroundImage: user?['profileImage'] != null ? NetworkImage(user!['profileImage'] as String) : null,
-                            child: user?['profileImage'] == null ? Icon(Icons.person, size: 44, color: color) : null,
+                            child: user?['profileImage'] == null ? Icon(Icons.person, size: 44.sp, color: color) : null,
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8.h),
                           Text(user?['fullName'] as String? ?? 'User',
-                              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
+                              style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                          SizedBox(height: 4.h),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(config['icon'] as IconData, color: Colors.white, size: 16),
-                              const SizedBox(width: 4),
+                              Icon(config['icon'] as IconData, color: Colors.white, size: 16.sp),
+                              SizedBox(width: 4.w),
                               Text(config['label'] as String,
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                             ],
                           ),
                         ],
@@ -69,7 +73,7 @@ class ProfilePage extends StatelessWidget {
               ),
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16.r),
                   child: Column(
                     children: [
                       _InfoCard(
@@ -82,7 +86,7 @@ class ProfilePage extends StatelessWidget {
                           _InfoRow(Icons.location_city, 'City', user?['city'] as String? ?? '-'),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       _InfoCard(
                         title: 'Activity',
                         children: [
@@ -90,11 +94,11 @@ class ProfilePage extends StatelessWidget {
                           _InfoRow(Icons.directions_car, 'Vehicles Posted', '${user?['vehiclesPosted'] ?? 0}'),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.workspace_premium,
                         label: 'Upgrade Membership',
-                        color: Colors.amber,
+                        color: AppColors.warning,
                         onTap: () => context.push('/subscriptions'),
                       ),
                       _ProfileAction(
@@ -112,32 +116,32 @@ class ProfilePage extends StatelessWidget {
                         label: 'Settings',
                         onTap: () {},
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.logout,
                         label: 'Sign Out',
-                        color: Colors.red,
+                        color: AppColors.error,
                         onTap: () {
                           showDialog(
                             context: context,
                             builder: (_) => AlertDialog(
-                              title: const Text('Sign Out'),
-                              content: const Text('Are you sure you want to sign out?'),
+                              title: Text('Sign Out', style: TextStyle(fontFamily: 'Poppins')),
+                              content: Text('Are you sure you want to sign out?', style: TextStyle(fontFamily: 'Poppins')),
                               actions: [
-                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel', style: TextStyle(fontFamily: 'Poppins'))),
                                 TextButton(
                                   onPressed: () {
                                     Navigator.pop(context);
                                     context.read<AuthBloc>().add(AuthLogoutEvent());
                                   },
-                                  child: const Text('Sign Out', style: TextStyle(color: Colors.red)),
+                                  child: Text('Sign Out', style: TextStyle(color: AppColors.error, fontFamily: 'Poppins')),
                                 ),
                               ],
                             ),
                           );
                         },
                       ),
-                      const SizedBox(height: 32),
+                      SizedBox(height: 32.h),
                     ],
                   ),
                 ),
@@ -158,13 +162,18 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16.r),
+        side: BorderSide(color: AppColors.border, width: 1),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16.r),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const Divider(height: 16),
+            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+            Divider(height: 16.h, color: AppColors.border),
             ...children,
           ],
         ),
@@ -182,13 +191,13 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: EdgeInsets.symmetric(vertical: 6.h),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.grey),
-          const SizedBox(width: 12),
-          Text('$label: ', style: TextStyle(color: Colors.grey.shade600)),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500))),
+          Icon(icon, size: 18.sp, color: AppColors.textHint),
+          SizedBox(width: 12.w),
+          Text('$label: ', style: TextStyle(color: AppColors.textSecondary, fontFamily: 'Poppins')),
+          Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.w500, fontFamily: 'Poppins', color: AppColors.textPrimary))),
         ],
       ),
     );
@@ -205,11 +214,16 @@ class _ProfileAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: AppColors.border, width: 1),
+      ),
+      margin: EdgeInsets.only(bottom: 8.h),
       child: ListTile(
-        leading: Icon(icon, color: color ?? Theme.of(context).primaryColor),
-        title: Text(label, style: color != null ? TextStyle(color: color) : null),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        leading: Icon(icon, color: color ?? AppColors.primary, size: 22.sp),
+        title: Text(label, style: TextStyle(color: color ?? AppColors.textPrimary, fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
+        trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
         onTap: onTap,
       ),
     );

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key});
@@ -19,19 +21,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
       icon: Icons.directions_car_outlined,
       title: 'Post Vehicle Requirements',
       subtitle: 'Instantly share your cab needs with hundreds of verified operators across India.',
-      color: Colors.orange,
+      color: AppColors.primary,
     ),
     _OnboardingData(
       icon: Icons.local_taxi_outlined,
       title: 'List Your Available Cabs',
       subtitle: 'Have empty cabs? Post your available fleet and connect with travel agencies instantly.',
-      color: Colors.blue,
+      color: AppColors.info,
     ),
     _OnboardingData(
       icon: Icons.verified_outlined,
       title: 'Verified Network',
       subtitle: 'All users are verified. Premium members get contact access for seamless coordination.',
-      color: Colors.green,
+      color: AppColors.success,
     ),
   ];
 
@@ -49,18 +51,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final isLast = _current == _pages.length - 1;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextButton(onPressed: _finish, child: const Text('Skip')),
+                padding: EdgeInsets.all(16.r),
+                child: TextButton(onPressed: _finish, child: Text('Skip', style: TextStyle(color: AppColors.primary, fontFamily: 'Poppins'))),
               ),
             ),
             Expanded(
@@ -72,28 +74,27 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
               child: Column(
                 children: [
                   SmoothPageIndicator(
                     controller: _controller,
                     count: _pages.length,
                     effect: WormEffect(
-                      dotHeight: 10,
-                      dotWidth: 10,
-                      activeDotColor: theme.primaryColor,
-                      dotColor: Colors.grey.shade300,
+                      dotHeight: 10.h,
+                      dotWidth: 10.w,
+                      activeDotColor: AppColors.primary,
+                      dotColor: AppColors.border,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  SizedBox(height: 32.h),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: isLast
                           ? _finish
                           : () => _controller.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeInOut),
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                      child: Text(isLast ? 'Get Started' : 'Next', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      child: Text(isLast ? 'Get Started' : 'Next', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                     ),
                   ),
                 ],
@@ -121,20 +122,20 @@ class _OnboardingSlide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: EdgeInsets.symmetric(horizontal: 32.w),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 140,
-            height: 140,
+            width: 140.w,
+            height: 140.h,
             decoration: BoxDecoration(color: data.color.withOpacity(0.1), shape: BoxShape.circle),
-            child: Icon(data.icon, size: 72, color: data.color),
+            child: Icon(data.icon, size: 72.sp, color: data.color),
           ),
-          const SizedBox(height: 40),
-          Text(data.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          Text(data.subtitle, style: TextStyle(fontSize: 16, color: Colors.grey.shade600, height: 1.6), textAlign: TextAlign.center),
+          SizedBox(height: 40.h),
+          Text(data.title, style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary), textAlign: TextAlign.center),
+          SizedBox(height: 16.h),
+          Text(data.subtitle, style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, height: 1.6, fontFamily: 'Poppins'), textAlign: TextAlign.center),
         ],
       ),
     );
