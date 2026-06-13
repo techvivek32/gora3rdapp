@@ -1,0 +1,82 @@
+import axios from 'axios';
+import { getSession } from 'next-auth/react';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+
+const apiClient = axios.create({ baseURL: BASE_URL, timeout: 30000 });
+
+apiClient.interceptors.request.use(async (config) => {
+  const session = await getSession();
+  if (session?.user?.accessToken) {
+    config.headers.Authorization = `Bearer ${session.user.accessToken}`;
+  }
+  return config;
+});
+
+apiClient.interceptors.response.use(
+  (res) => res.data,
+  (error) => {
+    const message = error.response?.data?.message || error.message || 'Something went wrong';
+    return Promise.reject(new Error(message));
+  },
+);
+
+export const adminApi = {
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+  login: (data: { identifier: string; password: string }) =>
+    apiClient.post('/auth/login', data),
+
+  // ─── Dashboard ─────────────────────────────────────────────────────────────
+  getDashboardStats: () => apiClient.get('/admin/dashboard'),
+  getAnalytics: (params: any) => apiClient.get('/admin/analytics', { params }),
+
+  // ─── Users ─────────────────────────────────────────────────────────────────
+  getUsers: (params: any) => apiClient.get('/admin/users', { params }),
+  getUser: (id: string) => apiClient.get(`/admin/users/${id}`),
+  updateUser: (id: string, data: any) => apiClient.put(`/admin/users/${id}`, data),
+  verifyUser: (id: string) => apiClient.post(`/admin/users/${id}/verify`),
+  blockUser: (id: string, reason?: string) => apiClient.post(`/admin/users/${id}/block`, { reason }),
+  unblockUser: (id: string) => apiClient.post(`/admin/users/${id}/unblock`),
+  upgradeMembership: (id: string, membershipType: string, daysToAdd?: number) =>
+    apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd }),
+
+  // ─── Requirements ──────────────────────────────────────────────────────────
+  getRequirements: (params: any) => apiClient.get('/admin/requirements', { params }),
+  deleteRequirement: (id: string) => apiClient.delete(`/requirements/${id}`),
+
+  // ─── Vehicles ──────────────────────────────────────────────────────────────
+  getVehicles: (params: any) => apiClient.get('/admin/vehicles', { params }),
+
+  // ─── Payments ──────────────────────────────────────────────────────────────
+  getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
+  approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
+
+  // ─── Cities ────────────────────────────────────────────────────────────────
+  getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
+  createCity: (data: any) => apiClient.post('/admin/cities', data),
+  updateCity: (id: string, data: any) => apiClient.put(`/admin/cities/${id}`, data),
+  deleteCity: (id: string) => apiClient.delete(`/admin/cities/${id}`),
+
+  // ─── Banners ───────────────────────────────────────────────────────────────
+  getBanners: (params?: any) => apiClient.get('/admin/banners', { params }),
+  createBanner: (data: any) => apiClient.post('/admin/banners', data),
+  updateBanner: (id: string, data: any) => apiClient.put(`/admin/banners/${id}`, data),
+  deleteBanner: (id: string) => apiClient.delete(`/admin/banners/${id}`),
+
+  // ─── Reports ───────────────────────────────────────────────────────────────
+  getReports: (params?: any) => apiClient.get('/admin/reports', { params }),
+  resolveReport: (id: string, data: any) => apiClient.post(`/admin/reports/${id}/resolve`, data),
+
+  // ─── Notifications ─────────────────────────────────────────────────────────
+  sendNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
+  sendAdminNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
+
+  // ─── Subscriptions ─────────────────────────────────────────────────────────
+  getSubscriptionPlans: () => apiClient.get('/subscriptions/plans'),
+  getSubscriptions: (params: any) => apiClient.get('/admin/subscriptions', { params }),
+  createPlan: (data: any) => apiClient.post('/admin/subscription-plans', data),
+  updatePlan: (id: string, data: any) => apiClient.put(`/admin/subscription-plans/${id}`, data),
+  deletePlan: (id: string) => apiClient.delete(`/admin/subscription-plans/${id}`),
+};
+
+export default apiClient;

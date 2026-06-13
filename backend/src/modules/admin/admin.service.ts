@@ -1,0 +1,314 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { User, UserDocument } from '../../database/schemas/user.schema';
+import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
+import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
+import { Payment, PaymentDocument } from '../../database/schemas/payment.schema';
+import { Subscription, SubscriptionDocument } from '../../database/schemas/subscription.schema';
+import { Report, ReportDocument, ReportStatus } from '../../database/schemas/report.schema';
+import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
+import { City, CityDocument } from '../../database/schemas/city.schema';
+import { AuditLog, AuditLogDocument } from '../../database/schemas/audit-log.schema';
+import { NotificationsService } from '../notifications/notifications.service';
+import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
+import { BookingStatus } from '../../common/enums/vehicle-type.enum';
+import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+
+@Injectable()
+export class AdminService {
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
+    @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
+    @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
+    @InjectModel(Banner.name) private bannerModel: Model<BannerDocument>,
+    @InjectModel(City.name) private cityModel: Model<CityDocument>,
+    @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLogDocument>,
+    private notificationsService: NotificationsService,
+  ) {}
+
+  async getDashboardStats() {
+    const now = new Date();
+    const todayStart = new Date(now.setHours(0, 0, 0, 0));
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [
+      totalUsers, activeUsers, verifiedUsers, premiumUsers, goldenUsers,
+      totalRequirements, activeRequirements,
+      totalVehicles, activeVehicles,
+      totalRevenue, monthlyRevenue,
+      pendingReports, totalNotifications,
+      todayRegistrations, todayRequirements,
+    ] = await Promise.all([
+      this.userModel.countDocuments({ isActive: true }),
+      this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }),
+      this.userModel.countDocuments({ isVerified: true }),
+      this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM }),
+      this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN }),
+      this.requirementModel.countDocuments({ isDeleted: false }),
+      this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false }),
+      this.vehicleModel.countDocuments({ isDeleted: false }),
+      this.vehicleModel.countDocuments({ status: 'available', isDeleted: false }),
+      this.paymentModel.aggregate([{ $match: { status: 'success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      this.paymentModel.aggregate([
+        { $match: { status: 'success', createdAt: { $gte: monthStart } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      this.reportModel.countDocuments({ status: ReportStatus.PENDING }),
+      this.notificationsService ? 0 : 0,
+      this.userModel.countDocuments({ createdAt: { $gte: todayStart } }),
+      this.requirementModel.countDocuments({ createdAt: { $gte: todayStart } }),
+    ]);
+
+    return {
+      message: 'Dashboard stats',
+      data: {
+        users: { total: totalUsers, active: activeUsers, verified: verifiedUsers, premium: premiumUsers, golden: goldenUsers },
+        requirements: { total: totalRequirements, active: activeRequirements, today: todayRequirements },
+        vehicles: { total: totalVehicles, active: activeVehicles },
+        revenue: {
+          total: totalRevenue[0]?.total || 0,
+          monthly: monthlyRevenue[0]?.total || 0,
+        },
+        reports: { pending: pendingReports },
+        today: { registrations: todayRegistrations, requirements: todayRequirements },
+      },
+    };
+  }
+
+  async getUsers(query: any) {
+    const { page, limit, skip, sort } = getPaginationParams(query);
+    const filter: any = {};
+
+    if (query.search) {
+      filter.$or = [
+        { fullName: new RegExp(query.search, 'i') },
+        { email: new RegExp(query.search, 'i') },
+        { mobile: new RegExp(query.search, 'i') },
+        { agencyName: new RegExp(query.search, 'i') },
+      ];
+    }
+
+    if (query.role) filter.role = query.role;
+    if (query.membershipType) filter.membershipType = query.membershipType;
+    if (query.isVerified !== undefined) filter.isVerified = query.isVerified === 'true';
+    if (query.isBlocked !== undefined) filter.isBlocked = query.isBlocked === 'true';
+    if (query.city) filter.city = new RegExp(query.city, 'i');
+
+    const [users, total] = await Promise.all([
+      this.userModel.find(filter).select('-password -refreshToken -fcmTokens').sort(sort).skip(skip).limit(limit).lean(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    return buildPaginatedResult(users, total, page, limit);
+  }
+
+  async updateUser(id: string, data: Partial<any>) {
+    const user = await this.userModel.findByIdAndUpdate(id, data, { new: true }).select('-password -refreshToken');
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'User updated', data: user };
+  }
+
+  async verifyUser(id: string) {
+    const user = await this.userModel.findByIdAndUpdate(id, { isVerified: true, isAdminApproved: true }, { new: true });
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'User verified', data: user };
+  }
+
+  async blockUser(id: string, reason?: string) {
+    const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: true }, { new: true });
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'User blocked' };
+  }
+
+  async unblockUser(id: string) {
+    const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: false }, { new: true });
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'User unblocked' };
+  }
+
+  async upgradeMembership(id: string, membershipType: MembershipType, daysToAdd = 30) {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + daysToAdd);
+
+    const user = await this.userModel.findByIdAndUpdate(id, {
+      membershipType,
+      isPremium: [MembershipType.PREMIUM, MembershipType.GOLDEN].includes(membershipType),
+      isGolden: membershipType === MembershipType.GOLDEN,
+      membershipExpiresAt: expiresAt,
+    }, { new: true });
+
+    if (!user) throw new NotFoundException('User not found');
+    return { message: `Membership upgraded to ${membershipType}`, data: user };
+  }
+
+  async getRequirements(query: any) {
+    const { page, limit, skip, sort } = getPaginationParams(query);
+    const filter: any = { isDeleted: false };
+
+    if (query.search) filter.bookingId = new RegExp(query.search, 'i');
+    if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');
+    if (query.status) filter.status = query.status;
+
+    const [requirements, total] = await Promise.all([
+      this.requirementModel
+        .find(filter)
+        .populate('postedBy', 'fullName agencyName mobile membershipType')
+        .sort(sort).skip(skip).limit(limit).lean(),
+      this.requirementModel.countDocuments(filter),
+    ]);
+
+    return buildPaginatedResult(requirements, total, page, limit);
+  }
+
+  // Cities CRUD
+  async createCity(data: Partial<any>) {
+    const slug = data.name.toLowerCase().replace(/\s+/g, '-');
+    const city = await this.cityModel.create({ ...data, slug });
+    return { message: 'City created', data: city };
+  }
+
+  async getCities(query: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = {};
+    if (query.search) filter.name = new RegExp(query.search, 'i');
+    if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
+
+    const [cities, total] = await Promise.all([
+      this.cityModel.find(filter).sort({ sortOrder: 1, name: 1 }).skip(skip).limit(limit).lean(),
+      this.cityModel.countDocuments(filter),
+    ]);
+
+    return buildPaginatedResult(cities, total, page, limit);
+  }
+
+  async updateCity(id: string, data: Partial<any>) {
+    const city = await this.cityModel.findByIdAndUpdate(id, data, { new: true });
+    if (!city) throw new NotFoundException('City not found');
+    return { message: 'City updated', data: city };
+  }
+
+  async deleteCity(id: string) {
+    await this.cityModel.findByIdAndDelete(id);
+    return { message: 'City deleted' };
+  }
+
+  // Banners CRUD
+  async createBanner(data: Partial<any>) {
+    const banner = await this.bannerModel.create(data);
+    return { message: 'Banner created', data: banner };
+  }
+
+  async getBanners(isActive?: boolean) {
+    const filter: any = {};
+    if (isActive !== undefined) filter.isActive = isActive;
+    const banners = await this.bannerModel.find(filter).sort({ sortOrder: 1 }).lean();
+    return { message: 'Banners retrieved', data: banners };
+  }
+
+  async updateBanner(id: string, data: Partial<any>) {
+    const banner = await this.bannerModel.findByIdAndUpdate(id, data, { new: true });
+    if (!banner) throw new NotFoundException('Banner not found');
+    return { message: 'Banner updated', data: banner };
+  }
+
+  async deleteBanner(id: string) {
+    await this.bannerModel.findByIdAndDelete(id);
+    return { message: 'Banner deleted' };
+  }
+
+  // Reports
+  async getReports(query: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = {};
+    if (query.status) filter.status = query.status;
+
+    const [reports, total] = await Promise.all([
+      this.reportModel
+        .find(filter)
+        .populate('reportedBy', 'fullName email mobile')
+        .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.reportModel.countDocuments(filter),
+    ]);
+
+    return buildPaginatedResult(reports, total, page, limit);
+  }
+
+  async resolveReport(id: string, adminId: string, action: string, notes?: string) {
+    const report = await this.reportModel.findByIdAndUpdate(id, {
+      status: ReportStatus.RESOLVED,
+      reviewedBy: new Types.ObjectId(adminId),
+      reviewedAt: new Date(),
+      actionTaken: action,
+      adminNotes: notes,
+    }, { new: true });
+
+    if (!report) throw new NotFoundException('Report not found');
+    return { message: 'Report resolved', data: report };
+  }
+
+  async sendAdminNotification(data: { title: string; body: string; targetType: string; targetCities?: string[]; targetMemberships?: string[] }) {
+    return this.notificationsService.sendGlobalNotification(data.title, data.body);
+  }
+
+  async getAnalytics(period: string) {
+    const days = period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const [userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown] = await Promise.all([
+      this.userModel.aggregate([
+        { $match: { createdAt: { $gte: startDate } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      this.requirementModel.aggregate([
+        { $match: { createdAt: { $gte: startDate }, isDeleted: false } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      this.paymentModel.aggregate([
+        { $match: { status: 'success', createdAt: { $gte: startDate } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      this.requirementModel.aggregate([
+        { $match: { isDeleted: false } },
+        { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+      ]),
+      this.userModel.aggregate([
+        { $group: { _id: '$membershipType', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    return {
+      message: 'Analytics data',
+      data: { userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown },
+    };
+  }
+
+  async getPayments(query: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = {};
+    if (query.status) filter.status = query.status;
+    if (query.search) filter.$or = [
+      { orderId: new RegExp(query.search, 'i') },
+      { razorpayPaymentId: new RegExp(query.search, 'i') },
+    ];
+
+    const [payments, total] = await Promise.all([
+      this.paymentModel
+        .find(filter)
+        .populate('userId', 'fullName email mobile')
+        .populate('planId', 'name membershipType')
+        .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.paymentModel.countDocuments(filter),
+    ]);
+
+    return buildPaginatedResult(payments, total, page, limit);
+  }
+}

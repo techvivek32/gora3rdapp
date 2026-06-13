@@ -1,0 +1,133 @@
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
+import { UserRole, MembershipType } from '../../common/enums/user-role.enum';
+
+export type UserDocument = User & Document;
+
+@Schema({ timestamps: true, collection: 'users' })
+export class User {
+  @Prop({ required: true, trim: true })
+  fullName: string;
+
+  @Prop({ required: true, unique: true, trim: true, lowercase: true })
+  email: string;
+
+  @Prop({ required: true, unique: true, trim: true })
+  mobile: string;
+
+  @Prop({ select: false })
+  password: string;
+
+  @Prop({ trim: true })
+  agencyName: string;
+
+  @Prop({ trim: true })
+  city: string;
+
+  @Prop({ trim: true })
+  state: string;
+
+  @Prop()
+  profileImage: string;
+
+  @Prop({ type: String, enum: UserRole, default: UserRole.DRIVER })
+  role: UserRole;
+
+  @Prop({ type: String, enum: MembershipType, default: MembershipType.NEW })
+  membershipType: MembershipType;
+
+  @Prop({ default: false })
+  isVerified: boolean;
+
+  @Prop({ default: false })
+  isAdminApproved: boolean;
+
+  @Prop({ default: true })
+  isActive: boolean;
+
+  @Prop({ default: false })
+  isBlocked: boolean;
+
+  @Prop({ default: false })
+  isPremium: boolean;
+
+  @Prop({ default: false })
+  isGolden: boolean;
+
+  @Prop({ type: [String], default: [] })
+  businessCities: string[];
+
+  @Prop({ type: [String], default: [] })
+  fcmTokens: string[];
+
+  @Prop({ default: true })
+  notificationsEnabled: boolean;
+
+  @Prop({ default: 0, min: 0, max: 5 })
+  rating: number;
+
+  @Prop({ default: 0 })
+  totalRatings: number;
+
+  @Prop()
+  lastActive: Date;
+
+  @Prop({ type: Date })
+  membershipExpiresAt: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'Subscription' })
+  activeSubscription: Types.ObjectId;
+
+  @Prop({ type: Object, default: {} })
+  deviceInfo: {
+    deviceId: string;
+    platform: string;
+    appVersion: string;
+    osVersion: string;
+  };
+
+  @Prop({ type: Object })
+  documents: {
+    aadhar: string;
+    pan: string;
+    drivingLicense: string;
+    vehicleRc: string;
+  };
+
+  @Prop({ default: 0 })
+  requirementsPosted: number;
+
+  @Prop({ default: 0 })
+  vehiclesPosted: number;
+
+  @Prop()
+  firebaseUid: string;
+
+  @Prop({ type: String })
+  refreshToken: string;
+
+  @Prop({ default: 0 })
+  loginAttempts: number;
+
+  @Prop()
+  lockUntil: Date;
+}
+
+export const UserSchema = SchemaFactory.createForClass(User);
+
+// Indexes for performance
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ mobile: 1 }, { unique: true });
+UserSchema.index({ city: 1, membershipType: 1 });
+UserSchema.index({ businessCities: 1 });
+UserSchema.index({ isActive: 1, isBlocked: 1 });
+UserSchema.index({ membershipType: 1, isActive: 1 });
+UserSchema.index({ createdAt: -1 });
+UserSchema.index({ lastActive: -1 });
+UserSchema.index({ firebaseUid: 1 });
+
+// Virtual for membership status
+UserSchema.virtual('isMembershipActive').get(function () {
+  if (!this.membershipExpiresAt) return false;
+  return new Date() < this.membershipExpiresAt;
+});

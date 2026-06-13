@@ -1,0 +1,101 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/onboarding_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/otp_page.dart';
+import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/requirements/presentation/pages/requirements_feed_page.dart';
+import '../../features/requirements/presentation/pages/create_requirement_page.dart';
+import '../../features/requirements/presentation/pages/requirement_detail_page.dart';
+import '../../features/available_vehicles/presentation/pages/vehicles_feed_page.dart';
+import '../../features/available_vehicles/presentation/pages/create_vehicle_page.dart';
+import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/chat/presentation/pages/chat_list_page.dart';
+import '../../features/chat/presentation/pages/chat_room_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
+import '../../features/subscriptions/presentation/pages/subscription_plans_page.dart';
+import '../../features/home/presentation/pages/main_nav_page.dart';
+
+class AppRouter {
+  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
+
+  static GoRouter get router => GoRouter(
+    navigatorKey: _rootNavigatorKey,
+    debugLogDiagnostics: true,
+    initialLocation: '/splash',
+    redirect: (context, state) {
+      final authBloc = context.read<AuthBloc>();
+      final authState = authBloc.state;
+      final isAuthRoute = state.matchedLocation.startsWith('/auth');
+      final isSplash = state.matchedLocation == '/splash';
+
+      if (isSplash) return null;
+      if (authState is AuthAuthenticated) {
+        if (isAuthRoute) return '/';
+        return null;
+      }
+      if (authState is AuthUnauthenticated) {
+        if (!isAuthRoute) return '/auth/login';
+        return null;
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
+      GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
+
+      // Auth Routes
+      GoRoute(path: '/auth/login', builder: (_, __) => const LoginPage()),
+      GoRoute(path: '/auth/register', builder: (_, __) => const RegisterPage()),
+      GoRoute(
+        path: '/auth/otp',
+        builder: (_, state) => OtpPage(phoneNumber: state.extra as String? ?? ''),
+      ),
+
+      // Main App Shell
+      ShellRoute(
+        builder: (context, state, child) => MainNavPage(child: child),
+        routes: [
+          GoRoute(path: '/', builder: (_, __) => const HomePage()),
+          GoRoute(path: '/requirements', builder: (_, __) => const RequirementsFeedPage()),
+          GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
+          GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
+        ],
+      ),
+
+      // Detail Routes
+      GoRoute(
+        path: '/requirements/create',
+        builder: (_, __) => const CreateRequirementPage(),
+      ),
+      GoRoute(
+        path: '/requirements/:id',
+        builder: (_, state) => RequirementDetailPage(requirementId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/vehicles/create',
+        builder: (_, __) => const CreateVehiclePage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/chats',
+        builder: (_, __) => const ChatListPage(),
+      ),
+      GoRoute(
+        path: '/chats/:chatId',
+        builder: (_, state) => ChatRoomPage(chatId: state.pathParameters['chatId']!),
+      ),
+      GoRoute(
+        path: '/subscriptions',
+        builder: (_, __) => const SubscriptionPlansPage(),
+      ),
+    ],
+  );
+}

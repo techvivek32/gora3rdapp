@@ -1,0 +1,48 @@
+# ─── Node / Backend / Admin ───────────────────────────────────────────────────
+node_modules/
+dist/
+.next/
+.turbo/
+*.log
+npm-debug.log*
+
+# ─── Environment files (keep .env.example, ignore real secrets) ───────────────
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ─── Flutter / Dart ───────────────────────────────────────────────────────────
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.packages
+mobile/pubspec.lock
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/debug.keystore
+mobile/android/key.properties
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework
+mobile/ios/Flutter/Flutter.podspec
+mobile/.idea/
+mobile/*.iml
+
+# ─── Android ──────────────────────────────────────────────────────────────────
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
