@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/onboarding_page.dart';
+import '../../features/auth/presentation/pages/welcome_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/otp_page.dart';
@@ -32,20 +33,22 @@ class AppRouter {
       final authState = authBloc.state;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';
+      final isWelcome = state.matchedLocation == '/welcome';
 
       if (isSplash) return null;
       if (authState is AuthAuthenticated) {
-        if (isAuthRoute) return '/';
+        if (isAuthRoute || isWelcome) return '/';
         return null;
       }
       if (authState is AuthUnauthenticated) {
-        if (!isAuthRoute) return '/auth/login';
+        if (!isAuthRoute && !isWelcome) return '/welcome';
         return null;
       }
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
+      GoRoute(path: '/welcome', builder: (_, __) => const WelcomePage()),
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
 
       // Auth Routes

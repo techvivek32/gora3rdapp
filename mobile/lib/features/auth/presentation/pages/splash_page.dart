@@ -15,7 +15,7 @@ class SplashPage extends StatelessWidget {
         if (state is AuthAuthenticated) {
           context.go('/');
         } else if (state is AuthUnauthenticated) {
-          context.go('/auth/login');
+          context.go('/welcome');
         }
       },
       child: Scaffold(

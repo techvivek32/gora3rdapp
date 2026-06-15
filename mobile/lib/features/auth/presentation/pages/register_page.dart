@@ -136,7 +136,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     const Text('Already have an account? '),
                     GestureDetector(
-                      onTap: () => context.pop(),
+                      onTap: () => context.go('/auth/login'),
                       child: Text('Sign In', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600)),
                     ),
                   ],
