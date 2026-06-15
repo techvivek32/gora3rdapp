@@ -14,6 +14,7 @@ import '../../features/requirements/presentation/pages/create_requirement_page.d
 import '../../features/requirements/presentation/pages/requirement_detail_page.dart';
 import '../../features/available_vehicles/presentation/pages/vehicles_feed_page.dart';
 import '../../features/available_vehicles/presentation/pages/create_vehicle_page.dart';
+import '../../features/available_vehicles/presentation/pages/vehicle_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/chat/presentation/pages/chat_list_page.dart';
 import '../../features/chat/presentation/pages/chat_room_page.dart';
@@ -77,11 +78,18 @@ class AppRouter {
       ),
       GoRoute(
         path: '/requirements/:id',
-        builder: (_, state) => RequirementDetailPage(requirementId: state.pathParameters['id']!),
+        builder: (_, state) => RequirementDetailPage(
+          requirementId: state.pathParameters['id']!,
+          requirement: state.extra as Map<String, dynamic>?,
+        ),
       ),
       GoRoute(
         path: '/vehicles/create',
         builder: (_, __) => const CreateVehiclePage(),
+      ),
+      GoRoute(
+        path: '/vehicles/:id',
+        builder: (_, state) => VehicleDetailPage(vehicle: state.extra as Map<String, dynamic>? ?? {}),
       ),
       GoRoute(
         path: '/notifications',

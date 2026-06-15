@@ -30,39 +30,34 @@ class ProfilePage extends StatelessWidget {
           body: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 200.h,
+                expandedHeight: 180.h,
                 pinned: true,
                 backgroundColor: AppColors.primary,
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   background: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [color.withOpacity(0.8), color],
-                      ),
-                    ),
+                    color: AppColors.primary,
                     child: SafeArea(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircleAvatar(
-                            radius: 44.r,
+                            radius: 40.r,
                             backgroundColor: Colors.white,
                             backgroundImage: user?['profileImage'] != null ? NetworkImage(user!['profileImage'] as String) : null,
-                            child: user?['profileImage'] == null ? Icon(Icons.person, size: 44.sp, color: color) : null,
+                            child: user?['profileImage'] == null ? Icon(Icons.person, size: 40.sp, color: AppColors.primary) : null,
                           ),
                           SizedBox(height: 8.h),
                           Text(user?['fullName'] as String? ?? 'User',
-                              style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                              style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold)),
                           SizedBox(height: 4.h),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(config['icon'] as IconData, color: Colors.white, size: 16.sp),
+                              Icon(config['icon'] as IconData, color: Colors.white70, size: 14.sp),
                               SizedBox(width: 4.w),
                               Text(config['label'] as String,
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                                  style: TextStyle(color: Colors.white70, fontSize: 12.sp, fontWeight: FontWeight.w500)),
                             ],
                           ),
                         ],
@@ -161,22 +156,40 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16.r),
-        side: BorderSide(color: AppColors.border, width: 1),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.black26, width: 1),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1)),
+        ],
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-            Divider(height: 16.h, color: AppColors.border),
-            ...children,
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(8.r),
+                topRight: Radius.circular(8.r),
+              ),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.all(14.r),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: AppColors.primary)),
+                Divider(height: 14.h, thickness: 1, color: Colors.black26),
+                ...children,
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -191,13 +204,13 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6.h),
+      padding: EdgeInsets.symmetric(vertical: 5.h),
       child: Row(
         children: [
-          Icon(icon, size: 18.sp, color: AppColors.textHint),
-          SizedBox(width: 12.w),
-          Text('$label: ', style: TextStyle(color: AppColors.textSecondary, fontFamily: 'Poppins')),
-          Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.w500, fontFamily: 'Poppins', color: AppColors.textPrimary))),
+          Icon(icon, size: 16.sp, color: AppColors.primary),
+          SizedBox(width: 10.w),
+          Text('$label: ', style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)),
+          Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp, color: Colors.black))),
         ],
       ),
     );
@@ -213,17 +226,20 @@ class _ProfileAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        side: BorderSide(color: AppColors.border, width: 1),
-      ),
+    return Container(
       margin: EdgeInsets.only(bottom: 8.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.black26, width: 1),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 3, offset: const Offset(0, 1)),
+        ],
+      ),
       child: ListTile(
         leading: Icon(icon, color: color ?? AppColors.primary, size: 22.sp),
-        title: Text(label, style: TextStyle(color: color ?? AppColors.textPrimary, fontFamily: 'Poppins', fontWeight: FontWeight.w500)),
-        trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
+        title: Text(label, style: TextStyle(color: color ?? Colors.black, fontSize: 14.sp, fontWeight: FontWeight.w600)),
+        trailing: Icon(Icons.chevron_right, color: Colors.black45),
         onTap: onTap,
       ),
     );

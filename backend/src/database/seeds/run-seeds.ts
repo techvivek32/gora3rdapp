@@ -8,7 +8,7 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/goraca
 
 const UserSchema = new mongoose.Schema({ email: String, mobile: String, fullName: String, password: String, role: String, membershipType: String, isVerified: Boolean, isAdminApproved: Boolean, isActive: Boolean });
 const CitySchema = new mongoose.Schema({ name: String, state: String, slug: String, isActive: Boolean, isFeatured: Boolean, sortOrder: Number, requirementCount: Number, vehicleCount: Number, userCount: Number, aliases: [String] });
-const SubscriptionPlanSchema = new mongoose.Schema({ name: String, description: String, membershipType: String, duration: String, price: Number, discountedPrice: Number, durationDays: Number, features: [String], isActive: Boolean, isPopular: Boolean, sortOrder: Number });
+const SubscriptionPlanSchema = new mongoose.Schema({ name: String, description: String, membershipType: String, duration: String, price: Number, discountedPrice: Number, durationDays: Number, features: [String], isActive: Boolean, isPopular: Boolean, sortOrder: Number }, { collection: 'subscriptionPlans' });
 
 async function runSeeds() {
   await mongoose.connect(MONGODB_URI);

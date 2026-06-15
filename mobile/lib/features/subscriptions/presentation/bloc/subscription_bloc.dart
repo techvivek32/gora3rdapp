@@ -15,33 +15,36 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     on<LoadMySubscriptionEvent>(_onLoadMy);
   }
 
+  List<Map<String, dynamic>> _cachedPlans = [];
+
   Future<void> _onLoadPlans(LoadPlansEvent event, Emitter<SubscriptionState> emit) async {
     emit(SubscriptionLoading());
     try {
       final res = await apiClient.get('/subscriptions/plans');
-      emit(PlansLoaded(plans: List<Map<String, dynamic>>.from(res.data['data'] ?? [])));
+      _cachedPlans = List<Map<String, dynamic>>.from(res.data['data'] ?? []);
+      emit(PlansLoaded(plans: _cachedPlans));
     } catch (e) {
       emit(SubscriptionError(message: e.toString()));
     }
   }
 
   Future<void> _onCreateOrder(CreateOrderEvent event, Emitter<SubscriptionState> emit) async {
-    emit(SubscriptionLoading());
+    emit(SubscriptionLoading(cachedPlans: _cachedPlans));
     try {
-      final res = await apiClient.post('/subscriptions/create-order', data: {'planId': event.planId});
-      emit(OrderCreated(orderData: res.data['data'] as Map<String, dynamic>));
+      final res = await apiClient.post('/subscriptions/create-order/${event.planId}');
+      emit(OrderCreated(orderData: res.data['data'] as Map<String, dynamic>, plans: _cachedPlans));
     } catch (e) {
-      emit(SubscriptionError(message: e.toString()));
+      emit(SubscriptionError(message: e.toString(), cachedPlans: _cachedPlans));
     }
   }
 
   Future<void> _onVerify(VerifyPaymentEvent event, Emitter<SubscriptionState> emit) async {
-    emit(SubscriptionLoading());
+    emit(SubscriptionLoading(cachedPlans: _cachedPlans));
     try {
       await apiClient.post('/subscriptions/verify-payment', data: event.paymentData);
       emit(PaymentVerified());
     } catch (e) {
-      emit(SubscriptionError(message: e.toString()));
+      emit(SubscriptionError(message: e.toString(), cachedPlans: _cachedPlans));
     }
   }
 

@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/subscription_bloc.dart';
 
 class SubscriptionPlansPage extends StatefulWidget {
@@ -13,22 +15,18 @@ class SubscriptionPlansPage extends StatefulWidget {
 }
 
 class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
-  final _razorpay = Razorpay();
+  Razorpay? _razorpay;
   String? _pendingPlanId;
-
-  static const _membershipColors = {
-    'active': AppColors.memberActive,
-    'verified': AppColors.memberVerified,
-    'premium': AppColors.memberPremium,
-    'golden': AppColors.memberGolden,
-  };
 
   @override
   void initState() {
     super.initState();
     context.read<SubscriptionBloc>().add(LoadPlansEvent());
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    if (!kIsWeb) {
+      _razorpay = Razorpay();
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    }
   }
 
   void _onPaymentSuccess(PaymentSuccessResponse response) {
@@ -47,14 +45,50 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   }
 
   void _purchasePlan(Map<String, dynamic> plan) {
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payments are only supported on the mobile app.'), backgroundColor: AppColors.warning),
+      );
+      return;
+    }
     _pendingPlanId = plan['_id'] as String;
     context.read<SubscriptionBloc>().add(CreateOrderEvent(_pendingPlanId!));
   }
 
+  void _openRazorpay(Map<String, dynamic> order) {
+    if (kIsWeb || _razorpay == null) return;
+    final authState = context.read<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
+
+    final options = {
+      'key': const String.fromEnvironment('RAZORPAY_KEY', defaultValue: 'rzp_test_placeholder'),
+      'amount': order['amount'],
+      'currency': order['currency'] ?? 'INR',
+      'order_id': order['orderId'] ?? order['razorpayOrderId'],
+      'name': 'Gora Cabs',
+      'description': 'Membership Upgrade',
+      'prefill': {
+        'contact': user?['mobile'] ?? '',
+        'email': user?['email'] ?? '',
+        'name': user?['fullName'] ?? '',
+      },
+      'theme': {'color': '#F97316'},
+    };
+    _razorpay!.open(options);
+  }
+
   @override
   void dispose() {
-    _razorpay.clear();
+    _razorpay?.clear();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>>? _getPlans(SubscriptionState state) {
+    if (state is PlansLoaded) return state.plans;
+    if (state is OrderCreated) return state.plans;
+    if (state is SubscriptionLoading) return state.cachedPlans;
+    if (state is SubscriptionError) return state.cachedPlans;
+    return null;
   }
 
   @override
@@ -62,29 +96,19 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Membership Plans', style: TextStyle(fontFamily: 'Poppins')),
+        title: const Text('Membership Plans', style: TextStyle(fontFamily: 'Poppins')),
         centerTitle: true,
         backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
       body: BlocConsumer<SubscriptionBloc, SubscriptionState>(
         listener: (context, state) {
           if (state is OrderCreated) {
-            final order = state.orderData;
-            final options = {
-              'key': const String.fromEnvironment('RAZORPAY_KEY', defaultValue: ''),
-              'amount': order['amount'],
-              'currency': 'INR',
-              'order_id': order['razorpayOrderId'],
-              'name': 'Gora Cabs',
-              'description': 'Membership Upgrade',
-              'prefill': {'contact': '', 'email': ''},
-              'theme': {'color': '#F97316'},
-            };
-            _razorpay.open(options);
+            _openRazorpay(state.orderData);
           }
           if (state is PaymentVerified) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Membership activated!'), backgroundColor: AppColors.success),
+              const SnackBar(content: Text('🎉 Membership activated!'), backgroundColor: AppColors.success),
             );
             Navigator.pop(context);
           }
@@ -95,23 +119,59 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           }
         },
         builder: (context, state) {
-          if (state is SubscriptionLoading) return Center(child: CircularProgressIndicator(color: AppColors.primary));
-          if (state is PlansLoaded) {
-            return SingleChildScrollView(
-              padding: EdgeInsets.all(16.r),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const _HeaderBanner(),
-                  SizedBox(height: 16.h),
-                  ...state.plans.map((plan) => _PlanCard(plan: plan, onSelect: () => _purchasePlan(plan))),
-                  SizedBox(height: 32.h),
-                  _FeatureComparisonTable(),
-                ],
-              ),
-            );
+          final plans = _getPlans(state);
+          final showOverlay = state is SubscriptionLoading && state.cachedPlans != null;
+
+          if (state is SubscriptionLoading && state.cachedPlans == null) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
-          return Center(child: Text('No plans available', style: TextStyle(fontFamily: 'Poppins')));
+
+          if (plans == null || plans.isEmpty) {
+            if (state is SubscriptionError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: AppColors.error, size: 48),
+                    const SizedBox(height: 12),
+                    Text(state.message, textAlign: TextAlign.center, style: const TextStyle(fontFamily: 'Poppins')),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => context.read<SubscriptionBloc>().add(LoadPlansEvent()),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              );
+            }
+            return const Center(child: Text('No plans available', style: TextStyle(fontFamily: 'Poppins')));
+          }
+
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                padding: EdgeInsets.all(16.r),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _HeaderBanner(),
+                    SizedBox(height: 16.h),
+                    ...plans.map((plan) => _PlanCard(
+                      plan: plan,
+                      onSelect: showOverlay ? null : () => _purchasePlan(plan),
+                    )),
+                    SizedBox(height: 32.h),
+                    const _FeatureComparisonTable(),
+                  ],
+                ),
+              ),
+              if (showOverlay)
+                Container(
+                  color: Colors.black26,
+                  child: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                ),
+            ],
+          );
         },
       ),
     );
@@ -125,7 +185,7 @@ class _HeaderBanner extends StatelessWidget {
     return Container(
       padding: EdgeInsets.all(20.r),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+        gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
         borderRadius: BorderRadius.circular(12.r),
       ),
       child: Column(
@@ -143,7 +203,7 @@ class _HeaderBanner extends StatelessWidget {
 
 class _PlanCard extends StatelessWidget {
   final Map<String, dynamic> plan;
-  final VoidCallback onSelect;
+  final VoidCallback? onSelect;
 
   static const _membershipColors = {
     'active': AppColors.memberActive,
@@ -162,6 +222,7 @@ class _PlanCard extends StatelessWidget {
     final price = plan['price'] as num? ?? 0;
     final discountedPrice = plan['discountedPrice'] as num?;
     final features = List<String>.from(plan['features'] as List? ?? []);
+    final effectivePrice = (discountedPrice != null && discountedPrice > 0 && discountedPrice < price) ? discountedPrice : price;
 
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
@@ -200,9 +261,9 @@ class _PlanCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    if (discountedPrice != null && discountedPrice < price)
-                      Text('₹${price.toInt()}', style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontFamily: 'Poppins')),
-                    Text('₹${(discountedPrice ?? price).toInt()}', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: color, fontFamily: 'Poppins')),
+                    if (discountedPrice != null && discountedPrice > 0 && discountedPrice < price)
+                      Text('₹${(price / 100).toStringAsFixed(0)}', style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontFamily: 'Poppins')),
+                    Text('₹${(effectivePrice / 100).toStringAsFixed(0)}', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.bold, color: color, fontFamily: 'Poppins')),
                     Text('/ ${plan['duration'] ?? 'month'}', style: TextStyle(color: AppColors.textHint, fontSize: 12.sp, fontFamily: 'Poppins')),
                   ],
                 ),
@@ -231,9 +292,12 @@ class _PlanCard extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: color,
                       foregroundColor: Colors.white,
+                      disabledBackgroundColor: color.withOpacity(0.5),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
                     ),
-                    child: Text('Get ${plan['name']}', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                    child: onSelect == null
+                        ? SizedBox(height: 18.h, width: 18.w, child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : Text('Get ${plan['name']}', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
               ],
@@ -246,8 +310,9 @@ class _PlanCard extends StatelessWidget {
 }
 
 class _FeatureComparisonTable extends StatelessWidget {
-  _FeatureComparisonTable();
-  final _features = [
+  const _FeatureComparisonTable();
+
+  static const _features = [
     ['View Contact Details', false, true, true, true],
     ['Post Requirements', true, true, true, true],
     ['Post Available Cabs', true, true, true, true],
@@ -257,8 +322,8 @@ class _FeatureComparisonTable extends StatelessWidget {
     ['Unlimited Listings', false, false, false, true],
   ];
 
-  final _plans = ['Free', 'Active', 'Premium', 'Golden'];
-  final _colors = [AppColors.textHint, AppColors.memberActive, AppColors.memberPremium, AppColors.memberGolden];
+  static const _plans = ['Free', 'Active', 'Premium', 'Golden'];
+  static const _colors = [AppColors.textHint, AppColors.memberActive, AppColors.memberPremium, AppColors.memberGolden];
 
   @override
   Widget build(BuildContext context) {
@@ -266,7 +331,7 @@ class _FeatureComparisonTable extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16.r),
-        side: BorderSide(color: AppColors.border),
+        side: const BorderSide(color: AppColors.border),
       ),
       child: Padding(
         padding: EdgeInsets.all(16.r),
@@ -280,9 +345,9 @@ class _FeatureComparisonTable extends StatelessWidget {
               children: [
                 TableRow(
                   children: [
-                    SizedBox(),
+                    const SizedBox(),
                     ..._plans.asMap().entries.map((e) => Center(
-                      child: Text(_plans[e.key], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.sp, color: _colors[e.key], fontFamily: 'Poppins')),
+                      child: Text(e.value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.sp, color: _colors[e.key], fontFamily: 'Poppins')),
                     )),
                   ],
                 ),
@@ -293,7 +358,7 @@ class _FeatureComparisonTable extends StatelessWidget {
                       child: Text(row[0] as String, style: TextStyle(fontSize: 13.sp, fontFamily: 'Poppins')),
                     ),
                     ...List.generate(4, (i) => Center(
-                      child: row[i + 1] as bool
+                      child: (row[i + 1] as bool)
                           ? Icon(Icons.check, color: _colors[i], size: 18.sp)
                           : Icon(Icons.close, color: AppColors.textHint, size: 18.sp),
                     )),

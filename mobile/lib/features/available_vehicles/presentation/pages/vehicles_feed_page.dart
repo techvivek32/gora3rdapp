@@ -46,14 +46,8 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         automaticallyImplyLeading: false,
         title: Text('Available Cabs', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(Icons.add, color: Colors.white, size: 28.sp),
-            onPressed: () => context.push('/vehicles/create'),
-          ),
+          IconButton(icon: const Icon(Icons.filter_list, color: Colors.white), onPressed: () {}),
+          IconButton(icon: Icon(Icons.add, color: Colors.white, size: 28.sp), onPressed: () => context.push('/vehicles/create')),
         ],
       ),
       body: BlocBuilder<VehiclesBloc, VehiclesState>(
@@ -87,7 +81,10 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
                 padding: EdgeInsets.all(16.r),
                 itemCount: state.vehicles.length,
                 separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                itemBuilder: (_, i) => _VehicleCard(vehicle: state.vehicles[i]),
+                itemBuilder: (context, i) => _VehicleCard(
+                  vehicle: state.vehicles[i],
+                  onTap: () => context.push('/vehicles/${state.vehicles[i]['_id']}', extra: state.vehicles[i]),
+                ),
               ),
             );
           }
@@ -106,7 +103,8 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
 
 class _VehicleCard extends StatelessWidget {
   final Map<String, dynamic> vehicle;
-  const _VehicleCard({required this.vehicle});
+  final VoidCallback onTap;
+  const _VehicleCard({required this.vehicle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -119,214 +117,201 @@ class _VehicleCard extends StatelessWidget {
     final cardBg = isNew ? AppColors.primary.withOpacity(0.05) : Colors.white;
     final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
 
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: isNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1)),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8.r),
-        child: Stack(
-          children: [
-            // Diagonal watermark
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Center(
-                  child: Transform.rotate(
-                    angle: -0.6,
-                    child: Text(
-                      'Secure Member',
-                      style: TextStyle(
-                        fontSize: 28.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.withOpacity(0.08),
-                        letterSpacing: 2,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: isNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8.r),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Center(
+                    child: Transform.rotate(
+                      angle: -0.6,
+                      child: Text(
+                        'Secure Member',
+                        style: TextStyle(
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.withOpacity(0.08),
+                          letterSpacing: 2,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top border
-                Container(
-                  height: 4.h,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(8.r),
-                      topRight: Radius.circular(8.r),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(8.r),
+                        topRight: Radius.circular(8.r),
+                      ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: EdgeInsets.all(12.r),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header row: listingId | status badge
-                      IntrinsicHeight(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    vehicle['listingId'] as String? ?? '',
-                                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                  ),
-                                  Text(
-                                    _formatDate(vehicle['availableDate']),
-                                    style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
-                                  ),
-                                ],
+                  Padding(
+                    padding: EdgeInsets.all(12.r),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(_formatDate(vehicle['availableDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    Text(vehicle['availableTime'] as String? ?? '', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                                  ],
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 8.w),
-                            VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              flex: 2,
-                              child: Center(
-                                child: Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                  decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4.r),
-                                  ),
-                                  child: Text(
-                                    status.toUpperCase(),
-                                    style: TextStyle(color: statusColor, fontSize: 11.sp, fontWeight: FontWeight.w600),
-                                    textAlign: TextAlign.center,
+                              SizedBox(width: 8.w),
+                              VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                flex: 2,
+                                child: Center(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                    child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 11.sp, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      SizedBox(height: 10.h),
-                      Divider(height: 1, thickness: 1, color: Colors.black26),
-                      SizedBox(height: 10.h),
-
-                      // Route
-                      IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Expanded(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        width: 10.w, height: 10.h,
-                                        decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                                      ),
-                                      Container(width: 2.w, height: 16.h, color: Colors.grey[400]),
-                                      Container(
-                                        width: 10.w, height: 10.h,
-                                        decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          vehicle['currentCity'] as String? ?? '',
-                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                        ),
-                                        SizedBox(height: 6.h),
-                                        Text(
-                                          vehicle['destinationCity'] as String? ?? 'Any',
-                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                        ),
-                                      ],
+                              SizedBox(width: 8.w),
+                              VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                flex: 2,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(6.r),
+                                      decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(6.r)),
+                                      child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 8.w),
+                                    Container(
+                                      padding: EdgeInsets.all(6.r),
+                                      decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(6.r)),
+                                      child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
 
-                      SizedBox(height: 10.h),
-                      Divider(height: 1, thickness: 1, color: Colors.black26),
-                      SizedBox(height: 10.h),
-
-                      // Vehicle type
-                      Row(
-                        children: [
-                          Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
-                          SizedBox(width: 6.w),
-                          Text(
-                            (vehicle['vehicleType'] as String? ?? '').toUpperCase(),
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 6.h),
-
-                      // Vehicle number
-                      Row(
-                        children: [
-                          Icon(Icons.badge_outlined, size: 14.sp, color: Colors.black),
-                          SizedBox(width: 6.w),
-                          Text(
-                            vehicle['vehicleNumber'] as String? ?? '',
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 6.h),
-
-                      // Driver name
-                      Row(
-                        children: [
-                          Icon(Icons.person_outline, size: 14.sp, color: Colors.black),
-                          SizedBox(width: 6.w),
-                          Text(
-                            vehicle['driverName'] as String? ?? '',
-                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                          ),
-                        ],
-                      ),
-
-                      if (isNew) ...[
                         SizedBox(height: 10.h),
                         Divider(height: 1, thickness: 1, color: Colors.black26),
-                        SizedBox(height: 8.h),
-                        Text(
-                          'Become a premium member to contact immediately',
-                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                          textAlign: TextAlign.center,
-                        ),
-                        SizedBox(height: 4.h),
-                      ] else
                         SizedBox(height: 10.h),
-                    ],
+
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(width: 10.w, height: 10.h, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                                        Container(width: 2.w, height: 16.h, color: Colors.grey[400]),
+                                        Container(width: 10.w, height: 10.h, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                                      ],
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(vehicle['currentCity'] as String? ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black)),
+                                          SizedBox(height: 6.h),
+                                          Text(vehicle['destinationCity'] as String? ?? 'Any', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 10.h),
+                        Divider(height: 1, thickness: 1, color: Colors.black26),
+                        SizedBox(height: 10.h),
+
+                        Row(
+                          children: [
+                            Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text((vehicle['vehicleType'] as String? ?? '').toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          ],
+                        ),
+                        SizedBox(height: 6.h),
+
+                        Row(
+                          children: [
+                            Icon(Icons.badge_outlined, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text(vehicle['vehicleNumber'] as String? ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          ],
+                        ),
+                        SizedBox(height: 6.h),
+
+                        Row(
+                          children: [
+                            Icon(Icons.person_outline, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text(vehicle['driverName'] as String? ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          ],
+                        ),
+
+                        if (isNew) ...[
+                          SizedBox(height: 10.h),
+                          Divider(height: 1, thickness: 1, color: Colors.black26),
+                          SizedBox(height: 8.h),
+                          Text(
+                            'Become a premium member to contact immediately',
+                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+                          SizedBox(height: 4.h),
+                        ] else
+                          SizedBox(height: 10.h),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

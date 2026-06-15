@@ -7,7 +7,13 @@ abstract class SubscriptionState extends Equatable {
 }
 
 class SubscriptionInitial extends SubscriptionState {}
-class SubscriptionLoading extends SubscriptionState {}
+
+class SubscriptionLoading extends SubscriptionState {
+  final List<Map<String, dynamic>>? cachedPlans;
+  const SubscriptionLoading({this.cachedPlans});
+  @override
+  List<Object?> get props => [cachedPlans];
+}
 
 class PlansLoaded extends SubscriptionState {
   final List<Map<String, dynamic>> plans;
@@ -18,9 +24,10 @@ class PlansLoaded extends SubscriptionState {
 
 class OrderCreated extends SubscriptionState {
   final Map<String, dynamic> orderData;
-  const OrderCreated({required this.orderData});
+  final List<Map<String, dynamic>> plans;
+  const OrderCreated({required this.orderData, required this.plans});
   @override
-  List<Object?> get props => [orderData];
+  List<Object?> get props => [orderData, plans];
 }
 
 class PaymentVerified extends SubscriptionState {}
@@ -34,7 +41,8 @@ class MySubscriptionLoaded extends SubscriptionState {
 
 class SubscriptionError extends SubscriptionState {
   final String message;
-  const SubscriptionError({required this.message});
+  final List<Map<String, dynamic>>? cachedPlans;
+  const SubscriptionError({required this.message, this.cachedPlans});
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, cachedPlans];
 }

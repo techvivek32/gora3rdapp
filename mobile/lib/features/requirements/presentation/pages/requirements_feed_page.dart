@@ -88,7 +88,10 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                   }
                   return RequirementCardWidget(
                     requirement: state.requirements[index],
-                    onTap: () => context.push('/requirements/${state.requirements[index]['_id']}'),
+                    onTap: () => context.push(
+                      '/requirements/${state.requirements[index]['_id']}',
+                      extra: state.requirements[index],
+                    ).then((_) => context.read<RequirementsBloc>().add(LoadRequirementsEvent())),
                   );
                 },
               ),

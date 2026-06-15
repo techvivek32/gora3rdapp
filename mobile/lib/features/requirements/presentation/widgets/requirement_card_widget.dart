@@ -29,326 +29,285 @@ class RequirementCardWidget extends StatelessWidget {
     final color = isNew ? AppColors.primary : (isActive ? Colors.green : AppColors.primary);
     final cardBg = isNew ? AppColors.primary.withOpacity(0.05) : Colors.white;
 
-    return Container(
-      margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: isNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8.r),
-        child: Stack(
-          children: [
-            // Diagonal watermark
-            Positioned.fill(
-              child: IgnorePointer(
-                child: Center(
-                  child: Transform.rotate(
-                    angle: -0.6,
-                    child: Text(
-                      'Secure Member',
-                      style: TextStyle(
-                        fontSize: 28.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.withOpacity(0.08),
-                        letterSpacing: 2,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: isNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8.r),
+          child: Stack(
+            children: [
+              // Diagonal watermark
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Center(
+                    child: Transform.rotate(
+                      angle: -0.6,
+                      child: Text(
+                        'Secure Member',
+                        style: TextStyle(
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.withOpacity(0.08),
+                          letterSpacing: 2,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-            Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top border for membership
-          Container(
-            height: 4.h,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(8.r),
-                topRight: Radius.circular(8.r),
-              ),
-            ),
-          ),
-          
-          Padding(
-            padding: EdgeInsets.all(12.r),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header - Three sections
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // 1. Date & Time
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _formatDate(requirement['travelDate']),
-                              style: TextStyle(
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                            Text(
-                              requirement['travelTime'] ?? '',
-                              style: TextStyle(
-                                fontSize: 12.sp,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top border for membership
+                  Container(
+                    height: 4.h,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(8.r),
+                        topRight: Radius.circular(8.r),
                       ),
-                      SizedBox(width: 8.w),
-                      // Divider
-                      VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                      SizedBox(width: 8.w),
-                      // 2. Today badge
-                      Expanded(
-                        flex: 2,
-                        child: Center(
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                            child: Text(
-                              'Today',
-                              style: TextStyle(
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.blue[700],
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.all(12.r),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header - Three sections
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              // 1. Date & Time
+                              Expanded(
+                                flex: 2,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      _formatDate(requirement['travelDate']),
+                                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                    ),
+                                    Text(
+                                      requirement['travelTime'] ?? '',
+                                      style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                              SizedBox(width: 8.w),
+                              VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
+                              SizedBox(width: 8.w),
+                              // 2. Today badge
+                              Expanded(
+                                flex: 2,
+                                child: Center(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue[50],
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                    child: Text(
+                                      'Today',
+                                      style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: Colors.blue[700]),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
+                              SizedBox(width: 8.w),
+                              // 3. Icons
+                              Expanded(
+                                flex: 2,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(6.r),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green[50],
+                                        borderRadius: BorderRadius.circular(6.r),
+                                      ),
+                                      child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Container(
+                                      padding: EdgeInsets.all(6.r),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue[50],
+                                        borderRadius: BorderRadius.circular(6.r),
+                                      ),
+                                      child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      SizedBox(width: 8.w),
-                      // Divider
-                      VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                      SizedBox(width: 8.w),
-                      // 3. Icons
-                      Expanded(
-                        flex: 2,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(6.r),
-                              decoration: BoxDecoration(
-                                color: Colors.green[50],
-                                borderRadius: BorderRadius.circular(6.r),
+
+                        SizedBox(height: 12.h),
+                        Divider(height: 1, thickness: 1, color: Colors.black26),
+                        SizedBox(height: 12.h),
+
+                        // Route section with distance
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          width: 10.w, height: 10.h,
+                                          decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                                        ),
+                                        Container(width: 2.w, height: 16.h, color: Colors.grey[400]),
+                                        Container(
+                                          width: 10.w, height: 10.h,
+                                          decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            requirement['pickupCity'] ?? '',
+                                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Text(
+                                            requirement['dropCity'] ?? '',
+                                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              child: Icon(
-                                Icons.volume_up,
-                                size: 18.sp,
-                                color: Colors.green,
+                              // Distance on right - centered
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    requirement['distance']?.toString() ?? '284',
+                                    style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: Colors.green),
+                                  ),
+                                  Text('KM', style: TextStyle(fontSize: 8.sp, color: Colors.grey[600])),
+                                ],
                               ),
-                            ),
-                            SizedBox(width: 8.w),
-                            Container(
-                              padding: EdgeInsets.all(6.r),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(6.r),
-                              ),
-                              child: Icon(
-                                Icons.location_pin,
-                                size: 18.sp,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
 
-                SizedBox(height: 12.h),
-                Divider(height: 1, thickness: 1, color: Colors.black26),
-                SizedBox(height: 12.h),
+                        SizedBox(height: 12.h),
+                        Divider(height: 1, thickness: 1, color: Colors.black26),
+                        SizedBox(height: 12.h),
 
-                // Route section with distance
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Route dots and locations
-                      Expanded(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        // Vehicle type
+                        Row(
                           children: [
+                            Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
                             Column(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: 10.w,
-                                  height: 10.h,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                  ),
+                                Text(
+                                  _formatVehicleType(requirement['vehicleType']),
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
                                 ),
-                                Container(
-                                  width: 2.w,
-                                  height: 16.h,
-                                  color: Colors.grey[400],
-                                ),
-                                Container(
-                                  width: 10.w,
-                                  height: 10.h,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.red,
-                                    shape: BoxShape.circle,
-                                  ),
+                                Text(
+                                  'Any Fuel | Carrier Does Not Matter',
+                                  style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
                                 ),
                               ],
                             ),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    requirement['pickupCity'] ?? '',
-                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                  ),
-                                  SizedBox(height: 6.h),
-                                  Text(
-                                    requirement['dropCity'] ?? '',
-                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                  ),
-                                ],
-                              ),
+                          ],
+                        ),
+
+                        SizedBox(height: 6.h),
+
+                        // Trip type
+                        Row(
+                          children: [
+                            Icon(_getTripTypeIcon(requirement['tripType']), size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text(
+                              (requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(),
+                              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
                             ),
                           ],
                         ),
-                      ),
-                      // Distance on right - centered
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            requirement['distance']?.toString() ?? '284',
-                            style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: Colors.green),
-                          ),
-                          Text(
-                            'KM',
-                            style: TextStyle(fontSize: 8.sp, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
 
-                SizedBox(height: 12.h),
-                Divider(height: 1, thickness: 1, color: Colors.black26),
-                SizedBox(height: 12.h),
+                        SizedBox(height: 6.h),
+                        Divider(height: 1, thickness: 1, color: Colors.black26),
+                        SizedBox(height: 6.h),
 
-                // Vehicle type
-                Row(
-                  children: [
-                    Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
-                    SizedBox(width: 6.w),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _formatVehicleType(requirement['vehicleType']),
-                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                        // Booking
+                        Row(
+                          children: [
+                            Icon(Icons.receipt_long, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text('Booking', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          ],
                         ),
-                        Text(
-                          'Any Fuel | Carrier Does Not Matter',
-                          style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+
+                        SizedBox(height: 4.h),
+
+                        // No Saavari Stickers
+                        Row(
+                          children: [
+                            Icon(Icons.do_not_disturb_alt, size: 14.sp, color: Colors.black),
+                            SizedBox(width: 6.w),
+                            Text('No Saavari Stickers', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          ],
                         ),
+
+                        SizedBox(height: 12.h),
+                        Divider(height: 1, thickness: 1, color: Colors.black26),
+                        SizedBox(height: 8.h),
+
+                        // Warning banner
+                        if (isNew)
+                          Text(
+                            'Become a premium member to contact immediately',
+                            style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
+                            textAlign: TextAlign.center,
+                          ),
+
+                        SizedBox(height: 12.h),
                       ],
                     ),
-                  ],
-                ),
-
-                SizedBox(height: 6.h),
-
-                // Trip type
-                Row(
-                  children: [
-                    Icon(_getTripTypeIcon(requirement['tripType']), size: 14.sp, color: Colors.black),
-                    SizedBox(width: 6.w),
-                    Text(
-                      (requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(),
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 6.h),
-                Divider(height: 1, thickness: 1, color: Colors.black26),
-                SizedBox(height: 6.h),
-
-                // Booking
-                Row(
-                  children: [
-                    Icon(Icons.receipt_long, size: 14.sp, color: Colors.black),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'Booking',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 4.h),
-
-                // No Saavari Stickers
-                Row(
-                  children: [
-                    Icon(Icons.do_not_disturb_alt, size: 14.sp, color: Colors.black),
-                    SizedBox(width: 6.w),
-                    Text(
-                      'No Saavari Stickers',
-                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                    ),
-                  ],
-                ),
-
-                SizedBox(height: 12.h),
-                Divider(height: 1, thickness: 1, color: Colors.black26),
-                SizedBox(height: 8.h),
-
-                // Warning banner
-                if (isNew)
-                  Text(
-                    'Become a premium member to contact immediately',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                    textAlign: TextAlign.center,
                   ),
-
-                SizedBox(height: 12.h),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
-          ],
         ),
       ),
     );
@@ -378,8 +337,7 @@ class RequirementCardWidget extends StatelessWidget {
 
   String _formatVehicleType(String? type) {
     if (type == null) return '';
-    var formatted = type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ');
-    return formatted + ' Car';
+    return type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ') + ' Car';
   }
 
   String _formatDate(dynamic date) {
