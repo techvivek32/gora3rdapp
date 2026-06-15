@@ -17,6 +17,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   final _pickupCtrl = TextEditingController();
   final _dropCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _customFareCtrl = TextEditingController();
   String _vehicleType = 'sedan';
   String _tripType = 'one_way';
   int _numberOfVehicles = 1;
@@ -24,15 +25,38 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   TimeOfDay? _travelTime;
   DateTime? _returnDate;
   TimeOfDay? _returnTime;
-
+  bool _useCustomFare = false;
+  
+  // Sample values for suggested fare
+  final double _distance = 97.0; // KM
+  final double _ratePerKm = 20.0; // ₹/km
+  
   final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
+
+  // Calculate total suggested fare
+  double get _suggestedFare => _distance * _ratePerKm;
+  
+  // Get fare to use
+  double get _currentFare {
+    if (_useCustomFare && _customFareCtrl.text.isNotEmpty) {
+      return double.tryParse(_customFareCtrl.text) ?? _suggestedFare;
+    }
+    return _suggestedFare;
+  }
+  
+  // Calculate commission (10%)
+  double get _commission => _currentFare * 0.10;
+  
+  // Calculate total
+  double get _total => _currentFare + _commission;
 
   @override
   void dispose() {
     _pickupCtrl.dispose();
     _dropCtrl.dispose();
     _notesCtrl.dispose();
+    _customFareCtrl.dispose();
     super.dispose();
   }
 
@@ -378,6 +402,255 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+                
+                // Fare Selection Section
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Fare', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    
+                    // Suggested vs Custom Option
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _useCustomFare = false;
+                              });
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              decoration: BoxDecoration(
+                                color: _useCustomFare ? Colors.grey[100] : AppColors.primary,
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color: _useCustomFare ? AppColors.border : AppColors.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'App Suggested',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600,
+                                    color: _useCustomFare ? AppColors.textHint : Colors.white,
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _useCustomFare = true;
+                              });
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              decoration: BoxDecoration(
+                                color: !_useCustomFare ? Colors.grey[100] : AppColors.primary,
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(
+                                  color: !_useCustomFare ? AppColors.border : AppColors.primary,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Enter Your Own',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontWeight: FontWeight.w600,
+                                    color: !_useCustomFare ? AppColors.textHint : Colors.white,
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 16.h),
+                    
+                    // Fare Details
+                    Container(
+                      padding: EdgeInsets.all(16.r),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          // Suggested Fare Details (always visible)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Distance = ${_distance.toStringAsFixed(0)} KM',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Rate = ₹${_ratePerKm.toStringAsFixed(0)}/km',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          if (!_useCustomFare) ...[
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Suggested Fare',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  '₹${_suggestedFare.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                          if (_useCustomFare) ...[
+                            TextFormField(
+                              controller: _customFareCtrl,
+                              keyboardType: TextInputType.numberWithOptions(decimal: true),
+                              decoration: InputDecoration(
+                                labelText: 'Enter Your Fare (₹)',
+                                hintText: 'Minimum ₹${_suggestedFare.toStringAsFixed(0)}',
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                              ),
+                              onChanged: (value) {
+                                setState(() {});
+                              },
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your fare';
+                                }
+                                final entered = double.tryParse(value);
+                                if (entered == null) {
+                                  return 'Please enter valid number';
+                                }
+                                if (entered < _suggestedFare) {
+                                  return 'Minimum fare is ₹${_suggestedFare.toStringAsFixed(0)}';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 16.h),
+                          ],
+                          if (!_useCustomFare) SizedBox(height: 16.h),
+                          Divider(color: AppColors.primary.withOpacity(0.2)),
+                          SizedBox(height: 16.h),
+                          
+                          // Breakdown
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Base Fare',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                '₹${_currentFare.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Commission (10%)',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              Text(
+                                '₹${_commission.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Divider(color: AppColors.primary.withOpacity(0.5)),
+                          SizedBox(height: 12.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Total Amount',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                '₹${_total.toStringAsFixed(0)}',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 18.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],

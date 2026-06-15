@@ -34,13 +34,15 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text('Requirements', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700)),
+        backgroundColor: AppColors.primary,
+        elevation: 4,
+        automaticallyImplyLeading: false,
+        title: Text('Requirement', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_list_rounded, color: AppColors.textPrimary),
+            icon: Icon(Icons.filter_list_rounded, color: Colors.white),
             onPressed: () => showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -51,24 +53,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
               ),
             ),
           ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: Size.fromHeight(56.h),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-            child: TextField(
-              onChanged: (v) {
-                setState(() => _searchQuery = v);
-                context.read<RequirementsBloc>().add(SearchRequirementsEvent(query: v));
-              },
-              decoration: InputDecoration(
-                hintText: 'Search by city, booking ID...',
-                prefixIcon: const Icon(Icons.search),
-                contentPadding: EdgeInsets.symmetric(vertical: 10.h),
-              ),
-            ),
+          IconButton(
+            icon: Icon(Icons.add, color: Colors.white, size: 28.sp),
+            onPressed: () => context.push('/requirements/create'),
           ),
-        ),
+        ],
       ),
       body: BlocBuilder<RequirementsBloc, RequirementsState>(
         builder: (context, state) {
@@ -89,7 +78,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 controller: _scrollController,
                 padding: EdgeInsets.all(16.r),
                 itemCount: state.requirements.length + (state.isLoadingMore ? 1 : 0),
-                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                separatorBuilder: (_, __) => SizedBox(height: 16.h),
                 itemBuilder: (context, index) {
                   if (index == state.requirements.length) {
                     return Center(child: Padding(

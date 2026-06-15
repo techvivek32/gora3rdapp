@@ -24,151 +24,318 @@ class RequirementCardWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
     final memberType = postedBy?['membershipType'] ?? 'new';
+    final isNew = memberType == 'new';
+    final isActive = memberType == 'active';
+    final color = isNew ? Colors.red : (isActive ? Colors.green : AppColors.primary);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(16.r),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header Row
-            Row(
-              children: [
-                // Booking ID
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6.r),
-                  ),
-                  child: Text(
-                    '#${requirement['bookingId'] ?? 'N/A'}',
-                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary, fontFamily: 'Courier'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Trip type badge
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                  decoration: BoxDecoration(
-                    color: _getTripTypeColor().withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6.r),
-                  ),
-                  child: Text(
-                    (requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(),
-                    style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: _getTripTypeColor()),
-                  ),
-                ),
-                const Spacer(),
-                // Membership Badge
-                _MembershipBadgeWidget(type: memberType),
-              ],
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.grey[300]!, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top border for membership
+          Container(
+            height: 4.h,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(8.r),
+                topRight: Radius.circular(8.r),
+              ),
             ),
-
-            SizedBox(height: 12.h),
-
-            // Route
-            Row(
+          ),
+          
+          Padding(
+            padding: EdgeInsets.all(12.r),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Header - Three sections
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.trip_origin, size: 14.sp, color: AppColors.success),
-                          SizedBox(width: 4.w),
-                          Text(requirement['pickupCity'] ?? '', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                        ],
-                      ),
-                      Padding(
-                        padding: EdgeInsets.only(left: 7.w),
-                        child: Container(
-                          height: 16.h,
-                          width: 1,
-                          color: AppColors.border,
+                      // 1. Date & Time
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _formatDate(requirement['travelDate']),
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            Text(
+                              requirement['travelTime'] ?? '',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Row(
+                      SizedBox(width: 8.w),
+                      // Divider
+                      VerticalDivider(width: 1, thickness: 1, color: Colors.grey[300]),
+                      SizedBox(width: 8.w),
+                      // 2. Today badge
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Text(
+                              'Today',
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      // Divider
+                      VerticalDivider(width: 1, thickness: 1, color: Colors.grey[300]),
+                      SizedBox(width: 8.w),
+                      // 3. Icons
+                      Expanded(
+                        flex: 2,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(6.r),
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Icon(
+                                Icons.volume_up,
+                                size: 18.sp,
+                                color: Colors.green,
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Container(
+                              padding: EdgeInsets.all(6.r),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Icon(
+                                Icons.location_pin,
+                                size: 18.sp,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 12.h),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 12.h),
+
+                // Route section with distance
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Route dots and locations
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  width: 10.w,
+                                  height: 10.h,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                Container(
+                                  width: 2.w,
+                                  height: 16.h,
+                                  color: Colors.grey[400],
+                                ),
+                                Container(
+                                  width: 10.w,
+                                  height: 10.h,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    requirement['pickupCity'] ?? '',
+                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
+                                  ),
+                                  SizedBox(height: 6.h),
+                                  Text(
+                                    requirement['dropCity'] ?? '',
+                                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Distance on right - centered
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.location_on_rounded, size: 14.sp, color: AppColors.error),
-                          SizedBox(width: 4.w),
-                          Text(requirement['dropCity'] ?? '', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                          Text(
+                            requirement['distance']?.toString() ?? '284',
+                            style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: Colors.green),
+                          ),
+                          Text(
+                            'KM',
+                            style: TextStyle(fontSize: 8.sp, color: Colors.grey[600]),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+
+                SizedBox(height: 12.h),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 12.h),
+
+                // Vehicle type
+                Row(
                   children: [
-                    Row(
+                    Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
+                    SizedBox(width: 6.w),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.directions_car_outlined, size: 14.sp, color: AppColors.textSecondary),
-                        SizedBox(width: 4.w),
-                        Text(_formatVehicleType(requirement['vehicleType']), style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                    SizedBox(height: 6.h),
-                    Row(
-                      children: [
-                        Icon(Icons.people_outline, size: 14.sp, color: AppColors.textSecondary),
-                        SizedBox(width: 4.w),
-                        Text('${requirement['numberOfVehicles'] ?? 1} vehicle(s)', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+                        Text(
+                          _formatVehicleType(requirement['vehicleType']),
+                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                        ),
+                        Text(
+                          'Any Fuel | Carrier Does Not Matter',
+                          style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                        ),
                       ],
                     ),
                   ],
                 ),
+
+                SizedBox(height: 6.h),
+
+                // Trip type
+                Row(
+                  children: [
+                    Icon(_getTripTypeIcon(requirement['tripType']), size: 14.sp, color: Colors.black),
+                    SizedBox(width: 6.w),
+                    Text(
+                      (requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(),
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 6.h),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 6.h),
+
+                // Booking
+                Row(
+                  children: [
+                    Icon(Icons.receipt_long, size: 14.sp, color: Colors.black),
+                    SizedBox(width: 6.w),
+                    Text(
+                      'Booking',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 4.h),
+
+                // No Saavari Stickers
+                Row(
+                  children: [
+                    Icon(Icons.do_not_disturb_alt, size: 14.sp, color: Colors.black),
+                    SizedBox(width: 6.w),
+                    Text(
+                      'No Saavari Stickers',
+                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 12.h),
+                Divider(height: 1, color: Colors.grey[300]),
+                SizedBox(height: 8.h),
+
+                // Warning banner
+                if (isNew)
+                  Text(
+                    'Become a premium member to contact immediately',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+
+                SizedBox(height: 12.h),
               ],
             ),
-
-            SizedBox(height: 12.h),
-            Divider(height: 1, color: AppColors.border),
-            SizedBox(height: 10.h),
-
-            // Footer
-            Row(
-              children: [
-                Icon(Icons.calendar_today_outlined, size: 13.sp, color: AppColors.textHint),
-                SizedBox(width: 4.w),
-                Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                SizedBox(width: 12.w),
-                Icon(Icons.access_time, size: 13.sp, color: AppColors.textHint),
-                SizedBox(width: 4.w),
-                Text(requirement['travelTime'] ?? '', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-                const Spacer(),
-                // Map button
-                GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    padding: EdgeInsets.all(6.r),
-                    decoration: BoxDecoration(color: AppColors.info.withOpacity(0.1), borderRadius: BorderRadius.circular(8.r)),
-                    child: Icon(Icons.map_outlined, size: 16.sp, color: AppColors.info),
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                // Voice button
-                GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    padding: EdgeInsets.all(6.r),
-                    decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), borderRadius: BorderRadius.circular(8.r)),
-                    child: Icon(Icons.mic_outlined, size: 16.sp, color: AppColors.success),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  IconData _getTripTypeIcon(String? tripType) {
+    switch (tripType) {
+      case 'one_way': return Icons.arrow_forward;
+      case 'round_trip': return Icons.loop;
+      case 'airport_transfer': return Icons.flight;
+      case 'local': return Icons.location_city;
+      case 'outstation': return Icons.map;
+      default: return Icons.route;
+    }
   }
 
   Color _getTripTypeColor() {
@@ -184,14 +351,15 @@ class RequirementCardWidget extends StatelessWidget {
 
   String _formatVehicleType(String? type) {
     if (type == null) return '';
-    return type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ');
+    var formatted = type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ');
+    return formatted + ' Car';
   }
 
   String _formatDate(dynamic date) {
     if (date == null) return '';
     try {
       final d = DateTime.parse(date.toString());
-      return '${d.day} ${_monthName(d.month)} ${d.year}';
+      return '${d.day} ${_monthName(d.month)}';
     } catch (_) {
       return date.toString();
     }
@@ -200,42 +368,5 @@ class RequirementCardWidget extends StatelessWidget {
   String _monthName(int m) {
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[m];
-  }
-}
-
-class _MembershipBadgeWidget extends StatelessWidget {
-  final String type;
-  const _MembershipBadgeWidget({required this.type});
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    String label;
-    String icon;
-
-    switch (type) {
-      case 'golden': color = AppColors.memberGolden; label = 'Golden'; icon = '👑';
-      case 'premium': color = AppColors.memberPremium; label = 'Premium'; icon = '⭐';
-      case 'verified': color = AppColors.memberVerified; label = 'Verified'; icon = '✓';
-      case 'active': color = AppColors.memberActive; label = 'Active'; icon = '✓';
-      default: color = AppColors.memberNew; label = 'New'; icon = '👤';
-    }
-
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(6.r),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(icon, style: TextStyle(fontSize: 10.sp)),
-          SizedBox(width: 3.w),
-          Text(label, style: TextStyle(fontSize: 10.sp, color: color, fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
   }
 }
