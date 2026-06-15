@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/notification_bloc.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -19,64 +21,185 @@ class _NotificationsPageState extends State<NotificationsPage> {
   static const _typeIcons = {
     'new_requirement': Icons.post_add,
     'requirement_accepted': Icons.check_circle,
-    'new_message': Icons.chat,
-    'subscription_activated': Icons.star,
-    'system': Icons.notifications,
+    'new_message': Icons.chat_bubble_outline,
+    'subscription_activated': Icons.workspace_premium,
+    'system': Icons.notifications_outlined,
   };
+
+  static const _typeColors = {
+    'new_requirement': AppColors.primary,
+    'requirement_accepted': AppColors.success,
+    'new_message': AppColors.info,
+    'subscription_activated': AppColors.memberGolden,
+    'system': AppColors.textSecondary,
+  };
+
+  String _timeAgo(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      final dt = DateTime.parse(createdAt.toString()).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}d ago';
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Notifications'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text('Notifications', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Colors.white)),
         actions: [
           TextButton(
             onPressed: () => context.read<NotificationBloc>().add(MarkAllNotificationsReadEvent()),
-            child: const Text('Mark All Read'),
+            child: Text('Mark All Read', style: TextStyle(color: Colors.white, fontSize: 13.sp, fontFamily: 'Poppins')),
           ),
         ],
       ),
       body: BlocBuilder<NotificationBloc, NotificationState>(
         builder: (context, state) {
-          if (state is NotificationLoading) return const Center(child: CircularProgressIndicator());
-          if (state is NotificationError) return Center(child: Text(state.message));
+          if (state is NotificationLoading) {
+            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+          }
+
+          if (state is NotificationError) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 56.sp, color: AppColors.error),
+                  SizedBox(height: 12.h),
+                  Text('Something went wrong', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                  SizedBox(height: 6.h),
+                  Text(state.message, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                  SizedBox(height: 20.h),
+                  ElevatedButton.icon(
+                    onPressed: () => context.read<NotificationBloc>().add(LoadNotificationsEvent()),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                  ),
+                ],
+              ),
+            );
+          }
+
           if (state is NotificationLoaded) {
             if (state.notifications.isEmpty) {
-              return const Center(
+              return Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.notifications_none, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No notifications', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                    Container(
+                      padding: EdgeInsets.all(24.r),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.08),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.notifications_none_outlined, size: 56.sp, color: AppColors.primary),
+                    ),
+                    SizedBox(height: 20.h),
+                    Text('No notifications yet', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 8.h),
+                    Text("You're all caught up!", style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
                   ],
                 ),
               );
             }
+
             return RefreshIndicator(
+              color: AppColors.primary,
               onRefresh: () async => context.read<NotificationBloc>().add(LoadNotificationsEvent()),
               child: ListView.separated(
+                padding: EdgeInsets.symmetric(vertical: 8.h),
                 itemCount: state.notifications.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border, indent: 72.w),
                 itemBuilder: (_, i) {
                   final n = state.notifications[i];
                   final isRead = n['isRead'] as bool? ?? false;
                   final type = n['type'] as String? ?? 'system';
-                  return ListTile(
-                    tileColor: isRead ? null : Theme.of(context).primaryColor.withOpacity(0.05),
-                    leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.1),
-                      child: Icon(_typeIcons[type] ?? Icons.notifications, color: Theme.of(context).primaryColor),
-                    ),
-                    title: Text(n['title'] as String? ?? '', style: TextStyle(fontWeight: isRead ? FontWeight.normal : FontWeight.bold)),
-                    subtitle: Text(n['body'] as String? ?? '', maxLines: 2, overflow: TextOverflow.ellipsis),
-                    trailing: !isRead ? Container(width: 8, height: 8, decoration: BoxDecoration(color: Theme.of(context).primaryColor, shape: BoxShape.circle)) : null,
+                  final iconColor = _typeColors[type] ?? AppColors.textSecondary;
+                  final icon = _typeIcons[type] ?? Icons.notifications_outlined;
+
+                  return InkWell(
                     onTap: () => context.read<NotificationBloc>().add(MarkNotificationReadEvent(n['_id'] as String)),
+                    child: Container(
+                      color: isRead ? Colors.transparent : AppColors.primary.withOpacity(0.04),
+                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44.w,
+                            height: 44.h,
+                            decoration: BoxDecoration(
+                              color: iconColor.withOpacity(0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(icon, color: iconColor, size: 22.sp),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        n['title'] as String? ?? '',
+                                        style: TextStyle(
+                                          fontSize: 14.sp,
+                                          fontWeight: isRead ? FontWeight.w500 : FontWeight.bold,
+                                          fontFamily: 'Poppins',
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Text(
+                                      _timeAgo(n['createdAt']),
+                                      style: TextStyle(fontSize: 11.sp, color: AppColors.textHint, fontFamily: 'Poppins'),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4.h),
+                                Text(
+                                  n['body'] as String? ?? '',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins', height: 1.4),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (!isRead) ...[
+                            SizedBox(width: 8.w),
+                            Container(
+                              width: 8.w,
+                              height: 8.h,
+                              margin: EdgeInsets.only(top: 6.h),
+                              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                   );
                 },
               ),
             );
           }
+
           return const SizedBox.shrink();
         },
       ),

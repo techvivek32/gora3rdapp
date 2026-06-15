@@ -19,10 +19,11 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     try {
       final res = await apiClient.get('/notifications', params: {'page': '1', 'limit': '50'});
       final data = res.data as Map<String, dynamic>;
+      final inner = data['data'] as Map<String, dynamic>? ?? {};
       final countRes = await apiClient.get('/notifications/unread-count');
       emit(NotificationLoaded(
-        notifications: List<Map<String, dynamic>>.from(data['data'] ?? []),
-        unreadCount: countRes.data['data']?['count'] ?? 0,
+        notifications: List<Map<String, dynamic>>.from(inner['notifications'] ?? []),
+        unreadCount: countRes.data['data']?['count'] ?? inner['unreadCount'] ?? 0,
       ));
     } catch (e) {
       emit(NotificationError(message: e.toString()));
@@ -31,14 +32,14 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
 
   Future<void> _onMarkRead(MarkNotificationReadEvent event, Emitter<NotificationState> emit) async {
     try {
-      await apiClient.put('/notifications/${event.id}/read');
+      await apiClient.post('/notifications/${event.id}/mark-read');
       add(LoadNotificationsEvent());
     } catch (_) {}
   }
 
   Future<void> _onMarkAllRead(MarkAllNotificationsReadEvent event, Emitter<NotificationState> emit) async {
     try {
-      await apiClient.put('/notifications/mark-all-read');
+      await apiClient.post('/notifications/mark-read');
       add(LoadNotificationsEvent());
     } catch (_) {}
   }

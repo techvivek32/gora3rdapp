@@ -61,7 +61,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
 
     final options = {
-      'key': const String.fromEnvironment('RAZORPAY_KEY', defaultValue: 'rzp_test_placeholder'),
+      'key': 'rzp_test_RlUAkt1HzIvV4j',
       'amount': order['amount'],
       'currency': order['currency'] ?? 'INR',
       'order_id': order['orderId'] ?? order['razorpayOrderId'],
