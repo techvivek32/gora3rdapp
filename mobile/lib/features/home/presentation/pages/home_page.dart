@@ -6,7 +6,6 @@ import '../../../../core/theme/app_theme.dart';
 import '../bloc/home_bloc.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
-import '../widgets/recent_requirements_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -87,34 +86,73 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(height: 20.h),
 
-                // Quick Actions
+                // Top Closers Section
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Quick Actions', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                      Text('Top Closer', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                       SizedBox(height: 12.h),
-                      const QuickActionGridWidget(),
-                      SizedBox(height: 24.h),
-
-                      // Recent Requirements
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Recent Requirements', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                          TextButton(
-                            onPressed: () => context.go('/requirements'),
-                            child: Text('See All', style: TextStyle(color: AppColors.primary, fontSize: 13.sp, fontWeight: FontWeight.w600)),
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.primary, Color(0xFFFF6B35)],
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 8.h),
-                      BlocBuilder<HomeBloc, HomeState>(
-                        builder: (context, state) => RecentRequirementsWidget(
-                          requirements: state is HomeLoaded ? state.recentRequirements : [],
+                          borderRadius: BorderRadius.circular(20.r),
+                        ),
+                        padding: EdgeInsets.all(20.r),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 36.r,
+                                  backgroundColor: Colors.white.withOpacity(0.2),
+                                  child: Text('T', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28.sp)),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Thakar Choudhary', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w700, color: Colors.white, fontFamily: 'Poppins')),
+                                      SizedBox(height: 4.h),
+                                      Text('+91 8003092907', style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins')),
+                                      SizedBox(height: 4.h),
+                                      Text('thakarchoudhary51@gmail.com', style: TextStyle(fontSize: 12.sp, color: Colors.white70, fontFamily: 'Poppins')),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                            Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, color: Colors.white, size: 16.sp),
+                                SizedBox(width: 4.w),
+                                Text('Jodhpur, Rajasthan', style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins')),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            Row(
+                              children: [
+                                Icon(Icons.work_outline, color: Colors.white, size: 16.sp),
+                                SizedBox(width: 4.w),
+                                Text('Owner in Jodhpur, Rajasthan', style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins')),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
+                      SizedBox(height: 24.h),
+
+                      // Quick Actions
+                      const QuickActionGridWidget(),
                       SizedBox(height: 100.h),
                     ],
                   ),

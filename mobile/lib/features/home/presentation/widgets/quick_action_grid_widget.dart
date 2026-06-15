@@ -9,22 +9,46 @@ class QuickActionGridWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _QuickAction(icon: Icons.search_rounded, label: 'Requirement', color: AppColors.info, onTap: () => context.push('/requirements/create')),
-      _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab', color: AppColors.success, onTap: () => context.push('/vehicles/create')),
-      _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans', color: AppColors.memberPremium, onTap: () => context.push('/subscriptions')),
-      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities', color: AppColors.warning, onTap: () {}),
-      _QuickAction(icon: Icons.person_rounded, label: 'My Account', color: AppColors.primary, onTap: () => context.go('/profile')),
-      _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications', color: AppColors.error, onTap: () => context.push('/notifications')),
+      _QuickAction(icon: Icons.search_rounded, label: 'Requirement', onTap: () => context.push('/requirements/create')),
+      _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab', onTap: () => context.push('/vehicles/create')),
+      _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans', onTap: () => context.push('/subscriptions')),
+      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities', onTap: () {}),
+      _QuickAction(icon: Icons.person_rounded, label: 'My Account', onTap: () => context.go('/profile')),
+      _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications', onTap: () => context.push('/notifications')),
+    ];
+
+    final colors = [
+      AppColors.primary,
+      Colors.black,
+      AppColors.primary,
+      Colors.black,
+      Colors.white,
+      Colors.black,
+    ];
+
+    final textColors = [
+      Colors.white,
+      AppColors.primary,
+      Colors.white,
+      AppColors.primary,
+      Colors.black,
+      AppColors.primary,
     ];
 
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 3,
-      mainAxisSpacing: 12.h,
-      crossAxisSpacing: 12.w,
-      childAspectRatio: 0.9,
-      children: actions.map((a) => _QuickActionCard(action: a)).toList(),
+      mainAxisSpacing: 0,
+      crossAxisSpacing: 0,
+      childAspectRatio: 1,
+      children: List.generate(actions.length, (index) {
+        return _QuickActionCard(
+          action: actions[index],
+          bgColor: colors[index],
+          textColor: textColors[index],
+        );
+      }),
     );
   }
 }
@@ -32,43 +56,31 @@ class QuickActionGridWidget extends StatelessWidget {
 class _QuickAction {
   final IconData icon;
   final String label;
-  final Color color;
   final VoidCallback onTap;
-  const _QuickAction({required this.icon, required this.label, required this.color, required this.onTap});
+  const _QuickAction({required this.icon, required this.label, required this.onTap});
 }
 
 class _QuickActionCard extends StatelessWidget {
   final _QuickAction action;
-  const _QuickActionCard({required this.action});
+  final Color bgColor;
+  final Color textColor;
+  const _QuickActionCard({required this.action, required this.bgColor, required this.textColor});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: action.onTap,
       child: Container(
-        padding: EdgeInsets.all(12.r),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
-        ),
+        padding: EdgeInsets.all(16.r),
+        color: bgColor,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 48.w,
-              height: 48.w,
-              decoration: BoxDecoration(
-                color: action.color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(14.r),
-              ),
-              child: Icon(action.icon, color: action.color, size: 24.sp),
-            ),
+            Icon(action.icon, color: textColor, size: 36.sp),
             SizedBox(height: 8.h),
             Text(
               action.label,
-              style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: textColor, fontFamily: 'Poppins'),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
