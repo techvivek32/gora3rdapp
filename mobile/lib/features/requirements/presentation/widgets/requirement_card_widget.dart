@@ -26,14 +26,15 @@ class RequirementCardWidget extends StatelessWidget {
     final memberType = postedBy?['membershipType'] ?? 'new';
     final isNew = memberType == 'new';
     final isActive = memberType == 'active';
-    final color = isNew ? Colors.red : (isActive ? Colors.green : AppColors.primary);
+    final color = isNew ? AppColors.primary : (isActive ? Colors.green : AppColors.primary);
+    final cardBg = isNew ? AppColors.primary.withOpacity(0.05) : Colors.white;
 
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: Colors.grey[300]!, width: 1),
+        border: Border.all(color: isNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -42,7 +43,30 @@ class RequirementCardWidget extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8.r),
+        child: Stack(
+          children: [
+            // Diagonal watermark
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Transform.rotate(
+                    angle: -0.6,
+                    child: Text(
+                      'Secure Member',
+                      style: TextStyle(
+                        fontSize: 28.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.withOpacity(0.08),
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Top border for membership
@@ -94,7 +118,7 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                       SizedBox(width: 8.w),
                       // Divider
-                      VerticalDivider(width: 1, thickness: 1, color: Colors.grey[300]),
+                      VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
                       SizedBox(width: 8.w),
                       // 2. Today badge
                       Expanded(
@@ -119,7 +143,7 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                       SizedBox(width: 8.w),
                       // Divider
-                      VerticalDivider(width: 1, thickness: 1, color: Colors.grey[300]),
+                      VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
                       SizedBox(width: 8.w),
                       // 3. Icons
                       Expanded(
@@ -160,7 +184,7 @@ class RequirementCardWidget extends StatelessWidget {
                 ),
 
                 SizedBox(height: 12.h),
-                Divider(height: 1, color: Colors.grey[300]),
+                Divider(height: 1, thickness: 1, color: Colors.black26),
                 SizedBox(height: 12.h),
 
                 // Route section with distance
@@ -238,7 +262,7 @@ class RequirementCardWidget extends StatelessWidget {
                 ),
 
                 SizedBox(height: 12.h),
-                Divider(height: 1, color: Colors.grey[300]),
+                Divider(height: 1, thickness: 1, color: Colors.black26),
                 SizedBox(height: 12.h),
 
                 // Vehicle type
@@ -277,7 +301,7 @@ class RequirementCardWidget extends StatelessWidget {
                 ),
 
                 SizedBox(height: 6.h),
-                Divider(height: 1, color: Colors.grey[300]),
+                Divider(height: 1, thickness: 1, color: Colors.black26),
                 SizedBox(height: 6.h),
 
                 // Booking
@@ -307,7 +331,7 @@ class RequirementCardWidget extends StatelessWidget {
                 ),
 
                 SizedBox(height: 12.h),
-                Divider(height: 1, color: Colors.grey[300]),
+                Divider(height: 1, thickness: 1, color: Colors.black26),
                 SizedBox(height: 8.h),
 
                 // Warning banner
@@ -323,6 +347,9 @@ class RequirementCardWidget extends StatelessWidget {
             ),
           ),
         ],
+      ),
+          ],
+        ),
       ),
     );
   }
