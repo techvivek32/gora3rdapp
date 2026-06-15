@@ -22,7 +22,7 @@ class QuickActionGridWidget extends StatelessWidget {
       Colors.black,
       AppColors.primary,
       Colors.black,
-      Colors.white,
+      AppColors.primary,
       Colors.black,
     ];
 
@@ -31,7 +31,7 @@ class QuickActionGridWidget extends StatelessWidget {
       AppColors.primary,
       Colors.white,
       AppColors.primary,
-      Colors.black,
+      Colors.white,
       AppColors.primary,
     ];
 

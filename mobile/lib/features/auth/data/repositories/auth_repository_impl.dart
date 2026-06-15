@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dartz/dartz.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/error/failures.dart';
@@ -74,9 +76,10 @@ class AuthRepositoryImpl implements AuthRepository {
       if (token == null || userId == null) return null;
       if (userJson != null) {
         // Return cached user data
-        return {'_id': userId};
+        final decodedUser = jsonDecode(userJson) as Map<String, dynamic>;
+        return decodedUser;
       }
-      return null;
+      return {'_id': userId};
     } catch (_) {
       return null;
     }
@@ -108,6 +111,8 @@ class AuthRepositoryImpl implements AuthRepository {
     final user = data['user'];
     if (user != null && user['_id'] != null) {
       await storage.write(key: 'user_id', value: user['_id']);
+      // Save user data as JSON string
+      await storage.write(key: 'user_data', value: jsonEncode(user));
     }
   }
 }
