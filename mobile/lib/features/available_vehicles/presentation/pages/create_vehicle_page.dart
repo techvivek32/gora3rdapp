@@ -35,6 +35,13 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
     super.dispose();
   }
 
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     if (_availableDate == null) {
@@ -77,167 +84,218 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _currentCityCtrl,
-                          decoration: InputDecoration(labelText: 'Current City *', prefixIcon: Icon(Icons.my_location_outlined)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                        ),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _currentStateCtrl,
-                          decoration: InputDecoration(labelText: 'Current State *', prefixIcon: Icon(Icons.map_outlined)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                        ),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _destCityCtrl,
-                          decoration: InputDecoration(labelText: 'Available For (Destination City)', prefixIcon: Icon(Icons.location_on_outlined)),
-                        ),
-                      ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _currentCityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Current City *',
+                        prefixIcon: Icon(Icons.my_location_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        DropdownButtonFormField<String>(
-                          value: _vehicleType,
-                          decoration: InputDecoration(labelText: 'Vehicle Type'),
-                          items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
-                          onChanged: (v) => setState(() => _vehicleType = v!),
-                        ),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _vehicleNumberCtrl,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(labelText: 'Vehicle Number *', prefixIcon: Icon(Icons.badge_outlined)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                        ),
-                      ],
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _currentStateCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Current State *',
+                        prefixIcon: Icon(Icons.map_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                     ),
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Driver Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _driverNameCtrl,
-                          decoration: InputDecoration(labelText: 'Driver Name *', prefixIcon: Icon(Icons.person_outline)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                        ),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _driverMobileCtrl,
-                          keyboardType: TextInputType.phone,
-                          decoration: InputDecoration(labelText: 'Driver Mobile *', prefixIcon: Icon(Icons.phone_outlined)),
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Required';
-                            if (v.length != 10) return 'Enter 10 digit number';
-                            return null;
-                          },
-                        ),
-                      ],
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _destCityCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Available For (Destination City)',
+                        prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 4.h),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.calendar_today_outlined, color: AppColors.textHint, size: 20.sp),
-                          title: Text(_availableDate != null
-                              ? '${_availableDate!.day}/${_availableDate!.month}/${_availableDate!.year}'
-                              : 'Select Available Date *', style: TextStyle(fontFamily: 'Poppins')),
-                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
-                          onTap: () async {
-                            final d = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 90)),
-                            );
-                            if (d != null) setState(() => _availableDate = d);
-                          },
-                        ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.access_time, color: AppColors.textHint, size: 20.sp),
-                          title: Text(_availableTime != null ? _availableTime!.format(context) : 'Select Available Time', style: TextStyle(fontFamily: 'Poppins')),
-                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
-                          onTap: () async {
-                            final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-                            if (t != null) setState(() => _availableTime = t);
-                          },
-                        ),
-                      ],
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    DropdownButtonFormField<String>(
+                      value: _vehicleType,
+                      decoration: InputDecoration(
+                        labelText: 'Vehicle Type',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                      onChanged: (v) => setState(() => _vehicleType = v!),
                     ),
-                  ),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _vehicleNumberCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: InputDecoration(
+                        labelText: 'Vehicle Number *',
+                        prefixIcon: Icon(Icons.badge_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                  ],
                 ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: TextFormField(
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Driver Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _driverNameCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Driver Name *',
+                        prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _driverMobileCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Driver Mobile *',
+                        prefixIcon: Icon(Icons.phone_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (v.length != 10) return 'Enter 10 digit number';
+                        return null;
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    GestureDetector(
+                      onTap: () async {
+                        final d = await showDatePicker(
+                          context: context,
+                          initialDate: DateTime.now(),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(const Duration(days: 90)),
+                        );
+                        if (d != null) setState(() => _availableDate = d);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: 24.sp),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: Text(
+                                _availableDate != null
+                                    ? '${_availableDate!.day}-${_availableDate!.month}-${_availableDate!.year}'
+                                    : 'Select Available Date *',
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 15.sp, color: _availableDate != null ? AppColors.textPrimary : AppColors.textHint),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: AppColors.primary, size: 24.sp),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    GestureDetector(
+                      onTap: () async {
+                        final t = await showTimePicker(context: context, initialTime: TimeOfDay.now());
+                        if (t != null) setState(() => _availableTime = t);
+                      },
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.access_time, color: AppColors.primary, size: 24.sp),
+                            SizedBox(width: 12.w),
+                            Expanded(
+                              child: Text(
+                                _availableTime != null ? _formatTime(_availableTime!) : 'Select Available Time',
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 15.sp, color: _availableTime != null ? AppColors.textPrimary : AppColors.textHint),
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: AppColors.primary, size: 24.sp),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Additional Notes (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    TextFormField(
                       controller: _notesCtrl,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        labelText: 'Additional Notes (Optional)',
-                        alignLabelWithHint: true,
+                        hintText: 'Add any additional notes here...',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
                     ),
-                  ),
+                  ],
                 ),
                 SizedBox(height: 24.h),
                 BlocBuilder<VehiclesBloc, VehiclesState>(

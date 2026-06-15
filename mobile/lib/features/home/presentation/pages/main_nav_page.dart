@@ -28,6 +28,7 @@ class MainNavPage extends StatelessWidget {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
+        color: AppColors.primary,
         shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
         height: 65.h,
@@ -112,9 +113,9 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? AppColors.primary : AppColors.textHint, size: 24.sp),
+            Icon(icon, color: isSelected ? Colors.white : Colors.white70, size: 24.sp),
             SizedBox(height: 2.h),
-            Text(label, style: TextStyle(fontSize: 10.sp, color: isSelected ? AppColors.primary : AppColors.textHint, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400)),
+            Text(label, style: TextStyle(fontSize: 10.sp, color: isSelected ? Colors.white : Colors.white70, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400)),
           ],
         ),
       ),

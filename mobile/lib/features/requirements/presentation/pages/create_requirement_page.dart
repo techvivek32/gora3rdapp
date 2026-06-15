@@ -22,6 +22,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   int _numberOfVehicles = 1;
   DateTime? _travelDate;
   TimeOfDay? _travelTime;
+  DateTime? _returnDate;
+  TimeOfDay? _returnTime;
 
   final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
@@ -32,6 +34,13 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _dropCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
   }
 
   void _submit() {
@@ -76,147 +85,302 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Route Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _pickupCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Pickup City *',
+                        prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _dropCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'Drop City *',
+                        prefixIcon: Icon(Icons.location_off_outlined, color: AppColors.primary),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    DropdownButtonFormField<String>(
+                      value: _tripType,
+                      decoration: InputDecoration(
+                        labelText: 'Trip Type',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      items: _tripTypes.map((t) => DropdownMenuItem(value: t, child: Text(t.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                      onChanged: (v) => setState(() => _tripType = v!),
+                    ),
+                    SizedBox(height: 12.h),
+                    DropdownButtonFormField<String>(
+                      value: _vehicleType,
+                      decoration: InputDecoration(
+                        labelText: 'Vehicle Type',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                      onChanged: (v) => setState(() => _vehicleType = v!),
+                    ),
+                    SizedBox(height: 12.h),
+                    Row(
                       children: [
-                        Text('Route Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _pickupCtrl,
-                          decoration: InputDecoration(labelText: 'Pickup City *', prefixIcon: Icon(Icons.location_on_outlined)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        Expanded(
+                          flex: 2,
+                          child: Text('Number of Vehicles: ', style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                         ),
-                        SizedBox(height: 12.h),
-                        TextFormField(
-                          controller: _dropCtrl,
-                          decoration: InputDecoration(labelText: 'Drop City *', prefixIcon: Icon(Icons.location_off_outlined)),
-                          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                        Expanded(
+                          flex: 3,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                width: 40.w,
+                                height: 40.h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles - 1).clamp(1, 50)),
+                                  icon: Icon(Icons.remove, color: AppColors.primary, size: 20.sp),
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.primary, width: 2),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text('$_numberOfVehicles', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                              ),
+                              SizedBox(width: 8.w),
+                              Container(
+                                width: 40.w,
+                                height: 40.h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles + 1).clamp(1, 50)),
+                                  icon: Icon(Icons.add, color: Colors.white, size: 20.sp),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Date & Time', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    Row(
                       children: [
-                        Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        DropdownButtonFormField<String>(
-                          value: _tripType,
-                          decoration: InputDecoration(labelText: 'Trip Type'),
-                          items: _tripTypes.map((t) => DropdownMenuItem(value: t, child: Text(t.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
-                          onChanged: (v) => setState(() => _tripType = v!),
-                        ),
-                        SizedBox(height: 12.h),
-                        DropdownButtonFormField<String>(
-                          value: _vehicleType,
-                          decoration: InputDecoration(labelText: 'Vehicle Type'),
-                          items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
-                          onChanged: (v) => setState(() => _vehicleType = v!),
-                        ),
-                        SizedBox(height: 12.h),
-                        Row(
-                          children: [
-                            Text('Number of Vehicles: ', style: TextStyle(fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles - 1).clamp(1, 50)),
-                              icon: Icon(Icons.remove_circle_outline, color: AppColors.textSecondary, size: 24.sp),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now().add(const Duration(days: 1)),
+                                firstDate: DateTime.now(),
+                                lastDate: DateTime.now().add(const Duration(days: 365)),
+                              );
+                              if (picked != null) setState(() => _travelDate = picked);
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: 20.sp),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Text(
+                                      _travelDate != null
+                                          ? '${_travelDate!.day}-${_travelDate!.month}-${_travelDate!.year}'
+                                          : 'Date *',
+                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _travelDate != null ? AppColors.textPrimary : AppColors.textHint),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            Text('$_numberOfVehicles', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                            IconButton(
-                              onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles + 1).clamp(1, 50)),
-                              icon: Icon(Icons.add_circle_outline, color: AppColors.primary, size: 24.sp),
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () async {
+                              final picked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.now(),
+                              );
+                              if (picked != null) setState(() => _travelTime = picked);
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[50],
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.access_time, color: AppColors.primary, size: 20.sp),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Text(
+                                      _travelTime != null ? _formatTime(_travelTime!) : 'Time',
+                                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _travelTime != null ? AppColors.textPrimary : AppColors.textHint),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
-                  ),
+                    if (_tripType == 'round_trip') ...[
+                      SizedBox(height: 12.h),
+                      Text('Return Date & Time', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                      SizedBox(height: 12.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: (_travelDate ?? DateTime.now()).add(const Duration(days: 1)),
+                                  firstDate: _travelDate ?? DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (picked != null) setState(() => _returnDate = picked);
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: 20.sp),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text(
+                                        _returnDate != null
+                                            ? '${_returnDate!.day}-${_returnDate!.month}-${_returnDate!.year}'
+                                            : 'Return Date',
+                                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _returnDate != null ? AppColors.textPrimary : AppColors.textHint),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final picked = await showTimePicker(
+                                  context: context,
+                                  initialTime: TimeOfDay.now(),
+                                );
+                                if (picked != null) setState(() => _returnTime = picked);
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 14.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.7), width: 1.5),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.access_time, color: AppColors.primary, size: 20.sp),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text(
+                                        _returnTime != null ? _formatTime(_returnTime!) : 'Return Time',
+                                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _returnTime != null ? AppColors.textPrimary : AppColors.textHint),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
                 ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Date & Time', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        SizedBox(height: 12.h),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.calendar_today_outlined, color: AppColors.textHint, size: 20.sp),
-                          title: Text(_travelDate != null
-                              ? '${_travelDate!.day}/${_travelDate!.month}/${_travelDate!.year}'
-                              : 'Select Travel Date *', style: TextStyle(fontFamily: 'Poppins')),
-                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now().add(const Duration(days: 1)),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (picked != null) setState(() => _travelDate = picked);
-                          },
-                        ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.access_time, color: AppColors.textHint, size: 20.sp),
-                          title: Text(_travelTime != null ? _travelTime!.format(context) : 'Select Travel Time', style: TextStyle(fontFamily: 'Poppins')),
-                          trailing: Icon(Icons.chevron_right, color: AppColors.textHint),
-                          onTap: () async {
-                            final picked = await showTimePicker(
-                              context: context,
-                              initialTime: TimeOfDay.now(),
-                            );
-                            if (picked != null) setState(() => _travelTime = picked);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16.r),
-                    side: BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16.r),
-                    child: TextFormField(
+                SizedBox(height: 20.h),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Additional Notes (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    SizedBox(height: 12.h),
+                    TextFormField(
                       controller: _notesCtrl,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        labelText: 'Additional Notes (Optional)',
-                        alignLabelWithHint: true,
+                        hintText: 'Add any additional notes here...',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
                     ),
-                  ),
+                  ],
                 ),
                 SizedBox(height: 24.h),
                 BlocBuilder<RequirementsBloc, RequirementsState>(
