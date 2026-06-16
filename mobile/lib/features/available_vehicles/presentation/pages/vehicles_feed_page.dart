@@ -99,7 +99,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               child: ListView.separated(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(16.r),
+                padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
                 itemCount: state.vehicles.length,
                 separatorBuilder: (_, __) => SizedBox(height: 12.h),
                 itemBuilder: (context, i) => _VehicleCard(

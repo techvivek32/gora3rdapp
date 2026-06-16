@@ -61,6 +61,16 @@ export class RequirementsController {
     return this.requirementsService.acceptRequirement(id, userId);
   }
 
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a requirement' })
+  cancel(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('reason') reason: string,
+  ) {
+    return this.requirementsService.cancelRequirement(id, userId, reason);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a requirement' })
   remove(@Param('id') id: string, @CurrentUser('sub') userId: string) {

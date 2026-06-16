@@ -46,3 +46,19 @@ class AcceptRequirementEvent extends RequirementsEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class UpdateRequirementEvent extends RequirementsEvent {
+  final String id;
+  final Map<String, dynamic> data;
+  const UpdateRequirementEvent({required this.id, required this.data});
+  @override
+  List<Object?> get props => [id, data];
+}
+
+class CancelRequirementEvent extends RequirementsEvent {
+  final String id;
+  final String reason;
+  const CancelRequirementEvent({required this.id, required this.reason});
+  @override
+  List<Object?> get props => [id, reason];
+}

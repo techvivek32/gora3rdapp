@@ -54,3 +54,12 @@ class RequirementDetailLoaded extends RequirementsState {
 }
 
 class RequirementAccepted extends RequirementsState {}
+
+class RequirementUpdated extends RequirementsState {
+  final Map<String, dynamic> requirement;
+  const RequirementUpdated({required this.requirement});
+  @override
+  List<Object?> get props => [requirement];
+}
+
+class RequirementCancelled extends RequirementsState {}

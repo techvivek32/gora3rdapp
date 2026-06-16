@@ -7,6 +7,7 @@ abstract class RequirementsRemoteDataSource {
   Future<Map<String, dynamic>> update(String id, Map<String, dynamic> data);
   Future<void> delete(String id);
   Future<void> accept(String id);
+  Future<void> cancel(String id, String reason);
   Future<Map<String, dynamic>> getMy({String? status});
 }
 
@@ -46,6 +47,11 @@ class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
   @override
   Future<void> accept(String id) async {
     await apiClient.post('/requirements/$id/accept');
+  }
+
+  @override
+  Future<void> cancel(String id, String reason) async {
+    await apiClient.post('/requirements/$id/cancel', data: {'reason': reason});
   }
 
   @override

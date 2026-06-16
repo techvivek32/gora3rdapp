@@ -82,7 +82,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
               child: ListView.separated(
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(16.r),
+                padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
                 itemCount: state.requirements.length + (state.isLoadingMore ? 1 : 0),
                 separatorBuilder: (_, __) => SizedBox(height: 16.h),
                 itemBuilder: (context, index) {
@@ -97,7 +97,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                     onTap: () => context.push(
                       '/requirements/${state.requirements[index]['_id']}',
                       extra: state.requirements[index],
-                    ).then((_) => context.read<RequirementsBloc>().add(LoadRequirementsEvent())),
+                    ).then((result) {
+                      if (result == true && mounted) {
+                        context.read<RequirementsBloc>().add(LoadRequirementsEvent());
+                      }
+                    }),
                   );
                 },
               ),

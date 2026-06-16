@@ -69,6 +69,16 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
   }
 
   @override
+  Future<Either<Failure, void>> cancelRequirement(String id, String reason) async {
+    try {
+      await remote.cancel(id, reason);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Map<String, dynamic>>> getMyRequirements({String? status}) async {
     try {
       final result = await remote.getMy(status: status);

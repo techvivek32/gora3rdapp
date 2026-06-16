@@ -149,7 +149,10 @@ export class RequirementsService {
       throw new ForbiddenException('Not authorized to update this requirement');
     }
 
-    const updated = await this.requirementModel.findByIdAndUpdate(id, dto, { new: true });
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(id, dto, { new: true })
+      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
+      .lean();
     return { message: 'Requirement updated', data: updated };
   }
 
@@ -190,6 +193,22 @@ export class RequirementsService {
     await this.notificationsService.notifyRequirementAccepted(requirement, user);
 
     return { message: 'Requirement accepted successfully' };
+  }
+
+  async cancelRequirement(id: string, userId: string, reason: string) {
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.postedBy.toString() !== userId) {
+      throw new ForbiddenException('Not authorized to cancel this requirement');
+    }
+
+    await this.requirementModel.findByIdAndUpdate(id, {
+      status: BookingStatus.CANCELLED,
+      cancellationReason: reason,
+      cancelledAt: new Date(),
+    });
+
+    return { message: 'Requirement cancelled successfully' };
   }
 
   async getMyRequirements(userId: string, status?: BookingStatus) {

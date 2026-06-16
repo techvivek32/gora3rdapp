@@ -94,6 +94,12 @@ export class Requirement {
 
   @Prop({ type: String })
   deletedBy: string;
+
+  @Prop()
+  cancellationReason: string;
+
+  @Prop()
+  cancelledAt: Date;
 }
 
 export const RequirementSchema = SchemaFactory.createForClass(Requirement);
