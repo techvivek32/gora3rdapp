@@ -101,6 +101,18 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final result = await remote.updateProfile(data);
+      final user = result['data'] as Map<String, dynamic>;
+      await storage.write(key: 'user_data', value: jsonEncode(user));
+      return Right(user);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString().replaceAll('Exception: ', '')));
+    }
+  }
+
   Future<void> _saveTokens(Map<String, dynamic> data) async {
     if (data['accessToken'] != null) {
       await storage.write(key: 'access_token', value: data['accessToken']);

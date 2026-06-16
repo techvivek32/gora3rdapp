@@ -44,3 +44,10 @@ class AuthVerifyOtpEvent extends AuthEvent {
 }
 
 class AuthLogoutEvent extends AuthEvent {}
+
+class UpdateProfileEvent extends AuthEvent {
+  final Map<String, dynamic> data;
+  const UpdateProfileEvent(this.data);
+  @override
+  List<Object?> get props => [data];
+}
