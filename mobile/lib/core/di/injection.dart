@@ -66,7 +66,7 @@ Future<void> configureDependencies() async {
   getIt.registerFactory(() => VehiclesBloc(getIt<VehiclesRepository>()));
 
   // Other BLoCs
-  getIt.registerFactory(() => HomeBloc(getIt<ApiClient>()));
+  getIt.registerFactory(() => HomeBloc(getIt<ApiClient>(), getIt<SharedPreferences>()));
   getIt.registerFactory(() => NotificationBloc(getIt<ApiClient>()));
   getIt.registerFactory(() => ChatBloc(getIt<ApiClient>()));
   getIt.registerFactory(() => SubscriptionBloc(getIt<ApiClient>()));

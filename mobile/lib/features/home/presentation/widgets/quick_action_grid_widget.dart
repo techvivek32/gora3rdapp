@@ -12,7 +12,7 @@ class QuickActionGridWidget extends StatelessWidget {
       _QuickAction(icon: Icons.search_rounded, label: 'Requirement', onTap: () => context.push('/requirements/create')),
       _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab', onTap: () => context.push('/vehicles/create')),
       _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans', onTap: () => context.push('/subscriptions')),
-      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities', onTap: () {}),
+      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities', onTap: () => context.push('/select-city')),
       _QuickAction(icon: Icons.person_rounded, label: 'My Account', onTap: () => context.go('/profile')),
       _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications', onTap: () => context.push('/notifications')),
     ];

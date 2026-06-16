@@ -9,6 +9,7 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/otp_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/home/presentation/pages/select_city_page.dart';
 import '../../features/requirements/presentation/pages/requirements_feed_page.dart';
 import '../../features/requirements/presentation/pages/create_requirement_page.dart';
 import '../../features/requirements/presentation/pages/requirement_detail_page.dart';
@@ -109,6 +110,10 @@ class AppRouter {
       GoRoute(
         path: '/subscriptions',
         builder: (_, __) => const SubscriptionPlansPage(),
+      ),
+      GoRoute(
+        path: '/select-city',
+        builder: (_, __) => const SelectCityPage(),
       ),
     ],
   );
