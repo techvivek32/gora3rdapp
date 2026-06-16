@@ -12,6 +12,9 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
     on<LoadVehiclesEvent>(_onLoad);
     on<CreateVehicleEvent>(_onCreate);
     on<DeleteVehicleEvent>(_onDelete);
+    on<LoadVehicleDetailEvent>(_onLoadDetail);
+    on<UpdateVehicleEvent>(_onUpdate);
+    on<CancelVehicleEvent>(_onCancel);
   }
 
   Future<void> _onLoad(LoadVehiclesEvent event, Emitter<VehiclesState> emit) async {
@@ -34,5 +37,33 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
   Future<void> _onDelete(DeleteVehicleEvent event, Emitter<VehiclesState> emit) async {
     final result = await repository.deleteVehicle(event.id);
     result.fold((f) => emit(VehiclesError(message: f.message)), (_) => add(LoadVehiclesEvent()));
+  }
+
+  Future<void> _onLoadDetail(LoadVehicleDetailEvent event, Emitter<VehiclesState> emit) async {
+    emit(VehiclesLoading());
+    final result = await repository.getVehicleById(event.id);
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (data) => emit(VehicleDetailLoaded(vehicle: data['data'] as Map<String, dynamic>? ?? data)),
+    );
+  }
+
+  Future<void> _onUpdate(UpdateVehicleEvent event, Emitter<VehiclesState> emit) async {
+    emit(VehiclesLoading());
+    final result = await repository.updateVehicle(event.id, event.data);
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (data) => emit(VehicleUpdated(vehicle: data['data'] as Map<String, dynamic>? ?? data)),
+    );
+  }
+
+  Future<void> _onCancel(CancelVehicleEvent event, Emitter<VehiclesState> emit) async {
+    emit(VehiclesLoading());
+    // For now, we'll just delete the vehicle, similar to how requirements work? Or check if backend has cancel endpoint?
+    final result = await repository.deleteVehicle(event.id);
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (_) => emit(VehicleCancelled()),
+    );
   }
 }

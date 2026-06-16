@@ -15,6 +15,8 @@ class VehiclesFeedPage extends StatefulWidget {
 class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   final _scrollController = ScrollController();
   final _searchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _lastLoadedVehicles = [];
+  bool _lastHasMore = false;
 
   @override
   void initState() {
@@ -52,6 +54,11 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
       ),
       body: BlocBuilder<VehiclesBloc, VehiclesState>(
         builder: (context, state) {
+          if (state is VehiclesLoaded) {
+            _lastLoadedVehicles = state.vehicles;
+            _lastHasMore = state.hasMore;
+          }
+
           if (state is VehiclesLoading) {
             return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
@@ -68,48 +75,61 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               ),
             );
           }
+
+          // Use last loaded vehicles if current state isn't one of the feed-specific states
+          List<Map<String, dynamic>> vehicles = [];
           if (state is VehiclesLoaded) {
-            if (state.vehicles.isEmpty) {
-              return RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.35),
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.local_taxi_outlined, size: 64.sp, color: AppColors.textHint),
-                          SizedBox(height: 16.h),
-                          Text('No vehicles available', style: TextStyle(fontSize: 18.sp, color: AppColors.textSecondary)),
-                          SizedBox(height: 8.h),
-                          Text('Be the first to post your available cab', style: TextStyle(color: AppColors.textHint)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
+            vehicles = state.vehicles;
+          } else {
+            vehicles = _lastLoadedVehicles;
+          }
+
+          if (vehicles.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
-              child: ListView.separated(
-                controller: _scrollController,
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
-                itemCount: state.vehicles.length,
-                separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                itemBuilder: (context, i) => _VehicleCard(
-                  vehicle: state.vehicles[i],
-                  onTap: () => context.push('/vehicles/${state.vehicles[i]['_id']}', extra: state.vehicles[i]),
-                ),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.35),
+                  Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.local_taxi_outlined, size: 64.sp, color: AppColors.textHint),
+                        SizedBox(height: 16.h),
+                        Text('No vehicles available', style: TextStyle(fontSize: 18.sp, color: AppColors.textSecondary)),
+                        SizedBox(height: 8.h),
+                        Text('Be the first to post your available cab', style: TextStyle(color: AppColors.textHint)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             );
           }
-          return const SizedBox.shrink();
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
+            child: ListView.separated(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
+              itemCount: vehicles.length,
+              separatorBuilder: (_, __) => SizedBox(height: 12.h),
+              itemBuilder: (context, i) => _VehicleCard(
+                vehicle: vehicles[i],
+                onTap: () => context.push(
+                  '/vehicles/${vehicles[i]['_id']}',
+                  extra: vehicles[i],
+                ).then((result) {
+                  if (result == true && mounted) {
+                    context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
+                  }
+                }),
+              ),
+            ),
+          );
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -130,8 +150,9 @@ class _VehicleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = vehicle['status'] as String? ?? 'available';
-    final postedBy = vehicle['postedBy'] as Map<String, dynamic>?;
-    final memberType = postedBy?['membershipType'] ?? 'new';
+    final postedBy = vehicle['postedBy'];
+    final postedByMap = postedBy is Map ? postedBy : null;
+    final memberType = postedByMap?['membershipType'] ?? 'new';
     final isNew = memberType == 'new';
     final isActive = memberType == 'active';
     final color = isNew ? AppColors.primary : (isActive ? Colors.green : AppColors.primary);

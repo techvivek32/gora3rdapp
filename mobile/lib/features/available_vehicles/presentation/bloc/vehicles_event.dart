@@ -36,3 +36,26 @@ class FilterVehiclesEvent extends VehiclesEvent {
   @override
   List<Object?> get props => [filters];
 }
+
+class LoadVehicleDetailEvent extends VehiclesEvent {
+  final String id;
+  const LoadVehicleDetailEvent(this.id);
+  @override
+  List<Object?> get props => [id];
+}
+
+class UpdateVehicleEvent extends VehiclesEvent {
+  final String id;
+  final Map<String, dynamic> data;
+  const UpdateVehicleEvent({required this.id, required this.data});
+  @override
+  List<Object?> get props => [id, data];
+}
+
+class CancelVehicleEvent extends VehiclesEvent {
+  final String id;
+  final String reason;
+  const CancelVehicleEvent({required this.id, required this.reason});
+  @override
+  List<Object?> get props => [id, reason];
+}

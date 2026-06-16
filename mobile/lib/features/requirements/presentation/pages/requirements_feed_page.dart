@@ -17,6 +17,8 @@ class RequirementsFeedPage extends StatefulWidget {
 class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
   String _searchQuery = '';
+  List<Map<String, dynamic>> _lastLoadedRequirements = [];
+  bool _lastHasMore = false;
 
   @override
   void initState() {
@@ -61,52 +63,66 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
       ),
       body: BlocBuilder<RequirementsBloc, RequirementsState>(
         builder: (context, state) {
+          if (state is RequirementsLoaded) {
+            _lastLoadedRequirements = state.requirements;
+            _lastHasMore = state.hasMore;
+          }
+
           if (state is RequirementsLoading) {
             return _buildLoadingList();
           }
 
+          // Use last loaded requirements if current state isn't one of the feed-specific states
+          List<Map<String, dynamic>> requirements = [];
+          bool isLoadingMore = false;
           if (state is RequirementsLoaded) {
-            if (state.requirements.isEmpty) {
-              return RefreshIndicator(
-                color: AppColors.primary,
-                onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
-                child: ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: [SizedBox(height: MediaQuery.of(context).size.height * 0.35), _buildEmptyState()],
-                ),
-              );
-            }
+            requirements = state.requirements;
+            isLoadingMore = state.isLoadingMore;
+          } else {
+            requirements = _lastLoadedRequirements;
+            isLoadingMore = false;
+          }
+
+          if (requirements.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
-              child: ListView.separated(
-                controller: _scrollController,
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
-                itemCount: state.requirements.length + (state.isLoadingMore ? 1 : 0),
-                separatorBuilder: (_, __) => SizedBox(height: 16.h),
-                itemBuilder: (context, index) {
-                  if (index == state.requirements.length) {
-                    return Center(child: Padding(
-                      padding: EdgeInsets.all(16.r),
-                      child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
-                    ));
-                  }
-                  return RequirementCardWidget(
-                    requirement: state.requirements[index],
-                    onTap: () => context.push(
-                      '/requirements/${state.requirements[index]['_id']}',
-                      extra: state.requirements[index],
-                    ).then((result) {
-                      if (result == true && mounted) {
-                        context.read<RequirementsBloc>().add(LoadRequirementsEvent());
-                      }
-                    }),
-                  );
-                },
+                children: [SizedBox(height: MediaQuery.of(context).size.height * 0.35), _buildEmptyState()],
               ),
             );
           }
+          return RefreshIndicator(
+            color: AppColors.primary,
+            onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+            child: ListView.separated(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
+              itemCount: requirements.length + (isLoadingMore ? 1 : 0),
+              separatorBuilder: (_, __) => SizedBox(height: 16.h),
+              itemBuilder: (context, index) {
+                if (index == requirements.length) {
+                  return Center(child: Padding(
+                    padding: EdgeInsets.all(16.r),
+                    child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+                  ));
+                }
+                return RequirementCardWidget(
+                  requirement: requirements[index],
+                  onTap: () => context.push(
+                    '/requirements/${requirements[index]['_id']}',
+                    extra: requirements[index],
+                  ).then((result) {
+                    if (result == true && mounted) {
+                      context.read<RequirementsBloc>().add(LoadRequirementsEvent());
+                    }
+                  }),
+                );
+              },
+            ),
+          );
 
           if (state is RequirementsError) {
             return RefreshIndicator(

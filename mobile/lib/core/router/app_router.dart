@@ -89,7 +89,10 @@ class AppRouter {
       ),
       GoRoute(
         path: '/vehicles/:id',
-        builder: (_, state) => VehicleDetailPage(vehicle: state.extra as Map<String, dynamic>? ?? {}),
+        builder: (_, state) => VehicleDetailPage(
+          vehicleId: state.pathParameters['id']!,
+          vehicle: state.extra as Map<String, dynamic>?,
+        ),
       ),
       GoRoute(
         path: '/notifications',
