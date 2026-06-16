@@ -134,19 +134,8 @@ class _VehicleCard extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: IgnorePointer(
-                  child: Center(
-                    child: Transform.rotate(
-                      angle: -0.6,
-                      child: Text(
-                        'Secure Member',
-                        style: TextStyle(
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey.withOpacity(0.08),
-                          letterSpacing: 2,
-                        ),
-                      ),
-                    ),
+                  child: CustomPaint(
+                    painter: _WatermarkPainter(),
                   ),
                 ),
               ),
@@ -327,4 +316,50 @@ class _VehicleCard extends StatelessWidget {
       return date.toString();
     }
   }
+}
+
+class _WatermarkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const text = 'Secure Member';
+    const angle = -0.5;
+    const rowGap = 36.0;
+    const colGap = 120.0;
+
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.grey.withOpacity(0.2),
+          letterSpacing: 1.2,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
+
+    final rows = (size.height / rowGap).ceil() + 4;
+    final cols = (size.width / colGap).ceil() + 4;
+
+    for (int row = -2; row < rows; row++) {
+      for (int col = -2; col < cols; col++) {
+        final x = col * colGap;
+        final y = row * rowGap;
+        canvas.save();
+        canvas.translate(x, y);
+        canvas.rotate(angle);
+        tp.paint(canvas, Offset.zero);
+        canvas.restore();
+      }
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
