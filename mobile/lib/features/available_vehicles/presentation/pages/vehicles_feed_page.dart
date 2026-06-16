@@ -56,19 +56,39 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
             return Center(child: CircularProgressIndicator(color: AppColors.primary));
           }
           if (state is VehiclesError) {
-            return Center(child: Text(state.message, style: TextStyle(color: AppColors.textSecondary)));
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                  Center(child: Text(state.message, style: TextStyle(color: AppColors.textSecondary))),
+                ],
+              ),
+            );
           }
           if (state is VehiclesLoaded) {
             if (state.vehicles.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              return RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   children: [
-                    Icon(Icons.local_taxi_outlined, size: 64.sp, color: AppColors.textHint),
-                    SizedBox(height: 16.h),
-                    Text('No vehicles available', style: TextStyle(fontSize: 18.sp, color: AppColors.textSecondary)),
-                    SizedBox(height: 8.h),
-                    Text('Be the first to post your available cab', style: TextStyle(color: AppColors.textHint)),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.35),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.local_taxi_outlined, size: 64.sp, color: AppColors.textHint),
+                          SizedBox(height: 16.h),
+                          Text('No vehicles available', style: TextStyle(fontSize: 18.sp, color: AppColors.textSecondary)),
+                          SizedBox(height: 8.h),
+                          Text('Be the first to post your available cab', style: TextStyle(color: AppColors.textHint)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -78,6 +98,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
               child: ListView.separated(
                 controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.all(16.r),
                 itemCount: state.vehicles.length,
                 separatorBuilder: (_, __) => SizedBox(height: 12.h),

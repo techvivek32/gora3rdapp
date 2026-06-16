@@ -67,15 +67,21 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
           if (state is RequirementsLoaded) {
             if (state.requirements.isEmpty) {
-              return _buildEmptyState();
+              return RefreshIndicator(
+                color: AppColors.primary,
+                onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  children: [SizedBox(height: MediaQuery.of(context).size.height * 0.35), _buildEmptyState()],
+                ),
+              );
             }
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async {
-                context.read<RequirementsBloc>().add(LoadRequirementsEvent());
-              },
+              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
               child: ListView.separated(
                 controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.all(16.r),
                 itemCount: state.requirements.length + (state.isLoadingMore ? 1 : 0),
                 separatorBuilder: (_, __) => SizedBox(height: 16.h),
@@ -99,19 +105,29 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           }
 
           if (state is RequirementsError) {
-            return Center(child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 48.sp, color: AppColors.error),
-                SizedBox(height: 16.h),
-                Text(state.message, style: TextStyle(color: AppColors.textSecondary)),
-                SizedBox(height: 16.h),
-                ElevatedButton(
-                  onPressed: () => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
-                  child: const Text('Retry'),
-                ),
-              ],
-            ));
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                  Center(child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 48.sp, color: AppColors.error),
+                      SizedBox(height: 16.h),
+                      Text(state.message, style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
+                      SizedBox(height: 16.h),
+                      ElevatedButton(
+                        onPressed: () => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  )),
+                ],
+              ),
+            );
           }
 
           return const SizedBox();
