@@ -14,7 +14,8 @@ class SelectCityPage extends StatefulWidget {
 class _SelectCityPageState extends State<SelectCityPage> {
   final TextEditingController _searchController = TextEditingController();
   List<String> _filteredCities = [];
-  bool _isLoading = false;
+  bool _isSaving = false;
+  bool _justSaved = false;
 
   @override
   void initState() {
@@ -45,13 +46,21 @@ class _SelectCityPageState extends State<SelectCityPage> {
               backgroundColor: AppColors.error,
             ),
           );
-        }
-        if (state is HomeLoaded && !_isLoading) {
+          setState(() {
+            _isSaving = false;
+            _justSaved = false;
+          });
+        } else if (state is HomeSavingCities) {
+          setState(() {
+            _isSaving = true;
+            _justSaved = true;
+          });
+        } else if (state is HomeLoaded && _justSaved) {
           Navigator.of(context).pop();
         }
       },
       builder: (context, state) {
-        _isLoading = state is HomeLoading;
+        final isLoading = state is HomeLoading || state is HomeSavingCities;
         return Scaffold(
           backgroundColor: const Color(0xFFF8F8F8),
           appBar: AppBar(
@@ -278,7 +287,7 @@ class _SelectCityPageState extends State<SelectCityPage> {
                 ),
                 color: Colors.white,
                 child: ElevatedButton(
-                  onPressed: _isLoading
+                  onPressed: isLoading
                       ? null
                       : () {
                           context.read<HomeBloc>().add(const SaveSelectedCitiesEvent());
@@ -292,7 +301,7 @@ class _SelectCityPageState extends State<SelectCityPage> {
                     ),
                     minimumSize: Size(double.infinity, 50.h),
                   ),
-                  child: _isLoading
+                  child: isLoading
                       ? SizedBox(
                           width: 20.w,
                           height: 20.w,

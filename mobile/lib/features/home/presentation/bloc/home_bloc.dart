@@ -175,11 +175,15 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Future<void> _onLoad(LoadHomeDataEvent event, Emitter<HomeState> emit) async {
     emit(HomeLoading());
     try {
-      final selectedCities = sharedPreferences.getStringList(_selectedCitiesKey) ?? [];
       final results = await Future.wait([
         apiClient.get('/banners'),
         apiClient.get('/requirements', params: {'limit': '5', 'page': '1'}),
+        apiClient.get('/users/profile'),
       ]);
+      final userProfile = results[2].data['data'] as Map<String, dynamic>;
+      final selectedCities = List<String>.from(userProfile['businessCities'] ?? []);
+      // Also save to local storage for offline
+      await sharedPreferences.setStringList(_selectedCitiesKey, selectedCities);
       emit(HomeLoaded(
         banners: List<Map<String, dynamic>>.from(results[0].data['data'] ?? []),
         recentRequirements: List<Map<String, dynamic>>.from(results[1].data['data'] ?? []),
@@ -214,7 +218,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   Future<void> _onSaveSelectedCities(SaveSelectedCitiesEvent event, Emitter<HomeState> emit) async {
     if (state is HomeLoaded) {
       final current = state as HomeLoaded;
-      await sharedPreferences.setStringList(_selectedCitiesKey, current.selectedCities);
+      try {
+        emit(HomeSavingCities());
+        // Save to backend
+        await apiClient.put('/users/business-cities', data: {'cities': current.selectedCities});
+        // Save to local storage
+        await sharedPreferences.setStringList(_selectedCitiesKey, current.selectedCities);
+        emit(HomeLoaded(
+          banners: current.banners,
+          recentRequirements: current.recentRequirements,
+          selectedCities: current.selectedCities,
+        ));
+      } catch (e) {
+        emit(HomeError(message: e.toString()));
+      }
     }
   }
 }
