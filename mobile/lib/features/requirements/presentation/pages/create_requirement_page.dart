@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
+import 'location_picker_page.dart';
 
 class CreateRequirementPage extends StatefulWidget {
   const CreateRequirementPage({super.key});
@@ -26,10 +28,16 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   DateTime? _returnDate;
   TimeOfDay? _returnTime;
   bool _useCustomFare = false;
-  
-  // Sample values for suggested fare
-  final double _distance = 97.0; // KM
-  final double _ratePerKm = 20.0; // ₹/km
+
+  // Location lat/lng from map picker
+  double? _pickupLat, _pickupLng;
+  double? _dropLat, _dropLng;
+  double? _computedDistance;
+  bool _loadingDistance = false;
+
+  static const double _ratePerKm = 20.0;
+
+  double get _distance => _computedDistance ?? 0.0;
   
   final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
@@ -65,6 +73,73 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     final minute = time.minute.toString().padLeft(2, '0');
     final period = time.period == DayPeriod.am ? 'AM' : 'PM';
     return '$hour:$minute $period';
+  }
+
+  Future<void> _updateDistance() async {
+    if (_pickupLat == null || _dropLat == null) return;
+    setState(() => _loadingDistance = true);
+
+    double? routeKm;
+    try {
+      final res = await Dio().get(
+        'http://router.project-osrm.org/route/v1/driving/$_pickupLng,$_pickupLat;$_dropLng,$_dropLat',
+        queryParameters: {'overview': 'false'},
+        options: Options(receiveTimeout: const Duration(seconds: 8)),
+      );
+      final data = res.data as Map<String, dynamic>;
+      if (data['code'] == 'Ok') {
+        final routes = data['routes'] as List;
+        if (routes.isNotEmpty) {
+          routeKm = (routes[0]['distance'] as num).toDouble() / 1000.0;
+        }
+      }
+    } catch (_) {}
+
+    setState(() {
+      // fallback to straight-line if OSRM fails
+      _computedDistance = routeKm ?? haversineDistanceKm(_pickupLat!, _pickupLng!, _dropLat!, _dropLng!);
+      _loadingDistance = false;
+    });
+  }
+
+  Future<void> _openPickup() async {
+    final result = await Navigator.of(context).push<LocationPickerResult>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(
+          title: 'Pick Pickup Location',
+          initialLat: _pickupLat,
+          initialLng: _pickupLng,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _pickupCtrl.text = result.address;
+        _pickupLat = result.lat;
+        _pickupLng = result.lng;
+      });
+      _updateDistance();
+    }
+  }
+
+  Future<void> _openDrop() async {
+    final result = await Navigator.of(context).push<LocationPickerResult>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(
+          title: 'Pick Drop Location',
+          initialLat: _dropLat,
+          initialLng: _dropLng,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _dropCtrl.text = result.address;
+        _dropLat = result.lat;
+        _dropLng = result.lng;
+      });
+      _updateDistance();
+    }
   }
 
   void _submit() {
@@ -116,30 +191,36 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     SizedBox(height: 12.h),
                     TextFormField(
                       controller: _pickupCtrl,
+                      readOnly: true,
+                      onTap: _openPickup,
                       decoration: InputDecoration(
-                        labelText: 'Pickup City *',
+                        labelText: 'Pickup Location *',
                         prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primary),
+                        suffixIcon: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp),
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.isEmpty ? 'Tap to pick pickup location' : null,
                     ),
                     SizedBox(height: 12.h),
                     TextFormField(
                       controller: _dropCtrl,
+                      readOnly: true,
+                      onTap: _openDrop,
                       decoration: InputDecoration(
-                        labelText: 'Drop City *',
+                        labelText: 'Drop Location *',
                         prefixIcon: Icon(Icons.location_off_outlined, color: AppColors.primary),
+                        suffixIcon: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp),
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
-                      validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      validator: (v) => v == null || v.isEmpty ? 'Tap to pick drop location' : null,
                     ),
                   ],
                 ),
@@ -500,14 +581,26 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Distance = ${_distance.toStringAsFixed(0)} KM',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: AppColors.textPrimary,
+                              if (_loadingDistance)
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2)),
+                                    SizedBox(width: 8.w),
+                                    Text('Calculating route...', style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: AppColors.textHint)),
+                                  ],
+                                )
+                              else
+                                Text(
+                                  _computedDistance != null
+                                      ? 'Route = ${_computedDistance!.toStringAsFixed(1)} KM'
+                                      : 'Route = — (pick locations)',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14.sp,
+                                    color: _computedDistance != null ? AppColors.textPrimary : AppColors.textHint,
+                                  ),
                                 ),
-                              ),
                               Text(
                                 'Rate = ₹${_ratePerKm.toStringAsFixed(0)}/km',
                                 style: TextStyle(
