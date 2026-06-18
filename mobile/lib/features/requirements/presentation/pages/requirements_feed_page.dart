@@ -18,6 +18,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
   String _searchQuery = '';
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
+  List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
 
   @override
@@ -65,6 +66,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         builder: (context, state) {
           if (state is RequirementsLoaded) {
             _lastLoadedRequirements = state.requirements;
+            _lastMyAccepted = state.myAccepted;
             _lastHasMore = state.hasMore;
           }
 
@@ -72,18 +74,23 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             return _buildLoadingList();
           }
 
-          // Use last loaded requirements if current state isn't one of the feed-specific states
           List<Map<String, dynamic>> requirements = [];
+          List<Map<String, dynamic>> myAccepted = [];
           bool isLoadingMore = false;
           if (state is RequirementsLoaded) {
             requirements = state.requirements;
+            myAccepted = state.myAccepted;
             isLoadingMore = state.isLoadingMore;
           } else {
             requirements = _lastLoadedRequirements;
+            myAccepted = _lastMyAccepted;
             isLoadingMore = false;
           }
 
-          if (requirements.isEmpty) {
+          final hasMyAccepted = myAccepted.isNotEmpty;
+          final headerOffset = hasMyAccepted ? 1 : 0;
+
+          if (requirements.isEmpty && !hasMyAccepted) {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
@@ -100,20 +107,24 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
-              itemCount: requirements.length + (isLoadingMore ? 1 : 0),
+              itemCount: requirements.length + headerOffset + (isLoadingMore ? 1 : 0),
               separatorBuilder: (_, __) => SizedBox(height: 16.h),
               itemBuilder: (context, index) {
-                if (index == requirements.length) {
+                if (hasMyAccepted && index == 0) {
+                  return _buildMyAcceptedSection(myAccepted);
+                }
+                final reqIndex = index - headerOffset;
+                if (reqIndex == requirements.length) {
                   return Center(child: Padding(
                     padding: EdgeInsets.all(16.r),
                     child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
                   ));
                 }
                 return RequirementCardWidget(
-                  requirement: requirements[index],
+                  requirement: requirements[reqIndex],
                   onTap: () => context.push(
-                    '/requirements/${requirements[index]['_id']}',
-                    extra: requirements[index],
+                    '/requirements/${requirements[reqIndex]['_id']}',
+                    extra: requirements[reqIndex],
                   ).then((result) {
                     if (result == true && mounted) {
                       context.read<RequirementsBloc>().add(LoadRequirementsEvent());
@@ -153,6 +164,55 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           return const SizedBox();
         },
       ),
+    );
+  }
+
+  Widget _buildMyAcceptedSection(List<Map<String, dynamic>> myAccepted) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
+          child: Row(
+            children: [
+              Container(
+                width: 4.w,
+                height: 18.h,
+                decoration: BoxDecoration(color: Colors.green[700], borderRadius: BorderRadius.circular(2.r)),
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'My Accepted Requirements',
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.green[800]),
+              ),
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(10.r), border: Border.all(color: Colors.green.shade300)),
+                child: Text('${myAccepted.length}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: Colors.green[700])),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 4.h),
+        ...myAccepted.map((req) => Padding(
+          padding: EdgeInsets.only(bottom: 10.h),
+          child: Stack(
+            children: [
+              RequirementCardWidget(
+                requirement: req,
+                onTap: () => context.push('/requirements/${req['_id']}', extra: req).then((result) {
+                  if (result == true && mounted) {
+                    context.read<RequirementsBloc>().add(const LoadRequirementsEvent());
+                  }
+                }),
+              ),
+            ],
+          ),
+        )),
+        Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+        SizedBox(height: 8.h),
+      ],
     );
   }
 

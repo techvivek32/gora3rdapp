@@ -9,6 +9,7 @@ abstract class RequirementsRemoteDataSource {
   Future<void> accept(String id);
   Future<void> cancel(String id, String reason);
   Future<Map<String, dynamic>> getMy({String? status});
+  Future<Map<String, dynamic>> getAcceptedByMe();
 }
 
 class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
@@ -58,6 +59,12 @@ class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
   Future<Map<String, dynamic>> getMy({String? status}) async {
     final params = status != null ? {'status': status} : <String, dynamic>{};
     final res = await apiClient.get('/requirements/my', params: params);
+    return res.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getAcceptedByMe() async {
+    final res = await apiClient.get('/requirements/accepted-by-me');
     return res.data as Map<String, dynamic>;
   }
 }

@@ -300,6 +300,18 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
             }
           });
         }
+        if (state is RequirementAccepted && mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Requirement accepted successfully!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            }
+          });
+        }
         if (state is RequirementsError && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -341,8 +353,21 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     );
   }
 
+  bool _hasCurrentUserAccepted(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! AuthAuthenticated) return false;
+    final userId = authState.user['_id'] as String? ?? authState.user['id'] as String?;
+    final acceptedBy = _requirement?['acceptedBy'] as List?;
+    if (acceptedBy == null || userId == null) return false;
+    return acceptedBy.any((u) {
+      if (u is Map) return (u['_id'] as String?) == userId;
+      return u.toString() == userId;
+    });
+  }
+
   Widget _buildBottomBar() {
     final isMine = _isMyRequirement(context);
+    final isBooked = _requirement?['status'] == 'accepted';
     if (isMine) {
       if (_isEditing) {
         return BlocBuilder<RequirementsBloc, RequirementsState>(
@@ -395,6 +420,31 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
           },
         );
       }
+      // Owner bottom bar: hide Edit when requirement is booked
+      if (isBooked) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              decoration: BoxDecoration(
+                color: Colors.green[50],
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: Colors.green),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green, size: 20.sp),
+                  SizedBox(width: 8.w),
+                  Text('Requirement Booked', style: TextStyle(color: Colors.green, fontSize: 14.sp, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
       return SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -426,6 +476,32 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                 ),
               ),
             ],
+          ),
+        ),
+      );
+    }
+    // Non-owner: show Already Accepted or Accept button
+    final alreadyAccepted = _hasCurrentUserAccepted(context);
+    if (alreadyAccepted) {
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(16.r),
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(vertical: 14.h),
+            decoration: BoxDecoration(
+              color: Colors.green[50],
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: Colors.green),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 20.sp),
+                SizedBox(width: 8.w),
+                Text('Already Accepted', style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ),
       );
@@ -1068,11 +1144,101 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                         ],
                       ),
               ),
+
+              // Accepted By section — only shown to the poster when someone has accepted
+              if (isMine && (req['acceptedBy'] as List?)?.isNotEmpty == true) ...[
+                SizedBox(height: 12.h),
+                _card(
+                  title: 'Accepted By',
+                  child: Column(
+                    children: [
+                      for (final acceptor in (req['acceptedBy'] as List)) ...[
+                        _buildAcceptorRow(acceptor as Map<String, dynamic>),
+                        if (acceptor != (req['acceptedBy'] as List).last)
+                          Divider(height: 16.h, thickness: 1, color: Colors.grey[200]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+
               SizedBox(height: 32.h),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAcceptorRow(Map<String, dynamic> acceptor) {
+    final memberType = acceptor['membershipType'] as String? ?? 'new';
+    Color badgeColor;
+    String? badgeText;
+    if (memberType == 'golden' || acceptor['isGolden'] == true) {
+      badgeColor = AppColors.memberGolden; badgeText = 'GOLDEN';
+    } else if (memberType == 'premium' || acceptor['isPremium'] == true) {
+      badgeColor = AppColors.memberPremium; badgeText = 'PREMIUM';
+    } else if (memberType == 'active' || memberType == 'verified') {
+      badgeColor = AppColors.memberActive; badgeText = 'ACTIVE';
+    } else {
+      badgeColor = Colors.grey; badgeText = null;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 22.r,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              backgroundImage: acceptor['profileImage'] != null ? NetworkImage(acceptor['profileImage'] as String) : null,
+              child: acceptor['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary, size: 18.sp) : null,
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(acceptor['fullName'] as String? ?? 'User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, fontFamily: 'Poppins')),
+                  if (acceptor['agencyName'] != null)
+                    Text(acceptor['agencyName'] as String, style: TextStyle(fontSize: 11.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+                ],
+              ),
+            ),
+            if (badgeText != null)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(4.r),
+                  border: Border.all(color: badgeColor),
+                ),
+                child: Text(badgeText, style: TextStyle(fontSize: 10.sp, color: badgeColor, fontWeight: FontWeight.w700)),
+              ),
+          ],
+        ),
+        SizedBox(height: 8.h),
+        if (acceptor['mobile'] != null)
+          _buildContactRow(Icons.phone, acceptor['mobile'] as String, Colors.blue[700]!),
+        if (acceptor['email'] != null)
+          _buildContactRow(Icons.email_outlined, acceptor['email'] as String, Colors.blue[700]!),
+        if (acceptor['city'] != null)
+          _buildContactRow(Icons.location_city, acceptor['city'] as String, Colors.grey[700]!),
+      ],
+    );
+  }
+
+  Widget _buildContactRow(IconData icon, String text, Color color) {
+    return Padding(
+      padding: EdgeInsets.only(top: 4.h),
+      child: Row(
+        children: [
+          Icon(icon, size: 14.sp, color: color),
+          SizedBox(width: 6.w),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 13.sp, color: Colors.black87, fontFamily: 'Poppins'))),
+        ],
+      ),
     );
   }
 

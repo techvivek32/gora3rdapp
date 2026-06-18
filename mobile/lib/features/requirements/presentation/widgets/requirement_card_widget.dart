@@ -30,13 +30,19 @@ class RequirementCardWidget extends StatelessWidget {
       builder: (context, authState) {
         bool isCurrentUserPremium = false;
         bool isCurrentUserOwner = false;
+        String? currentUserId;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
           isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
-          final currentUserId = user['_id'];
+          currentUserId = user['_id'] as String?;
           final posterId = postedBy?['_id'];
           isCurrentUserOwner = currentUserId != null && posterId != null && currentUserId == posterId;
         }
+
+        final acceptedByList = List.from(requirement['acceptedBy'] as List? ?? []);
+        final hasCurrentUserAccepted = currentUserId != null &&
+            acceptedByList.any((id) => id.toString() == currentUserId);
+        final isBooked = requirement['status'] == 'accepted';
 
         final memberType = postedBy?['membershipType'] ?? 'new';
         Color topBarColor;
@@ -78,7 +84,19 @@ class RequirementCardWidget extends StatelessWidget {
         }
 
         return GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('This requirement is already booked'),
+                  backgroundColor: Colors.red[700],
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            onTap();
+          },
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
             decoration: BoxDecoration(
@@ -417,6 +435,28 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (isBooked)
+                    Positioned(
+                      top: 10.h,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+                          decoration: BoxDecoration(
+                            color: hasCurrentUserAccepted ? Colors.green[700] : Colors.red[700],
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(4.r),
+                              bottomLeft: Radius.circular(4.r),
+                            ),
+                            boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(-1, 1))],
+                          ),
+                          child: Text(
+                            hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
+                            style: TextStyle(color: Colors.white, fontSize: 10.sp, fontWeight: FontWeight.bold, letterSpacing: 1),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

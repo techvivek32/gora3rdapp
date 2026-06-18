@@ -16,4 +16,5 @@ abstract class RequirementsRepository {
   Future<Either<Failure, void>> acceptRequirement(String id);
   Future<Either<Failure, void>> cancelRequirement(String id, String reason);
   Future<Either<Failure, Map<String, dynamic>>> getMyRequirements({String? status});
+  Future<Either<Failure, Map<String, dynamic>>> getAcceptedByMe();
 }

@@ -39,6 +39,12 @@ export class RequirementsController {
     return this.requirementsService.getMyRequirements(userId, status);
   }
 
+  @Get('accepted-by-me')
+  @ApiOperation({ summary: 'Get requirements I have accepted' })
+  getAcceptedByMe(@CurrentUser('sub') userId: string) {
+    return this.requirementsService.getAcceptedByMe(userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get requirement details' })
   findOne(@Param('id') id: string, @CurrentUser('sub') userId: string) {

@@ -87,4 +87,14 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       return Left(ServerFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getAcceptedByMe() async {
+    try {
+      final result = await remote.getAcceptedByMe();
+      return Right(result);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
 }

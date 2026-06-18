@@ -59,7 +59,7 @@ export class RequirementsService {
     const user = await this.userModel.findById(userId);
     const filter: any = {
       isDeleted: false,
-      status: BookingStatus.ACTIVE,
+      status: { $in: [BookingStatus.ACTIVE, BookingStatus.ACCEPTED] },
     };
 
     // Filter by user's business cities if they have set them
@@ -116,7 +116,8 @@ export class RequirementsService {
   async findOne(id: string, userId: string) {
     const requirement = await this.requirementModel
       .findById(id)
-      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
+      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile email city state')
+      .populate('acceptedBy', 'fullName agencyName profileImage membershipType mobile email city state')
       .lean();
 
     if (!requirement || requirement.isDeleted) {
@@ -186,6 +187,7 @@ export class RequirementsService {
 
     await this.requirementModel.findByIdAndUpdate(id, {
       $addToSet: { acceptedBy: new Types.ObjectId(userId) },
+      status: BookingStatus.ACCEPTED,
     });
 
     // Notify the poster
@@ -193,6 +195,15 @@ export class RequirementsService {
     await this.notificationsService.notifyRequirementAccepted(requirement, user);
 
     return { message: 'Requirement accepted successfully' };
+  }
+
+  async getAcceptedByMe(userId: string) {
+    const requirements = await this.requirementModel
+      .find({ acceptedBy: new Types.ObjectId(userId), isDeleted: false })
+      .populate('postedBy', 'fullName agencyName profileImage membershipType')
+      .sort({ updatedAt: -1 })
+      .lean();
+    return { message: 'Accepted requirements', data: requirements };
   }
 
   async cancelRequirement(id: string, userId: string, reason: string) {

@@ -11,27 +11,31 @@ class RequirementsLoading extends RequirementsState {}
 
 class RequirementsLoaded extends RequirementsState {
   final List<Map<String, dynamic>> requirements;
+  final List<Map<String, dynamic>> myAccepted;
   final bool isLoadingMore;
   final bool hasMore;
 
   const RequirementsLoaded({
     required this.requirements,
+    this.myAccepted = const [],
     this.isLoadingMore = false,
     this.hasMore = false,
   });
 
   RequirementsLoaded copyWith({
     List<Map<String, dynamic>>? requirements,
+    List<Map<String, dynamic>>? myAccepted,
     bool? isLoadingMore,
     bool? hasMore,
   }) => RequirementsLoaded(
     requirements: requirements ?? this.requirements,
+    myAccepted: myAccepted ?? this.myAccepted,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     hasMore: hasMore ?? this.hasMore,
   );
 
   @override
-  List<Object?> get props => [requirements, isLoadingMore, hasMore];
+  List<Object?> get props => [requirements, myAccepted, isLoadingMore, hasMore];
 }
 
 class RequirementsError extends RequirementsState {

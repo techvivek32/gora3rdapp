@@ -29,12 +29,19 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     _hasMore = true;
 
     final result = await repository.getRequirements(page: 1, filters: event.filters);
+    final myAcceptedResult = await repository.getAcceptedByMe();
+
     result.fold(
       (f) => emit(RequirementsError(message: f.message)),
       (data) {
         _hasMore = data['meta']?['hasNextPage'] ?? false;
+        final myAccepted = myAcceptedResult.fold(
+          (_) => <Map<String, dynamic>>[],
+          (my) => List<Map<String, dynamic>>.from(my['data'] ?? []),
+        );
         emit(RequirementsLoaded(
           requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
+          myAccepted: myAccepted,
           isLoadingMore: false,
           hasMore: _hasMore,
         ));
@@ -96,7 +103,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
       (f) => emit(RequirementsError(message: f.message)),
       (data) {
         emit(RequirementCreated(requirement: data));
-        add(LoadRequirementsEvent());
+        add(const LoadRequirementsEvent());
       },
     );
   }
@@ -105,7 +112,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final result = await repository.deleteRequirement(event.id);
     result.fold(
       (f) => emit(RequirementsError(message: f.message)),
-      (_) => add(LoadRequirementsEvent()),
+      (_) => add(const LoadRequirementsEvent()),
     );
   }
 
@@ -122,7 +129,10 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final result = await repository.acceptRequirement(event.id);
     result.fold(
       (f) => emit(RequirementsError(message: f.message)),
-      (_) => emit(RequirementAccepted()),
+      (_) {
+        emit(RequirementAccepted());
+        add(LoadRequirementDetailEvent(event.id));
+      },
     );
   }
 
