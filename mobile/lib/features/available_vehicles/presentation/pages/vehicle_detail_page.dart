@@ -47,9 +47,8 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     if (widget.vehicle != null) {
       _vehicle = widget.vehicle;
       _populateControllers();
-    } else {
-      context.read<VehiclesBloc>().add(LoadVehicleDetailEvent(widget.vehicleId));
     }
+    context.read<VehiclesBloc>().add(LoadVehicleDetailEvent(widget.vehicleId));
   }
 
   void _populateControllers() {
@@ -293,6 +292,15 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
             }
           });
         }
+        if (state is VehicleAccepted && mounted) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Vehicle accepted successfully!'), backgroundColor: AppColors.success),
+              );
+            }
+          });
+        }
         if (state is VehiclesError && mounted) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -388,6 +396,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
           },
         );
       }
+      final isVehicleBooked = (_vehicle?['status'] as String? ?? '') == 'booked';
       return SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
@@ -405,20 +414,71 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                   ),
                 ),
               ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => setState(() => _isEditing = true),
-                  icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                  label: Text('Edit', style: TextStyle(color: Colors.white, fontSize: 14.sp)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: EdgeInsets.symmetric(vertical: 13.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+              if (!isVehicleBooked) ...[
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => setState(() => _isEditing = true),
+                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
+                    label: Text('Edit', style: TextStyle(color: Colors.white, fontSize: 14.sp)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: EdgeInsets.symmetric(vertical: 13.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
+          ),
+        ),
+      );
+    }
+    // Non-owner bottom bar
+    final authState = context.read<AuthBloc>().state;
+    final currentUserId = authState is AuthAuthenticated ? authState.user['_id'] as String? : null;
+    final acceptorsList = (_vehicle?['acceptedBy'] as List? ?? []);
+    final hasCurrentUserAccepted = currentUserId != null && acceptorsList.any((a) {
+      if (a is Map) return a['_id']?.toString() == currentUserId;
+      return a?.toString() == currentUserId;
+    });
+    final vehicleStatus = (_vehicle?['status'] as String? ?? 'available');
+    final isBooked = vehicleStatus == 'booked';
+
+    if (hasCurrentUserAccepted) {
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(16.r),
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.check_circle_outline, color: Colors.white),
+            label: const Text('Already Accepted', style: TextStyle(color: Colors.white, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[700],
+              disabledBackgroundColor: Colors.green[700],
+              disabledForegroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+            ),
+          ),
+        ),
+      );
+    }
+    if (isBooked) {
+      return SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(16.r),
+          child: ElevatedButton.icon(
+            onPressed: null,
+            icon: const Icon(Icons.block, color: Colors.white),
+            label: const Text('Vehicle Already Booked', style: TextStyle(color: Colors.white, fontSize: 15)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[700],
+              disabledBackgroundColor: Colors.red[700],
+              disabledForegroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 14.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+            ),
           ),
         ),
       );
@@ -427,9 +487,9 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
       child: Padding(
         padding: EdgeInsets.all(16.r),
         child: ElevatedButton.icon(
-          onPressed: () {},
-          icon: const Icon(Icons.call, color: Colors.white),
-          label: const Text('Contact Driver', style: TextStyle(color: Colors.white, fontSize: 15)),
+          onPressed: () => context.read<VehiclesBloc>().add(AcceptVehicleEvent(widget.vehicleId)),
+          icon: const Icon(Icons.handshake_outlined, color: Colors.white),
+          label: const Text('Accept Cab', style: TextStyle(color: Colors.white, fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -672,6 +732,11 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     final isMine = _isMyVehicle(context);
     final postedBy = vehicle['postedBy'];
     final postedByMap = postedBy is Map ? postedBy : null;
+
+    final acceptors = (vehicle['acceptedBy'] as List? ?? [])
+        .where((a) => a is Map)
+        .map((a) => Map<String, dynamic>.from(a as Map))
+        .toList();
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
@@ -919,11 +984,84 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                         ],
                       ),
               ),
+              if (isMine && acceptors.isNotEmpty) ...[
+                SizedBox(height: 12.h),
+                _card(
+                  title: 'Accepted By',
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < acceptors.length; i++) ...[
+                        _buildAcceptorRow(acceptors[i]),
+                        if (i < acceptors.length - 1)
+                          Divider(height: 16.h, thickness: 1, color: Colors.grey[200]),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
               SizedBox(height: 32.h),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildAcceptorRow(Map<String, dynamic> acceptor) {
+    final memberType = acceptor['membershipType'] as String? ?? 'new';
+    Color badgeColor;
+    Color badgeBg;
+    String? badgeText;
+    if (memberType == 'golden') {
+      badgeColor = AppColors.memberGolden;
+      badgeBg = AppColors.memberGolden.withOpacity(0.12);
+      badgeText = 'GOLDEN';
+    } else if (memberType == 'premium') {
+      badgeColor = AppColors.memberPremium;
+      badgeBg = AppColors.memberPremium.withOpacity(0.12);
+      badgeText = 'PREMIUM';
+    } else if (memberType == 'active' || memberType == 'verified') {
+      badgeColor = AppColors.memberActive;
+      badgeBg = AppColors.memberActive.withOpacity(0.1);
+      badgeText = 'ACTIVE';
+    } else {
+      badgeColor = Colors.grey;
+      badgeBg = Colors.grey[100]!;
+      badgeText = null;
+    }
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 20.r,
+          backgroundColor: AppColors.primary.withOpacity(0.1),
+          backgroundImage: acceptor['profileImage'] != null ? NetworkImage(acceptor['profileImage'] as String) : null,
+          child: acceptor['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary, size: 20.sp) : null,
+        ),
+        SizedBox(width: 10.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(acceptor['fullName'] as String? ?? 'Unknown', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp)),
+              if (acceptor['agencyName'] != null)
+                Text(acceptor['agencyName'] as String, style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+              if (acceptor['mobile'] != null)
+                Text(acceptor['mobile'] as String, style: TextStyle(fontSize: 11.sp, color: Colors.blue[700])),
+            ],
+          ),
+        ),
+        if (badgeText != null)
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+            decoration: BoxDecoration(
+              color: badgeBg,
+              borderRadius: BorderRadius.circular(4.r),
+              border: Border.all(color: badgeColor),
+            ),
+            child: Text(badgeText, style: TextStyle(fontSize: 9.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+          ),
+      ],
     );
   }
 

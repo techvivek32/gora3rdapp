@@ -11,20 +11,34 @@ class VehiclesLoading extends VehiclesState {}
 
 class VehiclesLoaded extends VehiclesState {
   final List<Map<String, dynamic>> vehicles;
+  final List<Map<String, dynamic>> myAccepted;
   final bool hasMore;
   final int currentPage;
-  const VehiclesLoaded({required this.vehicles, this.hasMore = false, this.currentPage = 1});
+  const VehiclesLoaded({
+    required this.vehicles,
+    this.myAccepted = const [],
+    this.hasMore = false,
+    this.currentPage = 1,
+  });
   @override
-  List<Object?> get props => [vehicles, hasMore, currentPage];
+  List<Object?> get props => [vehicles, myAccepted, hasMore, currentPage];
 
-  VehiclesLoaded copyWith({List<Map<String, dynamic>>? vehicles, bool? hasMore, int? currentPage}) {
+  VehiclesLoaded copyWith({
+    List<Map<String, dynamic>>? vehicles,
+    List<Map<String, dynamic>>? myAccepted,
+    bool? hasMore,
+    int? currentPage,
+  }) {
     return VehiclesLoaded(
       vehicles: vehicles ?? this.vehicles,
+      myAccepted: myAccepted ?? this.myAccepted,
       hasMore: hasMore ?? this.hasMore,
       currentPage: currentPage ?? this.currentPage,
     );
   }
 }
+
+class VehicleAccepted extends VehiclesState {}
 
 class VehicleCreated extends VehiclesState {
   final Map<String, dynamic> vehicle;

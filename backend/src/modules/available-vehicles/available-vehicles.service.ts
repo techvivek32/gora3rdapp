@@ -35,7 +35,7 @@ export class AvailableVehiclesService {
 
     const filter: any = {
       isDeleted: false,
-      status: AvailabilityStatus.AVAILABLE,
+      status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.BOOKED] },
     };
 
     if (user?.businessCities?.length > 0 && !query.currentCity) {
@@ -57,7 +57,11 @@ export class AvailableVehiclesService {
       this.vehicleModel.countDocuments(filter),
     ]);
 
-    const isPremium = ['premium', 'golden'].includes(user?.membershipType);
+    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
+      user?.membershipType === MembershipType.GOLDEN ||
+      user?.membershipType === MembershipType.ACTIVE ||
+      user?.membershipType === MembershipType.VERIFIED ||
+      user?.isPremium;
 
     const processed = vehicles.map((v) => {
       if (!isPremium) {
@@ -74,7 +78,8 @@ export class AvailableVehiclesService {
   async findOne(id: string, userId: string) {
     const vehicle = await this.vehicleModel
       .findById(id)
-      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
+      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile email city state')
+      .populate('acceptedBy', 'fullName agencyName profileImage membershipType mobile email city state')
       .lean();
 
     if (!vehicle || vehicle.isDeleted) throw new NotFoundException('Vehicle listing not found');
@@ -82,12 +87,18 @@ export class AvailableVehiclesService {
     await this.vehicleModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } });
 
     const user = await this.userModel.findById(userId).select('membershipType isPremium isGolden');
-    const isPremium = user?.isPremium || user?.isGolden || ['premium', 'golden'].includes(user?.membershipType);
+    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
+      user?.membershipType === MembershipType.GOLDEN ||
+      user?.membershipType === MembershipType.ACTIVE ||
+      user?.membershipType === MembershipType.VERIFIED ||
+      user?.isPremium;
 
     if (!isPremium) {
       (vehicle as any).driverMobile = undefined;
       const postedBy = vehicle.postedBy as any;
       if (postedBy) postedBy.mobile = undefined;
+    } else {
+      await this.vehicleModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
     }
 
     return { message: 'Vehicle listing found', data: vehicle };
@@ -122,5 +133,42 @@ export class AvailableVehiclesService {
       .lean();
 
     return { message: 'My vehicle listings', data: vehicles };
+  }
+
+  async acceptVehicle(id: string, userId: string) {
+    const vehicle = await this.vehicleModel.findById(id);
+    if (!vehicle) throw new NotFoundException('Vehicle listing not found');
+
+    if (vehicle.postedBy.toString() === userId) {
+      return { message: 'You cannot accept your own vehicle listing' };
+    }
+
+    const isAlreadyAccepted = (vehicle as any).acceptedBy?.some(
+      (uid: any) => uid.toString() === userId,
+    );
+
+    if (isAlreadyAccepted) {
+      return { message: 'Already accepted this vehicle listing' };
+    }
+
+    await this.vehicleModel.findByIdAndUpdate(id, {
+      $addToSet: { acceptedBy: new Types.ObjectId(userId) },
+      status: AvailabilityStatus.BOOKED,
+    });
+
+    return { message: 'Vehicle listing accepted successfully' };
+  }
+
+  async getAcceptedByMe(userId: string) {
+    const vehicles = await this.vehicleModel
+      .find({
+        acceptedBy: new Types.ObjectId(userId),
+        postedBy: { $ne: new Types.ObjectId(userId) },
+        isDeleted: false,
+      })
+      .populate('postedBy', 'fullName agencyName profileImage membershipType')
+      .sort({ updatedAt: -1 })
+      .lean();
+    return { message: 'Accepted vehicle listings', data: vehicles };
   }
 }

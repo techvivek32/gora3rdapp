@@ -63,6 +63,9 @@ export class AvailableVehicle {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   interestedUsers: Types.ObjectId[];
 
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  acceptedBy: Types.ObjectId[];
+
   @Prop({ type: Date })
   expiresAt: Date;
 

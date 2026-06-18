@@ -15,14 +15,26 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
     on<LoadVehicleDetailEvent>(_onLoadDetail);
     on<UpdateVehicleEvent>(_onUpdate);
     on<CancelVehicleEvent>(_onCancel);
+    on<AcceptVehicleEvent>(_onAccept);
   }
 
   Future<void> _onLoad(LoadVehiclesEvent event, Emitter<VehiclesState> emit) async {
     emit(VehiclesLoading());
     final result = await repository.getVehicles(page: event.page, filters: event.filters);
+    final myAcceptedResult = await repository.getAcceptedByMe();
+
     result.fold(
       (f) => emit(VehiclesError(message: f.message)),
-      (data) => emit(VehiclesLoaded(vehicles: List<Map<String, dynamic>>.from(data['data'] ?? []))),
+      (data) {
+        final myAccepted = myAcceptedResult.fold(
+          (_) => const <Map<String, dynamic>>[],
+          (my) => List<Map<String, dynamic>>.from(my['data'] ?? []),
+        );
+        emit(VehiclesLoaded(
+          vehicles: List<Map<String, dynamic>>.from(data['data'] ?? []),
+          myAccepted: myAccepted,
+        ));
+      },
     );
   }
 
@@ -30,7 +42,7 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
     final result = await repository.createVehicle(event.data);
     result.fold(
       (f) => emit(VehiclesError(message: f.message)),
-      (data) { emit(VehicleCreated(vehicle: data)); add(LoadVehiclesEvent()); },
+      (data) { emit(VehicleCreated(vehicle: data)); add(const LoadVehiclesEvent()); },
     );
   }
 
@@ -59,11 +71,21 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
 
   Future<void> _onCancel(CancelVehicleEvent event, Emitter<VehiclesState> emit) async {
     emit(VehiclesLoading());
-    // For now, we'll just delete the vehicle, similar to how requirements work? Or check if backend has cancel endpoint?
     final result = await repository.deleteVehicle(event.id);
     result.fold(
       (f) => emit(VehiclesError(message: f.message)),
       (_) => emit(VehicleCancelled()),
+    );
+  }
+
+  Future<void> _onAccept(AcceptVehicleEvent event, Emitter<VehiclesState> emit) async {
+    final result = await repository.acceptVehicle(event.id);
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (_) {
+        emit(VehicleAccepted());
+        add(LoadVehicleDetailEvent(event.id));
+      },
     );
   }
 }

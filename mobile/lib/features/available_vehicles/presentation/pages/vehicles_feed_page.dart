@@ -17,6 +17,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   final _scrollController = ScrollController();
   final _searchCtrl = TextEditingController();
   List<Map<String, dynamic>> _lastLoadedVehicles = [];
+  List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
 
   @override
@@ -57,6 +58,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         builder: (context, state) {
           if (state is VehiclesLoaded) {
             _lastLoadedVehicles = state.vehicles;
+            _lastMyAccepted = state.myAccepted;
             _lastHasMore = state.hasMore;
           }
 
@@ -78,13 +80,19 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           }
 
           List<Map<String, dynamic>> vehicles = [];
+          List<Map<String, dynamic>> myAccepted = [];
           if (state is VehiclesLoaded) {
             vehicles = state.vehicles;
+            myAccepted = state.myAccepted;
           } else {
             vehicles = _lastLoadedVehicles;
+            myAccepted = _lastMyAccepted;
           }
 
-          if (vehicles.isEmpty) {
+          final hasMyAccepted = myAccepted.isNotEmpty;
+          final headerOffset = hasMyAccepted ? 1 : 0;
+
+          if (vehicles.isEmpty && !hasMyAccepted) {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<VehiclesBloc>().add(const LoadVehiclesEvent()),
@@ -115,16 +123,22 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(left: 16.w, right: 16.w, top: 16.r, bottom: 140.h),
-              itemCount: vehicles.length,
+              itemCount: vehicles.length + headerOffset,
               separatorBuilder: (_, __) => SizedBox(height: 12.h),
-              itemBuilder: (context, i) => _VehicleCard(
-                vehicle: vehicles[i],
-                onTap: () => context.push('/vehicles/${vehicles[i]['_id']}', extra: vehicles[i]).then((result) {
-                  if (result == true && mounted) {
-                    context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
-                  }
-                }),
-              ),
+              itemBuilder: (context, index) {
+                if (hasMyAccepted && index == 0) {
+                  return _buildMyAcceptedSection(myAccepted);
+                }
+                final i = index - headerOffset;
+                return _VehicleCard(
+                  vehicle: vehicles[i],
+                  onTap: () => context.push('/vehicles/${vehicles[i]['_id']}', extra: vehicles[i]).then((result) {
+                    if (result == true && mounted) {
+                      context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
+                    }
+                  }),
+                );
+              },
             ),
           );
         },
@@ -135,6 +149,55 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Post Vehicle', style: TextStyle(color: Colors.white)),
       ),
+    );
+  }
+
+  Widget _buildMyAcceptedSection(List<Map<String, dynamic>> myAccepted) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
+          child: Row(
+            children: [
+              Container(
+                width: 4.w,
+                height: 18.h,
+                decoration: BoxDecoration(color: Colors.green[700], borderRadius: BorderRadius.circular(2.r)),
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                'My Accepted Cabs',
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.green[800]),
+              ),
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: Colors.green.shade300),
+                ),
+                child: Text('${myAccepted.length}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: Colors.green[700])),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 4.h),
+        ...myAccepted.map((v) => Padding(
+          padding: EdgeInsets.only(bottom: 10.h),
+          child: _VehicleCard(
+            vehicle: v,
+            onTap: () => context.push('/vehicles/${v['_id']}', extra: v).then((result) {
+              if (result == true && mounted) {
+                context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
+              }
+            }),
+          ),
+        )),
+        Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+        SizedBox(height: 8.h),
+      ],
     );
   }
 }
@@ -149,19 +212,30 @@ class _VehicleCard extends StatelessWidget {
     final status = vehicle['status'] as String? ?? 'available';
     final postedBy = vehicle['postedBy'];
     final postedByMap = postedBy is Map ? postedBy : null;
-    final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
+    final isBooked = status == 'booked';
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
         bool isCurrentUserPremium = false;
         bool isCurrentUserOwner = false;
+        String? currentUserId;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
           isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
-          final currentUserId = user['_id'];
+          currentUserId = user['_id'] as String?;
           final posterId = postedByMap?['_id'];
           isCurrentUserOwner = currentUserId != null && posterId != null && currentUserId == posterId;
         }
+
+        final acceptedByRaw = vehicle['acceptedBy'];
+        final acceptedByIds = <String>[];
+        if (acceptedByRaw is List) {
+          for (final e in acceptedByRaw) {
+            final id = e is Map ? e['_id']?.toString() : e?.toString();
+            if (id != null) acceptedByIds.add(id);
+          }
+        }
+        final hasCurrentUserAccepted = currentUserId != null && acceptedByIds.contains(currentUserId);
 
         final memberType = postedByMap?['membershipType'] ?? 'new';
         Color topBarColor;
@@ -202,8 +276,22 @@ class _VehicleCard extends StatelessWidget {
           badgeBg = Colors.grey[100]!;
         }
 
+        final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
+
         return GestureDetector(
-          onTap: onTap,
+          onTap: () {
+            if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('This vehicle is already booked'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              return;
+            }
+            onTap();
+          },
           child: Container(
             decoration: BoxDecoration(
               color: cardBg,
@@ -356,7 +444,6 @@ class _VehicleCard extends StatelessWidget {
                             if (!isCurrentUserOwner) ...[
                               Divider(height: 1, thickness: 1, color: Colors.black26),
                               SizedBox(height: 8.h),
-                              // New driver info section
                               Row(
                                 children: [
                                   CircleAvatar(
@@ -483,6 +570,28 @@ class _VehicleCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (isBooked)
+                    Positioned(
+                      top: 10.h,
+                      right: 0,
+                      child: IgnorePointer(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+                          decoration: BoxDecoration(
+                            color: hasCurrentUserAccepted ? Colors.green[700] : Colors.red[700],
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(4.r),
+                              bottomLeft: Radius.circular(4.r),
+                            ),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 1))],
+                          ),
+                          child: Text(
+                            hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
+                            style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

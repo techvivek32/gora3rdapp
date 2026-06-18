@@ -59,3 +59,10 @@ class CancelVehicleEvent extends VehiclesEvent {
   @override
   List<Object?> get props => [id, reason];
 }
+
+class AcceptVehicleEvent extends VehiclesEvent {
+  final String id;
+  const AcceptVehicleEvent(this.id);
+  @override
+  List<Object?> get props => [id];
+}

@@ -30,6 +30,18 @@ export class AvailableVehiclesController {
     return this.service.getMyVehicles(userId);
   }
 
+  @Get('accepted-by-me')
+  @ApiOperation({ summary: 'Get vehicle listings I have accepted' })
+  getAcceptedByMe(@CurrentUser('sub') userId: string) {
+    return this.service.getAcceptedByMe(userId);
+  }
+
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Accept a vehicle listing' })
+  acceptVehicle(@Param('id') id: string, @CurrentUser('sub') userId: string) {
+    return this.service.acceptVehicle(id, userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get vehicle listing details' })
   findOne(@Param('id') id: string, @CurrentUser('sub') userId: string) {
