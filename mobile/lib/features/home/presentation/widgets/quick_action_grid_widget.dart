@@ -35,20 +35,23 @@ class QuickActionGridWidget extends StatelessWidget {
       AppColors.primary,
     ];
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 0,
-      crossAxisSpacing: 0,
-      childAspectRatio: 1,
-      children: List.generate(actions.length, (index) {
-        return _QuickActionCard(
-          action: actions[index],
-          bgColor: colors[index],
-          textColor: textColors[index],
-        );
-      }),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: 3,
+        mainAxisSpacing: 12.w,
+        crossAxisSpacing: 12.w,
+        childAspectRatio: 1,
+        children: List.generate(actions.length, (index) {
+          return _QuickActionCard(
+            action: actions[index],
+            bgColor: colors[index],
+            textColor: textColors[index],
+          );
+        }),
+      ),
     );
   }
 }
@@ -71,16 +74,20 @@ class _QuickActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: action.onTap,
       child: Container(
-        padding: EdgeInsets.all(16.r),
-        color: bgColor,
+        padding: EdgeInsets.symmetric(vertical: 10.r, horizontal: 8.r),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(12.r),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(action.icon, color: textColor, size: 36.sp),
-            SizedBox(height: 8.h),
+            Icon(action.icon, color: textColor, size: 28.sp),
+            SizedBox(height: 6.h),
             Text(
               action.label,
-              style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: textColor, fontFamily: 'Poppins'),
+              style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: textColor, fontFamily: 'Poppins'),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
