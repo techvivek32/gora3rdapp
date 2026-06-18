@@ -678,7 +678,29 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         bool isCurrentUserPremium = false;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
-          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (user['membershipType'] != null && user['membershipType'] != 'free');
+          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
+        }
+
+        final posterMemberType = postedByMap?['membershipType'] as String? ?? 'new';
+        String? posterBadgeText;
+        Color posterBadgeColor;
+        Color posterBadgeBg;
+        if (posterMemberType == 'golden' || postedByMap?['isGolden'] == true) {
+          posterBadgeText = 'GOLDEN USER';
+          posterBadgeColor = AppColors.memberGolden;
+          posterBadgeBg = AppColors.memberGolden.withOpacity(0.12);
+        } else if (posterMemberType == 'premium' || postedByMap?['isPremium'] == true) {
+          posterBadgeText = 'PREMIUM USER';
+          posterBadgeColor = AppColors.memberPremium;
+          posterBadgeBg = AppColors.memberPremium.withOpacity(0.12);
+        } else if (posterMemberType == 'active' || posterMemberType == 'verified') {
+          posterBadgeText = 'ACTIVE USER';
+          posterBadgeColor = AppColors.memberActive;
+          posterBadgeBg = AppColors.memberActive.withOpacity(0.1);
+        } else {
+          posterBadgeText = null;
+          posterBadgeColor = Colors.grey;
+          posterBadgeBg = Colors.grey[100]!;
         }
 
         return SingleChildScrollView(
@@ -768,14 +790,26 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                                 child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
                               ),
                               SizedBox(width: 12.w),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(postedByMap?['fullName'] as String? ?? 'Hidden', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black)),
-                                  if (postedByMap?['agencyName'] != null)
-                                    Text(postedByMap!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(postedByMap?['fullName'] as String? ?? 'Hidden', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black)),
+                                    if (postedByMap?['agencyName'] != null)
+                                      Text(postedByMap!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                                  ],
+                                ),
                               ),
+                              if (posterBadgeText != null)
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    color: posterBadgeBg,
+                                    borderRadius: BorderRadius.circular(4.r),
+                                    border: Border.all(color: posterBadgeColor),
+                                  ),
+                                  child: Text(posterBadgeText, style: TextStyle(fontSize: 10.sp, color: posterBadgeColor, fontWeight: FontWeight.w600)),
+                                ),
                             ],
                           ),
                           if (!isCurrentUserPremium) ...[
@@ -807,14 +841,79 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                             ),
                           ] else ...[
                             SizedBox(height: 12.h),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                                onPressed: () {},
-                                icon: const Icon(Icons.call, color: Colors.white),
-                                label: Text('Call ${postedByMap!['mobile']}', style: const TextStyle(color: Colors.white)),
+                            if (postedByMap?['mobile'] != null || postedByMap?['phone'] != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8.r),
+                                  border: Border.all(color: Colors.blue.shade200, width: 1),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.phone, color: Colors.blue[700], size: 16.sp),
+                                    SizedBox(width: 8.w),
+                                    Text(
+                                      postedByMap?['mobile'] as String? ?? postedByMap?['phone'] as String? ?? '',
+                                      style: TextStyle(fontSize: 14.sp, color: Colors.blue[800], fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              SizedBox(height: 8.h),
+                            ],
+                            if (postedByMap?['email'] != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8.r),
+                                  border: Border.all(color: Colors.blue.shade200, width: 1),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.email_outlined, color: Colors.blue[700], size: 16.sp),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text(
+                                        postedByMap!['email'] as String,
+                                        style: TextStyle(fontSize: 13.sp, color: Colors.blue[800], fontWeight: FontWeight.w500),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.call, color: Colors.white),
+                                    label: Text(
+                                      postedByMap?['mobile'] != null ? 'Call ${postedByMap!['mobile']}' : 'Call',
+                                      style: const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    icon: Icon(Icons.chat, color: Colors.green, size: 16.sp),
+                                    label: Text('WhatsApp', style: TextStyle(fontSize: 13.sp, color: Colors.green)),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Colors.green, width: 1.5),
+                                      padding: EdgeInsets.symmetric(vertical: 10.h),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ],

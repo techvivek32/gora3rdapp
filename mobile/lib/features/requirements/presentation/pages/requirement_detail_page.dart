@@ -111,6 +111,17 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     return type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ') + ' Car';
   }
 
+  String _getMemberSince(Map<String, dynamic> user) {
+    try {
+      final createdAt = user['createdAt'] as String?;
+      if (createdAt != null) {
+        final date = DateTime.parse(createdAt);
+        return date.year.toString();
+      }
+    } catch (_) {}
+    return '2024';
+  }
+
   void _showCancelDialog() {
     showModalBottomSheet(
       context: context,
@@ -681,7 +692,29 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
         bool isCurrentUserPremium = false;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
-          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (user['membershipType'] != null && user['membershipType'] != 'free');
+          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
+        }
+
+        final posterMemberType = postedBy?['membershipType'] as String? ?? 'new';
+        String? posterBadgeText;
+        Color posterBadgeColor;
+        Color posterBadgeBg;
+        if (posterMemberType == 'golden' || postedBy?['isGolden'] == true) {
+          posterBadgeText = 'GOLDEN USER';
+          posterBadgeColor = AppColors.memberGolden;
+          posterBadgeBg = AppColors.memberGolden.withOpacity(0.12);
+        } else if (posterMemberType == 'premium' || postedBy?['isPremium'] == true) {
+          posterBadgeText = 'PREMIUM USER';
+          posterBadgeColor = AppColors.memberPremium;
+          posterBadgeBg = AppColors.memberPremium.withOpacity(0.12);
+        } else if (posterMemberType == 'active' || posterMemberType == 'verified') {
+          posterBadgeText = 'ACTIVE USER';
+          posterBadgeColor = AppColors.memberActive;
+          posterBadgeBg = AppColors.memberActive.withOpacity(0.1);
+        } else {
+          posterBadgeText = null;
+          posterBadgeColor = Colors.grey;
+          posterBadgeBg = Colors.grey[100]!;
         }
 
         return SingleChildScrollView(
@@ -760,23 +793,67 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
               _card(
                 title: 'Posted By',
                 child: isMine
-                    ? Row(
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 24.r,
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
-                            backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
-                            child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
-                          ),
-                          SizedBox(width: 12.w),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          Row(
                             children: [
-                              Text('Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: AppColors.primary)),
-                              if (postedBy?['agencyName'] != null)
-                                Text(postedBy!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                              CircleAvatar(
+                                radius: 24.r,
+                                backgroundColor: AppColors.primary.withOpacity(0.1),
+                                backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
+                                child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary, size: 20.sp) : null,
+                              ),
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: AppColors.primary, fontFamily: 'Poppins')),
+                                    if (postedBy?['agencyName'] != null)
+                                      Text(postedBy!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
+                          SizedBox(height: 12.h),
+                          Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+                          SizedBox(height: 8.h),
+                          // User Details - Only show real data that exists
+                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null) 
+                            _userInfoRow(Icons.phone, 'Mobile', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
+                          if (postedBy?['email'] != null) 
+                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
+                          if (postedBy?['city'] != null) 
+                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
+                          if (postedBy?['state'] != null) 
+                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
+                          if (postedBy?['agencyName'] != null) 
+                            _userInfoRow(Icons.business, 'Agency', postedBy!['agencyName'] as String),
+                          SizedBox(height: 8.h),
+                          if (postedBy != null) ...[
+                            Row(
+                              children: [
+                                if (postedBy['rating'] != null) ...[
+                                  Icon(Icons.star, size: 16.sp, color: Colors.amber),
+                                  SizedBox(width: 4.w),
+                                  Text('${postedBy['rating']}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'Poppins')),
+                                  SizedBox(width: 8.w),
+                                ],
+                                if (postedBy['createdAt'] != null) ...[
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                    child: Text('Member since ${_getMemberSince(postedBy)}', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ],
                       )
                     : Column(
@@ -788,21 +865,163 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                                 radius: 24.r,
                                 backgroundColor: AppColors.primary.withOpacity(0.1),
                                 backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
-                                child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                                child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary, size: 20.sp) : null,
                               ),
                               SizedBox(width: 12.w),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(postedBy?['fullName'] as String? ?? 'Hidden', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black)),
-                                  if (postedBy?['agencyName'] != null)
-                                    Text(postedBy!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(postedBy?['fullName'] as String? ?? postedBy?['name'] as String? ?? 'User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black, fontFamily: 'Poppins')),
+                                    if (postedBy?['agencyName'] != null)
+                                      Text(postedBy!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+                                  ],
+                                ),
+                              ),
+                              if (posterBadgeText != null)
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                  decoration: BoxDecoration(
+                                    color: posterBadgeBg,
+                                    borderRadius: BorderRadius.circular(4.r),
+                                    border: Border.all(color: posterBadgeColor),
+                                  ),
+                                  child: Text(posterBadgeText, style: TextStyle(fontSize: 10.sp, color: posterBadgeColor, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                                ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+                          SizedBox(height: 8.h),
+                          // User Details - Only show real data that exists
+                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null) 
+                            _userInfoRow(Icons.phone, 'Mobile', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
+                          if (postedBy?['email'] != null) 
+                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
+                          if (postedBy?['city'] != null) 
+                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
+                          if (postedBy?['state'] != null) 
+                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
+                          if (postedBy?['agencyName'] != null) 
+                            _userInfoRow(Icons.business, 'Agency', postedBy!['agencyName'] as String),
+                          
+                          // Rating and member info - only if data exists
+                          SizedBox(height: 8.h),
+                          Row(
+                            children: [
+                              if (postedBy?['rating'] != null) ...[
+                                Icon(Icons.star, size: 16.sp, color: Colors.amber),
+                                SizedBox(width: 4.w),
+                                Text('${postedBy!['rating']}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black, fontFamily: 'Poppins')),
+                                SizedBox(width: 8.w),
+                              ],
+                              if (postedBy?['createdAt'] != null) ...[
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(4.r),
+                                  ),
+                                  child: Text('Member since ${_getMemberSince(postedBy!)}', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+                                ),
+                              ],
+                              const Spacer(),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 3.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(4.r),
+                                ),
+                                child: Text('Report', style: TextStyle(fontSize: 10.sp, color: Colors.red, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                               ),
                             ],
                           ),
-                          if (!isCurrentUserPremium) ...[
+                          SizedBox(height: 12.h),
+                          
+                          // Contact buttons
+                          if (isCurrentUserPremium) ...[
+                            if (postedBy?['mobile'] != null || postedBy?['phone'] != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8.r),
+                                  border: Border.all(color: Colors.blue.shade200, width: 1),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.phone, color: Colors.blue[700], size: 16.sp),
+                                    SizedBox(width: 8.w),
+                                    Text(
+                                      postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? '',
+                                      style: TextStyle(fontSize: 14.sp, color: Colors.blue[800], fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                            ],
+                            if (postedBy?['email'] != null) ...[
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8.r),
+                                  border: Border.all(color: Colors.blue.shade200, width: 1),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.email_outlined, color: Colors.blue[700], size: 16.sp),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text(
+                                        postedBy!['email'] as String,
+                                        style: TextStyle(fontSize: 13.sp, color: Colors.blue[800], fontWeight: FontWeight.w500, fontFamily: 'Poppins'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                            ],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {},
+                                    icon: Icon(Icons.phone, color: Colors.white, size: 16.sp),
+                                    label: Text(
+                                      postedBy?['mobile'] != null ? 'Call ${postedBy!['mobile']}' : 'Call',
+                                      style: TextStyle(fontSize: 13.sp, color: Colors.white, fontFamily: 'Poppins'),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      padding: EdgeInsets.symmetric(vertical: 10.h),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {},
+                                    icon: Icon(Icons.chat, color: Colors.green, size: 16.sp),
+                                    label: Text('WhatsApp', style: TextStyle(fontSize: 13.sp, color: Colors.green, fontFamily: 'Poppins')),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: Colors.green, width: 1.5),
+                                      padding: EdgeInsets.symmetric(vertical: 10.h),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                             SizedBox(height: 12.h),
+                          ],
+                          
+                          if (!isCurrentUserPremium) ...[
                             Container(
                               width: double.infinity,
                               padding: EdgeInsets.all(12.r),
@@ -813,9 +1032,9 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.lock_outline, color: Colors.amber[700]),
+                                  Icon(Icons.lock_outline, color: Colors.amber[700], size: 16.sp),
                                   SizedBox(width: 8.w),
-                                  Expanded(child: Text('Upgrade to Premium to view contact details', style: TextStyle(fontSize: 12.sp, color: Colors.amber[800]))),
+                                  Expanded(child: Text('Upgrade to Premium to contact directly', style: TextStyle(fontSize: 12.sp, color: Colors.amber[800], fontFamily: 'Poppins'))),
                                 ],
                               ),
                             ),
@@ -824,22 +1043,28 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: () => context.push('/subscriptions'),
-                                icon: const Icon(Icons.star, color: Colors.amber),
-                                label: const Text('Upgrade to Premium'),
+                                icon: Icon(Icons.star, color: Colors.amber, size: 16.sp),
+                                label: Text('Upgrade to Premium', style: TextStyle(fontFamily: 'Poppins')),
                               ),
                             ),
-                          ] else ...[
-                            SizedBox(height: 12.h),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                                onPressed: () {},
-                                icon: const Icon(Icons.call, color: Colors.white),
-                                label: Text('Call ${postedBy!['mobile']}', style: const TextStyle(color: Colors.white)),
-                              ),
-                            ),
+                            SizedBox(height: 8.h),
                           ],
+                          
+                          // Safety warning
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                            decoration: BoxDecoration(
+                              color: Colors.amber[50],
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(color: Colors.amber.shade200, width: 1),
+                            ),
+                            child: Text(
+                              '⚠️ Don\'t pay without reference & proper verification.',
+                              style: TextStyle(fontSize: 11.sp, color: Colors.amber[800], fontWeight: FontWeight.w500, fontFamily: 'Poppins'),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         ],
                       ),
               ),
@@ -895,6 +1120,20 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
           SizedBox(width: 10.w),
           Text('$label: ', style: TextStyle(fontSize: 13.sp, color: Colors.grey[600])),
           Expanded(child: Text(value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black))),
+        ],
+      ),
+    );
+  }
+
+  Widget _userInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      child: Row(
+        children: [
+          Icon(icon, size: 14.sp, color: AppColors.primary),
+          SizedBox(width: 8.w),
+          Text('$label: ', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600], fontFamily: 'Poppins')),
+          Expanded(child: Text(value, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.black, fontFamily: 'Poppins'))),
         ],
       ),
     );

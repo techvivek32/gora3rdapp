@@ -25,11 +25,6 @@ class RequirementCardWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
-    final memberType = postedBy?['membershipType'] ?? 'new';
-    final isPosterNew = memberType == 'new';
-    final isActive = memberType == 'active';
-    final color = isPosterNew ? AppColors.primary : (isActive ? Colors.green : AppColors.primary);
-    final cardBg = isPosterNew ? AppColors.primary.withOpacity(0.05) : Colors.white;
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
@@ -37,10 +32,49 @@ class RequirementCardWidget extends StatelessWidget {
         bool isCurrentUserOwner = false;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
-          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (user['membershipType'] != null && user['membershipType'] != 'free');
+          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
           final currentUserId = user['_id'];
           final posterId = postedBy?['_id'];
           isCurrentUserOwner = currentUserId != null && posterId != null && currentUserId == posterId;
+        }
+
+        final memberType = postedBy?['membershipType'] ?? 'new';
+        Color topBarColor;
+        Color cardBg;
+        String? badgeText;
+        Color badgeColor;
+        Color badgeBg;
+
+        if (isCurrentUserOwner) {
+          topBarColor = Colors.grey[400]!;
+          cardBg = Colors.white;
+          badgeText = null;
+          badgeColor = Colors.grey;
+          badgeBg = Colors.grey[100]!;
+        } else if (memberType == 'golden') {
+          topBarColor = AppColors.memberGolden;
+          cardBg = AppColors.memberGolden.withOpacity(0.07);
+          badgeText = 'GOLDEN USER';
+          badgeColor = AppColors.memberGolden;
+          badgeBg = AppColors.memberGolden.withOpacity(0.12);
+        } else if (memberType == 'premium') {
+          topBarColor = AppColors.memberPremium;
+          cardBg = AppColors.memberPremium.withOpacity(0.07);
+          badgeText = 'PREMIUM USER';
+          badgeColor = AppColors.memberPremium;
+          badgeBg = AppColors.memberPremium.withOpacity(0.12);
+        } else if (memberType == 'active' || memberType == 'verified') {
+          topBarColor = AppColors.memberActive;
+          cardBg = AppColors.memberActive.withOpacity(0.05);
+          badgeText = 'ACTIVE USER';
+          badgeColor = AppColors.memberActive;
+          badgeBg = AppColors.memberActive.withOpacity(0.1);
+        } else {
+          topBarColor = AppColors.primary;
+          cardBg = AppColors.primary.withOpacity(0.05);
+          badgeText = null;
+          badgeColor = Colors.grey;
+          badgeBg = Colors.grey[100]!;
         }
 
         return GestureDetector(
@@ -50,7 +84,7 @@ class RequirementCardWidget extends StatelessWidget {
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(color: isPosterNew ? AppColors.primary.withOpacity(0.3) : Colors.grey[300]!, width: 1),
+              border: Border.all(color: topBarColor.withOpacity(0.3), width: 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -76,7 +110,7 @@ class RequirementCardWidget extends StatelessWidget {
                       Container(
                         height: 4.h,
                         decoration: BoxDecoration(
-                          color: color,
+                          color: topBarColor,
                           borderRadius: BorderRadius.only(
                             topLeft: Radius.circular(8.r),
                             topRight: Radius.circular(8.r),
@@ -282,15 +316,15 @@ class RequirementCardWidget extends StatelessWidget {
                                       ],
                                     ),
                                   ),
-                                  if (postedBy != null && (postedBy['isPremium'] == true || postedBy['isGolden'] == true || postedBy['membershipType'] != 'free'))
+                                  if (badgeText != null)
                                     Container(
                                       padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                                       decoration: BoxDecoration(
-                                        color: Colors.green[50],
+                                        color: badgeBg,
                                         borderRadius: BorderRadius.circular(4.r),
-                                        border: Border.all(color: Colors.green),
+                                        border: Border.all(color: badgeColor),
                                       ),
-                                      child: Text('ACTIVE USER', style: TextStyle(fontSize: 10.sp, color: Colors.green, fontWeight: FontWeight.w600)),
+                                      child: Text(badgeText, style: TextStyle(fontSize: 10.sp, color: badgeColor, fontWeight: FontWeight.w600)),
                                     ),
                                 ],
                               ),
@@ -320,64 +354,64 @@ class RequirementCardWidget extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 12.h),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.phone, color: Colors.white),
-                                      label: Text('Phone', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        padding: EdgeInsets.symmetric(vertical: 10.h),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                              if (isCurrentUserPremium) ...[
+                                SizedBox(height: 12.h),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {},
+                                        icon: const Icon(Icons.phone, color: Colors.white),
+                                        label: Text('Phone', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          padding: EdgeInsets.symmetric(vertical: 10.h),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  SizedBox(width: 10.w),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {},
-                                      icon: const Icon(Icons.chat, color: Colors.green),
-                                      label: Text('WhatsApp', style: TextStyle(fontSize: 12.sp, color: Colors.green)),
-                                      style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: Colors.green, width: 1.5),
-                                        padding: EdgeInsets.symmetric(vertical: 10.h),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                    SizedBox(width: 10.w),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {},
+                                        icon: const Icon(Icons.chat, color: Colors.green),
+                                        label: Text('WhatsApp', style: TextStyle(fontSize: 12.sp, color: Colors.green)),
+                                        style: OutlinedButton.styleFrom(
+                                          side: BorderSide(color: Colors.green, width: 1.5),
+                                          padding: EdgeInsets.symmetric(vertical: 10.h),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 12.h),
-                              Container(
-                                width: double.infinity,
-                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                                decoration: BoxDecoration(
-                                  color: Colors.amber[50],
-                                  borderRadius: BorderRadius.circular(8.r),
-                                  border: Border.all(color: Colors.amber.shade200, width: 1),
+                                  ],
                                 ),
-                                child: Text(
-                                  '⚠️ Don\'t pay without reference & proper verification.',
-                                  style: TextStyle(fontSize: 11.sp, color: Colors.amber[800], fontWeight: FontWeight.w500),
+                                SizedBox(height: 12.h),
+                                Container(
+                                  width: double.infinity,
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber[50],
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(color: Colors.amber.shade200, width: 1),
+                                  ),
+                                  child: Text(
+                                    '⚠️ Don\'t pay without reference & proper verification.',
+                                    style: TextStyle(fontSize: 11.sp, color: Colors.amber[800], fontWeight: FontWeight.w500),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                                SizedBox(height: 12.h),
+                              ] else ...[
+                                Divider(height: 1, thickness: 1, color: Colors.black26),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  'Become a premium member to contact immediately',
+                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
                                   textAlign: TextAlign.center,
                                 ),
-                              ),
+                                SizedBox(height: 8.h),
+                              ],
                             ],
-                            SizedBox(height: 12.h),
-                            if (!isCurrentUserPremium) ...[
-                              Divider(height: 1, thickness: 1, color: Colors.black26),
-                              SizedBox(height: 8.h),
-                              Text(
-                                'Become a premium member to contact immediately',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                                textAlign: TextAlign.center,
-                              ),
-                              SizedBox(height: 4.h),
-                            ] else
-                              SizedBox(height: 10.h),
                           ],
                         ),
                       ),
