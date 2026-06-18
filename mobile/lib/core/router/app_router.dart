@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -23,15 +23,28 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../features/subscriptions/presentation/pages/subscription_plans_page.dart';
 import '../../features/home/presentation/pages/main_nav_page.dart';
 
+class _GoRouterRefreshStream extends ChangeNotifier {
+  _GoRouterRefreshStream(Stream<dynamic> stream) {
+    _sub = stream.listen((_) => notifyListeners());
+  }
+  late final StreamSubscription<dynamic> _sub;
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
+
 class AppRouter {
   static final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
-  static GoRouter get router => GoRouter(
+  static GoRouter createRouter(AuthBloc authBloc) => GoRouter(
     navigatorKey: _rootNavigatorKey,
     debugLogDiagnostics: true,
     initialLocation: '/splash',
+    refreshListenable: _GoRouterRefreshStream(authBloc.stream),
     redirect: (context, state) {
-      final authBloc = context.read<AuthBloc>();
       final authState = authBloc.state;
       final isAuthRoute = state.matchedLocation.startsWith('/auth');
       final isSplash = state.matchedLocation == '/splash';

@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -54,14 +55,35 @@ void main() async {
   runApp(const GoraCabsApp());
 }
 
-class GoraCabsApp extends StatelessWidget {
+class GoraCabsApp extends StatefulWidget {
   const GoraCabsApp({super.key});
+
+  @override
+  State<GoraCabsApp> createState() => _GoraCabsAppState();
+}
+
+class _GoraCabsAppState extends State<GoraCabsApp> {
+  late final AuthBloc _authBloc;
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    _authBloc = getIt<AuthBloc>()..add(AuthCheckStatusEvent());
+    _router = AppRouter.createRouter(_authBloc);
+  }
+
+  @override
+  void dispose() {
+    _authBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthBloc>(create: (_) => getIt<AuthBloc>()..add(AuthCheckStatusEvent())),
+        BlocProvider<AuthBloc>.value(value: _authBloc),
         BlocProvider<HomeBloc>(create: (_) => getIt<HomeBloc>()),
         BlocProvider<RequirementsBloc>(create: (_) => getIt<RequirementsBloc>()),
         BlocProvider<VehiclesBloc>(create: (_) => getIt<VehiclesBloc>()),
@@ -79,7 +101,7 @@ class GoraCabsApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             themeMode: ThemeMode.light,
-            routerConfig: AppRouter.router,
+            routerConfig: _router,
           );
         },
       ),

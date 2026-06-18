@@ -203,13 +203,16 @@ class ProfilePage extends StatelessWidget {
                         color: AppColors.error,
                         onTap: () => showDialog(
                           context: context,
-                          builder: (_) => AlertDialog(
+                          builder: (dialogCtx) => AlertDialog(
                             title: const Text('Sign Out', style: TextStyle(fontFamily: 'Poppins')),
                             content: const Text('Are you sure you want to sign out?', style: TextStyle(fontFamily: 'Poppins')),
                             actions: [
-                              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                              TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
                               TextButton(
-                                onPressed: () { Navigator.pop(context); context.read<AuthBloc>().add(AuthLogoutEvent()); },
+                                onPressed: () {
+                                  Navigator.of(dialogCtx).pop();
+                                  context.read<AuthBloc>().add(AuthLogoutEvent());
+                                },
                                 child: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
                               ),
                             ],

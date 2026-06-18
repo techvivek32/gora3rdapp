@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -571,23 +572,15 @@ class _VehicleCard extends StatelessWidget {
                     ],
                   ),
                   if (isBooked)
-                    Positioned(
-                      top: 10.h,
-                      right: 0,
+                    Positioned.fill(
                       child: IgnorePointer(
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
-                          decoration: BoxDecoration(
-                            color: hasCurrentUserAccepted ? Colors.green[700] : Colors.red[700],
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(4.r),
-                              bottomLeft: Radius.circular(4.r),
+                        child: Center(
+                          child: Transform.rotate(
+                            angle: -0.2,
+                            child: _buildStampBadge(
+                              text: hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
+                              color: hasCurrentUserAccepted ? Colors.green[700]! : Colors.red[700]!,
                             ),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 1))],
-                          ),
-                          child: Text(
-                            hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
-                            style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5),
                           ),
                         ),
                       ),
@@ -598,6 +591,54 @@ class _VehicleCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildStampBadge({required String text, required Color color}) {
+    return SizedBox(
+      width: 110.w,
+      height: 110.w,
+      child: CustomPaint(
+        painter: _StampRingPainter(color: color),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, color: color, size: 9.sp),
+                  SizedBox(width: 2.w),
+                  Icon(Icons.star, color: color, size: 9.sp),
+                  SizedBox(width: 2.w),
+                  Icon(Icons.star, color: color, size: 9.sp),
+                ],
+              ),
+              SizedBox(height: 3.h),
+              Text(
+                text,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              SizedBox(height: 3.h),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star, color: color, size: 9.sp),
+                  SizedBox(width: 2.w),
+                  Icon(Icons.star, color: color, size: 9.sp),
+                  SizedBox(width: 2.w),
+                  Icon(Icons.star, color: color, size: 9.sp),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -653,6 +694,52 @@ class _WatermarkPainter extends CustomPainter {
     }
 
     canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _StampRingPainter extends CustomPainter {
+  final Color color;
+  _StampRingPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final rOuter = size.width / 2 - 2;
+    final rValley = rOuter - 7;
+    final rInner = rOuter - 14;
+
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+
+    const teeth = 26;
+    final path = Path();
+    for (int i = 0; i < teeth; i++) {
+      final a1 = (i / teeth) * 2 * pi - pi / 2;
+      final a2 = ((i + 0.5) / teeth) * 2 * pi - pi / 2;
+      final a3 = ((i + 1.0) / teeth) * 2 * pi - pi / 2;
+      final p1x = cx + rOuter * cos(a1);
+      final p1y = cy + rOuter * sin(a1);
+      final p2x = cx + rValley * cos(a2);
+      final p2y = cy + rValley * sin(a2);
+      final p3x = cx + rOuter * cos(a3);
+      final p3y = cy + rOuter * sin(a3);
+      if (i == 0) {
+        path.moveTo(p1x, p1y);
+      } else {
+        path.lineTo(p1x, p1y);
+      }
+      path.lineTo(p2x, p2y);
+      path.lineTo(p3x, p3y);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+    canvas.drawCircle(Offset(cx, cy), rInner - 2, paint);
   }
 
   @override
