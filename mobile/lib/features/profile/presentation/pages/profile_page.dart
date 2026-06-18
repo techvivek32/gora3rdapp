@@ -193,6 +193,7 @@ class ProfilePage extends StatelessWidget {
                       SizedBox(height: 12.h),
 
 
+                      _ProfileAction(icon: Icons.post_add_outlined, label: 'Posted Requirements', onTap: () => context.push('/my-requirements')),
                       _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/notifications')),
                       _ProfileAction(icon: Icons.chat_outlined, label: 'Messages', onTap: () => context.push('/chats')),
                       _ProfileAction(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),

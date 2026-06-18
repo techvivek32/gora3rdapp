@@ -21,6 +21,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     on<AcceptRequirementEvent>(_onAccept);
     on<UpdateRequirementEvent>(_onUpdate);
     on<CancelRequirementEvent>(_onCancel);
+    on<LoadMyRequirementsEvent>(_onLoadMy);
   }
 
   Future<void> _onLoad(LoadRequirementsEvent event, Emitter<RequirementsState> emit) async {
@@ -151,6 +152,17 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     result.fold(
       (f) => emit(RequirementsError(message: f.message)),
       (_) => emit(RequirementCancelled()),
+    );
+  }
+
+  Future<void> _onLoadMy(LoadMyRequirementsEvent event, Emitter<RequirementsState> emit) async {
+    emit(RequirementsLoading());
+    final result = await repository.getMyRequirements();
+    result.fold(
+      (f) => emit(RequirementsError(message: f.message)),
+      (data) => emit(MyRequirementsLoaded(
+        requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
+      )),
     );
   }
 }

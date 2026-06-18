@@ -240,6 +240,7 @@ export class RequirementsService {
     const requirements = await this.requirementModel
       .find(filter)
       .sort({ createdAt: -1 })
+      .populate('postedBy', 'fullName agencyName profileImage membershipType mobile email city state')
       .populate('acceptedBy', 'fullName agencyName mobile membershipType')
       .lean();
 

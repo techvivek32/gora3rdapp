@@ -13,6 +13,7 @@ import '../../features/home/presentation/pages/select_city_page.dart';
 import '../../features/requirements/presentation/pages/requirements_feed_page.dart';
 import '../../features/requirements/presentation/pages/create_requirement_page.dart';
 import '../../features/requirements/presentation/pages/requirement_detail_page.dart';
+import '../../features/requirements/presentation/pages/my_requirements_page.dart';
 import '../../features/available_vehicles/presentation/pages/vehicles_feed_page.dart';
 import '../../features/available_vehicles/presentation/pages/create_vehicle_page.dart';
 import '../../features/available_vehicles/presentation/pages/vehicle_detail_page.dart';
@@ -86,6 +87,10 @@ class AppRouter {
       ),
 
       // Detail Routes
+      GoRoute(
+        path: '/my-requirements',
+        builder: (_, __) => const MyRequirementsPage(),
+      ),
       GoRoute(
         path: '/requirements/create',
         builder: (_, __) => const CreateRequirementPage(),

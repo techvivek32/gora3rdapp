@@ -67,3 +67,10 @@ class RequirementUpdated extends RequirementsState {
 }
 
 class RequirementCancelled extends RequirementsState {}
+
+class MyRequirementsLoaded extends RequirementsState {
+  final List<Map<String, dynamic>> requirements;
+  const MyRequirementsLoaded({required this.requirements});
+  @override
+  List<Object?> get props => [requirements];
+}

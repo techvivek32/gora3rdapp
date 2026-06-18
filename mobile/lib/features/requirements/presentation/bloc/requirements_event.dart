@@ -62,3 +62,7 @@ class CancelRequirementEvent extends RequirementsEvent {
   @override
   List<Object?> get props => [id, reason];
 }
+
+class LoadMyRequirementsEvent extends RequirementsEvent {
+  const LoadMyRequirementsEvent();
+}

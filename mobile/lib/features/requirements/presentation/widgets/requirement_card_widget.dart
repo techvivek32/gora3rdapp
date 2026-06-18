@@ -44,6 +44,7 @@ class RequirementCardWidget extends StatelessWidget {
         final hasCurrentUserAccepted = currentUserId != null &&
             acceptedByList.any((id) => id.toString() == currentUserId);
         final isBooked = requirement['status'] == 'accepted';
+        final isCancelled = requirement['status'] == 'cancelled';
 
         final memberType = postedBy?['membershipType'] ?? 'new';
         Color topBarColor;
@@ -86,6 +87,7 @@ class RequirementCardWidget extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
+            if (isCancelled) return;
             if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -436,15 +438,23 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (isBooked)
+                  if (isBooked || isCancelled)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Center(
                           child: Transform.rotate(
                             angle: -0.2,
                             child: _buildStampBadge(
-                              text: hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
-                              color: hasCurrentUserAccepted ? Colors.green[700]! : Colors.red[700]!,
+                              text: isCancelled
+                                  ? 'CANCELLED'
+                                  : hasCurrentUserAccepted
+                                      ? 'ACCEPTED'
+                                      : 'BOOKED',
+                              color: isCancelled
+                                  ? Colors.grey[600]!
+                                  : hasCurrentUserAccepted
+                                      ? Colors.green[700]!
+                                      : Colors.red[700]!,
                             ),
                           ),
                         ),
