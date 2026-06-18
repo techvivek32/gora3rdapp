@@ -129,7 +129,10 @@ export class RequirementsService {
 
     const user = await this.userModel.findById(userId);
     const isPremium = user?.membershipType === MembershipType.PREMIUM ||
-      user?.membershipType === MembershipType.GOLDEN;
+      user?.membershipType === MembershipType.GOLDEN ||
+      user?.membershipType === MembershipType.ACTIVE ||
+      user?.membershipType === MembershipType.VERIFIED ||
+      user?.isPremium;
 
     if (!isPremium) {
       const postedBy = requirement.postedBy as any;
@@ -177,6 +180,10 @@ export class RequirementsService {
     const requirement = await this.requirementModel.findById(id);
     if (!requirement) throw new NotFoundException('Requirement not found');
 
+    if (requirement.postedBy.toString() === userId) {
+      return { message: 'You cannot accept your own requirement' };
+    }
+
     const isAlreadyAccepted = requirement.acceptedBy.some(
       (uid) => uid.toString() === userId,
     );
@@ -199,7 +206,11 @@ export class RequirementsService {
 
   async getAcceptedByMe(userId: string) {
     const requirements = await this.requirementModel
-      .find({ acceptedBy: new Types.ObjectId(userId), isDeleted: false })
+      .find({
+        acceptedBy: new Types.ObjectId(userId),
+        postedBy: { $ne: new Types.ObjectId(userId) },
+        isDeleted: false,
+      })
       .populate('postedBy', 'fullName agencyName profileImage membershipType')
       .sort({ updatedAt: -1 })
       .lean();

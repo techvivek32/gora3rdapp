@@ -42,9 +42,9 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     if (widget.requirement != null) {
       _requirement = widget.requirement;
       _populateControllers();
-    } else {
-      context.read<RequirementsBloc>().add(LoadRequirementDetailEvent(widget.requirementId));
     }
+    // Always load full detail from API so acceptedBy and other fields are fully populated
+    context.read<RequirementsBloc>().add(LoadRequirementDetailEvent(widget.requirementId));
   }
 
   void _populateControllers() {
@@ -762,6 +762,10 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
   Widget _buildBody(Map<String, dynamic> req) {
     final isMine = _isMyRequirement(context);
     final postedBy = req['postedBy'] as Map<String, dynamic>?;
+    final acceptors = (req['acceptedBy'] as List? ?? [])
+        .where((a) => a is Map)
+        .map((a) => Map<String, dynamic>.from(a as Map))
+        .toList();
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
@@ -897,16 +901,16 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                           Divider(height: 1, thickness: 1, color: Colors.grey[300]),
                           SizedBox(height: 8.h),
                           // User Details - Only show real data that exists
-                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null) 
-                            _userInfoRow(Icons.phone, 'Mobile', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
-                          if (postedBy?['email'] != null) 
-                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
-                          if (postedBy?['city'] != null) 
-                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
-                          if (postedBy?['state'] != null) 
-                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
-                          if (postedBy?['agencyName'] != null) 
+                          if (postedBy?['agencyName'] != null)
                             _userInfoRow(Icons.business, 'Agency', postedBy!['agencyName'] as String),
+                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null)
+                            _userInfoRow(Icons.phone, 'Phone', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
+                          if (postedBy?['email'] != null)
+                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
+                          if (postedBy?['city'] != null)
+                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
+                          if (postedBy?['state'] != null)
+                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
                           SizedBox(height: 8.h),
                           if (postedBy != null) ...[
                             Row(
@@ -969,19 +973,19 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                           SizedBox(height: 12.h),
                           Divider(height: 1, thickness: 1, color: Colors.grey[300]),
                           SizedBox(height: 8.h),
-                          // User Details - Only show real data that exists
-                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null) 
-                            _userInfoRow(Icons.phone, 'Mobile', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
-                          if (postedBy?['email'] != null) 
-                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
-                          if (postedBy?['city'] != null) 
-                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
-                          if (postedBy?['state'] != null) 
-                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
-                          if (postedBy?['agencyName'] != null) 
+                          // User Details
+                          if (postedBy?['agencyName'] != null)
                             _userInfoRow(Icons.business, 'Agency', postedBy!['agencyName'] as String),
-                          
-                          // Rating and member info - only if data exists
+                          if (postedBy?['mobile'] != null || postedBy?['phone'] != null)
+                            _userInfoRow(Icons.phone, 'Phone', postedBy?['mobile'] as String? ?? postedBy?['phone'] as String? ?? ''),
+                          if (postedBy?['email'] != null)
+                            _userInfoRow(Icons.email, 'Email', postedBy!['email'] as String),
+                          if (postedBy?['city'] != null)
+                            _userInfoRow(Icons.location_city, 'City', postedBy!['city'] as String),
+                          if (postedBy?['state'] != null)
+                            _userInfoRow(Icons.map, 'State', postedBy!['state'] as String),
+
+                          // Rating and member info
                           SizedBox(height: 8.h),
                           Row(
                             children: [
@@ -1145,16 +1149,16 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                       ),
               ),
 
-              // Accepted By section — only shown to the poster when someone has accepted
-              if (isMine && (req['acceptedBy'] as List?)?.isNotEmpty == true) ...[
+              // Accepted By section — shown to the poster once the full detail is loaded
+              if (isMine && acceptors.isNotEmpty) ...[
                 SizedBox(height: 12.h),
                 _card(
                   title: 'Accepted By',
                   child: Column(
                     children: [
-                      for (final acceptor in (req['acceptedBy'] as List)) ...[
-                        _buildAcceptorRow(acceptor as Map<String, dynamic>),
-                        if (acceptor != (req['acceptedBy'] as List).last)
+                      for (int i = 0; i < acceptors.length; i++) ...[
+                        _buildAcceptorRow(acceptors[i]),
+                        if (i < acceptors.length - 1)
                           Divider(height: 16.h, thickness: 1, color: Colors.grey[200]),
                       ],
                     ],
