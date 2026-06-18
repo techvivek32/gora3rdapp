@@ -13,6 +13,7 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     on<CreateOrderEvent>(_onCreateOrder);
     on<VerifyPaymentEvent>(_onVerify);
     on<LoadMySubscriptionEvent>(_onLoadMy);
+    on<TestActivateSubscriptionEvent>(_onTestActivate);
   }
 
   List<Map<String, dynamic>> _cachedPlans = [];
@@ -54,6 +55,16 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
       emit(MySubscriptionLoaded(subscription: res.data['data'] as Map<String, dynamic>?));
     } catch (e) {
       emit(SubscriptionError(message: e.toString()));
+    }
+  }
+
+  Future<void> _onTestActivate(TestActivateSubscriptionEvent event, Emitter<SubscriptionState> emit) async {
+    emit(SubscriptionLoading(cachedPlans: _cachedPlans));
+    try {
+      await apiClient.post('/subscriptions/test-activate/${event.planId}');
+      emit(PaymentVerified());
+    } catch (e) {
+      emit(SubscriptionError(message: e.toString(), cachedPlans: _cachedPlans));
     }
   }
 }

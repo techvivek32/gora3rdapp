@@ -22,3 +22,10 @@ class VerifyPaymentEvent extends SubscriptionEvent {
   @override
   List<Object?> get props => [paymentData];
 }
+
+class TestActivateSubscriptionEvent extends SubscriptionEvent {
+  final String planId;
+  const TestActivateSubscriptionEvent(this.planId);
+  @override
+  List<Object?> get props => [planId];
+}

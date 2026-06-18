@@ -157,4 +157,24 @@ export class SubscriptionsService {
 
     return { message: 'Subscription retrieved', data: subscription };
   }
+
+  async testActivateSubscription(userId: string, planId: string) {
+    const plan = await this.planModel.findById(planId);
+    if (!plan) throw new Error('Plan not found');
+
+    const payment = await this.paymentModel.create({
+      orderId: `TEST_${Date.now()}`,
+      userId: new Types.ObjectId(userId),
+      planId: new Types.ObjectId(planId),
+      amount: plan.discountedPrice || plan.price,
+      status: 'success',
+      razorpayOrderId: `TEST_ORDER_${Date.now()}`,
+      razorpayPaymentId: `TEST_PAY_${Date.now()}`,
+      razorpaySignature: 'TEST_SIG',
+    });
+
+    await this.activateSubscription(userId, planId, payment._id.toString());
+
+    return { message: 'TEST: Subscription activated (no payment)', data: { plan, payment } };
+  }
 }

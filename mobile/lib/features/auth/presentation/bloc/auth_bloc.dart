@@ -26,6 +26,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthVerifyOtpEvent>(_onVerifyOtp);
     on<AuthLogoutEvent>(_onLogout);
     on<UpdateProfileEvent>(_onUpdateProfile);
+    on<AuthReloadProfileEvent>(_onReloadProfile);
   }
 
   Future<void> _onCheckStatus(AuthCheckStatusEvent event, Emitter<AuthState> emit) async {
@@ -97,6 +98,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       if (currentState is AuthAuthenticated) emit(currentState);
       emit(AuthError(message: e.toString()));
+    }
+  }
+
+  Future<void> _onReloadProfile(AuthReloadProfileEvent event, Emitter<AuthState> emit) async {
+    final currentState = state;
+    if (currentState is AuthAuthenticated) {
+      try {
+        final result = await repository.getProfile();
+        result.fold(
+          (failure) => emit(currentState),
+          (user) => emit(AuthAuthenticated(user: user)),
+        );
+      } catch (e) {
+        emit(currentState);
+      }
     }
   }
 }

@@ -37,6 +37,14 @@ export class SubscriptionsController {
     return this.subscriptionsService.verifyPayment(userId, data);
   }
 
+  @Post('test-activate/:planId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'TEST: Activate subscription without payment' })
+  testActivateSubscription(@CurrentUser('sub') userId: string, @Param('planId') planId: string) {
+    return this.subscriptionsService.testActivateSubscription(userId, planId);
+  }
+
   @Get('my-subscription')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

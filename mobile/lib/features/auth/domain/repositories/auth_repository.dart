@@ -31,4 +31,5 @@ abstract class AuthRepository {
   Future<Either<Failure, Map<String, dynamic>>> refreshTokens();
 
   Future<Either<Failure, Map<String, dynamic>>> updateProfile(Map<String, dynamic> data);
+  Future<Either<Failure, Map<String, dynamic>>> getProfile();
 }

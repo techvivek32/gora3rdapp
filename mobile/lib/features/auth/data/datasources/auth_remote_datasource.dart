@@ -7,6 +7,7 @@ abstract class AuthRemoteDataSource {
   Future<void> logout(String? fcmToken);
   Future<Map<String, dynamic>> refreshTokens(String userId, String refreshToken);
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data);
+  Future<Map<String, dynamic>> getProfile();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -55,6 +56,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> updateProfile(Map<String, dynamic> data) async {
     final response = await apiClient.put('/users/profile', data: data);
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  @override
+  Future<Map<String, dynamic>> getProfile() async {
+    final response = await apiClient.get('/users/profile');
     return Map<String, dynamic>.from(response.data as Map);
   }
 }

@@ -51,3 +51,9 @@ class UpdateProfileEvent extends AuthEvent {
   @override
   List<Object?> get props => [data];
 }
+
+class AuthReloadProfileEvent extends AuthEvent {
+  const AuthReloadProfileEvent();
+  @override
+  List<Object?> get props => [];
+}

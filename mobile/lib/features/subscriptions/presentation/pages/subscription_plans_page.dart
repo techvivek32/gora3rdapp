@@ -144,6 +144,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
         listener: (context, state) {
           if (state is OrderCreated) _openRazorpay(state.orderData);
           if (state is PaymentVerified) {
+            context.read<AuthBloc>().add(const AuthReloadProfileEvent());
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('🎉 Membership activated!'), backgroundColor: AppColors.success),
             );
@@ -451,26 +452,11 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
       ),
       child: SafeArea(
         top: false,
-        child: isFree
-            ? Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 16.h),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: AppColors.border, width: 1.5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.touch_app_outlined, color: AppColors.textHint, size: 20.sp),
-                    SizedBox(width: 8.w),
-                    Text('Tap a plan above to upgrade',
-                        style: TextStyle(fontSize: 14.sp, fontFamily: 'Poppins', color: AppColors.textHint, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              )
-            : ElevatedButton(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!isFree)
+              ElevatedButton(
                 onPressed: isLoading ? null : _buySelectedPlan,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: color,
@@ -491,6 +477,51 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                         ],
                       ),
               ),
+            if (!isFree) SizedBox(height: 8.h),
+            if (!isFree)
+              OutlinedButton(
+                onPressed: isLoading ? null : () {
+                  if (_selectedPlan == null) return;
+                  context.read<SubscriptionBloc>().add(
+                    TestActivateSubscriptionEvent(_selectedPlan!['_id'] as String)
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: color, width: 1.5),
+                  foregroundColor: color,
+                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.science_outlined, size: 18.sp),
+                    SizedBox(width: 8.w),
+                    Text('Test Activate (No Payment)', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                  ],
+                ),
+              ),
+            if (isFree)
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 16.h),
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppColors.border, width: 1.5),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.touch_app_outlined, color: AppColors.textHint, size: 20.sp),
+                    SizedBox(width: 8.w),
+                    Text('Tap a plan above to upgrade',
+                        style: TextStyle(fontSize: 14.sp, fontFamily: 'Poppins', color: AppColors.textHint, fontWeight: FontWeight.w500)),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

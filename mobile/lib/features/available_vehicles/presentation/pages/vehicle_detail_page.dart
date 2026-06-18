@@ -672,87 +672,72 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     final isMine = _isMyVehicle(context);
     final postedBy = vehicle['postedBy'];
     final postedByMap = postedBy is Map ? postedBy : null;
-    final isPremium = postedByMap != null && postedByMap['mobile'] != null;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(16.r),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Route card
-          _card(
-            title: 'Location',
-            child: Row(
-              children: [
-                Column(
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, authState) {
+        bool isCurrentUserPremium = false;
+        if (authState is AuthAuthenticated) {
+          final user = authState.user;
+          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (user['membershipType'] != null && user['membershipType'] != 'free');
+        }
+
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(16.r),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Route card
+              _card(
+                title: 'Location',
+                child: Row(
                   children: [
-                    Container(width: 12.w, height: 12.h, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
-                    Container(width: 2.w, height: 30.h, color: Colors.grey[400]),
-                    Container(width: 12.w, height: 12.h, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
-                  ],
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(vehicle['currentCity'] as String? ?? '', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                      if (vehicle['currentState'] != null)
-                        Text(vehicle['currentState'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
-                      SizedBox(height: 16.h),
-                      Text(vehicle['destinationCity'] as String? ?? 'Any', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12.h),
-
-          // Vehicle info card
-          _card(
-            title: 'Vehicle Info',
-            child: Column(
-              children: [
-                _infoRow(Icons.directions_car, 'Vehicle Type', _formatVehicleType(vehicle['vehicleType'])),
-                _infoRow(Icons.badge_outlined, 'Vehicle Number', vehicle['vehicleNumber'] as String? ?? '-'),
-                _infoRow(Icons.person_outline, 'Driver Name', vehicle['driverName'] as String? ?? '-'),
-                _infoRow(Icons.calendar_today_outlined, 'Available Date', _formatDate(vehicle['availableDate'])),
-                _infoRow(Icons.access_time, 'Available Time', vehicle['availableTime'] as String? ?? '-'),
-                if (vehicle['notes'] != null && (vehicle['notes'] as String).isNotEmpty)
-                  _infoRow(Icons.notes, 'Notes', vehicle['notes'] as String),
-              ],
-            ),
-          ),
-          SizedBox(height: 12.h),
-
-          // Contact card
-          _card(
-            title: 'Posted By',
-            child: isMine
-                ? Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 24.r,
-                        backgroundColor: AppColors.primary.withOpacity(0.1),
-                        backgroundImage: postedByMap?['profileImage'] != null ? NetworkImage(postedByMap!['profileImage'] as String) : null,
-                        child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
-                      ),
-                      SizedBox(width: 12.w),
-                      Column(
+                    Column(
+                      children: [
+                        Container(width: 12.w, height: 12.h, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                        Container(width: 2.w, height: 30.h, color: Colors.grey[400]),
+                        Container(width: 12.w, height: 12.h, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                      ],
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: AppColors.primary)),
-                          if (postedByMap?['agencyName'] != null)
-                            Text(postedByMap!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                          Text(vehicle['currentCity'] as String? ?? '', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                          if (vehicle['currentState'] != null)
+                            Text(vehicle['currentState'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                          SizedBox(height: 16.h),
+                          Text(vehicle['destinationCity'] as String? ?? 'Any', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                         ],
                       ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12.h),
+
+              // Vehicle info card
+              _card(
+                title: 'Vehicle Info',
+                child: Column(
+                  children: [
+                    _infoRow(Icons.directions_car, 'Vehicle Type', _formatVehicleType(vehicle['vehicleType'])),
+                    _infoRow(Icons.badge_outlined, 'Vehicle Number', vehicle['vehicleNumber'] as String? ?? '-'),
+                    _infoRow(Icons.person_outline, 'Driver Name', vehicle['driverName'] as String? ?? '-'),
+                    _infoRow(Icons.calendar_today_outlined, 'Available Date', _formatDate(vehicle['availableDate'])),
+                    _infoRow(Icons.access_time, 'Available Time', vehicle['availableTime'] as String? ?? '-'),
+                    if (vehicle['notes'] != null && (vehicle['notes'] as String).isNotEmpty)
+                      _infoRow(Icons.notes, 'Notes', vehicle['notes'] as String),
+                  ],
+                ),
+              ),
+              SizedBox(height: 12.h),
+
+              // Contact card
+              _card(
+                title: 'Posted By',
+                child: isMine
+                    ? Row(
                         children: [
                           CircleAvatar(
                             radius: 24.r,
@@ -764,58 +749,82 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(postedByMap?['fullName'] as String? ?? 'Hidden', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black)),
+                              Text('Me', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: AppColors.primary)),
                               if (postedByMap?['agencyName'] != null)
                                 Text(postedByMap!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
                             ],
                           ),
                         ],
-                      ),
-                      if (!isPremium) ...[
-                        SizedBox(height: 12.h),
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(12.r),
-                          decoration: BoxDecoration(
-                            color: Colors.amber[50],
-                            borderRadius: BorderRadius.circular(8.r),
-                            border: Border.all(color: Colors.amber.shade200),
-                          ),
-                          child: Row(
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Icon(Icons.lock_outline, color: Colors.amber[700]),
-                              SizedBox(width: 8.w),
-                              Expanded(child: Text('Upgrade to Premium to view contact details', style: TextStyle(fontSize: 12.sp, color: Colors.amber[800]))),
+                              CircleAvatar(
+                                radius: 24.r,
+                                backgroundColor: AppColors.primary.withOpacity(0.1),
+                                backgroundImage: postedByMap?['profileImage'] != null ? NetworkImage(postedByMap!['profileImage'] as String) : null,
+                                child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                              ),
+                              SizedBox(width: 12.w),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(postedByMap?['fullName'] as String? ?? 'Hidden', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: Colors.black)),
+                                  if (postedByMap?['agencyName'] != null)
+                                    Text(postedByMap!['agencyName'] as String, style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                                ],
+                              ),
                             ],
                           ),
-                        ),
-                        SizedBox(height: 8.h),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => context.push('/subscriptions'),
-                            icon: const Icon(Icons.star, color: Colors.amber),
-                            label: const Text('Upgrade to Premium'),
-                          ),
-                        ),
-                      ] else ...[
-                        SizedBox(height: 12.h),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                            onPressed: () {},
-                            icon: const Icon(Icons.call, color: Colors.white),
-                            label: Text('Call ${postedByMap!['mobile']}', style: const TextStyle(color: Colors.white)),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                          if (!isCurrentUserPremium) ...[
+                            SizedBox(height: 12.h),
+                            Container(
+                              width: double.infinity,
+                              padding: EdgeInsets.all(12.r),
+                              decoration: BoxDecoration(
+                                color: Colors.amber[50],
+                                borderRadius: BorderRadius.circular(8.r),
+                                border: Border.all(color: Colors.amber.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.lock_outline, color: Colors.amber[700]),
+                                  SizedBox(width: 8.w),
+                                  Expanded(child: Text('Upgrade to Premium to view contact details', style: TextStyle(fontSize: 12.sp, color: Colors.amber[800]))),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () => context.push('/subscriptions'),
+                                icon: const Icon(Icons.star, color: Colors.amber),
+                                label: const Text('Upgrade to Premium'),
+                              ),
+                            ),
+                          ] else ...[
+                            SizedBox(height: 12.h),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                                onPressed: () {},
+                                icon: const Icon(Icons.call, color: Colors.white),
+                                label: Text('Call ${postedByMap!['mobile']}', style: const TextStyle(color: Colors.white)),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+              SizedBox(height: 32.h),
+            ],
           ),
-          SizedBox(height: 32.h),
-        ],
-      ),
+        );
+      },
     );
   }
 
