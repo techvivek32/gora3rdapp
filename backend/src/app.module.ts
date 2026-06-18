@@ -24,6 +24,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { HealthModule } from './modules/health/health.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { HealthModule } from './modules/health/health.module';
     AnalyticsModule,
     StorageModule,
     HealthModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

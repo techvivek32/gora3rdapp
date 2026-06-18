@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class LocationPickerResult {
@@ -41,6 +42,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Timer? _debounce;
   final _dio = Dio();
 
+  // Search
+  final _searchCtrl = TextEditingController();
+  final _searchFocus = FocusNode();
+  bool _searchLoading = false;
+  List<Map<String, dynamic>> _suggestions = [];
+  bool _showSuggestions = false;
+
+  // Current location
+  bool _locating = false;
+
   @override
   void initState() {
     super.initState();
@@ -55,6 +66,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _debounce?.cancel();
     _mapCtrl?.dispose();
     _dio.close();
+    _searchCtrl.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -104,6 +117,82 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     _debounce = Timer(const Duration(milliseconds: 300), () => _reverseGeocode(_center));
   }
 
+  // ── Search ──────────────────────────────────────────────────────────────────
+
+  Future<void> _searchLocation(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() { _suggestions = []; _showSuggestions = false; });
+      return;
+    }
+    setState(() => _searchLoading = true);
+    try {
+      final res = await _dio.get(
+        'https://nominatim.openstreetmap.org/search',
+        queryParameters: {
+          'format': 'json',
+          'q': query.trim(),
+          'limit': 5,
+          'addressdetails': 1,
+        },
+        options: Options(
+          headers: {'Accept-Language': 'en', 'User-Agent': 'GoraCabs/1.0'},
+          receiveTimeout: const Duration(seconds: 8),
+        ),
+      );
+      final list = (res.data as List).cast<Map<String, dynamic>>();
+      setState(() {
+        _suggestions = list;
+        _showSuggestions = list.isNotEmpty;
+        _searchLoading = false;
+      });
+    } catch (_) {
+      setState(() { _searchLoading = false; _showSuggestions = false; });
+    }
+  }
+
+  void _selectSuggestion(Map<String, dynamic> item) {
+    final lat = double.tryParse(item['lat'] as String? ?? '') ?? _defaultLat;
+    final lng = double.tryParse(item['lon'] as String? ?? '') ?? _defaultLng;
+    final name = item['display_name'] as String? ?? '';
+    _searchCtrl.text = name.split(',').take(2).join(',');
+    _searchFocus.unfocus();
+    setState(() { _suggestions = []; _showSuggestions = false; });
+    _mapCtrl?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(lat, lng), 15));
+  }
+
+  // ── Current location ────────────────────────────────────────────────────────
+
+  Future<void> _goToCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      LocationPermission perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.deniedForever || perm == LocationPermission.denied) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission denied')),
+          );
+        }
+        setState(() => _locating = false);
+        return;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+      );
+      _mapCtrl?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(pos.latitude, pos.longitude), 16));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not get current location')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _locating = false);
+    }
+  }
+
   void _confirm() {
     if (_loading) return;
     Navigator.of(context).pop(LocationPickerResult(
@@ -134,7 +223,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             onCameraMove: _onCameraMove,
             onCameraIdle: _onCameraIdle,
             myLocationEnabled: true,
-            myLocationButtonEnabled: true,
+            myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
           ),
@@ -167,6 +256,129 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                   // spacer = same height as icon so the column center == icon tip
                   SizedBox(height: 52.sp + 4.h),
                 ],
+              ),
+            ),
+          ),
+
+          // ── Search bar ──────────────────────────────────────────────────────
+          Positioned(
+            top: 12.h,
+            left: 12.w,
+            right: 12.w,
+            child: Column(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))],
+                  ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    focusNode: _searchFocus,
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp),
+                    textInputAction: TextInputAction.search,
+                    onChanged: (v) {
+                      _debounce?.cancel();
+                      _debounce = Timer(const Duration(milliseconds: 500), () => _searchLocation(v));
+                      if (!mounted) return;
+                      setState(() {});
+                    },
+                    onSubmitted: _searchLocation,
+                    decoration: InputDecoration(
+                      hintText: 'Search location...',
+                      hintStyle: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp, color: AppColors.textHint),
+                      prefixIcon: _searchLoading
+                          ? Padding(
+                              padding: EdgeInsets.all(12.w),
+                              child: SizedBox(width: 20.w, height: 20.h, child: const CircularProgressIndicator(strokeWidth: 2)),
+                            )
+                          : Icon(Icons.search, color: AppColors.textSecondary, size: 22.sp),
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(Icons.close, color: AppColors.textSecondary, size: 18.sp),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                setState(() { _suggestions = []; _showSuggestions = false; });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 13.h),
+                    ),
+                  ),
+                ),
+                if (_showSuggestions)
+                  Container(
+                    margin: EdgeInsets.only(top: 4.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8, offset: const Offset(0, 2))],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _suggestions.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final item = _suggestions[i];
+                          final name = item['display_name'] as String? ?? '';
+                          final parts = name.split(',');
+                          final title = parts.first.trim();
+                          final subtitle = parts.skip(1).take(2).join(',').trim();
+                          return InkWell(
+                            onTap: () => _selectSuggestion(item),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18.sp),
+                                  SizedBox(width: 10.w),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(title, style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        if (subtitle.isNotEmpty)
+                                          Text(subtitle, style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp, color: AppColors.textSecondary), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // ── Current location button ─────────────────────────────────────────
+          Positioned(
+            right: 12.w,
+            bottom: 210.h,
+            child: GestureDetector(
+              onTap: _locating ? null : _goToCurrentLocation,
+              child: Container(
+                width: 44.w,
+                height: 44.h,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 6, offset: const Offset(0, 2))],
+                ),
+                child: _locating
+                    ? Padding(
+                        padding: EdgeInsets.all(12.w),
+                        child: const CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(Icons.my_location, color: AppColors.primary, size: 22.sp),
               ),
             ),
           ),

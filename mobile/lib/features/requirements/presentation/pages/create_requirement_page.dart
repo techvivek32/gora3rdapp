@@ -35,7 +35,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   double? _computedDistance;
   bool _loadingDistance = false;
 
-  static const double _ratePerKm = 20.0;
+  // Platform settings (fetched from backend)
+  double _ratePerKm = 20.0;
+  double _commissionPercent = 10.0;
+  bool _settingsLoading = true;
 
   double get _distance => _computedDistance ?? 0.0;
   
@@ -53,11 +56,43 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     return _suggestedFare;
   }
   
-  // Calculate commission (10%)
-  double get _commission => _currentFare * 0.10;
+  double get _commission => _currentFare * (_commissionPercent / 100);
   
   // Calculate total
   double get _total => _currentFare + _commission;
+
+  bool get _isCustomFareBelowMin {
+    if (!_useCustomFare) return false;
+    final entered = double.tryParse(_customFareCtrl.text);
+    if (entered == null) return false;
+    if (_suggestedFare <= 0) return false;
+    return entered < _suggestedFare;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSettings();
+  }
+
+  Future<void> _fetchSettings() async {
+    try {
+      final res = await Dio().get('http://localhost:3001/api/v1/settings');
+      final body = res.data as Map<String, dynamic>?;
+      // Backend wraps all responses: { success, data: <actual payload> }
+      final s = (body?['data'] as Map<String, dynamic>?) ?? body;
+      if (s != null && mounted) {
+        setState(() {
+          _ratePerKm = (s['pricePerKm'] as num?)?.toDouble() ?? _ratePerKm;
+          _commissionPercent = (s['commissionPercent'] as num?)?.toDouble() ?? _commissionPercent;
+        });
+      }
+    } catch (_) {
+      // keep defaults if backend unreachable
+    } finally {
+      if (mounted) setState(() => _settingsLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -602,11 +637,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   ),
                                 ),
                               Text(
-                                'Rate = ₹${_ratePerKm.toStringAsFixed(0)}/km',
+                                _settingsLoading ? 'Rate = loading...' : 'Rate = ₹${_ratePerKm.toStringAsFixed(0)}/km',
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 14.sp,
-                                  color: AppColors.textPrimary,
+                                  color: _settingsLoading ? AppColors.textHint : AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -643,7 +678,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                               keyboardType: TextInputType.numberWithOptions(decimal: true),
                               decoration: InputDecoration(
                                 labelText: 'Enter Your Fare (₹)',
-                                hintText: 'Minimum ₹${_suggestedFare.toStringAsFixed(0)}',
+                                hintText: _suggestedFare > 0 ? 'Minimum ₹${_suggestedFare.toStringAsFixed(0)}' : 'Enter your fare',
                                 filled: true,
                                 fillColor: Colors.white,
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
@@ -700,7 +735,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Commission (10%)',
+                                'Commission (${_commissionPercent.toStringAsFixed(0)}%)',
                                 style: TextStyle(
                                   fontFamily: 'Poppins',
                                   fontSize: 14.sp,
@@ -751,7 +786,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 SizedBox(height: 24.h),
                 BlocBuilder<RequirementsBloc, RequirementsState>(
                   builder: (context, state) => ElevatedButton(
-                    onPressed: state is RequirementsLoading ? null : _submit,
+                    onPressed: (state is RequirementsLoading || _isCustomFareBelowMin) ? null : _submit,
                     child: state is RequirementsLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : Text('Post Requirement', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),

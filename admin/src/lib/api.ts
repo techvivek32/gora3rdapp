@@ -67,6 +67,11 @@ export const adminApi = {
   getReports: (params?: any) => apiClient.get('/admin/reports', { params }),
   resolveReport: (id: string, data: any) => apiClient.post(`/admin/reports/${id}/resolve`, data),
 
+  // ─── Platform Settings ─────────────────────────────────────────────────────
+  getSettings: () => apiClient.get('/settings'),
+  updateSettings: (data: { pricePerKm?: number; commissionPercent?: number }) =>
+    apiClient.put('/settings', data),
+
   // ─── Notifications ─────────────────────────────────────────────────────────
   sendNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
   sendAdminNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
