@@ -44,8 +44,10 @@ export class RequirementsService {
 
     await this.userModel.findByIdAndUpdate(userId, { $inc: { requirementsPosted: 1 } });
 
-    // Send push notifications to matching city users
-    await this.notificationsService.notifyNewRequirement(requirement);
+    // Notify the poster (self-confirmation)
+    this.notificationsService.notifyRequirementPosted(requirement).catch(() => {});
+    // Notify matching city users
+    this.notificationsService.notifyNewRequirement(requirement).catch(() => {});
 
     return {
       message: 'Requirement posted successfully',

@@ -8,12 +8,14 @@ import { AvailabilityStatus } from '../../common/enums/vehicle-type.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
 import { generateVehicleListingId } from '../../common/utils/booking-id.util';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AvailableVehiclesService {
   constructor(
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private notificationsService: NotificationsService,
   ) {}
 
   async create(userId: string, dto: CreateAvailableVehicleDto) {
@@ -25,6 +27,9 @@ export class AvailableVehiclesService {
     });
 
     await this.userModel.findByIdAndUpdate(userId, { $inc: { vehiclesPosted: 1 } });
+
+    // Notify the poster (self-confirmation)
+    this.notificationsService.notifyVehiclePosted(listing).catch(() => {});
 
     return { message: 'Vehicle listing posted successfully', data: listing };
   }

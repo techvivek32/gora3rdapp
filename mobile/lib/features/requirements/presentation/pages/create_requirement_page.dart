@@ -192,6 +192,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'travelDate': _travelDate!.toIso8601String().split('T').first,
       'travelTime': _travelTime != null ? '${_travelTime!.hour.toString().padLeft(2, '0')}:${_travelTime!.minute.toString().padLeft(2, '0')}' : '00:00',
       'notes': _notesCtrl.text.trim(),
+      if (_computedDistance != null) 'estimatedDistance': _computedDistance!.round(),
     }));
   }
 

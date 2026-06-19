@@ -4,6 +4,8 @@ import { Document, Types } from 'mongoose';
 export enum NotificationType {
   NEW_REQUIREMENT = 'new_requirement',
   NEW_VEHICLE = 'new_vehicle',
+  REQUIREMENT_POSTED = 'requirement_posted',
+  VEHICLE_POSTED = 'vehicle_posted',
   REQUIREMENT_ACCEPTED = 'requirement_accepted',
   VEHICLE_BOOKED = 'vehicle_booked',
   NEW_MESSAGE = 'new_message',

@@ -1,9 +1,13 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
+import '../widgets/banner_card_widget.dart';
 import '../widgets/requirement_card_widget.dart';
 import '../widgets/requirements_filter_sheet.dart';
 
@@ -16,16 +20,39 @@ class RequirementsFeedPage extends StatefulWidget {
 
 class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
+  final _apiClient = getIt<ApiClient>();
   String _searchQuery = '';
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
+  List<Map<String, dynamic>> _banners = [];
+
+  static const _bannerEvery = 1; // insert a banner after every N requirement cards
 
   @override
   void initState() {
     super.initState();
     context.read<RequirementsBloc>().add(LoadRequirementsEvent());
     _scrollController.addListener(_onScroll);
+    _loadBanners();
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final res = await _apiClient.get('/banners');
+      final data = res.data as Map<String, dynamic>?;
+      final list = (data?['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (mounted && list.isNotEmpty) {
+        setState(() => _banners = list);
+      }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic>? _randomBanner() {
+    if (_banners.isEmpty) return null;
+    return _banners[Random().nextInt(_banners.length)];
   }
 
   void _onScroll() {
@@ -80,16 +107,27 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           bool isLoadingMore = false;
           if (state is RequirementsLoaded) {
             requirements = state.requirements.where((r) => !_isExpired(r)).toList();
-            myAccepted = state.myAccepted;
+            myAccepted = state.myAccepted.where((r) => !_isExpired(r)).toList();
             isLoadingMore = state.isLoadingMore;
           } else {
             requirements = _lastLoadedRequirements.where((r) => !_isExpired(r)).toList();
-            myAccepted = _lastMyAccepted;
+            myAccepted = _lastMyAccepted.where((r) => !_isExpired(r)).toList();
             isLoadingMore = false;
           }
 
           final hasMyAccepted = myAccepted.isNotEmpty;
-          final headerOffset = hasMyAccepted ? 1 : 0;
+
+          // Build flat mixed list: requirements interleaved with banners
+          final List<dynamic> items = [];
+          if (hasMyAccepted) items.add('accepted_section');
+          for (int i = 0; i < requirements.length; i++) {
+            items.add(requirements[i]);
+            // After every card insert a random banner
+            if (_banners.isNotEmpty && (i + 1) % _bannerEvery == 0) {
+              items.add({'_type': 'banner', 'banner': _randomBanner()!});
+            }
+          }
+          if (isLoadingMore) items.add('loading');
 
           if (requirements.isEmpty && !hasMyAccepted) {
             return RefreshIndicator(
@@ -108,24 +146,28 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
-              itemCount: requirements.length + headerOffset + (isLoadingMore ? 1 : 0),
+              itemCount: items.length,
               separatorBuilder: (_, __) => SizedBox(height: 16.h),
               itemBuilder: (context, index) {
-                if (hasMyAccepted && index == 0) {
+                final item = items[index];
+                if (item == 'accepted_section') {
                   return _buildMyAcceptedSection(myAccepted);
                 }
-                final reqIndex = index - headerOffset;
-                if (reqIndex == requirements.length) {
+                if (item == 'loading') {
                   return Center(child: Padding(
                     padding: EdgeInsets.all(16.r),
                     child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
                   ));
                 }
+                if (item is Map && item['_type'] == 'banner') {
+                  return BannerCardWidget(banner: item['banner'] as Map<String, dynamic>, apiClient: _apiClient);
+                }
+                final req = item as Map<String, dynamic>;
                 return RequirementCardWidget(
-                  requirement: requirements[reqIndex],
+                  requirement: req,
                   onTap: () => context.push(
-                    '/requirements/${requirements[reqIndex]['_id']}',
-                    extra: requirements[reqIndex],
+                    '/requirements/${req['_id']}',
+                    extra: req,
                   ).then((result) {
                     if (result == true && mounted) {
                       context.read<RequirementsBloc>().add(LoadRequirementsEvent());

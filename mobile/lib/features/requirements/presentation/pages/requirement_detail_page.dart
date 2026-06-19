@@ -422,27 +422,66 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
           },
         );
       }
-      // Owner bottom bar: hide Edit when requirement is booked
+      // Owner bottom bar: show booked badge + optional cancel when before travel time
       if (isBooked) {
+        // Determine if travel datetime is still in the future
+        bool canCancel = false;
+        try {
+          final dateStr = _requirement?['travelDate'] as String?;
+          final timeStr = _requirement?['travelTime'] as String?;
+          if (dateStr != null) {
+            final d = DateTime.parse(dateStr).toLocal();
+            int hour = 0, minute = 0;
+            if (timeStr != null) {
+              final parts = timeStr.split(':');
+              hour = int.tryParse(parts[0]) ?? 0;
+              minute = int.tryParse(parts[1]) ?? 0;
+            }
+            final travelDt = DateTime(d.year, d.month, d.day, hour, minute);
+            canCancel = DateTime.now().isBefore(travelDt);
+          }
+        } catch (_) {}
+
         return SafeArea(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-            child: Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 14.h),
-              decoration: BoxDecoration(
-                color: Colors.green[50],
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(color: Colors.green),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 20.sp),
-                  SizedBox(width: 8.w),
-                  Text('Requirement Booked', style: TextStyle(color: Colors.green, fontSize: 14.sp, fontWeight: FontWeight.bold)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.green),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.green, size: 20.sp),
+                      SizedBox(width: 8.w),
+                      Text('Requirement Booked', style: TextStyle(color: Colors.green, fontSize: 14.sp, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+                if (canCancel) ...[
+                  SizedBox(height: 8.h),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _showCancelDialog,
+                      icon: Icon(Icons.cancel_outlined, color: AppColors.error, size: 18.sp),
+                      label: Text('Cancel Booking', style: TextStyle(color: AppColors.error, fontSize: 14.sp)),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                        side: const BorderSide(color: AppColors.error),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                      ),
+                    ),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );

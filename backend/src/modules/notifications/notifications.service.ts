@@ -80,6 +80,32 @@ export class NotificationsService {
     }
   }
 
+  async notifyRequirementPosted(requirement: any) {
+    await this.notificationModel.create({
+      userId: requirement.postedBy,
+      title: '✅ Requirement Posted Successfully!',
+      body: `Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity} is now live.`,
+      type: NotificationType.REQUIREMENT_POSTED,
+      data: {
+        requirementId: requirement._id.toString(),
+        bookingId: requirement.bookingId,
+      },
+    });
+  }
+
+  async notifyVehiclePosted(vehicle: any) {
+    await this.notificationModel.create({
+      userId: vehicle.postedBy,
+      title: '✅ Vehicle Listed Successfully!',
+      body: `Listing #${vehicle.listingId} | ${vehicle.currentCity} → ${vehicle.destinationCity} is now live.`,
+      type: NotificationType.VEHICLE_POSTED,
+      data: {
+        vehicleId: vehicle._id.toString(),
+        listingId: vehicle.listingId,
+      },
+    });
+  }
+
   async notifyRequirementAccepted(requirement: any, acceptingUser: any) {
     const poster = await this.userModel.findById(requirement.postedBy).select('fcmTokens _id');
     if (!poster?.fcmTokens?.length) return;

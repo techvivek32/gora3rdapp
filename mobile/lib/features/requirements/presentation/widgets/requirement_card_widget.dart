@@ -265,7 +265,9 @@ class RequirementCardWidget extends StatelessWidget {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        requirement['distance']?.toString() ?? '284',
+                                        requirement['estimatedDistance'] != null
+                                            ? requirement['estimatedDistance'].toString()
+                                            : '—',
                                         style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: Colors.green),
                                       ),
                                       Text('KM', style: TextStyle(fontSize: 8.sp, color: Colors.grey[600])),
@@ -362,7 +364,7 @@ class RequirementCardWidget extends StatelessWidget {
                                       color: Colors.grey[100],
                                       borderRadius: BorderRadius.circular(4.r),
                                     ),
-                                    child: Text('1hr 9 mins ago', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
+                                    child: Text(_timeAgo(requirement['createdAt']), style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
                                   ),
                                   const Spacer(),
                                   Container(
@@ -557,6 +559,23 @@ class RequirementCardWidget extends StatelessWidget {
   String _monthName(int m) {
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[m];
+  }
+
+  String _timeAgo(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      final created = DateTime.parse(createdAt.toString()).toLocal();
+      final diff = DateTime.now().difference(created);
+      if (diff.inDays >= 1) return '${diff.inDays}d ago';
+      if (diff.inHours >= 1) {
+        final mins = diff.inMinutes % 60;
+        return mins > 0 ? '${diff.inHours}hr ${mins}m ago' : '${diff.inHours}hr ago';
+      }
+      if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
+      return 'just now';
+    } catch (_) {
+      return '';
+    }
   }
 }
 

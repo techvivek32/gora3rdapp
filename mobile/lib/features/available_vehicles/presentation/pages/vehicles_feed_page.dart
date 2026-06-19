@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../requirements/presentation/widgets/banner_card_widget.dart';
 import '../bloc/vehicles_bloc.dart';
 
 class VehiclesFeedPage extends StatefulWidget {
@@ -17,15 +20,36 @@ class VehiclesFeedPage extends StatefulWidget {
 class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   final _scrollController = ScrollController();
   final _searchCtrl = TextEditingController();
+  final _apiClient = getIt<ApiClient>();
   List<Map<String, dynamic>> _lastLoadedVehicles = [];
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
+  List<Map<String, dynamic>> _banners = [];
 
   @override
   void initState() {
     super.initState();
     context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
     _scrollController.addListener(_onScroll);
+    _loadBanners();
+  }
+
+  Future<void> _loadBanners() async {
+    try {
+      final res = await _apiClient.get('/banners');
+      final data = res.data as Map<String, dynamic>?;
+      final list = (data?['data'] as List? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (mounted && list.isNotEmpty) {
+        setState(() => _banners = list);
+      }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic>? _randomBanner() {
+    if (_banners.isEmpty) return null;
+    return _banners[Random().nextInt(_banners.length)];
   }
 
   void _onScroll() {
@@ -99,14 +123,23 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           List<Map<String, dynamic>> myAccepted = [];
           if (state is VehiclesLoaded) {
             vehicles = state.vehicles.where((v) => !_isExpired(v)).toList();
-            myAccepted = state.myAccepted;
+            myAccepted = state.myAccepted.where((v) => !_isExpired(v)).toList();
           } else {
             vehicles = _lastLoadedVehicles.where((v) => !_isExpired(v)).toList();
-            myAccepted = _lastMyAccepted;
+            myAccepted = _lastMyAccepted.where((v) => !_isExpired(v)).toList();
           }
 
           final hasMyAccepted = myAccepted.isNotEmpty;
-          final headerOffset = hasMyAccepted ? 1 : 0;
+
+          // Build flat mixed list: vehicles interleaved with banners
+          final List<dynamic> items = [];
+          if (hasMyAccepted) items.add('accepted_section');
+          for (int i = 0; i < vehicles.length; i++) {
+            items.add(vehicles[i]);
+            if (_banners.isNotEmpty) {
+              items.add({'_type': 'banner', 'banner': _randomBanner()!});
+            }
+          }
 
           if (vehicles.isEmpty && !hasMyAccepted) {
             return RefreshIndicator(
@@ -139,16 +172,23 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.only(left: 16.w, right: 16.w, top: 16.r, bottom: 140.h),
-              itemCount: vehicles.length + headerOffset,
+              itemCount: items.length,
               separatorBuilder: (_, __) => SizedBox(height: 12.h),
               itemBuilder: (context, index) {
-                if (hasMyAccepted && index == 0) {
+                final item = items[index];
+                if (item == 'accepted_section') {
                   return _buildMyAcceptedSection(myAccepted);
                 }
-                final i = index - headerOffset;
+                if (item is Map && item['_type'] == 'banner') {
+                  return BannerCardWidget(
+                    banner: item['banner'] as Map<String, dynamic>,
+                    apiClient: _apiClient,
+                  );
+                }
+                final v = item as Map<String, dynamic>;
                 return _VehicleCard(
-                  vehicle: vehicles[i],
-                  onTap: () => context.push('/vehicles/${vehicles[i]['_id']}', extra: vehicles[i]).then((result) {
+                  vehicle: v,
+                  onTap: () => context.push('/vehicles/${v['_id']}', extra: v).then((result) {
                     if (result == true && mounted) {
                       context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
                     }

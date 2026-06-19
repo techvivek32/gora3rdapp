@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/notification_bloc.dart';
 
@@ -20,7 +21,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   static const _typeIcons = {
     'new_requirement': Icons.post_add,
+    'requirement_posted': Icons.check_circle_outline,
     'requirement_accepted': Icons.check_circle,
+    'vehicle_posted': Icons.directions_car,
+    'new_vehicle': Icons.directions_car_outlined,
     'new_message': Icons.chat_bubble_outline,
     'subscription_activated': Icons.workspace_premium,
     'system': Icons.notifications_outlined,
@@ -28,11 +32,30 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   static const _typeColors = {
     'new_requirement': AppColors.primary,
+    'requirement_posted': AppColors.success,
     'requirement_accepted': AppColors.success,
+    'vehicle_posted': AppColors.primary,
+    'new_vehicle': AppColors.primary,
     'new_message': AppColors.info,
     'subscription_activated': AppColors.memberGolden,
     'system': AppColors.textSecondary,
   };
+
+  void _handleTap(BuildContext context, Map<String, dynamic> n) {
+    final id = n['_id'] as String?;
+    if (id != null) {
+      context.read<NotificationBloc>().add(MarkNotificationReadEvent(id));
+    }
+    final type = n['type'] as String? ?? '';
+    final data = n['data'] as Map<String, dynamic>? ?? {};
+    if (type == 'requirement_posted' || type == 'requirement_accepted' || type == 'new_requirement') {
+      final requirementId = data['requirementId'] as String?;
+      if (requirementId != null) context.push('/requirements/$requirementId');
+    } else if (type == 'vehicle_posted' || type == 'new_vehicle') {
+      final vehicleId = data['vehicleId'] as String?;
+      if (vehicleId != null) context.push('/vehicles/$vehicleId');
+    }
+  }
 
   String _timeAgo(dynamic createdAt) {
     if (createdAt == null) return '';
@@ -131,7 +154,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   final icon = _typeIcons[type] ?? Icons.notifications_outlined;
 
                   return InkWell(
-                    onTap: () => context.read<NotificationBloc>().add(MarkNotificationReadEvent(n['_id'] as String)),
+                    onTap: () => _handleTap(context, n),
                     child: Container(
                       color: isRead ? Colors.transparent : AppColors.primary.withOpacity(0.04),
                       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
