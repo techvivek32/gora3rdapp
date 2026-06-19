@@ -73,19 +73,28 @@ class _AuthInterceptor extends Interceptor {
           final newToken = response.data['data']['accessToken'];
           await _storage.write(key: 'access_token', value: newToken);
 
-          // Retry original request
+          // Retry original request with refreshed token.
+          // FormData streams are consumed on first use, so multipart retries
+          // will fail here — that's handled by the caller, not by wiping tokens.
           err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-          final retried = await _dio.request(
-            err.requestOptions.path,
-            options: Options(
-              method: err.requestOptions.method,
-              headers: err.requestOptions.headers,
-            ),
-            data: err.requestOptions.data,
-            queryParameters: err.requestOptions.queryParameters,
-          );
-          return handler.resolve(retried);
+          try {
+            final retried = await _dio.request(
+              err.requestOptions.path,
+              options: Options(
+                method: err.requestOptions.method,
+                headers: err.requestOptions.headers,
+              ),
+              data: err.requestOptions.data,
+              queryParameters: err.requestOptions.queryParameters,
+            );
+            return handler.resolve(retried);
+          } catch (_) {
+            // Retry failed (e.g. FormData consumed) but token was refreshed —
+            // do NOT delete storage; just propagate the original error.
+            return handler.next(err);
+          }
         } catch (_) {
+          // Refresh request itself failed — clear tokens and force re-login.
           await _storage.deleteAll();
         }
       }

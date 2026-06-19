@@ -1,7 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
@@ -261,6 +265,10 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   late final TextEditingController _cityCtrl;
   late final TextEditingController _stateCtrl;
   bool _loading = false;
+  bool _uploadingImage = false;
+  String? _uploadedImageUrl;
+  final _picker = ImagePicker();
+  final _apiClient = getIt<ApiClient>();
 
   @override
   void initState() {
@@ -279,6 +287,48 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     super.dispose();
   }
 
+  Future<void> _pickAndUpload() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingImage = true);
+    try {
+      final bytes = await picked.readAsBytes();
+
+      // FormData streams are consumed on first use and can't be retried by the
+      // auth interceptor. Build a fresh one each time we attempt the upload.
+      FormData buildForm() => FormData.fromMap({
+            'file': MultipartFile.fromBytes(bytes, filename: 'profile.jpg'),
+          });
+
+      Response res;
+      try {
+        res = await _apiClient.dio.post('/storage/upload/profile', data: buildForm());
+      } catch (_) {
+        // First attempt may have failed because the access token was expired.
+        // The interceptor will have refreshed the token but the FormData stream
+        // was consumed — so we retry once with a fresh FormData.
+        res = await _apiClient.dio.post('/storage/upload/profile', data: buildForm());
+      }
+
+      final url = res.data['data'] as String?;
+      if (url != null && mounted) setState(() => _uploadedImageUrl = url);
+    } catch (e) {
+      if (mounted) {
+        final msg = e is DioException ? (e.response?.data?.toString() ?? e.message ?? 'Upload failed') : e.toString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
   void _save() {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -288,6 +338,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       'agencyName': _agencyCtrl.text.trim(),
       'city': _cityCtrl.text.trim(),
       'state': _stateCtrl.text.trim(),
+      if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl!,
     }));
   }
 
@@ -346,6 +397,53 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     key: _formKey,
                     child: Column(
                       children: [
+                        // Avatar picker
+                        Center(
+                          child: GestureDetector(
+                            onTap: _uploadingImage ? null : _pickAndUpload,
+                            child: Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 44.r,
+                                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                  backgroundImage: _uploadedImageUrl != null
+                                      ? NetworkImage(_uploadedImageUrl!) as ImageProvider
+                                      : widget.user?['profileImage'] != null
+                                          ? NetworkImage(widget.user!['profileImage'] as String)
+                                          : null,
+                                  child: (_uploadedImageUrl == null && widget.user?['profileImage'] == null)
+                                      ? Icon(Icons.person, size: 40.sp, color: AppColors.primary)
+                                      : null,
+                                ),
+                                Positioned(
+                                  right: 0,
+                                  bottom: 0,
+                                  child: Container(
+                                    padding: EdgeInsets.all(6.r),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: _uploadingImage
+                                        ? SizedBox(
+                                            width: 14.w,
+                                            height: 14.w,
+                                            child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                          )
+                                        : Icon(Icons.camera_alt, size: 14.sp, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Tap to change photo',
+                          style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+                        ),
+                        SizedBox(height: 20.h),
                         _field(_nameCtrl, 'Full Name', Icons.person_outline, required: true),
                         SizedBox(height: 14.h),
                         _field(_emailCtrl, 'Email', Icons.email_outlined, keyboardType: TextInputType.emailAddress),

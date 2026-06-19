@@ -52,6 +52,8 @@ export default function UsersPage() {
       }),
   });
   const data = rawData as any;
+  const users = data?.data?.data || [];
+  const meta = data?.data?.meta;
 
   const verifyMutation = useMutation({
     mutationFn: (userId: string) => adminApi.verifyUser(userId),
@@ -135,10 +137,17 @@ export default function UsersPage() {
     {
       header: 'Posts',
       cell: ({ row }) => (
-        <div className="text-sm">
-          <span className="text-blue-600">{row.original.requirementsPosted}</span>
-          <span className="text-gray-400 mx-1">/</span>
-          <span className="text-green-600">{row.original.vehiclesPosted}</span>
+        <div className="flex flex-col gap-0.5 text-xs">
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
+            <span className="text-blue-600 font-semibold">{row.original.requirementsPosted}</span>
+            <span className="text-gray-400">Req</span>
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+            <span className="text-green-600 font-semibold">{row.original.vehiclesPosted}</span>
+            <span className="text-gray-400">Cab</span>
+          </span>
         </div>
       ),
     },
@@ -177,7 +186,7 @@ export default function UsersPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Users</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {data?.meta?.total?.toLocaleString()} total users
+            {meta?.total?.toLocaleString()} total users
           </p>
         </div>
         <Button variant="outline" size="sm">
@@ -217,11 +226,11 @@ export default function UsersPage() {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <DataTable
           columns={columns}
-          data={data?.data || []}
+          data={users}
           isLoading={isLoading}
           pagination={{
             page,
-            totalPages: data?.meta?.totalPages || 1,
+            totalPages: meta?.totalPages || 1,
             onPageChange: setPage,
           }}
         />
