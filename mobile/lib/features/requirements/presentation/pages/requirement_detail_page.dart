@@ -18,6 +18,7 @@ class RequirementDetailPage extends StatefulWidget {
 class _RequirementDetailPageState extends State<RequirementDetailPage> {
   Map<String, dynamic>? _requirement;
   bool _isEditing = false;
+  bool _detailLoaded = false;
   final _formKey = GlobalKey<FormState>();
 
   // Edit controllers
@@ -269,6 +270,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
         if (state is RequirementDetailLoaded && mounted) {
           setState(() {
             _requirement = state.requirement;
+            _detailLoaded = true;
             _populateControllers();
           });
         }
@@ -1149,20 +1151,36 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                       ),
               ),
 
-              // Accepted By section — shown to the poster once the full detail is loaded
-              if (isMine && acceptors.isNotEmpty) ...[
+              // Accepted By section — shown to the poster when requirement is booked
+              if (isMine && _requirement?['status'] == 'accepted') ...[
                 SizedBox(height: 12.h),
                 _card(
                   title: 'Accepted By',
-                  child: Column(
-                    children: [
-                      for (int i = 0; i < acceptors.length; i++) ...[
-                        _buildAcceptorRow(acceptors[i]),
-                        if (i < acceptors.length - 1)
-                          Divider(height: 16.h, thickness: 1, color: Colors.grey[200]),
-                      ],
-                    ],
-                  ),
+                  child: acceptors.isEmpty
+                      ? _detailLoaded
+                          ? Row(
+                              children: [
+                                Icon(Icons.check_circle_outline, color: Colors.green, size: 18.sp),
+                                SizedBox(width: 8.w),
+                                Expanded(child: Text('Booking confirmed. Acceptor will contact you soon.', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins'))),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                                SizedBox(width: 12.w),
+                                Expanded(child: Text('Loading acceptor details...', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins'))),
+                              ],
+                            )
+                      : Column(
+                          children: [
+                            for (int i = 0; i < acceptors.length; i++) ...[
+                              _buildAcceptorRow(acceptors[i]),
+                              if (i < acceptors.length - 1)
+                                Divider(height: 16.h, thickness: 1, color: Colors.grey[200]),
+                            ],
+                          ],
+                        ),
                 ),
               ],
 

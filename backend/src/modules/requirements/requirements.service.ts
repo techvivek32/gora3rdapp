@@ -117,7 +117,6 @@ export class RequirementsService {
     const requirement = await this.requirementModel
       .findById(id)
       .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile email city state')
-      .populate('acceptedBy', 'fullName agencyName profileImage membershipType mobile email city state')
       .lean();
 
     if (!requirement || requirement.isDeleted) {
@@ -141,6 +140,18 @@ export class RequirementsService {
       }
     } else {
       await this.requirementModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
+    }
+
+    // Manually populate acceptedBy to avoid Mongoose lean() populate inconsistencies
+    const acceptedByIds = (requirement as any).acceptedBy as Types.ObjectId[];
+    if (acceptedByIds && acceptedByIds.length > 0) {
+      const acceptors = await this.userModel
+        .find({ _id: { $in: acceptedByIds } })
+        .select('fullName agencyName profileImage membershipType mobile email city state')
+        .lean();
+      (requirement as any).acceptedBy = acceptors;
+    } else {
+      (requirement as any).acceptedBy = [];
     }
 
     return { message: 'Requirement found', data: requirement };
@@ -241,8 +252,25 @@ export class RequirementsService {
       .find(filter)
       .sort({ createdAt: -1 })
       .populate('postedBy', 'fullName agencyName profileImage membershipType mobile email city state')
-      .populate('acceptedBy', 'fullName agencyName mobile membershipType')
       .lean();
+
+    // Manually populate acceptedBy for each requirement
+    const allAcceptorIds = [...new Set(
+      requirements.flatMap((r: any) => (r.acceptedBy as Types.ObjectId[]) || []).map(String)
+    )];
+    let acceptorMap: Record<string, any> = {};
+    if (allAcceptorIds.length > 0) {
+      const acceptors = await this.userModel
+        .find({ _id: { $in: allAcceptorIds } })
+        .select('fullName agencyName mobile membershipType profileImage')
+        .lean();
+      acceptorMap = Object.fromEntries(acceptors.map((a: any) => [a._id.toString(), a]));
+    }
+    for (const req of requirements as any[]) {
+      req.acceptedBy = ((req.acceptedBy as Types.ObjectId[]) || [])
+        .map((aid: any) => acceptorMap[aid.toString()])
+        .filter(Boolean);
+    }
 
     return { message: 'My requirements', data: requirements };
   }
