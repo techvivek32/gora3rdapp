@@ -14,23 +14,27 @@ class HomeLoaded extends HomeState {
   final List<Map<String, dynamic>> banners;
   final List<Map<String, dynamic>> recentRequirements;
   final List<String> selectedCities;
+  final List<String> availableCities;
   const HomeLoaded({
     required this.banners,
     required this.recentRequirements,
     this.selectedCities = const [],
+    this.availableCities = const [],
   });
   @override
-  List<Object?> get props => [banners, recentRequirements, selectedCities];
+  List<Object?> get props => [banners, recentRequirements, selectedCities, availableCities];
 
   HomeLoaded copyWith({
     List<Map<String, dynamic>>? banners,
     List<Map<String, dynamic>>? recentRequirements,
     List<String>? selectedCities,
+    List<String>? availableCities,
   }) {
     return HomeLoaded(
       banners: banners ?? this.banners,
       recentRequirements: recentRequirements ?? this.recentRequirements,
       selectedCities: selectedCities ?? this.selectedCities,
+      availableCities: availableCities ?? this.availableCities,
     );
   }
 }

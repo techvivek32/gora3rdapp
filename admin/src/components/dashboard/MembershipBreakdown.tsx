@@ -15,7 +15,7 @@ const MEMBERSHIP_COLORS: Record<string, string> = {
 export function MembershipBreakdown() {
   const { data } = useQuery({
     queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics('month'),
+    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
   });
 
   const breakdown = data?.data?.membershipBreakdown || [];

@@ -25,3 +25,7 @@ class SaveSelectedCitiesEvent extends HomeEvent {
   const SaveSelectedCitiesEvent();
 }
 
+class LoadAvailableCitiesEvent extends HomeEvent {
+  const LoadAvailableCitiesEvent();
+}
+

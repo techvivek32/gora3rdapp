@@ -21,7 +21,7 @@ export default function AnalyticsPage() {
     queryFn: () => adminApi.getAnalytics({ days: 30 }),
   });
 
-  const analytics = data?.data?.data;
+  const analytics = data?.data;
 
   if (isLoading) {
     return (
@@ -88,9 +88,9 @@ export default function AnalyticsPage() {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
               <XAxis dataKey="_id" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${(v / 100).toLocaleString('en-IN')}`} />
-              <Tooltip formatter={(value: number) => [`₹${(value / 100).toLocaleString('en-IN')}`, 'Revenue']} />
-              <Area type="monotone" dataKey="total" stroke="#10B981" fill="url(#revGrad)" strokeWidth={2} />
+              <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
+              <Tooltip formatter={(value: number) => [`₹${Number(value).toLocaleString('en-IN')}`, 'Revenue']} />
+              <Area type="monotone" dataKey="revenue" stroke="#10B981" fill="url(#revGrad)" strokeWidth={2} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

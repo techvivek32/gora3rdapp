@@ -7,7 +7,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export function UserGrowthChart() {
   const { data } = useQuery({
     queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics('month'),
+    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
   });
 
   const userGrowth = data?.data?.userGrowth || [];

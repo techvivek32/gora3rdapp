@@ -11,165 +11,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final SharedPreferences sharedPreferences;
   final String _selectedCitiesKey = 'selected_cities';
 
-  static const List<String> availableCities = [
-    'Mumbai',
-    'Delhi',
-    'Bangalore',
-    'Hyderabad',
-    'Chennai',
-    'Kolkata',
-    'Ahmedabad',
-    'Pune',
-    'Surat',
-    'Jaipur',
-    'Lucknow',
-    'Kanpur',
-    'Nagpur',
-    'Indore',
-    'Thane',
-    'Bhopal',
-    'Visakhapatnam',
-    'Pimpri-Chinchwad',
-    'Patna',
-    'Vadodara',
-    'Ghaziabad',
-    'Ludhiana',
-    'Agra',
-    'Nashik',
-    'Faridabad',
-    'Meerut',
-    'Rajkot',
-    'Kalyan-Dombivli',
-    'Vasai-Virar',
-    'Varanasi',
-    'Srinagar',
-    'Aurangabad',
-    'Dhanbad',
-    'Amritsar',
-    'Navi Mumbai',
-    'Allahabad',
-    'Ranchi',
-    'Howrah',
-    'Coimbatore',
-    'Jabalpur',
-    'Gwalior',
-    'Vijayawada',
-    'Jodhpur',
-    'Madurai',
-    'Raipur',
-    'Kota',
-    'Guwahati',
-    'Chandigarh',
-    'Solapur',
-    'Hubli-Dharwad',
-    'Tiruchirappalli',
-    'Mysore',
-    'Tiruppur',
-    'Bareilly',
-    'Aligarh',
-    'Moradabad',
-    'Gurugram',
-    'Jalandhar',
-    'Bhubaneswar',
-    'Salem',
-    'Mira-Bhayandar',
-    'Warangal',
-    'Guntur',
-    'Bhiwandi',
-    'Saharanpur',
-    'Gorakhpur',
-    'Bikaner',
-    'Amravati',
-    'Noida',
-    'Jamshedpur',
-    'Bhilai',
-    'Cuttack',
-    'Firozabad',
-    'Kochi',
-    'Nellore',
-    'Bhavnagar',
-    'Dehradun',
-    'Durgapur',
-    'Asansol',
-    'Nanded',
-    'Kolhapur',
-    'Ajmer',
-    'Akola',
-    'Gulbarga',
-    'Jamnagar',
-    'Ujjain',
-    'Loni',
-    'Siliguri',
-    'Jhansi',
-    'Ulhasnagar',
-    'Jammu',
-    'Sangli-Miraj & Kupwad',
-    'Mangalore',
-    'Erode',
-    'Belgaum',
-    'Ambattur',
-    'Tirunelveli',
-    'Malegaon',
-    'Gaya',
-    'Kakinada',
-    'Thiruvananthapuram',
-    'Davanagere',
-    'Kozhikode',
-    'Kurnool',
-    'Rajahmundry',
-    'Bokaro',
-    'South Dumdum',
-    'Bellary',
-    'Patiala',
-    'Gopalpur',
-    'Agartala',
-    'Bhagalpur',
-    'Muzaffarnagar',
-    'Bhatpara',
-    'Panihati',
-    'Latur',
-    'Dhule',
-    'Rohtak',
-    'Sagar',
-    'Ratlam',
-    'Durg',
-    'Bhilwara',
-    'Berhampur',
-    'Muzaffarpur',
-    'Ahmednagar',
-    'Kollam',
-    'Rourkela',
-    'Kottayam',
-    'Ichalkaranji',
-    'Tirupati',
-    'Khandwa',
-    'Fatehpur Sikri',
-    'Dibrugarh',
-    'Saharanpur',
-    'Srikakulam',
-    'Karimnagar',
-    'Vellore',
-    'Hapur',
-    'Hindupur',
-    'Burdwan',
-    'Nellore',
-    'Shahdara',
-    'Vijayapura',
-    'Aurangabad',
-    'Nagercoil',
-    'Parbhani',
-    'Sangli',
-    'Sikar',
-    'Tumkur',
-    'Mathura',
-    'Rajkot',
-  ];
-
   HomeBloc(this.apiClient, this.sharedPreferences) : super(HomeInitial()) {
     on<LoadHomeDataEvent>(_onLoad);
     on<LoadSelectedCitiesEvent>(_onLoadSelectedCities);
     on<ToggleCityEvent>(_onToggleCity);
     on<SaveSelectedCitiesEvent>(_onSaveSelectedCities);
+    on<LoadAvailableCitiesEvent>(_onLoadAvailableCities);
   }
 
   Future<void> _onLoad(LoadHomeDataEvent event, Emitter<HomeState> emit) async {
@@ -220,18 +67,25 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       final current = state as HomeLoaded;
       try {
         emit(HomeSavingCities());
-        // Save to backend
         await apiClient.put('/users/business-cities', data: {'cities': current.selectedCities});
-        // Save to local storage
         await sharedPreferences.setStringList(_selectedCitiesKey, current.selectedCities);
-        emit(HomeLoaded(
-          banners: current.banners,
-          recentRequirements: current.recentRequirements,
-          selectedCities: current.selectedCities,
-        ));
+        emit(current.copyWith(selectedCities: current.selectedCities));
       } catch (e) {
         emit(HomeError(message: e.toString()));
       }
     }
+  }
+
+  Future<void> _onLoadAvailableCities(LoadAvailableCitiesEvent event, Emitter<HomeState> emit) async {
+    if (state is! HomeLoaded) return;
+    final current = state as HomeLoaded;
+    if (current.availableCities.isNotEmpty) return;
+    try {
+      final res = await apiClient.get('/cities');
+      final cities = (res.data['data'] as List<dynamic>? ?? [])
+          .map((c) => (c as Map<String, dynamic>)['name'] as String)
+          .toList();
+      emit(current.copyWith(availableCities: cities));
+    } catch (_) {}
   }
 }

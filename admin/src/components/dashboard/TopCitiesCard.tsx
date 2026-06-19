@@ -7,7 +7,7 @@ import { MapPin } from 'lucide-react';
 export function TopCitiesCard() {
   const { data } = useQuery({
     queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics('month'),
+    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
   });
 
   const topCities = data?.data?.topCities || [];

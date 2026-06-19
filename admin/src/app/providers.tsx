@@ -8,6 +8,8 @@ import { setAuthToken } from '@/lib/api';
 
 function SessionSync() {
   const { data: session } = useSession();
+  // Set synchronously during render so queries fired in this render cycle already have the token
+  setAuthToken((session?.user as any)?.accessToken ?? null);
   useEffect(() => {
     setAuthToken((session?.user as any)?.accessToken ?? null);
   }, [session]);
@@ -21,7 +23,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 60 * 1000,
-            retry: 1,
+            retry: 2,
+            retryDelay: 800,
             refetchOnWindowFocus: false,
           },
         },

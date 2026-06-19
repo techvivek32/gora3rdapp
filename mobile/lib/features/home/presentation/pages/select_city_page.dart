@@ -13,26 +13,20 @@ class SelectCityPage extends StatefulWidget {
 
 class _SelectCityPageState extends State<SelectCityPage> {
   final TextEditingController _searchController = TextEditingController();
-  List<String> _filteredCities = [];
+  String _searchQuery = '';
   bool _isSaving = false;
   bool _justSaved = false;
 
   @override
   void initState() {
     super.initState();
-    _filteredCities = HomeBloc.availableCities;
+    context.read<HomeBloc>().add(const LoadAvailableCitiesEvent());
   }
 
-  void _filterCities(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredCities = HomeBloc.availableCities;
-      } else {
-        _filteredCities = HomeBloc.availableCities
-            .where((city) => city.toLowerCase().contains(query.toLowerCase()))
-            .toList();
-      }
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -41,26 +35,26 @@ class _SelectCityPageState extends State<SelectCityPage> {
       listener: (ctx, state) {
         if (state is HomeError) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.message),
-              backgroundColor: AppColors.error,
-            ),
+            SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
           );
-          setState(() {
-            _isSaving = false;
-            _justSaved = false;
-          });
+          setState(() { _isSaving = false; _justSaved = false; });
         } else if (state is HomeSavingCities) {
-          setState(() {
-            _isSaving = true;
-            _justSaved = true;
-          });
+          setState(() { _isSaving = true; _justSaved = true; });
         } else if (state is HomeLoaded && _justSaved) {
           Navigator.of(context).pop();
         }
       },
       builder: (context, state) {
         final isLoading = state is HomeLoading || state is HomeSavingCities;
+        final loadedState = state is HomeLoaded ? state : null;
+        final allCities = loadedState?.availableCities ?? [];
+        final selectedCities = loadedState?.selectedCities ?? [];
+        final citiesLoading = loadedState != null && allCities.isEmpty;
+
+        final filteredCities = _searchQuery.isEmpty
+            ? allCities
+            : allCities.where((c) => c.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+
         return Scaffold(
           backgroundColor: const Color(0xFFF8F8F8),
           appBar: AppBar(
@@ -72,11 +66,7 @@ class _SelectCityPageState extends State<SelectCityPage> {
             ),
             title: Text(
               'Select Your Cities',
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
+              style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, color: Colors.white),
             ),
           ),
           body: Column(
@@ -87,18 +77,11 @@ class _SelectCityPageState extends State<SelectCityPage> {
                 color: Colors.white,
                 child: TextField(
                   controller: _searchController,
-                  onChanged: _filterCities,
+                  onChanged: (q) => setState(() => _searchQuery = q),
                   decoration: InputDecoration(
                     hintText: 'Search cities...',
-                    hintStyle: TextStyle(
-                      color: const Color(0xFFAAAAAA),
-                      fontSize: 14.sp,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: AppColors.primary,
-                      size: 22.sp,
-                    ),
+                    hintStyle: TextStyle(color: const Color(0xFFAAAAAA), fontSize: 14.sp),
+                    prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22.sp),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -118,205 +101,134 @@ class _SelectCityPageState extends State<SelectCityPage> {
                 ),
               ),
 
-              // Selected cities section
-              BlocBuilder<HomeBloc, HomeState>(
-                builder: (context, state) {
-                  final selectedCities = state is HomeLoaded ? state.selectedCities : <String>[];
-                  if (selectedCities.isNotEmpty) {
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Selected Cities (${selectedCities.length})',
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black,
-                            ),
+              // Selected cities chips
+              if (selectedCities.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Selected Cities (${selectedCities.length})',
+                        style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.black),
+                      ),
+                      SizedBox(height: 12.h),
+                      Wrap(
+                        spacing: 10.w,
+                        runSpacing: 10.h,
+                        children: selectedCities.map((city) => Container(
+                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8.r),
+                            border: Border.all(color: AppColors.primary, width: 1.5),
                           ),
-                          SizedBox(height: 12.h),
-                          Wrap(
-                            spacing: 10.w,
-                            runSpacing: 10.h,
-                            children: selectedCities
-                                .map(
-                                  (city) => Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 14.w,
-                                      vertical: 8.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(8.r),
-                                      border: Border.all(
-                                        color: AppColors.primary,
-                                        width: 1.5,
-                                      ),
-                                    ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(city, style: TextStyle(fontSize: 14.sp, color: AppColors.primary, fontWeight: FontWeight.w500)),
+                              SizedBox(width: 6.w),
+                              GestureDetector(
+                                onTap: () => context.read<HomeBloc>().add(ToggleCityEvent(city)),
+                                child: Container(
+                                  width: 18.w,
+                                  height: 18.w,
+                                  decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                  child: Icon(Icons.close, color: Colors.white, size: 12.sp),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+
+              Container(height: 1, color: const Color(0xFFEEEEEE)),
+
+              // City list
+              Expanded(
+                child: citiesLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredCities.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchQuery.isEmpty ? 'No cities available.\nAsk admin to add cities.' : 'No cities match "$_searchQuery"',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFFF8F8F8),
+                            child: ListView.separated(
+                              padding: EdgeInsets.symmetric(vertical: 4.h),
+                              itemCount: filteredCities.length,
+                              separatorBuilder: (_, __) => Container(height: 1, color: const Color(0xFFEEEEEE)),
+                              itemBuilder: (context, index) {
+                                final city = filteredCities[index];
+                                final isSelected = selectedCities.contains(city);
+                                return GestureDetector(
+                                  onTap: () => context.read<HomeBloc>().add(ToggleCityEvent(city)),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                                    color: isSelected ? const Color(0xFFF0F0F0) : Colors.transparent,
                                     child: Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           city,
                                           style: TextStyle(
-                                            fontSize: 14.sp,
-                                            color: AppColors.primary,
-                                            fontWeight: FontWeight.w500,
+                                            fontSize: 16.sp,
+                                            color: Colors.black,
+                                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                                           ),
                                         ),
-                                        SizedBox(width: 6.w),
-                                        GestureDetector(
-                                          onTap: () {
-                                            context.read<HomeBloc>().add(ToggleCityEvent(city));
-                                          },
-                                          child: Container(
-                                            width: 18.w,
-                                            height: 18.w,
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primary,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 12.sp,
+                                        Container(
+                                          width: 24.w,
+                                          height: 24.w,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: isSelected ? AppColors.primary : Colors.transparent,
+                                            border: Border.all(
+                                              color: isSelected ? AppColors.primary : const Color(0xFFAAAAAA),
+                                              width: 2,
                                             ),
                                           ),
+                                          child: isSelected
+                                              ? Icon(Icons.check, color: Colors.white, size: 16.sp)
+                                              : null,
                                         ),
                                       ],
                                     ),
                                   ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-
-              // Divider
-              Container(
-                height: 1,
-                color: const Color(0xFFEEEEEE),
-              ),
-
-              // Cities list
-              Expanded(
-                child: BlocBuilder<HomeBloc, HomeState>(
-                  builder: (context, state) {
-                    final selectedCities = state is HomeLoaded ? state.selectedCities : <String>[];
-                    return Container(
-                      color: const Color(0xFFF8F8F8),
-                      child: ListView.separated(
-                        padding: EdgeInsets.symmetric(vertical: 4.h),
-                        itemCount: _filteredCities.length,
-                        separatorBuilder: (context, index) =>
-                            Container(height: 1, color: const Color(0xFFEEEEEE)),
-                        itemBuilder: (context, index) {
-                          final city = _filteredCities[index];
-                          final isSelected = selectedCities.contains(city);
-                          return GestureDetector(
-                            onTap: () {
-                              context.read<HomeBloc>().add(ToggleCityEvent(city));
-                            },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16.w,
-                                vertical: 14.h,
-                              ),
-                              color: isSelected
-                                  ? const Color(0xFFF0F0F0)
-                                  : Colors.transparent,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    city,
-                                    style: TextStyle(
-                                      fontSize: 16.sp,
-                                      color: Colors.black,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                    ),
-                                  ),
-                                  Container(
-                                    width: 24.w,
-                                    height: 24.w,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isSelected
-                                          ? AppColors.primary
-                                          : Colors.transparent,
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? AppColors.primary
-                                            : const Color(0xFFAAAAAA),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: isSelected
-                                        ? Icon(
-                                            Icons.check,
-                                            color: Colors.white,
-                                            size: 16.sp,
-                                          )
-                                        : null,
-                                  ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
+                          ),
               ),
 
               // Save button
               Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 16.w,
-                  vertical: 16.h,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
                 color: Colors.white,
                 child: ElevatedButton(
-                  onPressed: isLoading
-                      ? null
-                      : () {
-                          context.read<HomeBloc>().add(const SaveSelectedCitiesEvent());
-                        },
+                  onPressed: isLoading ? null : () => context.read<HomeBloc>().add(const SaveSelectedCitiesEvent()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    disabledBackgroundColor: AppColors.primary.withOpacity(0.5),
+                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
                     padding: EdgeInsets.symmetric(vertical: 16.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                     minimumSize: Size(double.infinity, 50.h),
                   ),
                   child: isLoading
                       ? SizedBox(
-                          width: 20.w,
-                          height: 20.w,
-                          child: const CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          width: 20.w, height: 20.w,
+                          child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : Text(
                           'Save & Continue',
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                 ),
               ),
@@ -325,11 +237,5 @@ class _SelectCityPageState extends State<SelectCityPage> {
         );
       },
     );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

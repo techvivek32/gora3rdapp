@@ -13,7 +13,7 @@ export function RecentRequirements() {
     queryFn: () => adminApi.getRequirements({ page: 1, limit: 8, sortBy: 'createdAt', sortOrder: 'desc' }),
   });
 
-  const requirements = data?.data || [];
+  const requirements = data?.data?.data || [];
 
   const tripTypeColor: Record<string, string> = {
     one_way: 'bg-blue-100 text-blue-700',
