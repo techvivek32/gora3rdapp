@@ -70,6 +70,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             _lastHasMore = state.hasMore;
           }
 
+
           if (state is RequirementsLoading) {
             return _buildLoadingList();
           }
@@ -78,11 +79,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           List<Map<String, dynamic>> myAccepted = [];
           bool isLoadingMore = false;
           if (state is RequirementsLoaded) {
-            requirements = state.requirements;
+            requirements = state.requirements.where((r) => !_isExpired(r)).toList();
             myAccepted = state.myAccepted;
             isLoadingMore = state.isLoadingMore;
           } else {
-            requirements = _lastLoadedRequirements;
+            requirements = _lastLoadedRequirements.where((r) => !_isExpired(r)).toList();
             myAccepted = _lastMyAccepted;
             isLoadingMore = false;
           }
@@ -251,6 +252,22 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         ],
       ),
     );
+  }
+
+  bool _isExpired(Map<String, dynamic> req) {
+    try {
+      final dateStr = req['travelDate'] as String?;
+      final timeStr = (req['travelTime'] as String?) ?? '00:00';
+      if (dateStr == null) return false;
+      final d = DateTime.parse(dateStr);
+      final timeParts = timeStr.split(':');
+      final h = int.tryParse(timeParts[0]) ?? 0;
+      final m = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
+      final departure = DateTime(d.year, d.month, d.day, h, m);
+      return departure.isBefore(DateTime.now());
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

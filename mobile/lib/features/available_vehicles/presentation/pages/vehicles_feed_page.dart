@@ -34,6 +34,21 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     }
   }
 
+  bool _isExpired(Map<String, dynamic> v) {
+    try {
+      final dateStr = v['availableDate'] as String?;
+      final timeStr = (v['availableTime'] as String?) ?? '00:00';
+      if (dateStr == null) return false;
+      final d = DateTime.parse(dateStr);
+      final parts = timeStr.split(':');
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+      return DateTime(d.year, d.month, d.day, h, m).isBefore(DateTime.now());
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -83,10 +98,10 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           List<Map<String, dynamic>> vehicles = [];
           List<Map<String, dynamic>> myAccepted = [];
           if (state is VehiclesLoaded) {
-            vehicles = state.vehicles;
+            vehicles = state.vehicles.where((v) => !_isExpired(v)).toList();
             myAccepted = state.myAccepted;
           } else {
-            vehicles = _lastLoadedVehicles;
+            vehicles = _lastLoadedVehicles.where((v) => !_isExpired(v)).toList();
             myAccepted = _lastMyAccepted;
           }
 
