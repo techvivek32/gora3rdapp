@@ -1,9 +1,18 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SessionProvider } from 'next-auth/react';
+import { SessionProvider, useSession } from 'next-auth/react';
 import { Toaster } from 'react-hot-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { setAuthToken } from '@/lib/api';
+
+function SessionSync() {
+  const { data: session } = useSession();
+  useEffect(() => {
+    setAuthToken((session?.user as any)?.accessToken ?? null);
+  }, [session]);
+  return null;
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -21,6 +30,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionProvider>
+      <SessionSync />
       <QueryClientProvider client={queryClient}>
         {children}
         <Toaster

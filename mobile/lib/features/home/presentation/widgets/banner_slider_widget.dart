@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class BannerSliderWidget extends StatefulWidget {
   final List<Map<String, dynamic>> banners;
@@ -11,9 +13,41 @@ class BannerSliderWidget extends StatefulWidget {
 
 class _BannerSliderWidgetState extends State<BannerSliderWidget> {
   final _controller = PageController();
+  int _current = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startAutoScroll();
+  }
+
+  void _startAutoScroll() {
+    _timer?.cancel();
+    if (widget.banners.length <= 1) return;
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      _current = (_current + 1) % widget.banners.length;
+      _controller.animateToPage(
+        _current,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
+  @override
+  void didUpdateWidget(BannerSliderWidget old) {
+    super.didUpdateWidget(old);
+    if (old.banners.length != widget.banners.length) {
+      _current = 0;
+      _startAutoScroll();
+    }
+  }
 
   @override
   void dispose() {
+    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -21,27 +55,34 @@ class _BannerSliderWidgetState extends State<BannerSliderWidget> {
   @override
   Widget build(BuildContext context) {
     if (widget.banners.isEmpty) return const SizedBox.shrink();
+
     return Column(
       children: [
         SizedBox(
-          height: 160,
+          height: 220.h,
           child: PageView.builder(
             controller: _controller,
+            onPageChanged: (i) => setState(() => _current = i),
             itemCount: widget.banners.length,
             itemBuilder: (_, i) => _BannerItem(banner: widget.banners[i]),
           ),
         ),
         if (widget.banners.length > 1) ...[
-          const SizedBox(height: 8),
-          SmoothPageIndicator(
-            controller: _controller,
-            count: widget.banners.length,
-            effect: WormEffect(
-              dotHeight: 6,
-              dotWidth: 6,
-              activeDotColor: Theme.of(context).primaryColor,
-              dotColor: Colors.grey.shade300,
-            ),
+          SizedBox(height: 8.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(widget.banners.length, (i) {
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: i == _current ? 24.w : 8.w,
+                height: 8.h,
+                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                decoration: BoxDecoration(
+                  color: i == _current ? AppColors.primary : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4.r),
+                ),
+              );
+            }),
           ),
         ],
       ],
@@ -55,48 +96,60 @@ class _BannerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = banner['imageUrl'] as String?;
+    final title = banner['title'] as String?;
+    final subtitle = banner['subtitle'] as String?;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16.r),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (banner['imageUrl'] != null)
+            // Background: image or gradient
+            if (imageUrl != null && imageUrl.isNotEmpty)
               Image.network(
-                banner['imageUrl'] as String,
+                imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: Colors.orange.shade100),
+                loadingBuilder: (_, child, progress) =>
+                    progress == null ? child : Container(color: Colors.orange.shade100),
+                errorBuilder: (_, __, ___) => _gradientBg(),
               )
             else
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [Colors.orange.shade400, Colors.orange.shade600]),
-                ),
-              ),
+              _gradientBg(),
+
+            // Dark gradient overlay for text readability
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
               child: Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.fromLTRB(14.w, 24.h, 14.w, 14.h),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+                    colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (banner['title'] != null)
-                      Text(banner['title'] as String,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                    if (banner['subtitle'] != null)
-                      Text(banner['subtitle'] as String,
-                          style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                    if (title != null && title.isNotEmpty)
+                      Text(title,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14.sp,
+                              fontFamily: 'Poppins')),
+                    if (subtitle != null && subtitle.isNotEmpty)
+                      Text(subtitle,
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11.sp,
+                              fontFamily: 'Poppins')),
                   ],
                 ),
               ),
@@ -106,4 +159,14 @@ class _BannerItem extends StatelessWidget {
       ),
     );
   }
+
+  Widget _gradientBg() => const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primary, Color(0xFFFF6B35)],
+          ),
+        ),
+      );
 }

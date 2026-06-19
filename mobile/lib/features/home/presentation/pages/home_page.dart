@@ -15,57 +15,14 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final PageController _pageController = PageController(initialPage: 0);
-  final List<Map<String, String>> _closers = [
-    {
-      'name': 'Thakar Choudhary',
-      'phone': '+91 8003092907',
-      'email': 'thakarchoudhary51@gmail.com',
-      'location': 'Jodhpur, Rajasthan',
-      'role': 'Owner in Jodhpur, Rajasthan',
-      'initials': 'T',
-    },
-    {
-      'name': 'Rahul Sharma',
-      'phone': '+91 9876543210',
-      'email': 'rahul.sharma@gmail.com',
-      'location': 'Mumbai, Maharashtra',
-      'role': 'Partner in Mumbai, Maharashtra',
-      'initials': 'R',
-    },
-    {
-      'name': 'Priya Singh',
-      'phone': '+91 9123456789',
-      'email': 'priya.singh@gmail.com',
-      'location': 'Delhi, Delhi',
-      'role': 'Driver in Delhi, Delhi',
-      'initials': 'P',
-    },
-  ];
-  int _currentPage = 0;
-
   @override
   void initState() {
     super.initState();
     context.read<HomeBloc>().add(LoadHomeDataEvent());
-    // Auto scroll every 3 seconds
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 3));
-      if (mounted) {
-        _currentPage = (_currentPage + 1) % _closers.length;
-        _pageController.animateToPage(
-          _currentPage,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeInOut,
-        );
-      }
-      return mounted;
-    });
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -134,116 +91,12 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(height: 20.h),
 
-                // Top Closers Section
+                // Quick Actions
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        height: 220.h,
-                        child: PageView.builder(
-                          controller: _pageController,
-                          onPageChanged: (index) {
-                            setState(() {
-                              _currentPage = index;
-                            });
-                          },
-                          itemCount: _closers.length,
-                          itemBuilder: (context, index) {
-                            final closer = _closers[index];
-                            return Container(
-                              width: double.infinity,
-                              margin: EdgeInsets.only(right: index < _closers.length - 1 ? 8.w : 0),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [AppColors.primary, Color(0xFFFF6B35)],
-                                ),
-                                borderRadius: BorderRadius.circular(20.r),
-                              ),
-                              padding: EdgeInsets.all(20.r),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 36.r,
-                                        backgroundColor: Colors.white.withOpacity(0.2),
-                                        child: Text(
-                                          closer['initials']!, 
-                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 28.sp),
-                                        ),
-                                      ),
-                                      SizedBox(width: 16.w),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              closer['name']!, 
-                                              style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w700, color: Colors.white, fontFamily: 'Poppins'),
-                                            ),
-                                            SizedBox(height: 4.h),
-                                            Text(
-                                              closer['phone']!, 
-                                              style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins'),
-                                            ),
-                                            SizedBox(height: 4.h),
-                                            Text(
-                                              closer['email']!, 
-                                              style: TextStyle(fontSize: 12.sp, color: Colors.white70, fontFamily: 'Poppins'),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  SizedBox(height: 16.h),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.location_on_outlined, color: Colors.white, size: 16.sp),
-                                      SizedBox(width: 4.w),
-                                      Text(closer['location']!, style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins')),
-                                    ],
-                                  ),
-                                  SizedBox(height: 8.h),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.work_outline, color: Colors.white, size: 16.sp),
-                                      SizedBox(width: 4.w),
-                                      Text(closer['role']!, style: TextStyle(fontSize: 13.sp, color: Colors.white.withOpacity(0.87), fontFamily: 'Poppins')),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      // Page dots
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(
-                          _closers.length,
-                          (index) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: index == _currentPage ? 24.w : 8.w,
-                            height: 8.h,
-                            margin: EdgeInsets.symmetric(horizontal: 4.w),
-                            decoration: BoxDecoration(
-                              color: index == _currentPage ? AppColors.primary : AppColors.border,
-                              borderRadius: BorderRadius.circular(4.r),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 24.h),
-
-                      // Quick Actions
                       Text('Quick Actions', style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
                       SizedBox(height: 12.h),
                       const QuickActionGridWidget(),

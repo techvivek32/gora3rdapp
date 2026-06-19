@@ -11,7 +11,7 @@ export class Banner {
   @Prop()
   subtitle: string;
 
-  @Prop({ required: true })
+  @Prop()
   imageUrl: string;
 
   @Prop()

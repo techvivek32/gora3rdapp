@@ -30,4 +30,12 @@ export class StorageController {
   uploadProfile(@UploadedFile() file: Express.Multer.File) {
     return this.storageService.uploadProfileImage(file);
   }
+
+  @Post('upload/banner')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload banner image (1200×400, WebP)' })
+  async uploadBanner(@UploadedFile() file: Express.Multer.File) {
+    const url = await this.storageService.uploadBannerImage(file);
+    return { url };
+  }
 }

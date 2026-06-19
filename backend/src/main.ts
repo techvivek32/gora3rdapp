@@ -6,6 +6,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import helmet from 'helmet';
 import compression from 'compression';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -21,8 +22,17 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
   const corsOrigins = configService.get<string>('app.corsOrigins', '').split(',');
 
-  // Security middleware
-  app.use(helmet({ contentSecurityPolicy: false }));
+  // Serve locally-uploaded files as static assets (CORS headers for Flutter web / admin)
+  app.useStaticAssets(path.join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+    setHeaders: (res) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
+
+  // Security middleware (disable CORP so images load cross-origin)
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
   app.use(compression());
 
   // CORS configuration

@@ -1,14 +1,16 @@
 import axios from 'axios';
-import { getSession } from 'next-auth/react';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 const apiClient = axios.create({ baseURL: BASE_URL, timeout: 30000 });
 
-apiClient.interceptors.request.use(async (config) => {
-  const session = await getSession();
-  if (session?.user?.accessToken) {
-    config.headers.Authorization = `Bearer ${session.user.accessToken}`;
+// Kept in sync by SessionSync component (providers.tsx) via useSession()
+let _authToken: string | null = null;
+export const setAuthToken = (token: string | null) => { _authToken = token; };
+
+apiClient.interceptors.request.use((config) => {
+  if (_authToken) {
+    config.headers.Authorization = `Bearer ${_authToken}`;
   }
   return config;
 });
@@ -62,6 +64,13 @@ export const adminApi = {
   createBanner: (data: any) => apiClient.post('/admin/banners', data),
   updateBanner: (id: string, data: any) => apiClient.put(`/admin/banners/${id}`, data),
   deleteBanner: (id: string) => apiClient.delete(`/admin/banners/${id}`),
+  uploadBannerImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/banner', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 
   // ─── Reports ───────────────────────────────────────────────────────────────
   getReports: (params?: any) => apiClient.get('/admin/reports', { params }),
