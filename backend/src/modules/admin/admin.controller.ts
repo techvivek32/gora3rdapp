@@ -79,6 +79,20 @@ export class AdminController {
     return this.adminService.getRequirements(query);
   }
 
+  // ─── Subscriptions ─────────────────────────────────────────────────────────
+  @Get('subscriptions')
+  @ApiOperation({ summary: 'Get all subscriptions' })
+  getSubscriptions(@Query() query: any) {
+    return this.adminService.getSubscriptions(query);
+  }
+
+  // ─── Vehicles ──────────────────────────────────────────────────────────────
+  @Get('vehicles')
+  @ApiOperation({ summary: 'Get all available vehicles' })
+  getVehicles(@Query() query: any) {
+    return this.adminService.getVehicles(query);
+  }
+
   // ─── Cities ────────────────────────────────────────────────────────────────
   @Post('cities')
   @ApiOperation({ summary: 'Create city' })

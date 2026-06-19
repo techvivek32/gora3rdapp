@@ -103,7 +103,7 @@ export class AdminService {
       this.userModel.countDocuments(filter),
     ]);
 
-    return buildPaginatedResult(users, total, page, limit);
+    return { message: 'Users retrieved', data: buildPaginatedResult(users, total, page, limit) };
   }
 
   async updateUser(id: string, data: Partial<any>) {
@@ -161,7 +161,50 @@ export class AdminService {
       this.requirementModel.countDocuments(filter),
     ]);
 
-    return buildPaginatedResult(requirements, total, page, limit);
+    return { message: 'Requirements retrieved', data: buildPaginatedResult(requirements, total, page, limit) };
+  }
+
+  async getSubscriptions(query: any) {
+    const { page, limit, skip, sort } = getPaginationParams(query);
+    const filter: any = {};
+    if (query.status) filter.status = query.status;
+
+    const [subscriptions, total] = await Promise.all([
+      this.subscriptionModel
+        .find(filter)
+        .populate('userId', 'fullName mobile')
+        .populate('planId', 'name membershipType')
+        .sort(sort).skip(skip).limit(limit).lean(),
+      this.subscriptionModel.countDocuments(filter),
+    ]);
+
+    return { message: 'Subscriptions retrieved', data: buildPaginatedResult(subscriptions, total, page, limit) };
+  }
+
+  async getVehicles(query: any) {
+    const { page, limit, skip, sort } = getPaginationParams(query);
+    const filter: any = { isDeleted: false };
+
+    if (query.search) {
+      filter.$or = [
+        { listingId: new RegExp(query.search, 'i') },
+        { currentCity: new RegExp(query.search, 'i') },
+        { destinationCity: new RegExp(query.search, 'i') },
+        { vehicleNumber: new RegExp(query.search, 'i') },
+        { driverName: new RegExp(query.search, 'i') },
+      ];
+    }
+    if (query.status) filter.status = query.status;
+
+    const [vehicles, total] = await Promise.all([
+      this.vehicleModel
+        .find(filter)
+        .populate('postedBy', 'fullName agencyName mobile membershipType')
+        .sort(sort).skip(skip).limit(limit).lean(),
+      this.vehicleModel.countDocuments(filter),
+    ]);
+
+    return { message: 'Vehicles retrieved', data: buildPaginatedResult(vehicles, total, page, limit) };
   }
 
   // Cities CRUD
@@ -182,7 +225,7 @@ export class AdminService {
       this.cityModel.countDocuments(filter),
     ]);
 
-    return buildPaginatedResult(cities, total, page, limit);
+    return { message: 'Cities retrieved', data: buildPaginatedResult(cities, total, page, limit) };
   }
 
   async updateCity(id: string, data: Partial<any>) {
@@ -234,7 +277,7 @@ export class AdminService {
       this.reportModel.countDocuments(filter),
     ]);
 
-    return buildPaginatedResult(reports, total, page, limit);
+    return { message: 'Reports retrieved', data: buildPaginatedResult(reports, total, page, limit) };
   }
 
   async resolveReport(id: string, adminId: string, action: string, notes?: string) {
@@ -309,6 +352,6 @@ export class AdminService {
       this.paymentModel.countDocuments(filter),
     ]);
 
-    return buildPaginatedResult(payments, total, page, limit);
+    return { message: 'Payments retrieved', data: buildPaginatedResult(payments, total, page, limit) };
   }
 }
