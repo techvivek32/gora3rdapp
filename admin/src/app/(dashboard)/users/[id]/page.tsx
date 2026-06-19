@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
@@ -17,28 +18,29 @@ const INFO_FIELDS = [
   { key: 'role', label: 'Role' },
 ];
 
-export default function UserDetailPage({ params }: { params: { id: string } }) {
+export default function UserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['user', params.id],
-    queryFn: () => adminApi.getUser(params.id),
+    queryKey: ['user', id],
+    queryFn: () => adminApi.getUser(id),
   });
 
   const verifyMutation = useMutation({
-    mutationFn: () => adminApi.verifyUser(params.id),
-    onSuccess: () => { toast.success('User verified'); queryClient.invalidateQueries({ queryKey: ['user', params.id] }); },
+    mutationFn: () => adminApi.verifyUser(id),
+    onSuccess: () => { toast.success('User verified'); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
   });
 
   const blockMutation = useMutation({
-    mutationFn: (block: boolean) => adminApi[block ? 'blockUser' : 'unblockUser'](params.id),
-    onSuccess: (_, block) => { toast.success(block ? 'User blocked' : 'User unblocked'); queryClient.invalidateQueries({ queryKey: ['user', params.id] }); },
+    mutationFn: (block: boolean) => adminApi[block ? 'blockUser' : 'unblockUser'](id),
+    onSuccess: (_, block) => { toast.success(block ? 'User blocked' : 'User unblocked'); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
   });
 
   const upgradeMutation = useMutation({
-    mutationFn: (type: string) => adminApi.upgradeMembership(params.id, type),
-    onSuccess: () => { toast.success('Membership upgraded'); queryClient.invalidateQueries({ queryKey: ['user', params.id] }); },
+    mutationFn: (type: string) => adminApi.upgradeMembership(id, type),
+    onSuccess: () => { toast.success('Membership upgraded'); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
   });
 
   if (isLoading) return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
