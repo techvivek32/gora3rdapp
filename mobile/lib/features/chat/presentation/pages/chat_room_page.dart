@@ -30,7 +30,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final token = await storage.read(key: 'access_token');
     if (token == null) return;
 
-    final baseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:3000');
+    const baseUrl = String.fromEnvironment('SOCKET_BASE_URL', defaultValue: 'https://backend.goracabs.com');
     _socket = io.io(
       '$baseUrl/chat',
       io.OptionBuilder()

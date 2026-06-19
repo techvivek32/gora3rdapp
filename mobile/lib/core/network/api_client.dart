@@ -5,7 +5,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 class ApiClient {
   static const _baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:3001/api/v1', // Use localhost for web/emulator
+    defaultValue: 'https://backend.goracabs.com/api/v1',
   );
 
   late final Dio _dio;

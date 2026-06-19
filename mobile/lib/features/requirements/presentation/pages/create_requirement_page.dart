@@ -77,7 +77,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
   Future<void> _fetchSettings() async {
     try {
-      final res = await Dio().get('http://localhost:3001/api/v1/settings');
+      final res = await Dio().get('https://backend.goracabs.com/api/v1/settings');
       final body = res.data as Map<String, dynamic>?;
       // Backend wraps all responses: { success, data: <actual payload> }
       final s = (body?['data'] as Map<String, dynamic>?) ?? body;
