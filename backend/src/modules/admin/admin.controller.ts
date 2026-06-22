@@ -72,6 +72,31 @@ export class AdminController {
     return this.adminService.upgradeMembership(id, membershipType, daysToAdd);
   }
 
+  // ─── Verification Requests ─────────────────────────────────────────────────
+  @Get('verification-requests')
+  @ApiOperation({ summary: 'List KYC verification requests' })
+  getVerificationRequests(@Query() query: any) {
+    return this.adminService.getVerificationRequests(query);
+  }
+
+  @Get('verification-requests/:id')
+  @ApiOperation({ summary: 'Get a single verification request with documents' })
+  getVerificationRequest(@Param('id') id: string) {
+    return this.adminService.getVerificationRequest(id);
+  }
+
+  @Post('verification-requests/:id/approve')
+  @ApiOperation({ summary: 'Approve a verification request' })
+  approveVerification(@Param('id') id: string) {
+    return this.adminService.approveVerification(id);
+  }
+
+  @Post('verification-requests/:id/reject')
+  @ApiOperation({ summary: 'Reject a verification request' })
+  rejectVerification(@Param('id') id: string, @Body('reason') reason: string) {
+    return this.adminService.rejectVerification(id, reason);
+  }
+
   // ─── Requirements ──────────────────────────────────────────────────────────
   @Get('requirements')
   @ApiOperation({ summary: 'Get all requirements' })

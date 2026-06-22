@@ -11,7 +11,7 @@ import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
 import { City, CityDocument } from '../../database/schemas/city.schema';
 import { AuditLog, AuditLogDocument } from '../../database/schemas/audit-log.schema';
 import { NotificationsService } from '../notifications/notifications.service';
-import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
+import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
@@ -128,6 +128,79 @@ export class AdminService {
     const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: false }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User unblocked' };
+  }
+
+  // ─── Verification Requests ─────────────────────────────────────────────────
+  async getVerificationRequests(query: any) {
+    const { page, limit, skip, sort } = getPaginationParams(query);
+    const filter: any = {};
+
+    // Default to pending requests; allow ?status=all or a specific status.
+    filter.verificationStatus = query.status && query.status !== 'all'
+      ? query.status
+      : (query.status === 'all' ? { $ne: VerificationStatus.NONE } : VerificationStatus.PENDING);
+
+    if (query.search) {
+      filter.$or = [
+        { fullName: new RegExp(query.search, 'i') },
+        { email: new RegExp(query.search, 'i') },
+        { mobile: new RegExp(query.search, 'i') },
+        { agencyName: new RegExp(query.search, 'i') },
+      ];
+    }
+    if (query.role) filter.role = query.role;
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select('fullName email mobile agencyName role profileImage membershipType isVerified verificationStatus verificationSubmittedAt verificationRejectionReason documents city state createdAt')
+        .sort({ verificationSubmittedAt: -1, ...sort })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    return { message: 'Verification requests retrieved', data: buildPaginatedResult(users, total, page, limit) };
+  }
+
+  async getVerificationRequest(id: string) {
+    const user = await this.userModel
+      .findById(id)
+      .select('fullName email mobile agencyName role profileImage membershipType isVerified isAdminApproved verificationStatus verificationSubmittedAt verificationRejectionReason documents city state createdAt')
+      .lean();
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'Verification request retrieved', data: user };
+  }
+
+  async approveVerification(id: string) {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      {
+        isVerified: true,
+        isAdminApproved: true,
+        verificationStatus: VerificationStatus.VERIFIED,
+        verificationRejectionReason: null,
+      },
+      { new: true },
+    ).select('-password -refreshToken -fcmTokens');
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'Verification approved', data: user };
+  }
+
+  async rejectVerification(id: string, reason?: string) {
+    const user = await this.userModel.findByIdAndUpdate(
+      id,
+      {
+        isVerified: false,
+        isAdminApproved: false,
+        verificationStatus: VerificationStatus.REJECTED,
+        verificationRejectionReason: reason || 'Documents could not be verified',
+      },
+      { new: true },
+    ).select('-password -refreshToken -fcmTokens');
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'Verification rejected', data: user };
   }
 
   async upgradeMembership(id: string, membershipType: MembershipType, daysToAdd = 30) {

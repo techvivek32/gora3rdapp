@@ -21,3 +21,10 @@ export enum MembershipBadge {
   PREMIUM = 'premium',
   GOLDEN = 'golden',
 }
+
+export enum VerificationStatus {
+  NONE = 'none',
+  PENDING = 'pending',
+  VERIFIED = 'verified',
+  REJECTED = 'rejected',
+}

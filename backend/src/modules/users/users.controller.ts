@@ -6,6 +6,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -26,6 +27,15 @@ export class UsersController {
   @ApiOperation({ summary: 'Update user profile' })
   updateProfile(@CurrentUser('sub') userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Post('verification')
+  @ApiOperation({ summary: 'Submit KYC documents for verification' })
+  submitVerification(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: SubmitVerificationDto,
+  ) {
+    return this.usersService.submitVerification(userId, dto);
   }
 
   @Put('business-cities')

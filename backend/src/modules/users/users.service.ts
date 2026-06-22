@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { SubmitVerificationDto } from './dto/submit-verification.dto';
+import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
 @Injectable()
@@ -28,6 +30,33 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('User not found');
     return { message: 'Profile updated', data: user };
+  }
+
+  async submitVerification(userId: string, dto: SubmitVerificationDto) {
+    const { agencyName, ...documents } = dto;
+
+    // Keep only the document entries that were actually provided.
+    const cleanedDocuments = Object.fromEntries(
+      Object.entries(documents).filter(([, value]) => value && (value.number || value.image)),
+    );
+
+    const update: Record<string, any> = {
+      documents: cleanedDocuments,
+      verificationStatus: VerificationStatus.PENDING,
+      verificationSubmittedAt: new Date(),
+      verificationRejectionReason: null,
+      // Re-submitting resets any prior approval until an admin reviews again.
+      isVerified: false,
+      isAdminApproved: false,
+    };
+    if (agencyName) update.agencyName = agencyName;
+
+    const user = await this.userModel
+      .findByIdAndUpdate(userId, update, { new: true })
+      .select('-password -refreshToken -fcmTokens');
+
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'Verification submitted', data: user };
   }
 
   async updateBusinessCities(userId: string, cities: string[]) {

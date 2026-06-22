@@ -42,6 +42,13 @@ export const adminApi = {
   upgradeMembership: (id: string, membershipType: string, daysToAdd?: number) =>
     apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd }),
 
+  // ─── Verification Requests ─────────────────────────────────────────────────
+  getVerificationRequests: (params: any) => apiClient.get('/admin/verification-requests', { params }),
+  getVerificationRequest: (id: string) => apiClient.get(`/admin/verification-requests/${id}`),
+  approveVerification: (id: string) => apiClient.post(`/admin/verification-requests/${id}/approve`),
+  rejectVerification: (id: string, reason: string) =>
+    apiClient.post(`/admin/verification-requests/${id}/reject`, { reason }),
+
   // ─── Requirements ──────────────────────────────────────────────────────────
   getRequirements: (params: any) => apiClient.get('/admin/requirements', { params }),
   deleteRequirement: (id: string) => apiClient.delete(`/requirements/${id}`),

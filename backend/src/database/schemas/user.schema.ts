@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { UserRole, MembershipType } from '../../common/enums/user-role.enum';
+import { UserRole, MembershipType, VerificationStatus } from '../../common/enums/user-role.enum';
 
 export type UserDocument = User & Document;
 
@@ -86,13 +86,23 @@ export class User {
     osVersion: string;
   };
 
-  @Prop({ type: Object })
+  // KYC documents: each entry holds the document id/number and an uploaded image URL.
+  @Prop({ type: Object, default: {} })
   documents: {
-    aadhar: string;
-    pan: string;
-    drivingLicense: string;
-    vehicleRc: string;
+    aadhar?: { number?: string; image?: string };
+    pan?: { number?: string; image?: string };
+    drivingLicense?: { number?: string; image?: string };
+    vehicleRc?: { number?: string; image?: string };
   };
+
+  @Prop({ type: String, enum: VerificationStatus, default: VerificationStatus.NONE })
+  verificationStatus: VerificationStatus;
+
+  @Prop({ type: Date })
+  verificationSubmittedAt: Date;
+
+  @Prop({ trim: true })
+  verificationRejectionReason: string;
 
   @Prop({ default: 0 })
   requirementsPosted: number;
@@ -122,6 +132,7 @@ UserSchema.index({ city: 1, membershipType: 1 });
 UserSchema.index({ businessCities: 1 });
 UserSchema.index({ isActive: 1, isBlocked: 1 });
 UserSchema.index({ membershipType: 1, isActive: 1 });
+UserSchema.index({ verificationStatus: 1, verificationSubmittedAt: -1 });
 UserSchema.index({ createdAt: -1 });
 UserSchema.index({ lastActive: -1 });
 UserSchema.index({ firebaseUid: 1 });
