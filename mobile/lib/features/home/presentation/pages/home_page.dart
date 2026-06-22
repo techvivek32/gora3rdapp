@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../bloc/home_bloc.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
+import '../widgets/user_search_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -89,6 +90,10 @@ class _HomePageState extends State<HomePage> {
                     banners: state is HomeLoaded ? state.banners : [],
                   ),
                 ),
+                SizedBox(height: 16.h),
+
+                // Search a partner by phone number
+                const UserSearchWidget(),
                 SizedBox(height: 20.h),
 
                 // Quick Actions

@@ -47,10 +47,16 @@ export class UsersController {
     return this.usersService.updateBusinessCities(userId, cities);
   }
 
+  @Get('lookup')
+  @ApiOperation({ summary: 'Find a user by mobile number' })
+  lookupByMobile(@Query('mobile') mobile: string) {
+    return this.usersService.lookupByMobile(mobile);
+  }
+
   @Get('card/:userId')
-  @ApiOperation({ summary: 'Get user profile card (contact locked for non-premium)' })
-  getUserCard(@Param('userId') userId: string, @CurrentUser('sub') requestingUserId: string) {
-    return this.usersService.getUserCard(userId, requestingUserId);
+  @ApiOperation({ summary: 'Get user public profile card' })
+  getUserCard(@Param('userId') userId: string) {
+    return this.usersService.getUserCard(userId);
   }
 
   @Put('notifications')

@@ -2,14 +2,48 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
+// Public-facing profile fields (no credentials / private data).
+const PUBLIC_PROFILE_SELECT =
+  'fullName agencyName profileImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
+
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
+  ) {}
+
+  // Attaches the user's active vehicle listings so a profile shows "My Vehicles".
+  private async withVehicles(user: any) {
+    const vehicles = await this.vehicleModel
+      .find({ postedBy: user._id, isDeleted: false })
+      .select('listingId vehicleType vehicleNumber vehicleModel vehicleColor currentCity currentState status driverName driverRating')
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+    return { ...user, vehicles };
+  }
+
+  async lookupByMobile(mobile: string) {
+    const digits = (mobile || '').replace(/\D/g, '');
+    if (digits.length < 10) {
+      throw new BadRequestException('Enter a valid mobile number');
+    }
+    const last10 = digits.slice(-10);
+    const user = await this.userModel
+      .findOne({ mobile: new RegExp(`${last10}$`), isActive: true })
+      .select(PUBLIC_PROFILE_SELECT)
+      .lean();
+    if (!user) throw new NotFoundException('No user found with this number');
+
+    return { message: 'User found', data: await this.withVehicles(user) };
+  }
 
   async getProfile(userId: string) {
     const user = await this.userModel
@@ -73,24 +107,16 @@ export class UsersService {
     return { message: 'Business cities updated', data: user };
   }
 
-  async getUserCard(userId: string, requestingUserId: string) {
-    const [targetUser, requestingUser] = await Promise.all([
-      this.userModel.findById(userId).select(
-        'fullName agencyName profileImage membershipType isVerified rating totalRatings lastActive city state mobile',
-      ).lean(),
-      this.userModel.findById(requestingUserId).select('membershipType isPremium isGolden'),
-    ]);
+  async getUserCard(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
 
+    const targetUser = await this.userModel
+      .findById(userId)
+      .select(PUBLIC_PROFILE_SELECT)
+      .lean();
     if (!targetUser) throw new NotFoundException('User not found');
 
-    const isPremium = requestingUser?.isPremium || requestingUser?.isGolden ||
-      ['premium', 'golden'].includes(requestingUser?.membershipType);
-
-    if (!isPremium) {
-      (targetUser as any).mobile = undefined;
-    }
-
-    return { message: 'User card retrieved', data: targetUser };
+    return { message: 'User card retrieved', data: await this.withVehicles(targetUser) };
   }
 
   async toggleNotifications(userId: string, enabled: boolean) {

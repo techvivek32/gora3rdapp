@@ -3,11 +3,15 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User, UserSchema } from '../../database/schemas/user.schema';
+import { AvailableVehicle, AvailableVehicleSchema } from '../../database/schemas/available-vehicle.schema';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: AvailableVehicle.name, schema: AvailableVehicleSchema },
+    ]),
     StorageModule,
   ],
   controllers: [UsersController],
