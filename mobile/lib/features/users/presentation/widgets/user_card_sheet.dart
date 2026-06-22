@@ -98,7 +98,7 @@ class _UserCardSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 24),
 
           // Actions
           Row(
@@ -204,17 +204,26 @@ class _ActionItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (topText != null)
-              SizedBox(
-                width: 80,
-                child: Text(
-                  topText!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.red.shade700, height: 1.1),
-                ),
-              ),
-            if (topText != null) const SizedBox(height: 4),
-            Icon(icon, color: (onTap == null && topText == null) ? Colors.grey : color, size: 26),
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, color: (onTap == null && topText == null) ? Colors.grey : color, size: 26),
+                // Floating warning that overlays above the icon (doesn't take layout space).
+                if (topText != null)
+                  Positioned(
+                    bottom: 14,
+                    child: SizedBox(
+                      width: 84,
+                      child: Text(
+                        topText!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.red.shade700, height: 1.1),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 4),
             Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
           ],

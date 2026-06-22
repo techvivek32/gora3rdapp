@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/marquee_text.dart';
 import '../bloc/home_bloc.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
@@ -90,7 +91,18 @@ class _HomePageState extends State<HomePage> {
                     banners: state is HomeLoaded ? state.banners : [],
                   ),
                 ),
-                SizedBox(height: 16.h),
+                SizedBox(height: 12.h),
+
+                // Scrolling caution line
+                SizedBox(
+                  height: 28.h,
+                  child: MarqueeText(
+                    text:
+                        'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                  ),
+                ),
+                SizedBox(height: 10.h),
 
                 // Search a partner by phone number
                 const UserSearchWidget(),
