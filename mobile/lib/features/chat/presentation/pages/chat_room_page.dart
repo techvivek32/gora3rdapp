@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/config/env.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -30,7 +31,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final token = await storage.read(key: 'access_token');
     if (token == null) return;
 
-    const baseUrl = String.fromEnvironment('SOCKET_BASE_URL', defaultValue: 'https://backend.goracabs.com');
+    const baseUrl = Env.socketBaseUrl;
     _socket = io.io(
       '$baseUrl/chat',
       io.OptionBuilder()

@@ -1,12 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import '../config/env.dart';
 
 class ApiClient {
-  static const _baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://backend.goracabs.com/api/v1',
-  );
+  static const _baseUrl = Env.apiBaseUrl;
 
   late final Dio _dio;
   final FlutterSecureStorage _storage;

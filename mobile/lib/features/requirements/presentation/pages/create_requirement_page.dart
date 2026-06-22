@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
+import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
 import 'location_picker_page.dart';
@@ -77,7 +78,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
   Future<void> _fetchSettings() async {
     try {
-      final res = await Dio().get('https://backend.goracabs.com/api/v1/settings');
+      final res = await Dio().get('${Env.apiBaseUrl}/settings');
       final body = res.data as Map<String, dynamic>?;
       // Backend wraps all responses: { success, data: <actual payload> }
       final s = (body?['data'] as Map<String, dynamic>?) ?? body;
