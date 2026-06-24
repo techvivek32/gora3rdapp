@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dartz/dartz.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/error/failures.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -38,7 +39,7 @@ class AuthRepositoryImpl implements AuthRepository {
       await _saveTokens(data);
       return Right(data);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString().replaceAll('Exception: ', '')));
+      return Left(ServerFailure(message: ErrorMapper.message(e)));
     }
   }
 

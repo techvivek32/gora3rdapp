@@ -39,7 +39,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _submitting = false;
   String _status = '';
   bool _registered = false;
-  bool _triedSubmit = false;
 
   Uint8List? _profileBytes;
 
@@ -130,18 +129,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _submit() async {
-    setState(() => _triedSubmit = true);
     if (!_formKey.currentState!.validate()) return;
-
-    // Documents are mandatory: every visible document needs an id number AND an
-    // image before an account can be created.
-    for (final key in _visibleDocKeys) {
-      final d = _docs[key]!;
-      if (d.numberCtrl.text.trim().isEmpty || d.bytes == null) {
-        _snack('Please provide ${d.label} number and image');
-        return;
-      }
-    }
 
     setState(() => _submitting = true);
 
@@ -167,8 +155,8 @@ class _RegisterPageState extends State<RegisterPage> {
       _registered = true;
     }
 
-    // Step 2 — upload the (mandatory) documents and submit KYC. The user only
-    // enters the app once this succeeds; on failure they stay here and retry.
+    // Step 2 — documents are OPTIONAL. Upload the profile and any documents the
+    // user chose to provide; if none, the account is created without them.
     try {
       if (_profileBytes != null) {
         setState(() => _status = 'Uploading profile...');
@@ -181,28 +169,36 @@ class _RegisterPageState extends State<RegisterPage> {
         await _apiClient.dio.put('/users/profile', data: {'profileImage': profileUrl});
       }
 
-      setState(() => _status = 'Uploading documents...');
+      // Build a verification payload only from documents the user actually filled.
       final body = <String, dynamic>{};
       for (final key in _visibleDocKeys) {
         final d = _docs[key]!;
-        final url = await _uploadImage(d.bytes!, key);
-        body[key] = {'number': d.numberCtrl.text.trim(), 'image': url};
-      }
-      if (_selectedRole == 'travel_agency' && _agencyCtrl.text.trim().isNotEmpty) {
-        body['agencyName'] = _agencyCtrl.text.trim();
+        final hasNumber = d.numberCtrl.text.trim().isNotEmpty;
+        final hasImage = d.bytes != null;
+        if (!hasNumber && !hasImage) continue;
+        setState(() => _status = 'Uploading documents...');
+        final entry = <String, dynamic>{};
+        if (hasNumber) entry['number'] = d.numberCtrl.text.trim();
+        if (hasImage) entry['image'] = await _uploadImage(d.bytes!, key);
+        body[key] = entry;
       }
 
-      setState(() => _status = 'Submitting verification...');
-      await _apiClient.dio.post('/users/verification', data: body);
+      // Submit for verification only when at least one document was provided.
+      if (body.isNotEmpty) {
+        setState(() => _status = 'Submitting documents...');
+        await _apiClient.dio.post('/users/verification', data: body);
+      }
 
       if (!mounted) return;
-      _snack('Account created. Verification is pending admin review.', error: false);
+      _snack('Account created successfully.', error: false);
       context.read<AuthBloc>().add(AuthCheckStatusEvent());
       context.go('/');
     } catch (_) {
+      // The account exists; documents are optional, so let the user in.
       if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack('Could not upload your documents. Please tap Create Account to try again.');
+      _snack('Account created. You can add documents later from your profile.', error: false);
+      context.read<AuthBloc>().add(AuthCheckStatusEvent());
+      context.go('/');
     }
   }
 
@@ -326,12 +322,12 @@ class _RegisterPageState extends State<RegisterPage> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Provide the document number and a clear photo for each.',
+                    'Optional — add documents now or later from your profile to get verified.',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
                 const SizedBox(height: 12),
-                ..._visibleDocKeys.map((key) => _buildDocCard(_docs[key]!)),
+                ..._visibleDocKeys.map((key) => _buildDocTile(_docs[key]!)),
 
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -367,77 +363,78 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _buildDocCard(_DocField doc) {
+  Widget _buildDocTile(_DocField doc) {
+    final hasData = doc.bytes != null || doc.numberCtrl.text.trim().isNotEmpty;
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(doc.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 10),
-          TextFormField(
-            controller: doc.numberCtrl,
-            decoration: InputDecoration(
-              labelText: '${doc.label} Number',
-              isDense: true,
-              prefixIcon: const Icon(Icons.badge_outlined),
+      clipBehavior: Clip.antiAlias,
+      child: Theme(
+        // Hide the default ExpansionTile top/bottom dividers.
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: PageStorageKey('doc_${doc.key}'),
+          maintainState: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          leading: const Icon(Icons.description_outlined),
+          title: Text(doc.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+          trailing: hasData
+              ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
+              : const Icon(Icons.keyboard_arrow_down),
+          children: [
+            TextFormField(
+              controller: doc.numberCtrl,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: '${doc.label} Number',
+                isDense: true,
+                prefixIcon: const Icon(Icons.badge_outlined),
+              ),
             ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-          ),
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: () => _pickDoc(doc),
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              height: 120,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: (_triedSubmit && doc.bytes == null) ? Colors.red : Colors.grey.shade300,
+            const SizedBox(height: 10),
+            InkWell(
+              onTap: () => _pickDoc(doc),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: doc.bytes != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.memory(doc.bytes!, fit: BoxFit.cover),
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                            child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                clipBehavior: Clip.antiAlias,
+                child: doc.bytes != null
+                    ? Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          Image.memory(doc.bytes!, fit: BoxFit.cover),
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                              child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                            ),
                           ),
-                        ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cloud_upload_outlined, color: Colors.grey.shade500, size: 28),
-                        const SizedBox(height: 6),
-                        Text('Upload ${doc.label} photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                      ],
-                    ),
-            ),
-          ),
-          if (_triedSubmit && doc.bytes == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6, left: 4),
-              child: Text(
-                '${doc.label} photo is required',
-                style: const TextStyle(color: Colors.red, fontSize: 12),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.cloud_upload_outlined, color: Colors.grey.shade500, size: 28),
+                          const SizedBox(height: 6),
+                          Text('Upload ${doc.label} photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                        ],
+                      ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
