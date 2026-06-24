@@ -4,6 +4,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -16,10 +17,18 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post('register/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a registration OTP to the mobile number' })
+  sendRegistrationOtp(@Body() dto: SendOtpDto) {
+    return this.authService.sendRegistrationOtp(dto);
+  }
+
   @Post('register')
   @Public()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register new user' })
+  @ApiOperation({ summary: 'Register new user (requires verified OTP)' })
   @ApiResponse({ status: 201, description: 'Registration successful' })
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);

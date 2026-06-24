@@ -9,36 +9,89 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { AuditLog } from '../../database/schemas/audit-log.schema';
+import { OtpVerification, OtpVerificationDocument } from '../../database/schemas/otp-verification.schema';
 import { FirebaseService } from '../firebase/firebase.service';
+import { SmsService } from './sms.service';
 import { RegisterDto } from './dto/register.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
+
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const OTP_MAX_ATTEMPTS = 5;
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
+    @InjectModel(OtpVerification.name) private otpModel: Model<OtpVerificationDocument>,
     private jwtService: JwtService,
     private configService: ConfigService,
     private firebaseService: FirebaseService,
+    private smsService: SmsService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const existingUser = await this.userModel.findOne({
-      $or: [{ email: dto.email.toLowerCase() }, { mobile: dto.mobile }],
-    });
+  // Step 1 of registration: validate uniqueness, then text an OTP to the mobile.
+  async sendRegistrationOtp(dto: SendOtpDto) {
+    await this.ensureUnique(dto.email, dto.mobile);
 
+    const otp = randomInt(100000, 1000000).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MS);
+
+    await this.otpModel.findOneAndUpdate(
+      { mobile: dto.mobile },
+      { mobile: dto.mobile, otpHash, expiresAt, attempts: 0 },
+      { upsert: true, new: true },
+    );
+
+    await this.smsService.sendOtp(dto.mobile, otp);
+    return { message: 'OTP sent successfully' };
+  }
+
+  private async ensureUnique(email: string, mobile: string) {
+    const existingUser = await this.userModel.findOne({
+      $or: [{ email: email.toLowerCase() }, { mobile }],
+    });
     if (existingUser) {
-      if (existingUser.email === dto.email.toLowerCase()) {
+      if (existingUser.email === email.toLowerCase()) {
         throw new ConflictException('Email already registered');
       }
       throw new ConflictException('Mobile number already registered');
     }
+  }
+
+  private async verifyOtp(mobile: string, otp: string) {
+    // TESTING ONLY: a configured bypass code is accepted for any number.
+    const bypass = this.configService.get<string>('sms.bypassOtp');
+    if (bypass && otp === bypass) return;
+
+    const record = await this.otpModel.findOne({ mobile });
+    if (!record) throw new BadRequestException('Please request an OTP first');
+    if (record.expiresAt < new Date()) {
+      await this.otpModel.deleteOne({ _id: record._id });
+      throw new BadRequestException('OTP has expired. Please request a new one');
+    }
+    if (record.attempts >= OTP_MAX_ATTEMPTS) {
+      throw new BadRequestException('Too many attempts. Please request a new OTP');
+    }
+    const valid = await bcrypt.compare(otp, record.otpHash);
+    if (!valid) {
+      await this.otpModel.updateOne({ _id: record._id }, { $inc: { attempts: 1 } });
+      throw new BadRequestException('Invalid OTP');
+    }
+  }
+
+  async register(dto: RegisterDto) {
+    // Account is only created after the OTP is verified.
+    await this.verifyOtp(dto.mobile, dto.otp);
+    await this.ensureUnique(dto.email, dto.mobile);
 
     const hashedPassword = await bcrypt.hash(dto.password, 12);
 
@@ -57,6 +110,9 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user);
     await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+
+    // OTP consumed — remove it so it can't be reused.
+    await this.otpModel.deleteOne({ mobile: dto.mobile });
 
     await this.auditLog(user._id.toString(), 'REGISTER', 'user', user._id.toString());
 

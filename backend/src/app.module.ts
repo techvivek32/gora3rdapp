@@ -9,6 +9,7 @@ import jwtConfig from './config/jwt.config';
 import firebaseConfig from './config/firebase.config';
 import storageConfig from './config/storage.config';
 import razorpayConfig from './config/razorpay.config';
+import smsConfig from './config/sms.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { RequirementsModule } from './modules/requirements/requirements.module';
@@ -31,7 +32,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, firebaseConfig, storageConfig, razorpayConfig],
+      load: [appConfig, databaseConfig, jwtConfig, firebaseConfig, storageConfig, razorpayConfig, smsConfig],
       envFilePath: ['.env.local', '.env'],
       cache: true,
     }),

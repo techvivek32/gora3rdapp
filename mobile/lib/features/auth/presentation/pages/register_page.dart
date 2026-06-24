@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
@@ -131,12 +132,45 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _submitting = true);
+    // Step 1 — send an OTP to the mobile number (also checks email/mobile aren't
+    // already registered).
+    setState(() {
+      _submitting = true;
+      _status = 'Sending OTP...';
+    });
+    try {
+      await _apiClient.dio.post('/auth/register/send-otp', data: {
+        'email': _emailCtrl.text.trim(),
+        'mobile': _mobileCtrl.text.trim(),
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      _snack(ErrorMapper.message(e));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _submitting = false);
 
-    // Step 1 — create the account (only once; a retry skips this so we don't
-    // hit "email already registered").
+    // Step 2 — collect + verify the OTP, then create the account. Loop so a wrong
+    // OTP just reopens the dialog instead of restarting the whole flow.
+    while (true) {
+      final otp = await _showOtpDialog();
+      if (otp == null) return; // user cancelled
+      final done = await _completeRegistration(otp);
+      if (done) return;
+    }
+  }
+
+  /// Returns true once the account is created (and navigation has started);
+  /// returns false if the OTP was rejected so the caller can re-prompt.
+  Future<bool> _completeRegistration(String otp) async {
+    setState(() {
+      _submitting = true;
+      _status = 'Creating account...';
+    });
+
     if (!_registered) {
-      setState(() => _status = 'Creating account...');
       final result = await _authRepo.register(
         fullName: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
@@ -144,19 +178,20 @@ class _RegisterPageState extends State<RegisterPage> {
         password: _passwordCtrl.text,
         agencyName: _agencyCtrl.text.trim().isEmpty ? null : _agencyCtrl.text.trim(),
         role: _selectedRole,
+        otp: otp,
       );
       final failure = result.fold((f) => f, (_) => null);
       if (failure != null) {
-        if (!mounted) return;
+        if (!mounted) return false;
         setState(() => _submitting = false);
         _snack(failure.message);
-        return;
+        return false; // wrong/expired OTP → re-prompt
       }
       _registered = true;
     }
 
-    // Step 2 — documents are OPTIONAL. Upload the profile and any documents the
-    // user chose to provide; if none, the account is created without them.
+    // Documents are OPTIONAL. Upload the profile and any documents the user
+    // chose to provide; if none, the account is created without them.
     try {
       if (_profileBytes != null) {
         setState(() => _status = 'Uploading profile...');
@@ -189,17 +224,76 @@ class _RegisterPageState extends State<RegisterPage> {
         await _apiClient.dio.post('/users/verification', data: body);
       }
 
-      if (!mounted) return;
+      if (!mounted) return true;
       _snack('Account created successfully.', error: false);
       context.read<AuthBloc>().add(AuthCheckStatusEvent());
       context.go('/');
+      return true;
     } catch (_) {
       // The account exists; documents are optional, so let the user in.
-      if (!mounted) return;
+      if (!mounted) return true;
       _snack('Account created. You can add documents later from your profile.', error: false);
       context.read<AuthBloc>().add(AuthCheckStatusEvent());
       context.go('/');
+      return true;
     }
+  }
+
+  /// Asks the user for the OTP. Returns the entered code, or null if cancelled.
+  Future<String?> _showOtpDialog() {
+    final otpCtrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verify Mobile'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Enter the 6-digit OTP sent to ${_mobileCtrl.text.trim()}',
+                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: otpCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              autofocus: true,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(counterText: '', hintText: '••••••'),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () async {
+                  try {
+                    await _apiClient.dio.post('/auth/register/send-otp', data: {
+                      'email': _emailCtrl.text.trim(),
+                      'mobile': _mobileCtrl.text.trim(),
+                    });
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(content: Text('OTP resent')),
+                      );
+                    }
+                  } catch (_) {}
+                },
+                child: const Text('Resend OTP'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (otpCtrl.text.trim().length >= 4) Navigator.pop(ctx, otpCtrl.text.trim());
+            },
+            child: const Text('Verify'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -47,4 +47,9 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   profileImage?: string;
+
+  @ApiProperty({ example: '123456', description: 'OTP sent to the mobile number' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
 }

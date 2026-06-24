@@ -26,7 +26,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> register({required String fullName, required String mobile, required String email, required String password, String? agencyName, String? city, String? state, String role = 'driver'}) async {
+  Future<Either<Failure, Map<String, dynamic>>> register({required String fullName, required String mobile, required String email, required String password, String? agencyName, String? city, String? state, String role = 'driver', String? otp}) async {
     try {
       final result = await remote.register({
         'fullName': fullName, 'mobile': mobile, 'email': email, 'password': password,
@@ -34,6 +34,7 @@ class AuthRepositoryImpl implements AuthRepository {
         if (city != null) 'city': city,
         if (state != null) 'state': state,
         'role': role,
+        if (otp != null) 'otp': otp,
       });
       final data = result['data'] as Map<String, dynamic>;
       await _saveTokens(data);
