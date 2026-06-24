@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -150,7 +151,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           children: [
                             _Action(icon: Icons.phone, label: 'Phone', color: AppColors.primary,
                                 onTap: mobile != null && mobile.isNotEmpty ? () => callNumber(mobile) : null),
-                            _Action(icon: Icons.chat, label: 'WhatsApp', color: const Color(0xFF25D366),
+                            _Action(iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24), label: 'WhatsApp', color: const Color(0xFF25D366),
                                 onTap: mobile != null && mobile.isNotEmpty ? () => openWhatsApp(mobile) : null),
                             Column(mainAxisSize: MainAxisSize.min, children: [
                               Text(rating.toStringAsFixed(0),
@@ -231,18 +232,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
 }
 
 class _Action extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String label;
   final Color color;
   final VoidCallback? onTap;
-  const _Action({required this.icon, required this.label, required this.color, this.onTap});
+  const _Action({this.icon, this.iconWidget, required this.label, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: onTap == null ? Colors.grey : color, size: 26),
+        iconWidget ?? Icon(icon, color: onTap == null ? Colors.grey : color, size: 26),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ]),

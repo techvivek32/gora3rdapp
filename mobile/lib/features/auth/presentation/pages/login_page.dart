@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../bloc/auth_bloc.dart';
 
 class LoginPage extends StatefulWidget {
@@ -46,15 +47,7 @@ class _LoginPageState extends State<LoginPage> {
                   Center(
                     child: Column(
                       children: [
-                        Container(
-                          width: 72.w,
-                          height: 72.w,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(20.r),
-                          ),
-                          child: Icon(Icons.directions_car_rounded, color: Colors.white, size: 36.sp),
-                        ),
+                        AppLogo(size: 72.w, radius: 20.r),
                         SizedBox(height: 16.h),
                         Text('Welcome Back', style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                         SizedBox(height: 6.h),

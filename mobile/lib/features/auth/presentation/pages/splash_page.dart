@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../bloc/auth_bloc.dart';
 
 class SplashPage extends StatelessWidget {
@@ -25,10 +26,7 @@ class SplashPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 100.w,
-                height: 100.w,
                 decoration: BoxDecoration(
-                  color: Colors.white,
                   borderRadius: BorderRadius.circular(28.r),
                   boxShadow: [
                     BoxShadow(
@@ -38,7 +36,7 @@ class SplashPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Icon(Icons.directions_car_rounded, size: 52.sp, color: AppColors.primary),
+                child: AppLogo(size: 100.w, radius: 28.r),
               ),
               SizedBox(height: 24.h),
               Text(

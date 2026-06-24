@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -112,7 +113,7 @@ class _UserCardSheet extends StatelessWidget {
                 onTap: mobile != null && mobile.isNotEmpty ? () => callNumber(mobile) : null,
               ),
               _ActionItem(
-                icon: Icons.chat,
+                iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24),
                 label: 'WhatsApp',
                 color: const Color(0xFF25D366),
                 onTap: mobile != null && mobile.isNotEmpty ? () => openWhatsApp(mobile) : null,
@@ -187,12 +188,13 @@ class _Avatar extends StatelessWidget {
 }
 
 class _ActionItem extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final Widget? iconWidget;
   final String label;
   final Color color;
   final VoidCallback? onTap;
   final String? topText;
-  const _ActionItem({required this.icon, required this.label, required this.color, this.onTap, this.topText});
+  const _ActionItem({this.icon, this.iconWidget, required this.label, required this.color, this.onTap, this.topText});
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +210,7 @@ class _ActionItem extends StatelessWidget {
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                Icon(icon, color: (onTap == null && topText == null) ? Colors.grey : color, size: 26),
+                iconWidget ?? Icon(icon, color: (onTap == null && topText == null) ? Colors.grey : color, size: 26),
                 // Floating warning that overlays above the icon (doesn't take layout space).
                 if (topText != null)
                   Positioned(
