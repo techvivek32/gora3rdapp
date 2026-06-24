@@ -8,6 +8,14 @@ abstract class AuthRepository {
     String? fcmToken,
   });
 
+  Future<Either<Failure, void>> sendLoginOtp(String mobile);
+
+  Future<Either<Failure, Map<String, dynamic>>> loginWithOtp({
+    required String mobile,
+    required String otp,
+    String? fcmToken,
+  });
+
   Future<Either<Failure, Map<String, dynamic>>> register({
     required String fullName,
     required String mobile,

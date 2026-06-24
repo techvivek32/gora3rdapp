@@ -18,6 +18,7 @@ import { FirebaseService } from '../firebase/firebase.service';
 import { SmsService } from './sms.service';
 import { RegisterDto } from './dto/register.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
+import { LoginSendOtpDto, LoginVerifyOtpDto } from './dto/login-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
@@ -37,22 +38,60 @@ export class AuthService {
     private smsService: SmsService,
   ) {}
 
-  // Step 1 of registration: validate uniqueness, then text an OTP to the mobile.
-  async sendRegistrationOtp(dto: SendOtpDto) {
-    await this.ensureUnique(dto.email, dto.mobile);
-
+  private async generateAndSendOtp(mobile: string) {
     const otp = randomInt(100000, 1000000).toString();
     const otpHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
     await this.otpModel.findOneAndUpdate(
-      { mobile: dto.mobile },
-      { mobile: dto.mobile, otpHash, expiresAt, attempts: 0 },
+      { mobile },
+      { mobile, otpHash, expiresAt, attempts: 0 },
       { upsert: true, new: true },
     );
 
-    await this.smsService.sendOtp(dto.mobile, otp);
+    await this.smsService.sendOtp(mobile, otp);
+  }
+
+  // Step 1 of registration: validate uniqueness, then text an OTP to the mobile.
+  async sendRegistrationOtp(dto: SendOtpDto) {
+    await this.ensureUnique(dto.email, dto.mobile);
+    await this.generateAndSendOtp(dto.mobile);
     return { message: 'OTP sent successfully' };
+  }
+
+  // Login step 1: the number must already be registered, then text an OTP.
+  async sendLoginOtp(dto: LoginSendOtpDto) {
+    const user = await this.userModel.findOne({ mobile: dto.mobile });
+    if (!user) throw new NotFoundException('This number is not registered');
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+    if (!user.isActive) throw new UnauthorizedException('Account is inactive');
+
+    await this.generateAndSendOtp(dto.mobile);
+    return { message: 'OTP sent successfully' };
+  }
+
+  // Login step 2: verify the OTP and issue tokens.
+  async loginWithOtp(dto: LoginVerifyOtpDto) {
+    await this.verifyOtp(dto.mobile, dto.otp);
+
+    const user = await this.userModel.findOne({ mobile: dto.mobile });
+    if (!user) throw new NotFoundException('This number is not registered');
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+    if (!user.isActive) throw new UnauthorizedException('Account is inactive');
+
+    const tokens = await this.generateTokens(user);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+    await this.userModel.findByIdAndUpdate(user._id, {
+      lastActive: new Date(),
+      ...(dto.fcmToken ? { $addToSet: { fcmTokens: dto.fcmToken } } : {}),
+    });
+    await this.otpModel.deleteOne({ mobile: dto.mobile });
+    await this.auditLog(user._id.toString(), 'LOGIN_OTP', 'user', user._id.toString());
+
+    return {
+      message: 'Login successful',
+      data: { user: this.sanitizeUser(user), ...tokens },
+    };
   }
 
   private async ensureUnique(email: string, mobile: string) {

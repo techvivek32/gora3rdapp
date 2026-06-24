@@ -5,6 +5,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
+import { LoginSendOtpDto, LoginVerifyOtpDto } from './dto/login-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -40,6 +41,22 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email/mobile + password' })
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post('login/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a login OTP to a registered mobile number' })
+  sendLoginOtp(@Body() dto: LoginSendOtpDto) {
+    return this.authService.sendLoginOtp(dto);
+  }
+
+  @Post('login/verify-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify login OTP and issue tokens' })
+  loginWithOtp(@Body() dto: LoginVerifyOtpDto) {
+    return this.authService.loginWithOtp(dto);
   }
 
   @Post('verify-otp')

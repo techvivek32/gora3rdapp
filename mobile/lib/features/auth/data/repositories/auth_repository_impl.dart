@@ -26,6 +26,28 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, void>> sendLoginOtp(String mobile) async {
+    try {
+      await remote.loginSendOtp(mobile);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: ErrorMapper.message(e)));
+    }
+  }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> loginWithOtp({required String mobile, required String otp, String? fcmToken}) async {
+    try {
+      final result = await remote.loginVerifyOtp(mobile, otp, fcmToken);
+      final data = result['data'] as Map<String, dynamic>;
+      await _saveTokens(data);
+      return Right(data);
+    } catch (e) {
+      return Left(ServerFailure(message: ErrorMapper.message(e)));
+    }
+  }
+
+  @override
   Future<Either<Failure, Map<String, dynamic>>> register({required String fullName, required String mobile, required String email, required String password, String? agencyName, String? city, String? state, String role = 'driver', String? otp}) async {
     try {
       final result = await remote.register({
