@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../users/presentation/widgets/user_card_sheet.dart';
 
 class RequirementCardWidget extends StatelessWidget {
   final Map<String, dynamic> requirement;
@@ -306,27 +307,34 @@ class RequirementCardWidget extends StatelessWidget {
                               // User info section
                               Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 24.r,
-                                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                                    backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
-                                    child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                                  GestureDetector(
+                                    onTap: postedBy == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedBy)),
+                                    child: CircleAvatar(
+                                      radius: 24.r,
+                                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                                      backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
+                                      child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                                    ),
                                   ),
                                   SizedBox(width: 12.w),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          postedBy?['fullName'] as String? ?? 'User',
-                                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                        ),
-                                        SizedBox(height: 4.h),
-                                        Text(
-                                          postedBy?['agencyName'] as String? ?? '',
-                                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                                        ),
-                                      ],
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: postedBy == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedBy)),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            postedBy?['fullName'] as String? ?? 'User',
+                                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                          ),
+                                          SizedBox(height: 4.h),
+                                          Text(
+                                            postedBy?['agencyName'] as String? ?? '',
+                                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   if (badgeText != null)

@@ -118,10 +118,20 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     if (_pickupLat == null || _dropLat == null) return;
     setState(() => _loadingDistance = true);
 
+    // Ordered waypoints: pickup -> stops (with a location) -> drop.
+    final points = <List<double>>[
+      [_pickupLat!, _pickupLng!],
+      for (final s in _stops)
+        if (s.lat != null && s.lng != null) [s.lat!, s.lng!],
+      [_dropLat!, _dropLng!],
+    ];
+
     double? routeKm;
     try {
+      // OSRM returns the total distance through all waypoints in order.
+      final coordStr = points.map((p) => '${p[1]},${p[0]}').join(';');
       final res = await Dio().get(
-        'http://router.project-osrm.org/route/v1/driving/$_pickupLng,$_pickupLat;$_dropLng,$_dropLat',
+        'http://router.project-osrm.org/route/v1/driving/$coordStr',
         queryParameters: {'overview': 'false'},
         options: Options(receiveTimeout: const Duration(seconds: 8)),
       );
@@ -134,9 +144,14 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       }
     } catch (_) {}
 
+    // Fallback: sum straight-line distance between consecutive waypoints.
+    double fallback = 0;
+    for (var i = 0; i < points.length - 1; i++) {
+      fallback += haversineDistanceKm(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1]);
+    }
+
     setState(() {
-      // fallback to straight-line if OSRM fails
-      _computedDistance = routeKm ?? haversineDistanceKm(_pickupLat!, _pickupLng!, _dropLat!, _dropLng!);
+      _computedDistance = routeKm ?? fallback;
       _loadingDistance = false;
     });
   }
@@ -177,6 +192,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
         stop.lat = result.lat;
         stop.lng = result.lng;
       });
+      _updateDistance();
     }
   }
 
@@ -191,6 +207,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       _stops[index].ctrl.dispose();
       _stops.removeAt(index);
     });
+    _updateDistance();
   }
 
   Future<void> _openDrop() async {
