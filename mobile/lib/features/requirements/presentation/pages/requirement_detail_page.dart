@@ -28,7 +28,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
   late TextEditingController _notesCtrl;
   String _vehicleType = 'sedan';
   String _tripType = 'one_way';
-  int _numberOfVehicles = 1;
+  final List<TextEditingController> _stopCtrls = [];
   DateTime? _travelDate;
   TimeOfDay? _travelTime;
 
@@ -55,8 +55,15 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     _dropCtrl.text = _requirement?['dropCity'] as String? ?? '';
     _notesCtrl.text = _requirement?['notes'] as String? ?? '';
     _vehicleType = _requirement?['vehicleType'] as String? ?? 'sedan';
-    _numberOfVehicles = _requirement?['numberOfVehicles'] as int? ?? 1;
     _tripType = _requirement?['tripType'] as String? ?? 'one_way';
+    // Populate existing stops (once).
+    if (_stopCtrls.isEmpty) {
+      final stops = (_requirement?['stops'] as List?) ?? const [];
+      for (final s in stops) {
+        final addr = (s is Map ? s['address'] : null)?.toString() ?? '';
+        _stopCtrls.add(TextEditingController(text: addr));
+      }
+    }
     if (_requirement?['travelDate'] != null) {
       try {
         _travelDate = DateTime.parse(_requirement!['travelDate'].toString());
@@ -75,7 +82,19 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     _pickupCtrl.dispose();
     _dropCtrl.dispose();
     _notesCtrl.dispose();
+    for (final c in _stopCtrls) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _addEditStop() => setState(() => _stopCtrls.add(TextEditingController()));
+
+  void _removeEditStop(int index) {
+    setState(() {
+      _stopCtrls[index].dispose();
+      _stopCtrls.removeAt(index);
+    });
   }
 
   bool _isMyRequirement(BuildContext context) {
@@ -250,7 +269,10 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
       'dropCity': _dropCtrl.text.trim(),
       'vehicleType': _vehicleType,
       'tripType': _tripType,
-      'numberOfVehicles': _numberOfVehicles,
+      'stops': _stopCtrls
+          .where((c) => c.text.trim().isNotEmpty)
+          .map((c) => {'address': c.text.trim()})
+          .toList(),
       'travelDate': _travelDate!.toIso8601String().split('T').first,
       'travelTime': _travelTime != null ? '${_travelTime!.hour.toString().padLeft(2, '0')}:${_travelTime!.minute.toString().padLeft(2, '0')}' : '00:00',
     };
@@ -593,6 +615,32 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                   validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                 ),
                 SizedBox(height: 12.h),
+
+                // Intermediate stops
+                ..._stopCtrls.asMap().entries.map((e) {
+                  final i = e.key;
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: 12.h),
+                    child: TextFormField(
+                      controller: e.value,
+                      decoration: InputDecoration(
+                        labelText: 'Stop ${i + 1}',
+                        prefixIcon: Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+                        suffixIcon: IconButton(
+                          icon: Icon(Icons.close, color: AppColors.error, size: 20.sp),
+                          tooltip: 'Remove stop',
+                          onPressed: () => _removeEditStop(i),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                    ),
+                  );
+                }),
+
                 TextFormField(
                   controller: _dropCtrl,
                   decoration: InputDecoration(
@@ -605,6 +653,16 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                   ),
                   validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                ),
+                SizedBox(height: 4.h),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _addEditStop,
+                    icon: Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20.sp),
+                    label: Text('Add Stop', style: TextStyle(color: AppColors.primary, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                    style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 4.w)),
+                  ),
                 ),
               ],
             ),
@@ -640,59 +698,6 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                   ),
                   items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
                   onChanged: (v) => setState(() => _vehicleType = v!),
-                ),
-                SizedBox(height: 12.h),
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text('Number of Vehicles: ', style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Container(
-                            width: 40.w,
-                            height: 40.h,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles - 1).clamp(1, 50)),
-                              icon: Icon(Icons.remove, color: AppColors.primary, size: 20.sp),
-                            ),
-                          ),
-                          SizedBox(width: 8.w),
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.primary, width: 2),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Text('$_numberOfVehicles', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                          ),
-                          SizedBox(width: 8.w),
-                          Container(
-                            width: 40.w,
-                            height: 40.h,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles + 1).clamp(1, 50)),
-                              icon: Icon(Icons.add, color: Colors.white, size: 20.sp),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),

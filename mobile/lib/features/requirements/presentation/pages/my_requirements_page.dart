@@ -147,8 +147,8 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Actions menu (Running tab only).
-                      if (showMenu)
+                      // Actions menu (Running tab only; not for cancelled ones).
+                      if (showMenu && req['status'] != 'cancelled')
                         Align(
                           alignment: Alignment.centerRight,
                           child: _buildMenu(context, req),

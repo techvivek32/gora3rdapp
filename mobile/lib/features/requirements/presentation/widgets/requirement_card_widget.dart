@@ -45,6 +45,7 @@ class RequirementCardWidget extends StatelessWidget {
             acceptedByList.any((id) => id.toString() == currentUserId);
         final isBooked = requirement['status'] == 'accepted';
         final isCancelled = requirement['status'] == 'cancelled';
+        final isOnHold = requirement['status'] == 'on_hold';
 
         final memberType = postedBy?['membershipType'] ?? 'new';
         Color topBarColor;
@@ -430,7 +431,7 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (isBooked || isCancelled)
+                  if (isBooked || isCancelled || isOnHold)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Center(
@@ -439,14 +440,18 @@ class RequirementCardWidget extends StatelessWidget {
                             child: _buildStampBadge(
                               text: isCancelled
                                   ? 'CANCELLED'
-                                  : hasCurrentUserAccepted
-                                      ? 'ACCEPTED'
-                                      : 'BOOKED',
+                                  : isOnHold
+                                      ? 'ON HOLD'
+                                      : hasCurrentUserAccepted
+                                          ? 'ACCEPTED'
+                                          : 'BOOKED',
                               color: isCancelled
                                   ? Colors.grey[600]!
-                                  : hasCurrentUserAccepted
-                                      ? Colors.green[700]!
-                                      : Colors.red[700]!,
+                                  : isOnHold
+                                      ? Colors.orange[800]!
+                                      : hasCurrentUserAccepted
+                                          ? Colors.green[700]!
+                                          : Colors.red[700]!,
                             ),
                           ),
                         ),
