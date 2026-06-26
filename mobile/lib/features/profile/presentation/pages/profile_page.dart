@@ -76,9 +76,21 @@ class ProfilePage extends StatelessWidget {
                             ],
                           ),
                           SizedBox(height: 8.h),
-                          Text(
-                            user?['fullName'] as String? ?? 'User',
-                            style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  user?['fullName'] as String? ?? 'User',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
+                                ),
+                              ),
+                              if (user?['isVerified'] == true || user?['verificationStatus'] == 'verified') ...[
+                                SizedBox(width: 6.w),
+                                Icon(Icons.verified, color: Colors.white, size: 20.sp),
+                              ],
+                            ],
                           ),
                           SizedBox(height: 6.h),
                           // Current plan badge
