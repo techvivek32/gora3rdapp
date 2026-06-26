@@ -41,6 +41,8 @@ export enum BookingStatus {
 
 export enum AvailabilityStatus {
   AVAILABLE = 'available',
+  ON_HOLD = 'on_hold',
   BOOKED = 'booked',
+  CANCELLED = 'cancelled',
   EXPIRED = 'expired',
 }

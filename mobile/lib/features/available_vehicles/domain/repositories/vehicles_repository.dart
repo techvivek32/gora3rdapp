@@ -7,6 +7,8 @@ abstract class VehiclesRepository {
   Future<Either<Failure, Map<String, dynamic>>> createVehicle(Map<String, dynamic> data);
   Future<Either<Failure, Map<String, dynamic>>> updateVehicle(String id, Map<String, dynamic> data);
   Future<Either<Failure, void>> deleteVehicle(String id);
+  Future<Either<Failure, void>> cancelVehicle(String id, String reason);
+  Future<Either<Failure, void>> setStatus(String id, String status);
   Future<Either<Failure, Map<String, dynamic>>> getMyVehicles();
   Future<Either<Failure, Map<String, dynamic>>> acceptVehicle(String id);
   Future<Either<Failure, Map<String, dynamic>>> getAcceptedByMe();

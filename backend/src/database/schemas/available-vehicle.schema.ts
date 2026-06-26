@@ -95,6 +95,12 @@ export class AvailableVehicle {
   @Prop()
   deletedAt: Date;
 
+  @Prop({ trim: true })
+  cancellationReason: string;
+
+  @Prop()
+  cancelledAt: Date;
+
   @Prop()
   vehicleModel: string;
 

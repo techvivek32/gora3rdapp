@@ -54,6 +54,18 @@ export class AvailableVehiclesController {
     return this.service.update(id, userId, dto);
   }
 
+  @Post(':id/status')
+  @ApiOperation({ summary: 'Change vehicle status (owner: available/on_hold/booked)' })
+  setStatus(@Param('id') id: string, @CurrentUser('sub') userId: string, @Body('status') status: string) {
+    return this.service.setStatus(id, userId, status);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a vehicle listing' })
+  cancel(@Param('id') id: string, @CurrentUser('sub') userId: string, @Body('reason') reason: string) {
+    return this.service.cancel(id, userId, reason);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete vehicle listing' })
   remove(@Param('id') id: string, @CurrentUser('sub') userId: string) {

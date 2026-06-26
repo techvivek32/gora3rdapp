@@ -10,7 +10,10 @@ import '../../../requirements/presentation/pages/location_picker_page.dart';
 import '../bloc/vehicles_bloc.dart';
 
 class CreateVehiclePage extends StatefulWidget {
-  const CreateVehiclePage({super.key});
+  // When [existing] is provided the page acts as an edit form.
+  final Map<String, dynamic>? existing;
+  final String? vehicleId;
+  const CreateVehiclePage({super.key, this.existing, this.vehicleId});
 
   @override
   State<CreateVehiclePage> createState() => _CreateVehiclePageState();
@@ -57,10 +60,52 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
     return entered < _suggestedFare;
   }
 
+  bool get _isEdit => widget.existing != null;
+
   @override
   void initState() {
     super.initState();
     _fetchSettings();
+    if (widget.existing != null) _populateFromExisting(widget.existing!);
+  }
+
+  void _populateFromExisting(Map<String, dynamic> v) {
+    _currentCityCtrl.text = (v['currentCity'] ?? '') as String;
+    _destCityCtrl.text = (v['destinationCity'] ?? '') as String;
+    _vehicleNumberCtrl.text = (v['vehicleNumber'] ?? '') as String;
+    _driverNameCtrl.text = (v['driverName'] ?? '') as String;
+    _driverMobileCtrl.text = (v['driverMobile'] ?? '') as String;
+    _notesCtrl.text = (v['notes'] ?? '') as String;
+    _vehicleType = (v['vehicleType'] as String?) ?? 'sedan';
+
+    final cc = v['currentCoordinates'] as Map?;
+    if (cc != null) {
+      _currentLat = (cc['lat'] as num?)?.toDouble();
+      _currentLng = (cc['lng'] as num?)?.toDouble();
+    }
+    final dc = v['destinationCoordinates'] as Map?;
+    if (dc != null) {
+      _destLat = (dc['lat'] as num?)?.toDouble();
+      _destLng = (dc['lng'] as num?)?.toDouble();
+    }
+
+    if (v['commission'] != null) _commissionCtrl.text = '${(v['commission'] as num).round()}';
+    if (v['fare'] != null) _customFareCtrl.text = '${(v['fare'] as num).round()}';
+    if (v['estimatedDistance'] != null) _computedDistance = (v['estimatedDistance'] as num).toDouble();
+    if (v['availableDate'] != null) {
+      try {
+        _availableDate = DateTime.parse(v['availableDate'].toString());
+      } catch (_) {}
+    }
+    if (v['availableTime'] != null) {
+      try {
+        final p = (v['availableTime'] as String).split(':');
+        _availableTime = TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
+      } catch (_) {}
+    }
+    if (_currentLat != null && _destLat != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateDistance());
+    }
   }
 
   Future<void> _fetchSettings() async {
@@ -159,7 +204,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select available date'), backgroundColor: AppColors.error));
       return;
     }
-    context.read<VehiclesBloc>().add(CreateVehicleEvent({
+    final data = <String, dynamic>{
       'currentCity': _currentCityCtrl.text.trim(),
       'destinationCity': _destCityCtrl.text.trim().isEmpty ? null : _destCityCtrl.text.trim(),
       if (_currentLat != null && _currentLng != null)
@@ -177,18 +222,25 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       'fare': _currentFare.round(),
       'commission': _commission.round(),
       'totalAmount': _total.round(),
-    }));
+    };
+
+    final bloc = context.read<VehiclesBloc>();
+    if (_isEdit) {
+      bloc.add(UpdateVehicleEvent(id: widget.vehicleId!, data: data));
+    } else {
+      bloc.add(CreateVehicleEvent(data));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Post Available Cab', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Cab' : 'Post Available Cab', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<VehiclesBloc, VehiclesState>(
         listener: (context, state) {
-          if (state is VehicleCreated) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Vehicle listed!'), backgroundColor: AppColors.success));
+          if (state is VehicleCreated || state is VehicleUpdated) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Cab updated!' : 'Vehicle listed!'), backgroundColor: AppColors.success));
             context.pop();
           }
           if (state is VehiclesError) {
@@ -425,7 +477,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                     onPressed: (state is VehiclesLoading || _isCustomFareBelowMin) ? null : _submit,
                     child: state is VehiclesLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text('Post Available Cab', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Available Cab', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),

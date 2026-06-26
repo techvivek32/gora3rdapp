@@ -17,6 +17,7 @@ import '../../features/requirements/presentation/pages/my_requirements_page.dart
 import '../../features/available_vehicles/presentation/pages/vehicles_feed_page.dart';
 import '../../features/available_vehicles/presentation/pages/create_vehicle_page.dart';
 import '../../features/available_vehicles/presentation/pages/vehicle_detail_page.dart';
+import '../../features/available_vehicles/presentation/pages/my_vehicles_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/kyc_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
@@ -114,6 +115,17 @@ class AppRouter {
       GoRoute(
         path: '/vehicles/create',
         builder: (_, __) => const CreateVehiclePage(),
+      ),
+      GoRoute(
+        path: '/my-vehicles',
+        builder: (_, __) => const MyVehiclesPage(),
+      ),
+      GoRoute(
+        path: '/vehicles/:id/edit',
+        builder: (_, state) => CreateVehiclePage(
+          vehicleId: state.pathParameters['id']!,
+          existing: state.extra as Map<String, dynamic>?,
+        ),
       ),
       GoRoute(
         path: '/vehicles/:id',

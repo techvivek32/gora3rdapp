@@ -58,6 +58,26 @@ class VehiclesRepositoryImpl implements VehiclesRepository {
   }
 
   @override
+  Future<Either<Failure, void>> cancelVehicle(String id, String reason) async {
+    try {
+      await apiClient.post('/available-vehicles/$id/cancel', data: {'reason': reason});
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> setStatus(String id, String status) async {
+    try {
+      await apiClient.post('/available-vehicles/$id/status', data: {'status': status});
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Map<String, dynamic>>> getMyVehicles() async {
     try {
       final res = await apiClient.get('/available-vehicles/my');

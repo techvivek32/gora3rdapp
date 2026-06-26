@@ -66,3 +66,15 @@ class AcceptVehicleEvent extends VehiclesEvent {
   @override
   List<Object?> get props => [id];
 }
+
+class LoadMyVehiclesEvent extends VehiclesEvent {
+  const LoadMyVehiclesEvent();
+}
+
+class SetVehicleStatusEvent extends VehiclesEvent {
+  final String id;
+  final String status;
+  const SetVehicleStatusEvent({required this.id, required this.status});
+  @override
+  List<Object?> get props => [id, status];
+}

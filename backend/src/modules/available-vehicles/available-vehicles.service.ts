@@ -40,7 +40,7 @@ export class AvailableVehiclesService {
 
     const filter: any = {
       isDeleted: false,
-      status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.BOOKED] },
+      status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.ON_HOLD, AvailabilityStatus.BOOKED] },
     };
 
     if (user?.businessCities?.length > 0 && !query.currentCity) {
@@ -116,6 +116,31 @@ export class AvailableVehiclesService {
 
     const updated = await this.vehicleModel.findByIdAndUpdate(id, dto, { new: true });
     return { message: 'Vehicle listing updated', data: updated };
+  }
+
+  // Owner-only status change (hold/unhold/mark-booked).
+  async setStatus(id: string, userId: string, status: string) {
+    const allowed = [AvailabilityStatus.AVAILABLE, AvailabilityStatus.ON_HOLD, AvailabilityStatus.BOOKED];
+    if (!allowed.includes(status as AvailabilityStatus)) throw new ForbiddenException('Invalid status');
+    const vehicle = await this.vehicleModel.findById(id);
+    if (!vehicle) throw new NotFoundException('Vehicle listing not found');
+    if (vehicle.postedBy.toString() !== userId) throw new ForbiddenException('Unauthorized');
+
+    const updated = await this.vehicleModel.findByIdAndUpdate(id, { status }, { new: true });
+    return { message: 'Status updated', data: updated };
+  }
+
+  async cancel(id: string, userId: string, reason: string) {
+    const vehicle = await this.vehicleModel.findById(id);
+    if (!vehicle) throw new NotFoundException('Vehicle listing not found');
+    if (vehicle.postedBy.toString() !== userId) throw new ForbiddenException('Unauthorized');
+
+    await this.vehicleModel.findByIdAndUpdate(id, {
+      status: AvailabilityStatus.CANCELLED,
+      cancellationReason: reason,
+      cancelledAt: new Date(),
+    });
+    return { message: 'Vehicle listing cancelled' };
   }
 
   async remove(id: string, userId: string) {

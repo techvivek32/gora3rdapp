@@ -16,6 +16,25 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
     on<UpdateVehicleEvent>(_onUpdate);
     on<CancelVehicleEvent>(_onCancel);
     on<AcceptVehicleEvent>(_onAccept);
+    on<LoadMyVehiclesEvent>(_onLoadMy);
+    on<SetVehicleStatusEvent>(_onSetStatus);
+  }
+
+  Future<void> _onLoadMy(LoadMyVehiclesEvent event, Emitter<VehiclesState> emit) async {
+    emit(VehiclesLoading());
+    final result = await repository.getMyVehicles();
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (data) => emit(MyVehiclesLoaded(vehicles: List<Map<String, dynamic>>.from(data['data'] ?? []))),
+    );
+  }
+
+  Future<void> _onSetStatus(SetVehicleStatusEvent event, Emitter<VehiclesState> emit) async {
+    final result = await repository.setStatus(event.id, event.status);
+    result.fold(
+      (f) => emit(VehiclesError(message: f.message)),
+      (_) => add(const LoadMyVehiclesEvent()),
+    );
   }
 
   Future<void> _onLoad(LoadVehiclesEvent event, Emitter<VehiclesState> emit) async {
@@ -71,7 +90,7 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
 
   Future<void> _onCancel(CancelVehicleEvent event, Emitter<VehiclesState> emit) async {
     emit(VehiclesLoading());
-    final result = await repository.deleteVehicle(event.id);
+    final result = await repository.cancelVehicle(event.id, event.reason);
     result.fold(
       (f) => emit(VehiclesError(message: f.message)),
       (_) => emit(VehicleCancelled()),

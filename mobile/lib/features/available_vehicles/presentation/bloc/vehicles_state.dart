@@ -63,6 +63,13 @@ class VehicleUpdated extends VehiclesState {
 
 class VehicleCancelled extends VehiclesState {}
 
+class MyVehiclesLoaded extends VehiclesState {
+  final List<Map<String, dynamic>> vehicles;
+  const MyVehiclesLoaded({required this.vehicles});
+  @override
+  List<Object?> get props => [vehicles];
+}
+
 class VehiclesError extends VehiclesState {
   final String message;
   const VehiclesError({required this.message});

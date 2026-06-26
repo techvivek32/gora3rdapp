@@ -7,9 +7,15 @@ import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../requirements/presentation/widgets/banner_card_widget.dart';
+import '../../../users/presentation/widgets/user_card_sheet.dart';
 import '../bloc/vehicles_bloc.dart';
+import '../widgets/vehicles_filter_sheet.dart';
+
+const _kCaution =
+    'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.';
 
 class VehiclesFeedPage extends StatefulWidget {
   const VehiclesFeedPage({super.key});
@@ -26,6 +32,22 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
   List<Map<String, dynamic>> _banners = [];
+  Map<String, dynamic> _filters = {};
+
+  void _openFilter() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => VehiclesFilterSheet(
+        initialFilters: _filters,
+        onApply: (filters) {
+          setState(() => _filters = filters);
+          context.read<VehiclesBloc>().add(LoadVehiclesEvent(filters: filters.isEmpty ? null : filters));
+        },
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -91,7 +113,12 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         automaticallyImplyLeading: false,
         title: Text('Available Cabs', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
-          IconButton(icon: const Icon(Icons.filter_list, color: Colors.white), onPressed: () {}),
+          IconButton(
+            icon: const Icon(Icons.history_rounded, color: Colors.white),
+            tooltip: 'My Vehicles',
+            onPressed: () => context.push('/my-vehicles'),
+          ),
+          IconButton(icon: const Icon(Icons.filter_list, color: Colors.white), tooltip: 'Filter', onPressed: _openFilter),
           IconButton(icon: Icon(Icons.add, color: Colors.white, size: 28.sp), onPressed: () => context.push('/vehicles/create')),
         ],
       ),
@@ -187,24 +214,25 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
                   );
                 }
                 final v = item as Map<String, dynamic>;
-                return _VehicleCard(
-                  vehicle: v,
-                  onTap: () => context.push('/vehicles/${v['_id']}', extra: v).then((result) {
-                    if (result == true && mounted) {
-                      context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
-                    }
-                  }),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 22.h,
+                      child: MarqueeText(
+                        text: _kCaution,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                      ),
+                    ),
+                    SizedBox(height: 6.h),
+                    // Card is display-only; only the avatar/name open the profile popup.
+                    VehicleCard(vehicle: v),
+                  ],
                 );
               },
             ),
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primary,
-        onPressed: () => context.push('/vehicles/create'),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Post Vehicle', style: TextStyle(color: Colors.white)),
       ),
     );
   }
@@ -243,7 +271,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         SizedBox(height: 4.h),
         ...myAccepted.map((v) => Padding(
           padding: EdgeInsets.only(bottom: 10.h),
-          child: _VehicleCard(
+          child: VehicleCard(
             vehicle: v,
             onTap: () => context.push('/vehicles/${v['_id']}', extra: v).then((result) {
               if (result == true && mounted) {
@@ -259,10 +287,11 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   }
 }
 
-class _VehicleCard extends StatelessWidget {
+class VehicleCard extends StatelessWidget {
   final Map<String, dynamic> vehicle;
-  final VoidCallback onTap;
-  const _VehicleCard({required this.vehicle, required this.onTap});
+  final VoidCallback? onTap;
+  final Widget? menu;
+  const VehicleCard({super.key, required this.vehicle, this.onTap, this.menu});
 
   @override
   Widget build(BuildContext context) {
@@ -270,6 +299,8 @@ class _VehicleCard extends StatelessWidget {
     final postedBy = vehicle['postedBy'];
     final postedByMap = postedBy is Map ? postedBy : null;
     final isBooked = status == 'booked';
+    final isOnHold = status == 'on_hold';
+    final isCancelled = status == 'cancelled';
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
@@ -296,59 +327,48 @@ class _VehicleCard extends StatelessWidget {
 
         final memberType = postedByMap?['membershipType'] ?? 'new';
         Color topBarColor;
-        Color cardBg;
         String? badgeText;
-        Color badgeColor;
-        Color badgeBg;
 
-        if (isCurrentUserOwner) {
-          topBarColor = Colors.grey[400]!;
-          cardBg = Colors.white;
-          badgeText = null;
-          badgeColor = Colors.grey;
-          badgeBg = Colors.grey[100]!;
-        } else if (memberType == 'golden') {
+        // Card colour reflects the poster's membership (own cards included):
+        //   new / verified -> green, active -> blue, premium -> purple, golden -> orange
+        if (memberType == 'golden') {
           topBarColor = AppColors.memberGolden;
-          cardBg = AppColors.memberGolden.withOpacity(0.07);
           badgeText = 'GOLDEN USER';
-          badgeColor = AppColors.memberGolden;
-          badgeBg = AppColors.memberGolden.withOpacity(0.12);
         } else if (memberType == 'premium') {
           topBarColor = AppColors.memberPremium;
-          cardBg = AppColors.memberPremium.withOpacity(0.07);
           badgeText = 'PREMIUM USER';
-          badgeColor = AppColors.memberPremium;
-          badgeBg = AppColors.memberPremium.withOpacity(0.12);
-        } else if (memberType == 'active' || memberType == 'verified') {
+        } else if (memberType == 'active') {
           topBarColor = AppColors.memberActive;
-          cardBg = AppColors.memberActive.withOpacity(0.05);
           badgeText = 'ACTIVE USER';
-          badgeColor = AppColors.memberActive;
-          badgeBg = AppColors.memberActive.withOpacity(0.1);
+        } else if (memberType == 'verified') {
+          topBarColor = AppColors.memberVerified;
+          badgeText = 'VERIFIED USER';
         } else {
-          topBarColor = AppColors.primary;
-          cardBg = AppColors.primary.withOpacity(0.05);
-          badgeText = null;
-          badgeColor = Colors.grey;
-          badgeBg = Colors.grey[100]!;
+          topBarColor = AppColors.memberVerified; // new
+          badgeText = 'NEW USER';
         }
+        final Color cardBg = topBarColor.withOpacity(0.07);
+        final Color badgeColor = topBarColor;
+        final Color badgeBg = topBarColor.withOpacity(0.12);
 
         final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
 
         return GestureDetector(
-          onTap: () {
-            if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('This vehicle is already booked'),
-                  backgroundColor: Colors.red,
-                  duration: Duration(seconds: 2),
-                ),
-              );
-              return;
-            }
-            onTap();
-          },
+          onTap: onTap == null
+              ? null
+              : () {
+                  if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('This vehicle is already booked'),
+                        backgroundColor: Colors.red,
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+                  onTap!();
+                },
           child: Container(
             decoration: BoxDecoration(
               color: cardBg,
@@ -425,19 +445,21 @@ class _VehicleCard extends StatelessWidget {
                                     flex: 2,
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        Container(
-                                          padding: EdgeInsets.all(6.r),
-                                          decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(6.r)),
-                                          child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        Container(
-                                          padding: EdgeInsets.all(6.r),
-                                          decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(6.r)),
-                                          child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
-                                        ),
-                                      ],
+                                      children: menu != null
+                                          ? [menu!]
+                                          : [
+                                              Container(
+                                                padding: EdgeInsets.all(6.r),
+                                                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(6.r)),
+                                                child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
+                                              ),
+                                              SizedBox(width: 8.w),
+                                              Container(
+                                                padding: EdgeInsets.all(6.r),
+                                                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(6.r)),
+                                                child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
+                                              ),
+                                            ],
                                     ),
                                   ),
                                 ],
@@ -498,32 +520,39 @@ class _VehicleCard extends StatelessWidget {
                               ],
                             ),
                             SizedBox(height: 6.h),
-                            if (!isCurrentUserOwner) ...[
+                            ...[
                               Divider(height: 1, thickness: 1, color: Colors.black26),
                               SizedBox(height: 8.h),
                               Row(
                                 children: [
-                                  CircleAvatar(
-                                    radius: 24.r,
-                                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                                    backgroundImage: postedByMap?['profileImage'] != null ? NetworkImage(postedByMap!['profileImage'] as String) : null,
-                                    child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                                  GestureDetector(
+                                    onTap: postedByMap == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedByMap)),
+                                    child: CircleAvatar(
+                                      radius: 24.r,
+                                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                                      backgroundImage: postedByMap?['profileImage'] != null ? NetworkImage(postedByMap!['profileImage'] as String) : null,
+                                      child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
+                                    ),
                                   ),
                                   SizedBox(width: 12.w),
                                   Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          postedByMap?['fullName'] as String? ?? vehicle['driverName'] as String? ?? 'Driver',
-                                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                        ),
-                                        SizedBox(height: 4.h),
-                                        Text(
-                                          postedByMap?['agencyName'] as String? ?? 'Agency Name',
-                                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                                        ),
-                                      ],
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: postedByMap == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedByMap)),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            postedByMap?['fullName'] as String? ?? vehicle['driverName'] as String? ?? 'Driver',
+                                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                          ),
+                                          SizedBox(height: 4.h),
+                                          Text(
+                                            postedByMap?['agencyName'] as String? ?? 'Agency Name',
+                                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   if (badgeText != null)
@@ -564,7 +593,8 @@ class _VehicleCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              if (isCurrentUserPremium) ...[
+                              // Owners always see their own details, even without a plan.
+                              if (isCurrentUserPremium || isCurrentUserOwner) ...[
                                 SizedBox(height: 12.h),
                                 Row(
                                   children: [
@@ -627,15 +657,27 @@ class _VehicleCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (isBooked)
+                  if (isBooked || isOnHold || isCancelled)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Center(
                           child: Transform.rotate(
                             angle: -0.2,
                             child: _buildStampBadge(
-                              text: hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
-                              color: hasCurrentUserAccepted ? Colors.green[700]! : Colors.red[700]!,
+                              text: isCancelled
+                                  ? 'CANCELLED'
+                                  : isOnHold
+                                      ? 'ON HOLD'
+                                      : hasCurrentUserAccepted
+                                          ? 'ACCEPTED'
+                                          : 'BOOKED',
+                              color: isCancelled
+                                  ? Colors.grey[600]!
+                                  : isOnHold
+                                      ? Colors.orange[800]!
+                                      : hasCurrentUserAccepted
+                                          ? Colors.green[700]!
+                                          : Colors.red[700]!,
                             ),
                           ),
                         ),
