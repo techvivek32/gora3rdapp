@@ -21,6 +21,7 @@ export enum TripType {
 
 export enum BookingStatus {
   ACTIVE = 'active',
+  ON_HOLD = 'on_hold',
   ACCEPTED = 'accepted',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',

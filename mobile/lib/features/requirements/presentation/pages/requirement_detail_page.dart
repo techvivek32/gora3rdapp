@@ -9,7 +9,8 @@ import '../bloc/requirements_bloc.dart';
 class RequirementDetailPage extends StatefulWidget {
   final String requirementId;
   final Map<String, dynamic>? requirement;
-  const RequirementDetailPage({super.key, required this.requirementId, this.requirement});
+  final bool startEditing;
+  const RequirementDetailPage({super.key, required this.requirementId, this.requirement, this.startEditing = false});
 
   @override
   State<RequirementDetailPage> createState() => _RequirementDetailPageState();
@@ -44,6 +45,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
       _requirement = widget.requirement;
       _populateControllers();
     }
+    _isEditing = widget.startEditing;
     // Always load full detail from API so acceptedBy and other fields are fully populated
     context.read<RequirementsBloc>().add(LoadRequirementDetailEvent(widget.requirementId));
   }

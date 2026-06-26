@@ -66,3 +66,12 @@ class CancelRequirementEvent extends RequirementsEvent {
 class LoadMyRequirementsEvent extends RequirementsEvent {
   const LoadMyRequirementsEvent();
 }
+
+// Owner status change (hold/unhold/mark-booked). Reloads My Requirements after.
+class SetRequirementStatusEvent extends RequirementsEvent {
+  final String id;
+  final String status;
+  const SetRequirementStatusEvent({required this.id, required this.status});
+  @override
+  List<Object?> get props => [id, status];
+}

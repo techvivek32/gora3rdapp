@@ -21,7 +21,16 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     on<AcceptRequirementEvent>(_onAccept);
     on<UpdateRequirementEvent>(_onUpdate);
     on<CancelRequirementEvent>(_onCancel);
+    on<SetRequirementStatusEvent>(_onSetStatus);
     on<LoadMyRequirementsEvent>(_onLoadMy);
+  }
+
+  Future<void> _onSetStatus(SetRequirementStatusEvent event, Emitter<RequirementsState> emit) async {
+    final result = await repository.setStatus(event.id, event.status);
+    result.fold(
+      (f) => emit(RequirementsError(message: f.message)),
+      (_) => add(const LoadMyRequirementsEvent()),
+    );
   }
 
   Future<void> _onLoad(LoadRequirementsEvent event, Emitter<RequirementsState> emit) async {

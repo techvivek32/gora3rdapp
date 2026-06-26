@@ -67,6 +67,16 @@ export class RequirementsController {
     return this.requirementsService.acceptRequirement(id, userId);
   }
 
+  @Post(':id/status')
+  @ApiOperation({ summary: 'Change a requirement status (owner: active/on_hold/accepted)' })
+  setStatus(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('status') status: string,
+  ) {
+    return this.requirementsService.setStatus(id, userId, status);
+  }
+
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancel a requirement' })
   cancel(

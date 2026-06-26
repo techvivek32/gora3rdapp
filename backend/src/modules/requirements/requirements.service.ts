@@ -173,6 +173,25 @@ export class RequirementsService {
     return { message: 'Requirement updated', data: updated };
   }
 
+  // Owner-only status change (used for hold/unhold/mark-booked from My Requirements).
+  async setStatus(id: string, userId: string, status: string) {
+    const allowed = [BookingStatus.ACTIVE, BookingStatus.ON_HOLD, BookingStatus.ACCEPTED];
+    if (!allowed.includes(status as BookingStatus)) {
+      throw new ForbiddenException('Invalid status');
+    }
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.postedBy.toString() !== userId) {
+      throw new ForbiddenException('Not authorized to update this requirement');
+    }
+
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(id, { status }, { new: true })
+      .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
+      .lean();
+    return { message: 'Status updated', data: updated };
+  }
+
   async remove(id: string, userId: string) {
     const requirement = await this.requirementModel.findById(id);
     if (!requirement) throw new NotFoundException('Requirement not found');
