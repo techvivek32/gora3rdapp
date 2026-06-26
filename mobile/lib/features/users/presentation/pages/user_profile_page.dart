@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -79,6 +80,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final title = (agency != null && agency.isNotEmpty) ? agency : name;
     final businessCity = [city, state].where((e) => e != null && e.isNotEmpty).join(', ');
 
+    // Contact is only available to members with an active plan.
+    final isPremium = currentUserIsPremium(context);
+    final canContact = isPremium && mobile != null && mobile.isNotEmpty;
+
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -150,9 +155,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             _Action(icon: Icons.phone, label: 'Phone', color: AppColors.primary,
-                                onTap: mobile != null && mobile.isNotEmpty ? () => callNumber(mobile) : null),
+                                onTap: canContact ? () => callNumber(mobile) : null),
                             _Action(iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24), label: 'WhatsApp', color: const Color(0xFF25D366),
-                                onTap: mobile != null && mobile.isNotEmpty ? () => openWhatsApp(mobile) : null),
+                                onTap: canContact ? () => openWhatsApp(mobile) : null),
                             Column(mainAxisSize: MainAxisSize.min, children: [
                               Text(rating.toStringAsFixed(0),
                                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
@@ -176,7 +181,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       children: [
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: mobile != null && mobile.isNotEmpty ? () => callNumber(mobile) : null,
+                            onPressed: canContact ? () => callNumber(mobile) : null,
                             icon: const Icon(Icons.person_add_alt, size: 18),
                             label: const Text('Save Contact'),
                           ),
@@ -195,6 +200,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ),
                   ),
                 ),
+                if (!isPremium)
+                  GestureDetector(
+                    onTap: () => context.push('/subscriptions'),
+                    child: const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: Text(
+                        'Become a premium member to contact immediately',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

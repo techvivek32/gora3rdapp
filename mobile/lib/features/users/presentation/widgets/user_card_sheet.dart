@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+
+const _premiumTypes = ['active', 'verified', 'premium', 'golden'];
+
+bool currentUserIsPremium(BuildContext context) {
+  final auth = context.read<AuthBloc>().state;
+  final me = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
+  return _premiumTypes.contains(me?['membershipType']);
+}
 
 String membershipLabel(Map<String, dynamic> user) {
   if (user['isVerified'] == true) return 'Verified Member';
@@ -50,6 +60,10 @@ class _UserCardSheet extends StatelessWidget {
     final mobile = user['mobile'] as String?;
     final title = (agency != null && agency.isNotEmpty) ? agency : name;
     final subtitle = [name, city].where((e) => e != null && e.isNotEmpty).join(', ');
+
+    // Contact is only available to members with an active plan.
+    final isPremium = currentUserIsPremium(context);
+    final canContact = isPremium && mobile != null && mobile.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -110,13 +124,13 @@ class _UserCardSheet extends StatelessWidget {
                 icon: Icons.phone,
                 label: 'Phone',
                 color: AppColors.primary,
-                onTap: mobile != null && mobile.isNotEmpty ? () => callNumber(mobile) : null,
+                onTap: canContact ? () => callNumber(mobile) : null,
               ),
               _ActionItem(
                 iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24),
                 label: 'WhatsApp',
                 color: const Color(0xFF25D366),
-                onTap: mobile != null && mobile.isNotEmpty ? () => openWhatsApp(mobile) : null,
+                onTap: canContact ? () => openWhatsApp(mobile) : null,
               ),
               _ActionItem(
                 icon: Icons.notifications_active,
@@ -135,6 +149,23 @@ class _UserCardSheet extends StatelessWidget {
               ),
             ],
           ),
+          if (!isPremium) ...[
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/subscriptions');
+              },
+              child: const SizedBox(
+                width: double.infinity,
+                child: Text(
+                  'Become a premium member to contact immediately',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
