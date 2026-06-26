@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/constants/vehicle_types.dart';
 
 class RequirementsFilterSheet extends StatefulWidget {
   final Map<String, dynamic> initialFilters;
@@ -14,7 +15,7 @@ class _RequirementsFilterSheetState extends State<RequirementsFilterSheet> {
   late String? _tripType;
   late String? _status;
 
-  final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
+  final _vehicleTypes = kVehicleTypes;
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
   final _statuses = ['pending', 'accepted', 'completed', 'cancelled', 'expired'];
 
@@ -54,9 +55,9 @@ class _RequirementsFilterSheetState extends State<RequirementsFilterSheet> {
               spacing: 8,
               runSpacing: 8,
               children: _vehicleTypes.map((v) => FilterChip(
-                label: Text(v.replaceAll('_', ' ').toUpperCase(), style: const TextStyle(fontSize: 11)),
-                selected: _vehicleType == v,
-                onSelected: (_) => setState(() => _vehicleType = _vehicleType == v ? null : v),
+                label: Text(v['label']!, style: const TextStyle(fontSize: 11)),
+                selected: _vehicleType == v['value'],
+                onSelected: (_) => setState(() => _vehicleType = _vehicleType == v['value'] ? null : v['value']),
               )).toList(),
             ),
             const SizedBox(height: 16),

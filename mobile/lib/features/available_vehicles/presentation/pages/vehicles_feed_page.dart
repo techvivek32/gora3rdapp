@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -485,7 +486,7 @@ class _VehicleCard extends StatelessWidget {
                               children: [
                                 Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
                                 SizedBox(width: 6.w),
-                                Text((vehicle['vehicleType'] as String? ?? '').toUpperCase(), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                Text(vehicleTypeLabel(vehicle['vehicleType'] as String?), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                               ],
                             ),
                             SizedBox(height: 6.h),

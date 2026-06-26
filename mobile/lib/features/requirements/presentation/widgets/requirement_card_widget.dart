@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
@@ -549,10 +550,7 @@ class RequirementCardWidget extends StatelessWidget {
     }
   }
 
-  String _formatVehicleType(String? type) {
-    if (type == null) return '';
-    return type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ') + ' Car';
-  }
+  String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
 
   String _formatDate(dynamic date) {
     if (date == null) return '';

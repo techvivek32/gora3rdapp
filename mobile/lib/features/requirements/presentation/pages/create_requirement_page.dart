@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/config/env.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
 import 'location_picker_page.dart';
@@ -46,7 +47,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
   double get _distance => _computedDistance ?? 0.0;
   
-  final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
+  final _vehicleTypes = kVehicleTypes;
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
 
   // Calculate total suggested fare
@@ -450,7 +451,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
-                      items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                      items: _vehicleTypes.map((v) => DropdownMenuItem(value: v['value'], child: Text(v['label']!, style: TextStyle(fontFamily: 'Poppins')))).toList(),
                       onChanged: (v) => setState(() => _vehicleType = v!),
                     ),
                   ],

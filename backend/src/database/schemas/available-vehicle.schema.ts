@@ -18,7 +18,7 @@ export class AvailableVehicle {
   @Prop({ trim: true })
   destinationCity: string;
 
-  @Prop({ required: true })
+  @Prop({ trim: true })
   currentState: string;
 
   @Prop({ type: String, enum: VehicleType, required: true })
@@ -58,7 +58,27 @@ export class AvailableVehicle {
   currentCoordinates: {
     lat: number;
     lng: number;
+    address?: string;
   };
+
+  @Prop({ type: Object })
+  destinationCoordinates: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
+
+  @Prop({ type: Number })
+  estimatedDistance: number;
+
+  @Prop({ type: Number, default: 0 })
+  fare: number;
+
+  @Prop({ type: Number, default: 0 })
+  commission: number;
+
+  @Prop({ type: Number, default: 0 })
+  totalAmount: number;
 
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   interestedUsers: Types.ObjectId[];

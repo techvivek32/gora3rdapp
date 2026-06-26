@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/vehicle_types.dart';
 
 class RecentRequirementsWidget extends StatelessWidget {
   final List<Map<String, dynamic>> requirements;
@@ -77,7 +78,7 @@ class _RecentCard extends StatelessWidget {
                   children: [
                     Text('${req['pickupCity']} → ${req['dropCity']}',
                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                    Text(req['vehicleType'] as String? ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    Text(vehicleTypeLabel(req['vehicleType'] as String?), style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
                   ],
                 ),
               ),

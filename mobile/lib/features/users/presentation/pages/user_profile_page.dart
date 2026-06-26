@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -303,7 +304,7 @@ class _VehicleCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(type.isNotEmpty ? '${type[0].toUpperCase()}${type.substring(1)} Car' : 'Vehicle',
+          Text(vehicleTypeLabel(type),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           Text(number, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),

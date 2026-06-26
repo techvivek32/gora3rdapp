@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/vehicles_bloc.dart';
@@ -32,7 +33,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
   DateTime? _availableDate;
   TimeOfDay? _availableTime;
 
-  final _vehicleTypes = ['hatchback', 'sedan', 'suv', 'muv', 'traveller', 'tempo_traveller', 'mini_bus', 'bus'];
+  final _vehicleTypes = kVehicleTypes;
 
   @override
   void initState() {
@@ -107,10 +108,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
     }
   }
 
-  String _formatVehicleType(String? type) {
-    if (type == null) return '';
-    return type.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ') + ' Car';
-  }
+  String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
 
   void _showCancelDialog() {
     showModalBottomSheet(
@@ -571,7 +569,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                   ),
-                  items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                  items: _vehicleTypes.map((v) => DropdownMenuItem(value: v['value'], child: Text(v['label']!, style: TextStyle(fontFamily: 'Poppins')))).toList(),
                   onChanged: (v) => setState(() => _vehicleType = v!),
                 ),
                 SizedBox(height: 12.h),

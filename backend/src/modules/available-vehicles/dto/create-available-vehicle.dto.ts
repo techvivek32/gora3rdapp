@@ -1,11 +1,13 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType } from '../../../common/enums/vehicle-type.enum';
 
 export class CreateAvailableVehicleDto {
   @ApiProperty({ example: 'Jaipur' }) @IsString() @IsNotEmpty() currentCity: string;
   @ApiPropertyOptional({ example: 'Ajmer' }) @IsOptional() @IsString() destinationCity?: string;
-  @ApiProperty({ example: 'Rajasthan' }) @IsString() @IsNotEmpty() currentState: string;
+  @ApiPropertyOptional({ example: 'Rajasthan' }) @IsOptional() @IsString() currentState?: string;
+  @ApiPropertyOptional() @IsOptional() currentCoordinates?: { lat: number; lng: number; address?: string };
+  @ApiPropertyOptional() @IsOptional() destinationCoordinates?: { lat: number; lng: number; address?: string };
   @ApiProperty({ enum: VehicleType }) @IsEnum(VehicleType) vehicleType: VehicleType;
   @ApiProperty({ example: 'RJ14AB1234' }) @IsString() @IsNotEmpty() vehicleNumber: string;
   @ApiProperty({ example: 'Suresh Kumar' }) @IsString() @IsNotEmpty() driverName: string;
@@ -15,4 +17,8 @@ export class CreateAvailableVehicleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleModel?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() vehicleColor?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() estimatedDistance?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() fare?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() commission?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() totalAmount?: number;
 }
