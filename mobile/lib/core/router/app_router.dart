@@ -99,10 +99,9 @@ class AppRouter {
       ),
       GoRoute(
         path: '/requirements/:id/edit',
-        builder: (_, state) => RequirementDetailPage(
+        builder: (_, state) => CreateRequirementPage(
           requirementId: state.pathParameters['id']!,
-          requirement: state.extra as Map<String, dynamic>?,
-          startEditing: true,
+          existing: state.extra as Map<String, dynamic>?,
         ),
       ),
       GoRoute(

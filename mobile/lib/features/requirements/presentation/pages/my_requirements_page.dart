@@ -62,6 +62,9 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
               );
               context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
             }
+            if (state is RequirementUpdated) {
+              context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
+            }
             if (state is RequirementsError) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(state.message), backgroundColor: AppColors.error),
@@ -142,21 +145,12 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
               itemCount: items.length,
               itemBuilder: (context, index) {
                 final req = items[index];
+                // Actions menu lives inside the card (Running tab; not for cancelled).
+                final menu = (showMenu && req['status'] != 'cancelled') ? _buildMenu(context, req) : null;
                 return Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Actions menu (Running tab only; not for cancelled ones).
-                      if (showMenu && req['status'] != 'cancelled')
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: _buildMenu(context, req),
-                        ),
-                      // Cards are display-only — no navigation to the detail screen.
-                      RequirementCardWidget(requirement: req),
-                    ],
-                  ),
+                  // Cards are display-only — no navigation to the detail screen.
+                  child: RequirementCardWidget(requirement: req, menu: menu),
                 );
               },
             ),
@@ -167,6 +161,9 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
     final isHeld = req['status'] == 'on_hold';
     return PopupMenuButton<String>(
       icon: const Icon(Icons.more_vert, color: AppColors.textSecondary),
+      padding: EdgeInsets.zero,
+      tooltip: 'Options',
+      constraints: BoxConstraints(minWidth: 160.w),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
       onSelected: (value) => _onMenuAction(context, value, req),
       itemBuilder: (_) => [

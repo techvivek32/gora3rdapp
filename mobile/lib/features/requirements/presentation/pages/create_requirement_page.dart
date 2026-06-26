@@ -9,7 +9,10 @@ import '../bloc/requirements_bloc.dart';
 import 'location_picker_page.dart';
 
 class CreateRequirementPage extends StatefulWidget {
-  const CreateRequirementPage({super.key});
+  // When [existing] is provided the page acts as an edit form for that requirement.
+  final Map<String, dynamic>? existing;
+  final String? requirementId;
+  const CreateRequirementPage({super.key, this.existing, this.requirementId});
 
   @override
   State<CreateRequirementPage> createState() => _CreateRequirementPageState();
@@ -70,10 +73,58 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     return entered < _suggestedFare;
   }
 
+  bool get _isEdit => widget.existing != null;
+
   @override
   void initState() {
     super.initState();
     _fetchSettings();
+    if (widget.existing != null) _populateFromExisting(widget.existing!);
+  }
+
+  void _populateFromExisting(Map<String, dynamic> r) {
+    _pickupCtrl.text = (r['pickupCity'] ?? '') as String;
+    _dropCtrl.text = (r['dropCity'] ?? '') as String;
+    _notesCtrl.text = (r['notes'] ?? '') as String;
+    _vehicleType = (r['vehicleType'] as String?) ?? 'sedan';
+    _tripType = (r['tripType'] as String?) ?? 'one_way';
+
+    final pc = r['pickupCoordinates'] as Map?;
+    if (pc != null) {
+      _pickupLat = (pc['lat'] as num?)?.toDouble();
+      _pickupLng = (pc['lng'] as num?)?.toDouble();
+    }
+    final dc = r['dropCoordinates'] as Map?;
+    if (dc != null) {
+      _dropLat = (dc['lat'] as num?)?.toDouble();
+      _dropLng = (dc['lng'] as num?)?.toDouble();
+    }
+    for (final s in (r['stops'] as List? ?? const [])) {
+      final stop = _Stop();
+      stop.ctrl.text = (s is Map ? s['address'] : null)?.toString() ?? '';
+      stop.lat = s is Map ? (s['lat'] as num?)?.toDouble() : null;
+      stop.lng = s is Map ? (s['lng'] as num?)?.toDouble() : null;
+      _stops.add(stop);
+    }
+
+    if (r['commission'] != null) _commissionCtrl.text = '${(r['commission'] as num).round()}';
+    if (r['fare'] != null) _customFareCtrl.text = '${(r['fare'] as num).round()}';
+    if (r['estimatedDistance'] != null) _computedDistance = (r['estimatedDistance'] as num).toDouble();
+    if (r['travelDate'] != null) {
+      try {
+        _travelDate = DateTime.parse(r['travelDate'].toString());
+      } catch (_) {}
+    }
+    if (r['travelTime'] != null) {
+      try {
+        final p = (r['travelTime'] as String).split(':');
+        _travelTime = TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
+      } catch (_) {}
+    }
+    // Recompute distance through the route if we have coordinates.
+    if (_pickupLat != null && _dropLat != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _updateDistance());
+    }
   }
 
   Future<void> _fetchSettings() async {
@@ -236,7 +287,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'), backgroundColor: AppColors.error));
       return;
     }
-    context.read<RequirementsBloc>().add(CreateRequirementEvent(data: {
+    final data = <String, dynamic>{
       'pickupCity': _pickupCtrl.text.trim(),
       'dropCity': _dropCtrl.text.trim(),
       'vehicleType': _vehicleType,
@@ -252,7 +303,18 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'fare': _currentFare.round(),
       'commission': _commission.round(),
       'totalAmount': _total.round(),
-    }));
+      if (_pickupLat != null && _pickupLng != null)
+        'pickupCoordinates': {'lat': _pickupLat, 'lng': _pickupLng, 'address': _pickupCtrl.text.trim()},
+      if (_dropLat != null && _dropLng != null)
+        'dropCoordinates': {'lat': _dropLat, 'lng': _dropLng, 'address': _dropCtrl.text.trim()},
+    };
+
+    final bloc = context.read<RequirementsBloc>();
+    if (_isEdit) {
+      bloc.add(UpdateRequirementEvent(id: widget.requirementId!, data: data));
+    } else {
+      bloc.add(CreateRequirementEvent(data: data));
+    }
   }
 
 
@@ -261,11 +323,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text('Post Requirement', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Requirement' : 'Post Requirement', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<RequirementsBloc, RequirementsState>(
         listener: (context, state) {
-          if (state is RequirementCreated) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Requirement posted!'), backgroundColor: AppColors.success));
+          if (state is RequirementCreated || state is RequirementUpdated) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Requirement updated!' : 'Requirement posted!'), backgroundColor: AppColors.success));
             context.pop();
           }
           if (state is RequirementsError) {
@@ -847,7 +909,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     onPressed: (state is RequirementsLoading || _isCustomFareBelowMin) ? null : _submit,
                     child: state is RequirementsLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text('Post Requirement', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Requirement', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),

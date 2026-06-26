@@ -9,8 +9,11 @@ import '../../../users/presentation/widgets/user_card_sheet.dart';
 class RequirementCardWidget extends StatelessWidget {
   final Map<String, dynamic> requirement;
   final VoidCallback? onTap;
+  // When provided, replaces the volume/location icons in the top-right
+  // (used for the actions menu on My Requirements).
+  final Widget? menu;
 
-  const RequirementCardWidget({super.key, required this.requirement, this.onTap});
+  const RequirementCardWidget({super.key, required this.requirement, this.onTap, this.menu});
 
   Color get _membershipColor {
     final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
@@ -181,25 +184,27 @@ class RequirementCardWidget extends StatelessWidget {
                                     flex: 2,
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        Container(
-                                          padding: EdgeInsets.all(6.r),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green[50],
-                                            borderRadius: BorderRadius.circular(6.r),
-                                          ),
-                                          child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        Container(
-                                          padding: EdgeInsets.all(6.r),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue[50],
-                                            borderRadius: BorderRadius.circular(6.r),
-                                          ),
-                                          child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
-                                        ),
-                                      ],
+                                      children: menu != null
+                                          ? [menu!]
+                                          : [
+                                              Container(
+                                                padding: EdgeInsets.all(6.r),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green[50],
+                                                  borderRadius: BorderRadius.circular(6.r),
+                                                ),
+                                                child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
+                                              ),
+                                              SizedBox(width: 8.w),
+                                              Container(
+                                                padding: EdgeInsets.all(6.r),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.blue[50],
+                                                  borderRadius: BorderRadius.circular(6.r),
+                                                ),
+                                                child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
+                                              ),
+                                            ],
                                     ),
                                   ),
                                 ],
