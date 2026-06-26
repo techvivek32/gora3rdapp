@@ -6,10 +6,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/marquee_text.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/banner_card_widget.dart';
 import '../widgets/requirement_card_widget.dart';
 import '../widgets/requirements_filter_sheet.dart';
+
+const _kCaution =
+    'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.';
 
 class RequirementsFeedPage extends StatefulWidget {
   const RequirementsFeedPage({super.key});
@@ -169,7 +173,20 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 }
                 final req = item as Map<String, dynamic>;
                 // Cards are display-only here — no navigation to the detail screen.
-                return RequirementCardWidget(requirement: req);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 22.h,
+                      child: MarqueeText(
+                        text: _kCaution,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                      ),
+                    ),
+                    SizedBox(height: 6.h),
+                    RequirementCardWidget(requirement: req),
+                  ],
+                );
               },
             ),
           );

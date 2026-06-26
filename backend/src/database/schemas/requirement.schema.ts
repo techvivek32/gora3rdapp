@@ -41,6 +41,10 @@ export class Requirement {
     address: string;
   };
 
+  // Intermediate stops between pickup and drop.
+  @Prop({ type: [Object], default: [] })
+  stops: { address?: string; lat?: number; lng?: number }[];
+
   @Prop({ type: String, enum: VehicleType, required: true })
   vehicleType: VehicleType;
 

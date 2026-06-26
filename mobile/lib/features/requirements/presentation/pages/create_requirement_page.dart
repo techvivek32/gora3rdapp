@@ -23,7 +23,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   final _customFareCtrl = TextEditingController();
   String _vehicleType = 'sedan';
   String _tripType = 'one_way';
-  int _numberOfVehicles = 1;
+  final List<_Stop> _stops = [];
   DateTime? _travelDate;
   TimeOfDay? _travelTime;
   DateTime? _returnDate;
@@ -101,6 +101,9 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _dropCtrl.dispose();
     _notesCtrl.dispose();
     _customFareCtrl.dispose();
+    for (final s in _stops) {
+      s.ctrl.dispose();
+    }
     super.dispose();
   }
 
@@ -158,6 +161,38 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     }
   }
 
+  Future<void> _openStop(_Stop stop) async {
+    final result = await Navigator.of(context).push<LocationPickerResult>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerPage(
+          title: 'Pick Stop Location',
+          initialLat: stop.lat,
+          initialLng: stop.lng,
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        stop.ctrl.text = result.address;
+        stop.lat = result.lat;
+        stop.lng = result.lng;
+      });
+    }
+  }
+
+  void _addStop() {
+    final stop = _Stop();
+    setState(() => _stops.add(stop));
+    _openStop(stop);
+  }
+
+  void _removeStop(int index) {
+    setState(() {
+      _stops[index].ctrl.dispose();
+      _stops.removeAt(index);
+    });
+  }
+
   Future<void> _openDrop() async {
     final result = await Navigator.of(context).push<LocationPickerResult>(
       MaterialPageRoute(
@@ -189,7 +224,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'dropCity': _dropCtrl.text.trim(),
       'vehicleType': _vehicleType,
       'tripType': _tripType,
-      'numberOfVehicles': _numberOfVehicles,
+      'stops': _stops
+          .where((s) => s.ctrl.text.trim().isNotEmpty)
+          .map((s) => {'address': s.ctrl.text.trim(), 'lat': s.lat, 'lng': s.lng})
+          .toList(),
       'travelDate': _travelDate!.toIso8601String().split('T').first,
       'travelTime': _travelTime != null ? '${_travelTime!.hour.toString().padLeft(2, '0')}:${_travelTime!.minute.toString().padLeft(2, '0')}' : '00:00',
       'notes': _notesCtrl.text.trim(),
@@ -243,6 +281,35 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       validator: (v) => v == null || v.isEmpty ? 'Tap to pick pickup location' : null,
                     ),
                     SizedBox(height: 12.h),
+
+                    // Intermediate stops
+                    ..._stops.asMap().entries.map((e) {
+                      final i = e.key;
+                      final stop = e.value;
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 12.h),
+                        child: TextFormField(
+                          controller: stop.ctrl,
+                          readOnly: true,
+                          onTap: () => _openStop(stop),
+                          decoration: InputDecoration(
+                            labelText: 'Stop ${i + 1}',
+                            prefixIcon: Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+                            suffixIcon: IconButton(
+                              icon: Icon(Icons.close, color: AppColors.error, size: 20.sp),
+                              tooltip: 'Remove stop',
+                              onPressed: () => _removeStop(i),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                          ),
+                        ),
+                      );
+                    }),
+
                     TextFormField(
                       controller: _dropCtrl,
                       readOnly: true,
@@ -258,6 +325,16 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                       ),
                       validator: (v) => v == null || v.isEmpty ? 'Tap to pick drop location' : null,
+                    ),
+                    SizedBox(height: 4.h),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: _addStop,
+                        icon: Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20.sp),
+                        label: Text('Add Stop', style: TextStyle(color: AppColors.primary, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                        style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 4.w)),
+                      ),
                     ),
                   ],
                 ),
@@ -293,59 +370,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       ),
                       items: _vehicleTypes.map((v) => DropdownMenuItem(value: v, child: Text(v.replaceAll('_', ' ').toUpperCase(), style: TextStyle(fontFamily: 'Poppins')))).toList(),
                       onChanged: (v) => setState(() => _vehicleType = v!),
-                    ),
-                    SizedBox(height: 12.h),
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: Text('Number of Vehicles: ', style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                        ),
-                        Expanded(
-                          flex: 3,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Container(
-                                width: 40.w,
-                                height: 40.h,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles - 1).clamp(1, 50)),
-                                  icon: Icon(Icons.remove, color: AppColors.primary, size: 20.sp),
-                                ),
-                              ),
-                              SizedBox(width: 8.w),
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: AppColors.primary, width: 2),
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                child: Text('$_numberOfVehicles', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                              ),
-                              SizedBox(width: 8.w),
-                              Container(
-                                width: 40.w,
-                                height: 40.h,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  onPressed: () => setState(() => _numberOfVehicles = (_numberOfVehicles + 1).clamp(1, 50)),
-                                  icon: Icon(Icons.add, color: Colors.white, size: 20.sp),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -802,4 +826,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       ),
     );
   }
+}
+
+class _Stop {
+  final TextEditingController ctrl = TextEditingController();
+  double? lat;
+  double? lng;
 }

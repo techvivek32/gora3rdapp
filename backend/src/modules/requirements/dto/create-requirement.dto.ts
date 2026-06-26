@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType, TripType } from '../../../common/enums/vehicle-type.enum';
 
@@ -63,4 +63,10 @@ export class CreateRequirementDto {
   @ApiPropertyOptional()
   @IsOptional()
   dropCoordinates?: { lat: number; lng: number; address?: string };
+
+  // Intermediate stops between pickup and drop.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  stops?: { address?: string; lat?: number; lng?: number }[];
 }
