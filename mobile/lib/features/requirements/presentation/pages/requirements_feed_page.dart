@@ -72,6 +72,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         title: Text('Requirement', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
+            icon: Icon(Icons.history_rounded, color: Colors.white),
+            tooltip: 'My Requirements',
+            onPressed: () => context.push('/my-requirements'),
+          ),
+          IconButton(
             icon: Icon(Icons.filter_list_rounded, color: Colors.white),
             onPressed: () => showModalBottomSheet(
               context: context,
@@ -163,17 +168,8 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                   return BannerCardWidget(banner: item['banner'] as Map<String, dynamic>, apiClient: _apiClient);
                 }
                 final req = item as Map<String, dynamic>;
-                return RequirementCardWidget(
-                  requirement: req,
-                  onTap: () => context.push(
-                    '/requirements/${req['_id']}',
-                    extra: req,
-                  ).then((result) {
-                    if (result == true && mounted) {
-                      context.read<RequirementsBloc>().add(LoadRequirementsEvent());
-                    }
-                  }),
-                );
+                // Cards are display-only here — no navigation to the detail screen.
+                return RequirementCardWidget(requirement: req);
               },
             ),
           );

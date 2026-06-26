@@ -7,9 +7,9 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 class RequirementCardWidget extends StatelessWidget {
   final Map<String, dynamic> requirement;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const RequirementCardWidget({super.key, required this.requirement, required this.onTap});
+  const RequirementCardWidget({super.key, required this.requirement, this.onTap});
 
   Color get _membershipColor {
     final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
@@ -86,20 +86,22 @@ class RequirementCardWidget extends StatelessWidget {
         }
 
         return GestureDetector(
-          onTap: () {
-            if (isCancelled) return;
-            if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('This requirement is already booked'),
-                  backgroundColor: Colors.red[700],
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-              return;
-            }
-            onTap();
-          },
+          onTap: onTap == null
+              ? null
+              : () {
+                  if (isCancelled) return;
+                  if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('This requirement is already booked'),
+                        backgroundColor: Colors.red[700],
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
+                  onTap!();
+                },
           child: Container(
             margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
             decoration: BoxDecoration(
