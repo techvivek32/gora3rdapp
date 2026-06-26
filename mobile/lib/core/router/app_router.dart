@@ -18,6 +18,7 @@ import '../../features/available_vehicles/presentation/pages/vehicles_feed_page.
 import '../../features/available_vehicles/presentation/pages/create_vehicle_page.dart';
 import '../../features/available_vehicles/presentation/pages/vehicle_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/profile/presentation/pages/kyc_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/chat/presentation/pages/chat_list_page.dart';
 import '../../features/chat/presentation/pages/chat_room_page.dart';
@@ -120,6 +121,10 @@ class AppRouter {
           userId: state.pathParameters['id']!,
           user: state.extra as Map<String, dynamic>?,
         ),
+      ),
+      GoRoute(
+        path: '/kyc',
+        builder: (_, __) => const KycPage(),
       ),
       GoRoute(
         path: '/notifications',
