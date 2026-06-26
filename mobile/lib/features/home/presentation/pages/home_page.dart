@@ -157,8 +157,49 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
+
+                // Brand footer
+                _buildBrandFooter(),
+                SizedBox(height: 24.h),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBrandFooter() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Gora Cabs',
+            style: TextStyle(
+              fontSize: 26.sp,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textHint.withValues(alpha: 0.5),
+            ),
+          ),
+          SizedBox(height: 8.h),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.favorite, color: Colors.red, size: 14),
+              SizedBox(width: 6.w),
+              Text('Made in India', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+            ],
+          ),
+          SizedBox(height: 4.h),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_on, color: AppColors.primary, size: 14),
+              SizedBox(width: 6.w),
+              Text('Crafted in Rajasthan', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+            ],
           ),
         ],
       ),
