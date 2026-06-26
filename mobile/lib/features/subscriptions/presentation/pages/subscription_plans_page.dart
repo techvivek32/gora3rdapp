@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -76,7 +77,40 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     );
   }
 
+  bool _isVerified() {
+    final authState = context.read<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
+    return user?['isVerified'] == true || user?['verificationStatus'] == 'verified';
+  }
+
+  void _promptKyc() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verification Required', style: TextStyle(fontFamily: 'Poppins')),
+        content: const Text(
+          'Please complete your KYC verification before buying a plan.',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push('/kyc');
+            },
+            child: const Text('Verify Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _buyPlan(Map<String, dynamic> plan) {
+    if (!_isVerified()) {
+      _promptKyc();
+      return;
+    }
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payments are only supported on the mobile app.'), backgroundColor: AppColors.warning),
@@ -85,6 +119,14 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     }
     _pendingPlanId = plan['_id'] as String;
     context.read<SubscriptionBloc>().add(CreateOrderEvent(_pendingPlanId!));
+  }
+
+  void _testActivate(Map<String, dynamic> plan) {
+    if (!_isVerified()) {
+      _promptKyc();
+      return;
+    }
+    context.read<SubscriptionBloc>().add(TestActivateSubscriptionEvent(plan['_id'] as String));
   }
 
   void _openRazorpay(Map<String, dynamic> order) {
@@ -201,6 +243,11 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                 _buildCurrentPlanBanner(currentIcon, currentName, currentColIndex),
                 SizedBox(height: 16.h),
 
+                if (!_isVerified()) ...[
+                  _buildKycNotice(),
+                  SizedBox(height: 16.h),
+                ],
+
                 // Buyable plan cards
                 ...visiblePlans.map((p) => _buildPlanCard(p, currentMembership, isOrdering)),
                 SizedBox(height: 8.h),
@@ -261,6 +308,33 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
             ),
           ),
           Icon(Icons.workspace_premium, color: Colors.white38, size: 40.sp),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKycNotice() {
+    return Container(
+      padding: EdgeInsets.all(14.r),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.verified_user_outlined, color: AppColors.warning, size: 22.sp),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Text(
+              'Complete KYC verification to buy a plan.',
+              style: TextStyle(fontSize: 12.sp, fontFamily: 'Poppins', color: AppColors.textPrimary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/kyc'),
+            child: Text('Verify', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+          ),
         ],
       ),
     );
@@ -365,9 +439,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                 ),
                 if (!isCurrent)
                   TextButton(
-                    onPressed: isLoading
-                        ? null
-                        : () => context.read<SubscriptionBloc>().add(TestActivateSubscriptionEvent(plan['_id'] as String)),
+                    onPressed: isLoading ? null : () => _testActivate(plan),
                     child: Text('Test Activate (No Payment)',
                         style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
                   ),
