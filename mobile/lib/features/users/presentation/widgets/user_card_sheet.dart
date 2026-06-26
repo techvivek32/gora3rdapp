@@ -125,12 +125,14 @@ class _UserCardSheet extends StatelessWidget {
                 label: 'Phone',
                 color: AppColors.primary,
                 onTap: canContact ? () => callNumber(mobile) : null,
+                locked: !isPremium,
               ),
               _ActionItem(
                 iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24),
                 label: 'WhatsApp',
                 color: const Color(0xFF25D366),
                 onTap: canContact ? () => openWhatsApp(mobile) : null,
+                locked: !isPremium,
               ),
               _ActionItem(
                 icon: Icons.notifications_active,
@@ -149,35 +151,39 @@ class _UserCardSheet extends StatelessWidget {
               ),
             ],
           ),
-          if (!isPremium) ...[
-            const SizedBox(height: 14),
+          if (!isPremium)
+            // No plan: lock contact + viewing, prompt to upgrade.
             GestureDetector(
               onTap: () {
                 Navigator.pop(context);
                 context.push('/subscriptions');
               },
-              child: const SizedBox(
-                width: double.infinity,
-                child: Text(
-                  'Become a premium member to contact immediately',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+              child: const Padding(
+                padding: EdgeInsets.only(top: 14),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    'Become a premium member to contact immediately',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.red, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.push('/users/${user['_id']}', extra: user);
+                },
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                child: const Text('View Full Profile', style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
           ],
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                context.push('/users/${user['_id']}', extra: user);
-              },
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-              child: const Text('View Full Profile', style: TextStyle(fontWeight: FontWeight.w600)),
-            ),
-          ),
         ],
       ),
     );
@@ -225,7 +231,8 @@ class _ActionItem extends StatelessWidget {
   final Color color;
   final VoidCallback? onTap;
   final String? topText;
-  const _ActionItem({this.icon, this.iconWidget, required this.label, required this.color, this.onTap, this.topText});
+  final bool locked;
+  const _ActionItem({this.icon, this.iconWidget, required this.label, required this.color, this.onTap, this.topText, this.locked = false});
 
   @override
   Widget build(BuildContext context) {
@@ -242,6 +249,8 @@ class _ActionItem extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 iconWidget ?? Icon(icon, color: (onTap == null && topText == null) ? Colors.grey : color, size: 26),
+                // Red "blocked" overlay for locked (non-plan) actions.
+                if (locked) const Icon(Icons.block, color: Colors.red, size: 30),
                 // Floating warning that overlays above the icon (doesn't take layout space).
                 if (topText != null)
                   Positioned(
