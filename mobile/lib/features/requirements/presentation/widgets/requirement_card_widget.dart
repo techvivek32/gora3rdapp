@@ -48,42 +48,29 @@ class RequirementCardWidget extends StatelessWidget {
 
         final memberType = postedBy?['membershipType'] ?? 'new';
         Color topBarColor;
-        Color cardBg;
         String? badgeText;
-        Color badgeColor;
-        Color badgeBg;
 
-        if (isCurrentUserOwner) {
-          topBarColor = Colors.grey[400]!;
-          cardBg = Colors.white;
-          badgeText = null;
-          badgeColor = Colors.grey;
-          badgeBg = Colors.grey[100]!;
-        } else if (memberType == 'golden') {
+        // Card colour reflects the poster's membership (own cards included):
+        //   new / verified -> green, active -> blue, premium -> purple, golden -> orange
+        if (memberType == 'golden') {
           topBarColor = AppColors.memberGolden;
-          cardBg = AppColors.memberGolden.withOpacity(0.07);
           badgeText = 'GOLDEN USER';
-          badgeColor = AppColors.memberGolden;
-          badgeBg = AppColors.memberGolden.withOpacity(0.12);
         } else if (memberType == 'premium') {
           topBarColor = AppColors.memberPremium;
-          cardBg = AppColors.memberPremium.withOpacity(0.07);
           badgeText = 'PREMIUM USER';
-          badgeColor = AppColors.memberPremium;
-          badgeBg = AppColors.memberPremium.withOpacity(0.12);
-        } else if (memberType == 'active' || memberType == 'verified') {
+        } else if (memberType == 'active') {
           topBarColor = AppColors.memberActive;
-          cardBg = AppColors.memberActive.withOpacity(0.05);
           badgeText = 'ACTIVE USER';
-          badgeColor = AppColors.memberActive;
-          badgeBg = AppColors.memberActive.withOpacity(0.1);
+        } else if (memberType == 'verified') {
+          topBarColor = AppColors.memberVerified;
+          badgeText = 'VERIFIED USER';
         } else {
-          topBarColor = AppColors.primary;
-          cardBg = AppColors.primary.withOpacity(0.05);
-          badgeText = null;
-          badgeColor = Colors.grey;
-          badgeBg = Colors.grey[100]!;
+          topBarColor = AppColors.memberVerified; // new
+          badgeText = 'NEW USER';
         }
+        final Color cardBg = topBarColor.withOpacity(0.07);
+        final Color badgeColor = topBarColor;
+        final Color badgeBg = topBarColor.withOpacity(0.12);
 
         return GestureDetector(
           onTap: onTap == null
@@ -312,7 +299,7 @@ class RequirementCardWidget extends StatelessWidget {
                               ],
                             ),
                             SizedBox(height: 6.h),
-                            if (!isCurrentUserOwner) ...[
+                            ...[
                               Divider(height: 1, thickness: 1, color: Colors.black26),
                               SizedBox(height: 8.h),
                               // User info section
@@ -379,7 +366,8 @@ class RequirementCardWidget extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              if (isCurrentUserPremium) ...[
+                              // Owners always see their own details, even without a plan.
+                              if (isCurrentUserPremium || isCurrentUserOwner) ...[
                                 SizedBox(height: 12.h),
                                 Row(
                                   children: [
