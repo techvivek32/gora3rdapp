@@ -21,6 +21,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   final _dropCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   final _customFareCtrl = TextEditingController();
+  final _commissionCtrl = TextEditingController(text: '0');
   String _vehicleType = 'sedan';
   String _tripType = 'one_way';
   final List<_Stop> _stops = [];
@@ -38,7 +39,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
   // Platform settings (fetched from backend)
   double _ratePerKm = 20.0;
-  double _commissionPercent = 10.0;
   bool _settingsLoading = true;
 
   double get _distance => _computedDistance ?? 0.0;
@@ -57,7 +57,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     return _suggestedFare;
   }
   
-  double get _commission => _currentFare * (_commissionPercent / 100);
+  double get _commission => double.tryParse(_commissionCtrl.text) ?? 0;
   
   // Calculate total
   double get _total => _currentFare + _commission;
@@ -85,7 +85,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       if (s != null && mounted) {
         setState(() {
           _ratePerKm = (s['pricePerKm'] as num?)?.toDouble() ?? _ratePerKm;
-          _commissionPercent = (s['commissionPercent'] as num?)?.toDouble() ?? _commissionPercent;
         });
       }
     } catch (_) {
@@ -101,6 +100,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _dropCtrl.dispose();
     _notesCtrl.dispose();
     _customFareCtrl.dispose();
+    _commissionCtrl.dispose();
     for (final s in _stops) {
       s.ctrl.dispose();
     }
@@ -249,6 +249,9 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'travelTime': _travelTime != null ? '${_travelTime!.hour.toString().padLeft(2, '0')}:${_travelTime!.minute.toString().padLeft(2, '0')}' : '00:00',
       'notes': _notesCtrl.text.trim(),
       if (_computedDistance != null) 'estimatedDistance': _computedDistance!.round(),
+      'fare': _currentFare.round(),
+      'commission': _commission.round(),
+      'totalAmount': _total.round(),
     }));
   }
 
@@ -775,22 +778,34 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                           ),
                           SizedBox(height: 8.h),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Commission (${_commissionPercent.toStringAsFixed(0)}%)',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: AppColors.textSecondary,
+                              Expanded(
+                                child: Text(
+                                  'Commission (₹)',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 14.sp,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ),
                               ),
-                              Text(
-                                '₹${_commission.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: AppColors.textPrimary,
+                              SizedBox(
+                                width: 110.w,
+                                child: TextFormField(
+                                  controller: _commissionCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  textAlign: TextAlign.right,
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    prefixText: '₹ ',
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                                  ),
                                 ),
                               ),
                             ],

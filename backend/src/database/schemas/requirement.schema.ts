@@ -63,6 +63,15 @@ export class Requirement {
   @Prop({ type: Number })
   estimatedDistance: number;
 
+  @Prop({ type: Number, default: 0 })
+  fare: number;
+
+  @Prop({ type: Number, default: 0 })
+  commission: number;
+
+  @Prop({ type: Number, default: 0 })
+  totalAmount: number;
+
   @Prop({ trim: true })
   notes: string;
 

@@ -61,9 +61,13 @@ class _UserCardSheet extends StatelessWidget {
     final title = (agency != null && agency.isNotEmpty) ? agency : name;
     final subtitle = [name, city].where((e) => e != null && e.isNotEmpty).join(', ');
 
-    // Contact is only available to members with an active plan.
-    final isPremium = currentUserIsPremium(context);
-    final canContact = isPremium && mobile != null && mobile.isNotEmpty;
+    // Contact is available to members with an active plan, or to the owner
+    // viewing their own card.
+    final auth = context.read<AuthBloc>().state;
+    final me = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
+    final isOwner = me != null && me['_id'] != null && me['_id'] == user['_id'];
+    final canView = currentUserIsPremium(context) || isOwner;
+    final canContact = canView && mobile != null && mobile.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -125,14 +129,14 @@ class _UserCardSheet extends StatelessWidget {
                 label: 'Phone',
                 color: AppColors.primary,
                 onTap: canContact ? () => callNumber(mobile) : null,
-                locked: !isPremium,
+                locked: !canView,
               ),
               _ActionItem(
                 iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24),
                 label: 'WhatsApp',
                 color: const Color(0xFF25D366),
                 onTap: canContact ? () => openWhatsApp(mobile) : null,
-                locked: !isPremium,
+                locked: !canView,
               ),
               _ActionItem(
                 icon: Icons.notifications_active,
@@ -151,7 +155,7 @@ class _UserCardSheet extends StatelessWidget {
               ),
             ],
           ),
-          if (!isPremium)
+          if (!canView)
             // No plan: lock contact + viewing, prompt to upgrade.
             GestureDetector(
               onTap: () {

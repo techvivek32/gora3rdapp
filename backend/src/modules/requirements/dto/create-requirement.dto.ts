@@ -53,6 +53,21 @@ export class CreateRequirementDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsNumber()
+  fare?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  commission?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  totalAmount?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   notes?: string;
 
