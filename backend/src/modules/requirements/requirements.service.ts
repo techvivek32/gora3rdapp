@@ -104,9 +104,9 @@ export class RequirementsService {
       if (!isPremium) {
         const postedBy = req.postedBy as any;
         if (postedBy) {
+          // Only the phone number is gated for non-premium users; the profile
+          // picture and agency name are public display info shown on the card.
           postedBy.mobile = undefined;
-          postedBy.agencyName = undefined;
-          postedBy.profileImage = undefined;
         }
       }
       return req;
