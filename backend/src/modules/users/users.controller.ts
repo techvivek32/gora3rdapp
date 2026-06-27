@@ -7,6 +7,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagg
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
+import { RateUserDto } from './dto/rate-user.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -57,6 +58,22 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user public profile card' })
   getUserCard(@Param('userId') userId: string) {
     return this.usersService.getUserCard(userId);
+  }
+
+  @Post(':userId/rate')
+  @ApiOperation({ summary: 'Rate a user (one time only)' })
+  rateUser(
+    @Param('userId') userId: string,
+    @CurrentUser('sub') raterId: string,
+    @Body() dto: RateUserDto,
+  ) {
+    return this.usersService.rateUser(raterId, userId, dto);
+  }
+
+  @Get(':userId/rating-status')
+  @ApiOperation({ summary: 'Whether the current user has already rated this user' })
+  getRatingStatus(@Param('userId') userId: string, @CurrentUser('sub') raterId: string) {
+    return this.usersService.getRatingStatus(raterId, userId);
   }
 
   @Put('notifications')

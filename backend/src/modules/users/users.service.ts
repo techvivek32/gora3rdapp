@@ -3,7 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
+import { Rating, RatingDocument } from '../../database/schemas/rating.schema';
+import { ConflictException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { RateUserDto } from './dto/rate-user.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
@@ -17,7 +20,46 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
+    @InjectModel(Rating.name) private ratingModel: Model<RatingDocument>,
   ) {}
+
+  // One-time rating of another user. Recomputes the rated user's average.
+  async rateUser(raterId: string, ratedUserId: string, dto: RateUserDto) {
+    if (raterId === ratedUserId) {
+      throw new BadRequestException('You cannot rate yourself');
+    }
+    const target = await this.userModel.findById(ratedUserId).select('_id');
+    if (!target) throw new NotFoundException('User not found');
+
+    const existing = await this.ratingModel.findOne({ rater: raterId, ratedUser: ratedUserId });
+    if (existing) throw new ConflictException('You have already rated this user');
+
+    await this.ratingModel.create({
+      rater: new Types.ObjectId(raterId),
+      ratedUser: new Types.ObjectId(ratedUserId),
+      stars: dto.stars,
+      review: dto.review,
+    });
+
+    // Recompute average + count.
+    const agg = await this.ratingModel.aggregate([
+      { $match: { ratedUser: new Types.ObjectId(ratedUserId) } },
+      { $group: { _id: null, avg: { $avg: '$stars' }, count: { $sum: 1 } } },
+    ]);
+    const avg = agg[0]?.avg ?? dto.stars;
+    const count = agg[0]?.count ?? 1;
+    await this.userModel.findByIdAndUpdate(ratedUserId, {
+      rating: Math.round(avg * 10) / 10,
+      totalRatings: count,
+    });
+
+    return { message: 'Rating submitted', data: { rating: Math.round(avg * 10) / 10, totalRatings: count } };
+  }
+
+  async getRatingStatus(raterId: string, ratedUserId: string) {
+    const existing = await this.ratingModel.findOne({ rater: raterId, ratedUser: ratedUserId }).lean();
+    return { message: 'Rating status', data: { hasRated: !!existing, stars: existing?.stars ?? null } };
+  }
 
   // Attaches the user's active vehicle listings so a profile shows "My Vehicles".
   private async withVehicles(user: any) {

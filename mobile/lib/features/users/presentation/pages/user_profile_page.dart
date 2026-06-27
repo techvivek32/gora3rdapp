@@ -27,6 +27,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
     super.initState();
     _user = widget.user;
     if (_user == null) _fetch();
+    // Auto-open the rating popup when navigated here from the "Rate" action.
+    if (widget.user?['__openRating'] == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) openRatingFlow(context, {...?_user, '_id': widget.userId});
+      });
+    }
   }
 
   Future<void> _fetch() async {
@@ -223,11 +229,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ),
           ),
 
-          // My Vehicles
-          if (vehicles.isNotEmpty) ...[
-            const _SectionTitle('My Vehicles'),
-            ...vehicles.map((v) => _VehicleCard(vehicle: Map<String, dynamic>.from(v as Map))),
-          ],
+         
 
           // Stats
           const _SectionTitle('Stats'),

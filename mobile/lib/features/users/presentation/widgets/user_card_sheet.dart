@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -144,14 +146,29 @@ class _UserCardSheet extends StatelessWidget {
                 color: Colors.amber.shade700,
                 topText: "Don't pay without reference!",
               ),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(rating.toStringAsFixed(0),
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                  _Stars(rating: rating),
-                  Text('($totalRatings)', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                ],
+              InkWell(
+                onTap: () {
+                  if (isOwner) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("You can't rate yourself")));
+                    return;
+                  }
+                  if (!canView) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Become a premium member to rate')));
+                    return;
+                  }
+                  // Open the full profile first, then auto-open the rating popup there.
+                  Navigator.pop(context);
+                  context.push('/users/${user['_id']}', extra: {...user, '__openRating': true});
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(rating.toStringAsFixed(0),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    _Stars(rating: rating),
+                    Text('Rate ($totalRatings)', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  ],
+                ),
               ),
             ],
           ),
@@ -275,6 +292,112 @@ class _ActionItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Checks if the user already rated, then shows the rating dialog and submits.
+Future<void> openRatingFlow(BuildContext context, Map<String, dynamic> user) async {
+  final api = getIt<ApiClient>();
+  final userId = user['_id'];
+  if (userId == null) return;
+
+  try {
+    final res = await api.get('/users/$userId/rating-status');
+    if (res.data['data']?['hasRated'] == true) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have already rated this user')));
+      }
+      return;
+    }
+  } catch (_) {}
+
+  if (!context.mounted) return;
+  final result = await showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (_) => _RatingDialog(name: (user['fullName'] ?? 'this user') as String),
+  );
+  if (result == null || !context.mounted) return;
+
+  try {
+    await api.dio.post('/users/$userId/rate', data: {'stars': result['stars'], 'review': result['review']});
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Thanks for your rating!'), backgroundColor: AppColors.success),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_rateError(e)), backgroundColor: AppColors.error),
+      );
+    }
+  }
+}
+
+String _rateError(Object e) {
+  final s = e.toString();
+  if (s.contains('already')) return 'You have already rated this user';
+  return 'Could not submit rating';
+}
+
+class _RatingDialog extends StatefulWidget {
+  final String name;
+  const _RatingDialog({required this.name});
+
+  @override
+  State<_RatingDialog> createState() => _RatingDialogState();
+}
+
+class _RatingDialogState extends State<_RatingDialog> {
+  int _stars = 0;
+  final _reviewCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _reviewCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Rate ${widget.name}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(5, (i) {
+              final filled = i < _stars;
+              return IconButton(
+                onPressed: () => setState(() => _stars = i + 1),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                constraints: const BoxConstraints(),
+                icon: Icon(filled ? Icons.star : Icons.star_border, color: Colors.amber, size: 32),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _reviewCtrl,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Write a review (optional)',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: _stars == 0
+              ? null
+              : () => Navigator.pop(context, {'stars': _stars, 'review': _reviewCtrl.text.trim()}),
+          child: const Text('Submit'),
+        ),
+      ],
     );
   }
 }
