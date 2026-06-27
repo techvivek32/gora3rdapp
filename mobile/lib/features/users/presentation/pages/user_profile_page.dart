@@ -26,7 +26,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
   void initState() {
     super.initState();
     _user = widget.user;
-    if (_user == null) _fetch();
+    // Always refresh from the server so we have complete data (mobile, vehicles,
+    // etc.) — the data passed in via `extra` can be partial (e.g. a requirement's
+    // postedBy has no phone number).
+    _fetch();
     // Auto-open the rating popup when navigated here from the "Rate" action.
     if (widget.user?['__openRating'] == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -42,16 +45,19 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 
   Future<void> _fetch() async {
-    setState(() => _loading = true);
+    // Only show the full-screen loader when we have nothing to paint yet.
+    if (_user == null) setState(() => _loading = true);
     try {
       final res = await getIt<ApiClient>().get('/users/card/${widget.userId}');
+      if (!mounted) return;
       setState(() {
         _user = Map<String, dynamic>.from(res.data['data'] as Map);
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Could not load profile';
+        if (_user == null) _error = 'Could not load profile';
         _loading = false;
       });
     }

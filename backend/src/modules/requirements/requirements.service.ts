@@ -87,7 +87,7 @@ export class RequirementsService {
     const [requirements, total] = await Promise.all([
       this.requirementModel
         .find(filter)
-        .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive')
+        .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
         .sort(sort)
         .skip(skip)
         .limit(limit)
