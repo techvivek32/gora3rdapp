@@ -271,11 +271,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 onTap: canContact ? () => callNumber(mobile) : null),
                             _Action(iconWidget: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 24), label: 'WhatsApp', color: const Color(0xFF25D366),
                                 onTap: canContact ? () => openWhatsApp(mobile) : null),
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                              Text(rating.toStringAsFixed(0),
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
-                              const Text('Rating', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                            ]),
+                            InkWell(
+                              onTap: () {
+                                if (!isPremium) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Become a premium member to rate')));
+                                  return;
+                                }
+                                openRatingFlow(context, {...user, '_id': widget.userId});
+                              },
+                              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                Text(rating.toStringAsFixed(0),
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                                const Text('Rate', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              ]),
+                            ),
                             _Action(icon: Icons.report_gmailerrorred, label: 'Report', color: Colors.grey,
                                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(content: Text('Report submitted')),
