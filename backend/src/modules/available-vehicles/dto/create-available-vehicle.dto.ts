@@ -9,9 +9,9 @@ export class CreateAvailableVehicleDto {
   @ApiPropertyOptional() @IsOptional() currentCoordinates?: { lat: number; lng: number; address?: string };
   @ApiPropertyOptional() @IsOptional() destinationCoordinates?: { lat: number; lng: number; address?: string };
   @ApiProperty({ enum: VehicleType }) @IsEnum(VehicleType) vehicleType: VehicleType;
-  @ApiProperty({ example: 'RJ14AB1234' }) @IsString() @IsNotEmpty() vehicleNumber: string;
-  @ApiProperty({ example: 'Suresh Kumar' }) @IsString() @IsNotEmpty() driverName: string;
-  @ApiProperty({ example: '+919876543210' }) @IsString() @IsNotEmpty() driverMobile: string;
+  @ApiPropertyOptional({ example: 'RJ14AB1234' }) @IsOptional() @IsString() vehicleNumber?: string;
+  @ApiPropertyOptional({ example: 'Suresh Kumar' }) @IsOptional() @IsString() driverName?: string;
+  @ApiPropertyOptional({ example: '+919876543210' }) @IsOptional() @IsString() driverMobile?: string;
   @ApiProperty({ example: '2024-12-15' }) @IsNotEmpty() availableDate: Date;
   @ApiProperty({ example: '10:00 AM' }) @IsString() @IsNotEmpty() availableTime: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;

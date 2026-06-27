@@ -24,13 +24,13 @@ export class AvailableVehicle {
   @Prop({ type: String, enum: VehicleType, required: true })
   vehicleType: VehicleType;
 
-  @Prop({ required: true, trim: true, uppercase: true })
+  @Prop({ trim: true, uppercase: true })
   vehicleNumber: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ trim: true })
   driverName: string;
 
-  @Prop({ required: true, trim: true })
+  @Prop({ trim: true })
   driverMobile: string;
 
   @Prop({ required: true, type: Date })

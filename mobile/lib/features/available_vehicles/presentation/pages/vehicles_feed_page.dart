@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../requirements/presentation/widgets/banner_card_widget.dart';
@@ -351,8 +353,6 @@ class VehicleCard extends StatelessWidget {
         final Color badgeColor = topBarColor;
         final Color badgeBg = topBarColor.withOpacity(0.12);
 
-        final statusColor = status == 'available' ? AppColors.success : AppColors.textHint;
-
         return GestureDetector(
           onTap: onTap == null
               ? null
@@ -407,94 +407,51 @@ class VehicleCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 1. Route (left) + date/time box (right)
                             IntrinsicHeight(
                               child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(_formatDate(vehicle['availableDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                        Text(vehicle['availableTime'] as String? ?? '', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Center(
-                                      child: Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(4.r),
-                                        ),
-                                        child: Text(status.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 11.sp, fontWeight: FontWeight.w600), textAlign: TextAlign.center),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: menu != null
-                                          ? [menu!]
-                                          : [
-                                              Container(
-                                                padding: EdgeInsets.all(6.r),
-                                                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(6.r)),
-                                                child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
-                                              ),
-                                              SizedBox(width: 8.w),
-                                              Container(
-                                                padding: EdgeInsets.all(6.r),
-                                                decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(6.r)),
-                                                child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
-                                              ),
-                                            ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 10.h),
-                            Divider(height: 1, thickness: 1, color: Colors.black26),
-                            SizedBox(height: 10.h),
-                            IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Expanded(
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
                                         Column(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Container(width: 10.w, height: 10.h, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
-                                            Container(width: 2.w, height: 16.h, color: Colors.grey[400]),
-                                            Container(width: 10.w, height: 10.h, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle)),
+                                            Icon(Icons.trip_origin, size: 14.sp, color: topBarColor),
+                                            Expanded(child: Container(width: 2.w, color: Colors.grey[400])),
+                                            Icon(Icons.location_on, size: 18.sp, color: topBarColor),
                                           ],
                                         ),
-                                        SizedBox(width: 8.w),
+                                        SizedBox(width: 10.w),
                                         Expanded(
                                           child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(vehicle['currentCity'] as String? ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black)),
-                                              SizedBox(height: 6.h),
-                                              Text(vehicle['destinationCity'] as String? ?? 'Any', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black)),
+                                              _routePlace(vehicle['currentCity'] as String?, vehicle['currentState'] as String?),
+                                              SizedBox(height: 10.h),
+                                              _routePlace(vehicle['destinationCity'] as String? ?? 'Any', vehicle['destinationState'] as String?),
                                             ],
                                           ),
                                         ),
+                                      ],
+                                    ),
+                                  ),
+                                  SizedBox(width: 10.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                                    decoration: BoxDecoration(
+                                      color: topBarColor,
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(_formatDateFull(vehicle['availableDate']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        SizedBox(height: 2.h),
+                                        Text(_formatTime12(vehicle['availableTime'] as String?), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.white)),
                                       ],
                                     ),
                                   ),
@@ -504,154 +461,97 @@ class VehicleCard extends StatelessWidget {
                             SizedBox(height: 10.h),
                             Divider(height: 1, thickness: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
+
+                            // 2. Vehicle availability
                             Row(
                               children: [
-                                Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
-                                SizedBox(width: 6.w),
-                                Text(vehicleTypeLabel(vehicle['vehicleType'] as String?), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                Icon(Icons.directions_car, size: 18.sp, color: topBarColor),
+                                SizedBox(width: 8.w),
+                                Text('${vehicleTypeLabel(vehicle['vehicleType'] as String?)} is available',
+                                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                               ],
                             ),
-                            SizedBox(height: 6.h),
-                            Row(
-                              children: [
-                                Icon(Icons.badge_outlined, size: 14.sp, color: Colors.black),
-                                SizedBox(width: 6.w),
-                                Text(vehicle['vehicleNumber'] as String? ?? '', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                              ],
-                            ),
-                            SizedBox(height: 6.h),
-                            ...[
+
+                            // 3. Notes
+                            if (((vehicle['notes'] as String?) ?? '').trim().isNotEmpty) ...[
+                              SizedBox(height: 10.h),
                               Divider(height: 1, thickness: 1, color: Colors.black26),
-                              SizedBox(height: 8.h),
+                              SizedBox(height: 10.h),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  GestureDetector(
-                                    onTap: postedByMap == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedByMap)),
-                                    child: CircleAvatar(
-                                      radius: 24.r,
-                                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                                      backgroundImage: postedByMap?['profileImage'] != null ? NetworkImage(postedByMap!['profileImage'] as String) : null,
-                                      child: postedByMap?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
-                                    ),
-                                  ),
-                                  SizedBox(width: 12.w),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: postedByMap == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedByMap)),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            postedByMap?['fullName'] as String? ?? vehicle['driverName'] as String? ?? 'Driver',
-                                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                          ),
-                                          SizedBox(height: 4.h),
-                                          Text(
-                                            postedByMap?['agencyName'] as String? ?? 'Agency Name',
-                                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (badgeText != null)
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                      decoration: BoxDecoration(
-                                        color: badgeBg,
-                                        borderRadius: BorderRadius.circular(4.r),
-                                        border: Border.all(color: badgeColor),
-                                      ),
-                                      child: Text(badgeText, style: TextStyle(fontSize: 10.sp, color: badgeColor, fontWeight: FontWeight.w600)),
-                                    ),
+                                  Icon(Icons.chat_bubble_outline, size: 16.sp, color: topBarColor),
+                                  SizedBox(width: 8.w),
+                                  Expanded(child: Text((vehicle['notes'] as String).trim(), style: TextStyle(fontSize: 13.sp, color: Colors.black87))),
                                 ],
                               ),
-                              SizedBox(height: 12.h),
-                              Row(
-                                children: [
-                                  Icon(Icons.star, size: 16.sp, color: Colors.amber),
-                                  SizedBox(width: 4.w),
-                                  Text('4.9', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                  SizedBox(width: 8.w),
+                            ],
+
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, thickness: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 4. Poster + time ago
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    postedByMap?['fullName'] as String? ?? 'User',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                  ),
+                                ),
+                                if (badgeText != null) ...[
+                                  SizedBox(width: 6.w),
                                   Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
+                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey[100],
+                                      color: badgeBg,
                                       borderRadius: BorderRadius.circular(4.r),
+                                      border: Border.all(color: badgeColor),
                                     ),
-                                    child: Text('1hr 9 mins ago', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
+                                    child: Text(badgeText, style: TextStyle(fontSize: 9.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
+                                const Spacer(),
+                                Text(_timeAgo(vehicle['createdAt']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                              ],
+                            ),
+                            SizedBox(height: 12.h),
+                            Divider(height: 1, thickness: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 5. Actions: Call, WhatsApp, User Detail
+                            Builder(builder: (context) {
+                              final canContact = isCurrentUserPremium || isCurrentUserOwner;
+                              final mobile = postedByMap?['mobile'] as String?;
+                              void openSheet() {
+                                if (postedByMap != null) showUserCardSheet(context, Map<String, dynamic>.from(postedByMap));
+                              }
+                              return Row(
+                                children: [
+                                  _CardAction(
+                                    icon: const Icon(Icons.call, color: Colors.white, size: 18),
+                                    circleColor: const Color(0xFF2196F3),
+                                    label: 'Call',
+                                    onTap: (canContact && mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : openSheet,
+                                  ),
+                                  SizedBox(width: 20.w),
+                                  _CardAction(
+                                    icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.white, size: 18),
+                                    circleColor: const Color(0xFF25D366),
+                                    label: 'Whatsapp',
+                                    onTap: (canContact && mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : openSheet,
                                   ),
                                   const Spacer(),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(4.r),
-                                    ),
-                                    child: Text('Report', style: TextStyle(fontSize: 10.sp, color: Colors.red, fontWeight: FontWeight.w600)),
+                                  _CardAction(
+                                    icon: Icon(Icons.person_outline, color: topBarColor, size: 22),
+                                    label: 'User Detail',
+                                    onTap: openSheet,
                                   ),
                                 ],
-                              ),
-                              // Owners always see their own details, even without a plan.
-                              if (isCurrentUserPremium || isCurrentUserOwner) ...[
-                                SizedBox(height: 12.h),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {},
-                                        icon: const Icon(Icons.phone, color: Colors.white),
-                                        label: Text('Phone', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          padding: EdgeInsets.symmetric(vertical: 10.h),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10.w),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {},
-                                        icon: const Icon(Icons.chat, color: Colors.green),
-                                        label: Text('WhatsApp', style: TextStyle(fontSize: 12.sp, color: Colors.green)),
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: Colors.green, width: 1.5),
-                                          padding: EdgeInsets.symmetric(vertical: 10.h),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 12.h),
-                                Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber[50],
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    border: Border.all(color: Colors.amber.shade200, width: 1),
-                                  ),
-                                  child: Text(
-                                    '⚠️ Don\'t pay without reference & proper verification.',
-                                    style: TextStyle(fontSize: 11.sp, color: Colors.amber[800], fontWeight: FontWeight.w500),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                SizedBox(height: 12.h),
-                              ] else ...[
-                                Divider(height: 1, thickness: 1, color: Colors.black26),
-                                SizedBox(height: 8.h),
-                                Text(
-                                  'Become a premium member to contact immediately',
-                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 8.h),
-                              ],
-                            ],
+                              );
+                            }),
                           ],
                         ),
                       ),
@@ -740,15 +640,82 @@ class VehicleCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(dynamic date) {
+  Widget _routePlace(String? city, String? state) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(city ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+        if (state != null && state.trim().isNotEmpty)
+          Text(state, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+      ],
+    );
+  }
+
+  String _formatDateFull(dynamic date) {
     if (date == null) return '';
     try {
       final d = DateTime.parse(date.toString());
-      const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const months = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       return '${d.day} ${months[d.month]}';
     } catch (_) {
       return date.toString();
     }
+  }
+
+  String _formatTime12(String? t) {
+    if (t == null || t.isEmpty) return '';
+    final parts = t.split(':');
+    if (parts.length < 2) return t;
+    int h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final period = h >= 12 ? 'pm' : 'am';
+    int h12 = h % 12;
+    if (h12 == 0) h12 = 12;
+    return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+  }
+
+  String _timeAgo(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      final d = DateTime.parse(createdAt.toString());
+      final diff = DateTime.now().difference(d);
+      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} minute${diff.inMinutes == 1 ? '' : 's'} ago';
+      if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+class _CardAction extends StatelessWidget {
+  final Widget icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color? circleColor;
+  const _CardAction({required this.icon, required this.label, required this.onTap, this.circleColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (circleColor != null)
+            CircleAvatar(radius: 18.r, backgroundColor: circleColor, child: icon)
+          else
+            SizedBox(height: 36.r, child: Center(child: icon)),
+          SizedBox(height: 4.h),
+          Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+        ],
+      ),
+    );
   }
 }
 

@@ -93,26 +93,41 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               SizedBox(width: 6.w),
-              // WhatsApp
-              IconButton(
-                onPressed: () => openWhatsApp(_supportNumber, message: 'Hello, I need help with Gora Cabs'),
-                icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366)),
-                iconSize: 22.sp,
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                tooltip: 'WhatsApp',
-              ),
-              SizedBox(width: 8.w),
-              // Help
-              IconButton(
-                onPressed: () => callNumber(_supportNumber),
-                icon: Icon(Icons.headset_mic, color: AppColors.primary),
-                iconSize: 22.sp,
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              // Help menu — WhatsApp + Call options in a dropdown.
+              PopupMenuButton<String>(
                 tooltip: 'Help',
+                icon: Icon(Icons.headset_mic, color: AppColors.primary, size: 22.sp),
+                position: PopupMenuPosition.under,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                onSelected: (value) {
+                  if (value == 'whatsapp') {
+                    openWhatsApp(_supportNumber, message: 'Hello, I need help with Gora Cabs');
+                  } else if (value == 'help') {
+                    callNumber(_supportNumber);
+                  }
+                },
+                itemBuilder: (context) => [
+                  PopupMenuItem(
+                    value: 'whatsapp',
+                    child: Row(
+                      children: [
+                        const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 18),
+                        SizedBox(width: 10.w),
+                        Text('WhatsApp', style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'help',
+                    child: Row(
+                      children: [
+                        Icon(Icons.call, color: AppColors.primary, size: 18.sp),
+                        SizedBox(width: 10.w),
+                        Text('Help', style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               SizedBox(width: 8.w),
             ],
