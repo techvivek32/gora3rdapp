@@ -293,7 +293,8 @@ class VehicleCard extends StatelessWidget {
   final Map<String, dynamic> vehicle;
   final VoidCallback? onTap;
   final Widget? menu;
-  const VehicleCard({super.key, required this.vehicle, this.onTap, this.menu});
+  final bool mine; // true on the "My Vehicles" list — treat as owner
+  const VehicleCard({super.key, required this.vehicle, this.onTap, this.menu, this.mine = false});
 
   @override
   Widget build(BuildContext context) {
@@ -307,14 +308,18 @@ class VehicleCard extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
         bool isCurrentUserPremium = false;
-        bool isCurrentUserOwner = false;
+        bool isCurrentUserOwner = mine;
         String? currentUserId;
+        String? currentUserName;
+        String? currentMembership;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
           isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
           currentUserId = user['_id'] as String?;
+          currentUserName = user['fullName'] as String?;
+          currentMembership = user['membershipType'] as String?;
           final posterId = postedByMap?['_id'];
-          isCurrentUserOwner = currentUserId != null && posterId != null && currentUserId == posterId;
+          isCurrentUserOwner = mine || (currentUserId != null && posterId != null && currentUserId == posterId);
         }
 
         final acceptedByRaw = vehicle['acceptedBy'];
@@ -327,7 +332,7 @@ class VehicleCard extends StatelessWidget {
         }
         final hasCurrentUserAccepted = currentUserId != null && acceptedByIds.contains(currentUserId);
 
-        final memberType = postedByMap?['membershipType'] ?? 'new';
+        final memberType = (mine ? currentMembership : (postedByMap?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
         String? badgeText;
 
@@ -494,26 +499,32 @@ class VehicleCard extends StatelessWidget {
                             // 4. Poster + time ago
                             Row(
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    postedByMap?['fullName'] as String? ?? 'User',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          postedByMap?['fullName'] as String? ?? (mine ? (currentUserName ?? 'You') : 'User'),
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                        ),
+                                      ),
+                                      if (badgeText != null) ...[
+                                        SizedBox(width: 6.w),
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                          decoration: BoxDecoration(
+                                            color: badgeBg,
+                                            borderRadius: BorderRadius.circular(4.r),
+                                            border: Border.all(color: badgeColor),
+                                          ),
+                                          child: Text(badgeText, style: TextStyle(fontSize: 9.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
-                                if (badgeText != null) ...[
-                                  SizedBox(width: 6.w),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                    decoration: BoxDecoration(
-                                      color: badgeBg,
-                                      borderRadius: BorderRadius.circular(4.r),
-                                      border: Border.all(color: badgeColor),
-                                    ),
-                                    child: Text(badgeText, style: TextStyle(fontSize: 9.sp, color: badgeColor, fontWeight: FontWeight.w600)),
-                                  ),
-                                ],
-                                const Spacer(),
+                                SizedBox(width: 8.w),
                                 Text(_timeAgo(vehicle['createdAt']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
                               ],
                             ),
@@ -521,9 +532,22 @@ class VehicleCard extends StatelessWidget {
                             Divider(height: 1, thickness: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 
-                            // 5. Actions: Call, WhatsApp, User Detail
+                            // 5. Actions: Call, WhatsApp, User Detail (gated by plan/ownership)
                             Builder(builder: (context) {
                               final canContact = isCurrentUserPremium || isCurrentUserOwner;
+                              if (!canContact) {
+                                return GestureDetector(
+                                  onTap: () => context.push('/subscriptions'),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: Text(
+                                      'Become a premium member to contact immediately',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
+                                    ),
+                                  ),
+                                );
+                              }
                               final mobile = postedByMap?['mobile'] as String?;
                               void openSheet() {
                                 if (postedByMap != null) showUserCardSheet(context, Map<String, dynamic>.from(postedByMap));
@@ -549,6 +573,10 @@ class VehicleCard extends StatelessWidget {
                                     label: 'User Detail',
                                     onTap: openSheet,
                                   ),
+                                  if (menu != null) ...[
+                                    SizedBox(width: 8.w),
+                                    menu!,
+                                  ],
                                 ],
                               );
                             }),

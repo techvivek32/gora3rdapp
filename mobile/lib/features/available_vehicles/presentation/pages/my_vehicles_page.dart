@@ -134,7 +134,7 @@ class _MyVehiclesPageState extends State<MyVehiclesPage> {
                 final menu = (showMenu && v['status'] != 'cancelled') ? _buildMenu(context, v) : null;
                 return Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
-                  child: VehicleCard(vehicle: v, menu: menu),
+                  child: VehicleCard(vehicle: v, menu: menu, mine: true),
                 );
               },
             ),
