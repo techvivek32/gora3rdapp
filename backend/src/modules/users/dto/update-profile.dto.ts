@@ -8,4 +8,5 @@ export class UpdateProfileDto {
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() state?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() profileImage?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() coverImage?: string;
 }

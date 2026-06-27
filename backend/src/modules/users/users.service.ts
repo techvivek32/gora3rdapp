@@ -10,7 +10,7 @@ import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pa
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
 
 @Injectable()
 export class UsersService {

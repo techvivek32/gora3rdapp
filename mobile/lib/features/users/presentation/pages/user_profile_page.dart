@@ -71,6 +71,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final city = user['city'] as String?;
     final state = user['state'] as String?;
     final profileImage = user['profileImage'] as String?;
+    final coverImage = user['coverImage'] as String?;
     final isVerified = user['isVerified'] == true;
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
     final totalRatings = (user['totalRatings'] as num?)?.toInt() ?? 0;
@@ -98,8 +99,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 Container(
                   height: 120,
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                  decoration: BoxDecoration(
+                    gradient: coverImage == null
+                        ? const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark])
+                        : null,
+                    image: coverImage != null
+                        ? DecorationImage(image: NetworkImage(coverImage), fit: BoxFit.cover)
+                        : null,
                   ),
                 ),
                 Transform.translate(

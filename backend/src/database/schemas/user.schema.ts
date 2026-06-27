@@ -30,6 +30,9 @@ export class User {
   @Prop()
   profileImage: string;
 
+  @Prop()
+  coverImage: string;
+
   @Prop({ type: String, enum: UserRole, default: UserRole.DRIVER })
   role: UserRole;
 

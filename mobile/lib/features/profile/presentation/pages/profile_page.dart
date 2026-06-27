@@ -185,22 +185,57 @@ class MyProfilePage extends StatelessWidget {
       body: BlocBuilder<AuthBloc, AuthState>(
         builder: (context, state) {
           final user = state is AuthAuthenticated ? state.user as Map<String, dynamic>? : null;
+          final cover = user?['coverImage'] as String?;
+          final profileImage = user?['profileImage'] as String?;
           return SingleChildScrollView(
-            padding: EdgeInsets.all(16.r),
             child: Column(
               children: [
-                Center(
-                  child: CircleAvatar(
-                    radius: 44.r,
-                    backgroundColor: AppColors.primary.withOpacity(0.1),
-                    backgroundImage: user?['profileImage'] != null ? NetworkImage(user!['profileImage'] as String) : null,
-                    child: user?['profileImage'] == null ? Icon(Icons.person, size: 40.sp, color: AppColors.primary) : null,
+                // Cover banner with overlapping avatar
+                SizedBox(
+                  height: 178.h,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          height: 130.h,
+                          decoration: BoxDecoration(
+                            gradient: cover == null ? const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]) : null,
+                            image: cover != null ? DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover) : null,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 130.h - 48.r,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: CircleAvatar(
+                            radius: 48.r,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 44.r,
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              backgroundImage: profileImage != null ? NetworkImage(profileImage) : null,
+                              child: profileImage == null ? Icon(Icons.person, size: 40.sp, color: AppColors.primary) : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 10.h),
+                SizedBox(height: 8.h),
                 Text(user?['fullName'] as String? ?? 'User',
                     style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 16.h),
+                Padding(
+                  padding: EdgeInsets.all(16.r),
+                  child: Column(
+                    children: [
                 _InfoCard(
                   title: 'Account Information',
                   trailing: GestureDetector(
@@ -234,6 +269,9 @@ class MyProfilePage extends StatelessWidget {
                     _InfoRow(Icons.directions_car_outlined, 'Vehicles Posted', '${user?['vehiclesPosted'] ?? 0}'),
                   ],
                 ),
+                    ],
+                  ),
+                ),
               ],
             ),
           );
@@ -261,6 +299,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   bool _loading = false;
   bool _uploadingImage = false;
   String? _uploadedImageUrl;
+  bool _uploadingCover = false;
+  String? _uploadedCoverUrl;
   final _picker = ImagePicker();
   final _apiClient = getIt<ApiClient>();
 
@@ -323,6 +363,36 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
     }
   }
 
+  Future<void> _pickAndUploadCover() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 80);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingCover = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      FormData buildForm() => FormData.fromMap({
+            'file': MultipartFile.fromBytes(bytes, filename: 'cover.jpg'),
+            'folder': 'covers',
+          });
+      Response res;
+      try {
+        res = await _apiClient.dio.post('/storage/upload', data: buildForm());
+      } catch (_) {
+        res = await _apiClient.dio.post('/storage/upload', data: buildForm());
+      }
+      final url = res.data['data'] as String?;
+      if (url != null && mounted) setState(() => _uploadedCoverUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover upload failed'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
+  }
+
   void _save() {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -333,6 +403,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
       'city': _cityCtrl.text.trim(),
       'state': _stateCtrl.text.trim(),
       if (_uploadedImageUrl != null) 'profileImage': _uploadedImageUrl!,
+      if (_uploadedCoverUrl != null) 'coverImage': _uploadedCoverUrl!,
     }));
   }
 
@@ -391,6 +462,37 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                     key: _formKey,
                     child: Column(
                       children: [
+                        // Cover image picker
+                        GestureDetector(
+                          onTap: _uploadingCover ? null : _pickAndUploadCover,
+                          child: Builder(builder: (context) {
+                            final cover = _uploadedCoverUrl ?? widget.user?['coverImage'] as String?;
+                            return Container(
+                              height: 110.h,
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12.r),
+                                border: Border.all(color: AppColors.border),
+                                image: cover != null ? DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover) : null,
+                              ),
+                              child: Center(
+                                child: _uploadingCover
+                                    ? const CircularProgressIndicator(strokeWidth: 2)
+                                    : Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.add_photo_alternate_outlined, color: cover != null ? Colors.white : AppColors.primary, size: 26.sp),
+                                          SizedBox(height: 4.h),
+                                          Text(cover != null ? 'Tap to change cover' : 'Add cover image',
+                                              style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: cover != null ? Colors.white : AppColors.textSecondary)),
+                                        ],
+                                      ),
+                              ),
+                            );
+                          }),
+                        ),
+                        SizedBox(height: 16.h),
                         // Avatar picker
                         Center(
                           child: GestureDetector(
