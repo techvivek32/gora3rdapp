@@ -21,6 +21,9 @@ export class AvailableVehicle {
   @Prop({ trim: true })
   currentState: string;
 
+  @Prop({ trim: true })
+  destinationState: string;
+
   @Prop({ type: String, enum: VehicleType, required: true })
   vehicleType: VehicleType;
 

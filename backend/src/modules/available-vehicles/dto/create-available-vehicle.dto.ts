@@ -6,6 +6,7 @@ export class CreateAvailableVehicleDto {
   @ApiProperty({ example: 'Jaipur' }) @IsString() @IsNotEmpty() currentCity: string;
   @ApiPropertyOptional({ example: 'Ajmer' }) @IsOptional() @IsString() destinationCity?: string;
   @ApiPropertyOptional({ example: 'Rajasthan' }) @IsOptional() @IsString() currentState?: string;
+  @ApiPropertyOptional({ example: 'Gujarat' }) @IsOptional() @IsString() destinationState?: string;
   @ApiPropertyOptional() @IsOptional() currentCoordinates?: { lat: number; lng: number; address?: string };
   @ApiPropertyOptional() @IsOptional() destinationCoordinates?: { lat: number; lng: number; address?: string };
   @ApiProperty({ enum: VehicleType }) @IsEnum(VehicleType) vehicleType: VehicleType;

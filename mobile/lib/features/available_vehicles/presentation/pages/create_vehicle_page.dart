@@ -4,7 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../requirements/presentation/pages/location_picker_page.dart';
+import '../../../../core/widgets/city_autocomplete_field.dart';
 import '../bloc/vehicles_bloc.dart';
 
 class CreateVehiclePage extends StatefulWidget {
@@ -19,15 +19,18 @@ class CreateVehiclePage extends StatefulWidget {
 
 class _CreateVehiclePageState extends State<CreateVehiclePage> {
   final _formKey = GlobalKey<FormState>();
-  final _currentCityCtrl = TextEditingController();
-  final _destCityCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
   String _vehicleType = 'sedan';
   DateTime? _availableDate;
   TimeOfDay? _availableTime;
 
-  double? _currentLat, _currentLng;
-  double? _destLat, _destLng;
+  // City + state captured from the autocomplete fields.
+  String _currentCity = '';
+  String? _currentState;
+  String _destCity = '';
+  String? _destState;
+  String? _currentInitial;
+  String? _destInitial;
 
   bool get _isEdit => widget.existing != null;
 
@@ -40,21 +43,15 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   }
 
   void _populateFromExisting(Map<String, dynamic> v) {
-    _currentCityCtrl.text = (v['currentCity'] ?? '') as String;
-    _destCityCtrl.text = (v['destinationCity'] ?? '') as String;
     _notesCtrl.text = (v['notes'] ?? '') as String;
     _vehicleType = (v['vehicleType'] as String?) ?? 'sedan';
 
-    final cc = v['currentCoordinates'] as Map?;
-    if (cc != null) {
-      _currentLat = (cc['lat'] as num?)?.toDouble();
-      _currentLng = (cc['lng'] as num?)?.toDouble();
-    }
-    final dc = v['destinationCoordinates'] as Map?;
-    if (dc != null) {
-      _destLat = (dc['lat'] as num?)?.toDouble();
-      _destLng = (dc['lng'] as num?)?.toDouble();
-    }
+    _currentCity = (v['currentCity'] ?? '') as String;
+    _currentState = v['currentState'] as String?;
+    _destCity = (v['destinationCity'] ?? '') as String;
+    _destState = v['destinationState'] as String?;
+    _currentInitial = [_currentCity, _currentState].where((e) => e != null && e.isNotEmpty).join(', ');
+    _destInitial = [_destCity, _destState].where((e) => e != null && e.isNotEmpty).join(', ');
 
     if (v['availableDate'] != null) {
       try {
@@ -71,40 +68,8 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
 
   @override
   void dispose() {
-    _currentCityCtrl.dispose();
-    _destCityCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _openCurrentCity() async {
-    final result = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(title: 'Pick Current Location', initialLat: _currentLat, initialLng: _currentLng),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _currentCityCtrl.text = result.address;
-        _currentLat = result.lat;
-        _currentLng = result.lng;
-      });
-    }
-  }
-
-  Future<void> _openDestCity() async {
-    final result = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(title: 'Pick Destination', initialLat: _destLat, initialLng: _destLng),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _destCityCtrl.text = result.address;
-        _destLat = result.lat;
-        _destLng = result.lng;
-      });
-    }
   }
 
   String _formatTime(TimeOfDay time) {
@@ -121,12 +86,10 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       return;
     }
     final data = <String, dynamic>{
-      'currentCity': _currentCityCtrl.text.trim(),
-      'destinationCity': _destCityCtrl.text.trim().isEmpty ? null : _destCityCtrl.text.trim(),
-      if (_currentLat != null && _currentLng != null)
-        'currentCoordinates': {'lat': _currentLat, 'lng': _currentLng, 'address': _currentCityCtrl.text.trim()},
-      if (_destLat != null && _destLng != null)
-        'destinationCoordinates': {'lat': _destLat, 'lng': _destLng, 'address': _destCityCtrl.text.trim()},
+      'currentCity': _currentCity.trim(),
+      if (_currentState != null && _currentState!.isNotEmpty) 'currentState': _currentState,
+      'destinationCity': _destCity.trim().isEmpty ? null : _destCity.trim(),
+      if (_destState != null && _destState!.isNotEmpty) 'destinationState': _destState,
       'vehicleType': _vehicleType,
       'availableDate': _availableDate!.toIso8601String().split('T').first,
       'availableTime': _availableTime != null ? '${_availableTime!.hour.toString().padLeft(2, '0')}:${_availableTime!.minute.toString().padLeft(2, '0')}' : '00:00',
@@ -140,17 +103,6 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       bloc.add(CreateVehicleEvent(data));
     }
   }
-
-  InputDecoration _dec(String label, IconData icon, {Widget? suffix}) => InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: AppColors.primary),
-        suffixIcon: suffix,
-        filled: true,
-        fillColor: Colors.grey[50],
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
-      );
 
   @override
   Widget build(BuildContext context) {
@@ -176,19 +128,25 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
               children: [
                 Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 12.h),
-                TextFormField(
-                  controller: _currentCityCtrl,
-                  readOnly: true,
-                  onTap: _openCurrentCity,
-                  decoration: _dec('Current City *', Icons.my_location_outlined, suffix: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp)),
-                  validator: (v) => v == null || v.isEmpty ? 'Tap to pick current location' : null,
+                CityAutocompleteField(
+                  label: 'Current City *',
+                  icon: Icons.my_location_outlined,
+                  required: true,
+                  initialText: _currentInitial,
+                  onChanged: (city, state) {
+                    _currentCity = city;
+                    _currentState = state;
+                  },
                 ),
                 SizedBox(height: 12.h),
-                TextFormField(
-                  controller: _destCityCtrl,
-                  readOnly: true,
-                  onTap: _openDestCity,
-                  decoration: _dec('Available For (Destination City)', Icons.location_on_outlined, suffix: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp)),
+                CityAutocompleteField(
+                  label: 'Available For (Destination City)',
+                  icon: Icons.location_on_outlined,
+                  initialText: _destInitial,
+                  onChanged: (city, state) {
+                    _destCity = city;
+                    _destState = state;
+                  },
                 ),
                 SizedBox(height: 20.h),
 
