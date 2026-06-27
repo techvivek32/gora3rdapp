@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -327,7 +328,9 @@ class RequirementCardWidget extends StatelessWidget {
                                       () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
                                   _ratingAction(rating),
                                   _action(Icon(Icons.report, color: Colors.red.shade400, size: 22), 'Report',
-                                      () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted')))),
+                                      postedBy?['_id'] == null
+                                          ? null
+                                          : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
                                 ],
                               )
                             else

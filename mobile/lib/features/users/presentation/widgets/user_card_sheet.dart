@@ -341,6 +341,79 @@ String _rateError(Object e) {
   return 'Could not submit rating';
 }
 
+/// Shows a report form and submits it for the given user.
+Future<void> openReportFlow(BuildContext context, String userId) async {
+  final text = await showDialog<String>(
+    context: context,
+    builder: (_) => const _ReportDialog(),
+  );
+  if (text == null || text.trim().isEmpty || !context.mounted) return;
+  try {
+    await getIt<ApiClient>().dio.post('/reports', data: {
+      'targetId': userId,
+      'targetType': 'user',
+      'reason': 'other',
+      'description': text.trim(),
+    });
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Report submitted. Thank you.'), backgroundColor: AppColors.success),
+      );
+    }
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not submit report'), backgroundColor: AppColors.error),
+      );
+    }
+  }
+}
+
+class _ReportDialog extends StatefulWidget {
+  const _ReportDialog();
+
+  @override
+  State<_ReportDialog> createState() => _ReportDialogState();
+}
+
+class _ReportDialogState extends State<_ReportDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Report User'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: TextField(
+          controller: _ctrl,
+          maxLines: 4,
+          autofocus: true,
+          decoration: InputDecoration(
+            hintText: 'Describe the issue...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _ctrl.text),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+          child: const Text('Submit'),
+        ),
+      ],
+    );
+  }
+}
+
 class _RatingDialog extends StatefulWidget {
   final String name;
   const _RatingDialog({required this.name});

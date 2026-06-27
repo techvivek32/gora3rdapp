@@ -345,10 +345,25 @@ export class AdminService {
     const [reports, total] = await Promise.all([
       this.reportModel
         .find(filter)
-        .populate('reportedBy', 'fullName email mobile')
+        .populate('reportedBy', 'fullName email mobile agencyName city state membershipType profileImage')
         .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       this.reportModel.countDocuments(filter),
     ]);
+
+    // Attach the reported user's details (targetId is polymorphic, so resolve manually).
+    const userTargetIds = reports
+      .filter((r: any) => r.targetType === 'user' && r.targetId)
+      .map((r: any) => r.targetId);
+    if (userTargetIds.length) {
+      const targets = await this.userModel
+        .find({ _id: { $in: userTargetIds } })
+        .select('fullName email mobile agencyName city state membershipType profileImage')
+        .lean();
+      const map = Object.fromEntries(targets.map((t: any) => [t._id.toString(), t]));
+      for (const r of reports as any[]) {
+        if (r.targetType === 'user') r.target = map[r.targetId?.toString()] ?? null;
+      }
+    }
 
     return { message: 'Reports retrieved', data: buildPaginatedResult(reports, total, page, limit) };
   }

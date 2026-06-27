@@ -33,6 +33,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
         if (mounted) openRatingFlow(context, {...?_user, '_id': widget.userId});
       });
     }
+    // Auto-open the report form when navigated here from a "Report" action.
+    if (widget.user?['__openReport'] == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) openReportFlow(context, widget.userId);
+      });
+    }
   }
 
   Future<void> _fetch() async {
@@ -286,9 +292,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               ]),
                             ),
                             _Action(icon: Icons.report_gmailerrorred, label: 'Report', color: Colors.grey,
-                                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Report submitted')),
-                                    )),
+                                onTap: () => openReportFlow(context, widget.userId)),
                           ],
                         ),
                       ),
