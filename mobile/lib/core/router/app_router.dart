@@ -20,6 +20,7 @@ import '../../features/available_vehicles/presentation/pages/vehicle_detail_page
 import '../../features/available_vehicles/presentation/pages/my_vehicles_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/kyc_page.dart';
+import '../../features/reports/presentation/pages/my_reports_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/chat/presentation/pages/chat_list_page.dart';
 import '../../features/chat/presentation/pages/chat_room_page.dart';
@@ -148,6 +149,10 @@ class AppRouter {
       GoRoute(
         path: '/kyc',
         builder: (_, __) => const KycPage(),
+      ),
+      GoRoute(
+        path: '/my-reports',
+        builder: (_, __) => const MyReportsPage(),
       ),
       GoRoute(
         path: '/notifications',
