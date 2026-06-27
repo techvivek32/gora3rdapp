@@ -61,6 +61,15 @@ export class UsersService {
     return { message: 'Rating status', data: { hasRated: !!existing, stars: existing?.stars ?? null } };
   }
 
+  async getReviews(ratedUserId: string) {
+    const reviews = await this.ratingModel
+      .find({ ratedUser: ratedUserId })
+      .populate('rater', 'fullName profileImage')
+      .sort({ createdAt: -1 })
+      .lean();
+    return { message: 'Reviews retrieved', data: reviews };
+  }
+
   // Attaches the user's active vehicle listings so a profile shows "My Vehicles".
   private async withVehicles(user: any) {
     const vehicles = await this.vehicleModel

@@ -362,8 +362,11 @@ class _RatingDialogState extends State<_RatingDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text('Rate ${widget.name}'),
-      content: Column(
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
@@ -388,6 +391,7 @@ class _RatingDialogState extends State<_RatingDialog> {
             ),
           ),
         ],
+        ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),

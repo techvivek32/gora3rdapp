@@ -51,6 +51,89 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
+  Future<void> _showReviews(BuildContext context, String userId) async {
+    List<Map<String, dynamic>> reviews = [];
+    bool failed = false;
+    try {
+      final res = await getIt<ApiClient>().get('/users/$userId/reviews');
+      reviews = ((res.data['data'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    } catch (_) {
+      failed = true;
+    }
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('Reviews', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (reviews.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: Text(failed ? "Couldn't load reviews" : 'No reviews yet', style: const TextStyle(color: AppColors.textSecondary))),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: reviews.length,
+                    separatorBuilder: (_, __) => const Divider(height: 16),
+                    itemBuilder: (_, i) {
+                      final r = reviews[i];
+                      final rater = r['rater'] as Map?;
+                      final stars = (r['stars'] as num?)?.toInt() ?? 0;
+                      final raterImg = rater?['profileImage'] as String?;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: AppColors.primaryLight,
+                                backgroundImage: (raterImg != null && raterImg.isNotEmpty) ? NetworkImage(raterImg) : null,
+                                child: (raterImg == null || raterImg.isEmpty)
+                                    ? Text(((rater?['fullName'] as String?)?.isNotEmpty == true ? rater!['fullName'][0] : '?').toString().toUpperCase(),
+                                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold))
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(child: Text(rater?['fullName'] as String? ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold))),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: List.generate(5, (s) => Icon(s < stars ? Icons.star : Icons.star_border, size: 14, color: Colors.amber)),
+                              ),
+                            ],
+                          ),
+                          if ((r['review'] as String?)?.trim().isNotEmpty == true) ...[
+                            const SizedBox(height: 6),
+                            Text((r['review'] as String).trim(), style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                          ],
+                        ],
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _user;
@@ -80,7 +163,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final coverImage = user['coverImage'] as String?;
     final isVerified = user['isVerified'] == true;
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
-    final totalRatings = (user['totalRatings'] as num?)?.toInt() ?? 0;
     final mobile = user['mobile'] as String?;
     final vehicles = (user['vehicles'] as List?) ?? const [];
     final requirementsPosted = (user['requirementsPosted'] as num?)?.toInt() ?? 0;
@@ -149,6 +231,24 @@ class _UserProfilePageState extends State<UserProfilePage> {
                       const SizedBox(height: 8),
                       Text(title,
                           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (isVerified ? AppColors.success : AppColors.error).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: (isVerified ? AppColors.success : AppColors.error).withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(isVerified ? Icons.verified : Icons.gpp_bad, size: 14, color: isVerified ? AppColors.success : AppColors.error),
+                            const SizedBox(width: 5),
+                            Text(isVerified ? 'Verified' : 'Not Verified',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: isVerified ? AppColors.success : AppColors.error)),
+                          ],
+                        ),
+                      ),
                       if (agency != null && agency.isNotEmpty && name.isNotEmpty)
                         Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
                       if (businessCity.isNotEmpty)
@@ -202,9 +302,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('$totalRatings reviews')),
-                            ),
+                            onPressed: () => _showReviews(context, widget.userId),
                             icon: const Icon(Icons.star_outline, size: 18),
                             label: const Text('View Reviews'),
                           ),

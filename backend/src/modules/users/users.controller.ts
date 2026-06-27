@@ -76,6 +76,12 @@ export class UsersController {
     return this.usersService.getRatingStatus(raterId, userId);
   }
 
+  @Get(':userId/reviews')
+  @ApiOperation({ summary: 'Get all reviews for a user' })
+  getReviews(@Param('userId') userId: string) {
+    return this.usersService.getReviews(userId);
+  }
+
   @Put('notifications')
   @ApiOperation({ summary: 'Toggle notifications' })
   toggleNotifications(
