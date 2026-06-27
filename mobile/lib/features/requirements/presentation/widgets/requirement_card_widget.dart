@@ -2,31 +2,22 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
 
 class RequirementCardWidget extends StatelessWidget {
   final Map<String, dynamic> requirement;
   final VoidCallback? onTap;
-  // When provided, replaces the volume/location icons in the top-right
-  // (used for the actions menu on My Requirements).
+  // When provided, shown in the top-right (actions menu on My Requirements).
   final Widget? menu;
+  // True on the "My Requirements" list — treat as owner.
+  final bool mine;
 
-  const RequirementCardWidget({super.key, required this.requirement, this.onTap, this.menu});
-
-  Color get _membershipColor {
-    final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
-    final type = postedBy?['membershipType'] ?? 'new';
-    switch (type) {
-      case 'golden': return AppColors.memberGolden;
-      case 'premium': return AppColors.memberPremium;
-      case 'verified': return AppColors.memberVerified;
-      case 'active': return AppColors.memberActive;
-      default: return AppColors.memberNew;
-    }
-  }
+  const RequirementCardWidget({super.key, required this.requirement, this.onTap, this.menu, this.mine = false});
 
   @override
   Widget build(BuildContext context) {
@@ -35,29 +26,29 @@ class RequirementCardWidget extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
         bool isCurrentUserPremium = false;
-        bool isCurrentUserOwner = false;
+        bool isCurrentUserOwner = mine;
         String? currentUserId;
+        String? currentUserName;
+        String? currentMembership;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
           isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
           currentUserId = user['_id'] as String?;
+          currentUserName = user['fullName'] as String?;
+          currentMembership = user['membershipType'] as String?;
           final posterId = postedBy?['_id'];
-          isCurrentUserOwner = currentUserId != null && posterId != null && currentUserId == posterId;
+          isCurrentUserOwner = mine || (currentUserId != null && posterId != null && currentUserId == posterId);
         }
 
         final acceptedByList = List.from(requirement['acceptedBy'] as List? ?? []);
-        final hasCurrentUserAccepted = currentUserId != null &&
-            acceptedByList.any((id) => id.toString() == currentUserId);
+        final hasCurrentUserAccepted = currentUserId != null && acceptedByList.any((id) => id.toString() == currentUserId);
         final isBooked = requirement['status'] == 'accepted';
         final isCancelled = requirement['status'] == 'cancelled';
         final isOnHold = requirement['status'] == 'on_hold';
 
-        final memberType = postedBy?['membershipType'] ?? 'new';
+        final memberType = (mine ? currentMembership : (postedBy?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
         String? badgeText;
-
-        // Card colour reflects the poster's membership (own cards included):
-        //   new / verified -> green, active -> blue, premium -> purple, golden -> orange
         if (memberType == 'golden') {
           topBarColor = AppColors.memberGolden;
           badgeText = 'GOLDEN USER';
@@ -71,12 +62,25 @@ class RequirementCardWidget extends StatelessWidget {
           topBarColor = AppColors.memberVerified;
           badgeText = 'VERIFIED USER';
         } else {
-          topBarColor = AppColors.memberVerified; // new
+          topBarColor = AppColors.memberVerified;
           badgeText = 'NEW USER';
         }
         final Color cardBg = topBarColor.withOpacity(0.07);
         final Color badgeColor = topBarColor;
         final Color badgeBg = topBarColor.withOpacity(0.12);
+
+        final (statusLabel, statusColor) = _statusInfo(requirement['status'] as String?);
+        final num total = (requirement['totalAmount'] as num?) ?? 0;
+        final num driverEarning = (requirement['fare'] as num?) ?? 0;
+        final num commission = (requirement['commission'] as num?) ?? 0;
+        final notes = (requirement['notes'] as String?)?.trim() ?? '';
+        final stopsCount = (requirement['stops'] as List?)?.length ?? 0;
+        final rating = (postedBy?['rating'] as num?)?.toDouble() ?? 0;
+        final canContact = isCurrentUserPremium || isCurrentUserOwner;
+        final mobile = postedBy?['mobile'] as String?;
+        void openSheet() {
+          if (postedBy != null) showUserCardSheet(context, Map<String, dynamic>.from(postedBy));
+        }
 
         return GestureDetector(
           onTap: onTap == null
@@ -85,11 +89,7 @@ class RequirementCardWidget extends StatelessWidget {
                   if (isCancelled) return;
                   if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('This requirement is already booked'),
-                        backgroundColor: Colors.red[700],
-                        duration: const Duration(seconds: 2),
-                      ),
+                      SnackBar(content: const Text('This requirement is already booked'), backgroundColor: Colors.red[700], duration: const Duration(seconds: 2)),
                     );
                     return;
                   }
@@ -99,347 +99,246 @@ class RequirementCardWidget extends StatelessWidget {
             margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
             decoration: BoxDecoration(
               color: cardBg,
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: BorderRadius.circular(10.r),
               border: Border.all(color: topBarColor.withOpacity(0.3), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 1))],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(8.r),
+              borderRadius: BorderRadius.circular(10.r),
               child: Stack(
                 children: [
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: CustomPaint(
-                        painter: _WatermarkPainter(),
-                      ),
-                    ),
-                  ),
+                  Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _WatermarkPainter()))),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
                         height: 4.h,
-                        decoration: BoxDecoration(
-                          color: topBarColor,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(8.r),
-                            topRight: Radius.circular(8.r),
-                          ),
-                        ),
+                        decoration: BoxDecoration(color: topBarColor, borderRadius: BorderRadius.vertical(top: Radius.circular(10.r))),
                       ),
                       Padding(
                         padding: EdgeInsets.all(12.r),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    flex: 2,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          _formatDate(requirement['travelDate']),
-                                          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                        ),
-                                        Text(
-                                          requirement['travelTime'] ?? '',
-                                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Center(
-                                      child: Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue[50],
-                                          borderRadius: BorderRadius.circular(4.r),
-                                        ),
-                                        child: Text(
-                                          'Today',
-                                          style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: Colors.blue[700]),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  VerticalDivider(width: 1, thickness: 1, color: Colors.black26),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: menu != null
-                                          ? [menu!]
-                                          : [
-                                              Container(
-                                                padding: EdgeInsets.all(6.r),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green[50],
-                                                  borderRadius: BorderRadius.circular(6.r),
-                                                ),
-                                                child: Icon(Icons.volume_up, size: 18.sp, color: Colors.green),
-                                              ),
-                                              SizedBox(width: 8.w),
-                                              Container(
-                                                padding: EdgeInsets.all(6.r),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.blue[50],
-                                                  borderRadius: BorderRadius.circular(6.r),
-                                                ),
-                                                child: Icon(Icons.location_pin, size: 18.sp, color: Colors.blue),
-                                              ),
-                                            ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 12.h),
-                            Divider(height: 1, thickness: 1, color: Colors.black26),
-                            SizedBox(height: 12.h),
-                            IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Column(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Container(
-                                              width: 10.w,
-                                              height: 10.h,
-                                              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                                            ),
-                                            Container(width: 2.w, height: 16.h, color: Colors.grey[400]),
-                                            Container(
-                                              width: 10.w,
-                                              height: 10.h,
-                                              decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                requirement['pickupCity'] ?? '',
-                                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                              ),
-                                              SizedBox(height: 6.h),
-                                              Text(
-                                                requirement['dropCity'] ?? '',
-                                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.black),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        requirement['estimatedDistance'] != null
-                                            ? requirement['estimatedDistance'].toString()
-                                            : '—',
-                                        style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: Colors.green),
-                                      ),
-                                      Text('KM', style: TextStyle(fontSize: 8.sp, color: Colors.grey[600])),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            SizedBox(height: 12.h),
-                            Divider(height: 1, thickness: 1, color: Colors.black26),
-                            SizedBox(height: 12.h),
+                            // 1. ID + status + secure payment / menu
                             Row(
                               children: [
-                                Icon(Icons.directions_car, size: 14.sp, color: Colors.black),
+                                _chip('ID-${requirement['requirementId'] ?? requirement['bookingId'] ?? ''}', AppColors.textSecondary),
+                                SizedBox(width: 8.w),
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.circle, size: 8.sp, color: statusColor),
+                                  SizedBox(width: 4.w),
+                                  Text(statusLabel, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: statusColor)),
+                                ]),
+                                const Spacer(),
+                                if (menu != null)
+                                  menu!
+                                else
+                                  Row(mainAxisSize: MainAxisSize.min, children: [
+                                    Icon(Icons.verified_user, size: 13.sp, color: topBarColor),
+                                    SizedBox(width: 3.w),
+                                    Text('SECURE', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w700, color: topBarColor)),
+                                  ]),
+                              ],
+                            ),
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 2. date + trip type
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_month, size: 16.sp, color: topBarColor),
                                 SizedBox(width: 6.w),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      _formatVehicleType(requirement['vehicleType']),
-                                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                    ),
-                                    Text(
-                                      'Any Fuel | Carrier Does Not Matter',
-                                      style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
-                                    ),
+                                    Text(_dayLabel(requirement['travelDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    Text('#${requirement['bookingId'] ?? ''}', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
                                   ],
+                                ),
+                                const Spacer(),
+                                _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(), topBarColor, filled: true),
+                              ],
+                            ),
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 3. FROM -> [km] -> TO (single line each)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('FROM', style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                                      Text(requirement['pickupCity'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.arrow_forward, size: 16.sp, color: topBarColor),
+                                    if (requirement['estimatedDistance'] != null)
+                                      Text('${requirement['estimatedDistance']} KM',
+                                          style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: topBarColor)),
+                                    if (stopsCount > 0)
+                                      Text('$stopsCount mid stop${stopsCount == 1 ? '' : 's'}',
+                                          style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+                                  ],
+                                ),
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text('TO', style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                                      Text(requirement['dropCity'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 6.h),
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 4. vehicle + date/time box
                             Row(
                               children: [
-                                Icon(_getTripTypeIcon(requirement['tripType']), size: 14.sp, color: Colors.black),
-                                SizedBox(width: 6.w),
-                                Text(
-                                  (requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(),
-                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black),
+                                Icon(Icons.directions_car, size: 18.sp, color: topBarColor),
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(_formatVehicleType(requirement['vehicleType']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                      Text('Any Fuel | Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                  decoration: BoxDecoration(color: topBarColor, borderRadius: BorderRadius.circular(8.r)),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 6.h),
-                            ...[
-                              Divider(height: 1, thickness: 1, color: Colors.black26),
-                              SizedBox(height: 8.h),
-                              // User info section
-                              Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: postedBy == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedBy)),
-                                    child: CircleAvatar(
-                                      radius: 24.r,
-                                      backgroundColor: AppColors.primary.withOpacity(0.1),
-                                      backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
-                                      child: postedBy?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary) : null,
-                                    ),
-                                  ),
-                                  SizedBox(width: 12.w),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: postedBy == null ? null : () => showUserCardSheet(context, Map<String, dynamic>.from(postedBy)),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            postedBy?['fullName'] as String? ?? 'User',
-                                            style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black),
-                                          ),
-                                          SizedBox(height: 4.h),
-                                          Text(
-                                            postedBy?['agencyName'] as String? ?? '',
-                                            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (badgeText != null)
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                      decoration: BoxDecoration(
-                                        color: badgeBg,
-                                        borderRadius: BorderRadius.circular(4.r),
-                                        border: Border.all(color: badgeColor),
-                                      ),
-                                      child: Text(badgeText, style: TextStyle(fontSize: 10.sp, color: badgeColor, fontWeight: FontWeight.w600)),
-                                    ),
-                                ],
-                              ),
-                              SizedBox(height: 12.h),
-                              Row(
-                                children: [
-                                  Icon(Icons.star, size: 16.sp, color: Colors.amber),
-                                  SizedBox(width: 4.w),
-                                  Text('4.9', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                  SizedBox(width: 8.w),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(4.r),
-                                    ),
-                                    child: Text(_timeAgo(requirement['createdAt']), style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey[100],
-                                      borderRadius: BorderRadius.circular(4.r),
-                                    ),
-                                    child: Text('Report', style: TextStyle(fontSize: 10.sp, color: Colors.red, fontWeight: FontWeight.w600)),
-                                  ),
-                                ],
-                              ),
-                              // Owners always see their own details, even without a plan.
-                              if (isCurrentUserPremium || isCurrentUserOwner) ...[
-                                SizedBox(height: 12.h),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {},
-                                        icon: const Icon(Icons.phone, color: Colors.white),
-                                        label: Text('Phone', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          padding: EdgeInsets.symmetric(vertical: 10.h),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(width: 10.w),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {},
-                                        icon: const Icon(Icons.chat, color: Colors.green),
-                                        label: Text('WhatsApp', style: TextStyle(fontSize: 12.sp, color: Colors.green)),
-                                        style: OutlinedButton.styleFrom(
-                                          side: BorderSide(color: Colors.green, width: 1.5),
-                                          padding: EdgeInsets.symmetric(vertical: 10.h),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 12.h),
-                                Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                                  decoration: BoxDecoration(
-                                    color: Colors.amber[50],
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    border: Border.all(color: Colors.amber.shade200, width: 1),
-                                  ),
-                                  child: Text(
-                                    '⚠️ Don\'t pay without reference & proper verification.',
-                                    style: TextStyle(fontSize: 11.sp, color: Colors.amber[800], fontWeight: FontWeight.w500),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                                SizedBox(height: 12.h),
-                              ] else ...[
-                                Divider(height: 1, thickness: 1, color: Colors.black26),
-                                SizedBox(height: 8.h),
-                                Text(
-                                  'Become a premium member to contact immediately',
-                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                                  textAlign: TextAlign.center,
-                                ),
-                                SizedBox(height: 8.h),
-                              ],
+
+                            // 5. notes
+                            if (notes.isNotEmpty) ...[
+                              SizedBox(height: 10.h),
+                              Divider(height: 1, color: Colors.black26),
+                              SizedBox(height: 10.h),
+                              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Icon(Icons.chat_bubble, size: 16.sp, color: topBarColor),
+                                SizedBox(width: 8.w),
+                                Expanded(child: Text(notes, style: TextStyle(fontSize: 13.sp, color: Colors.black87))),
+                              ]),
                             ],
+
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 6. pricing breakdown
+                            IntrinsicHeight(
+                              child: Row(
+                                children: [
+                                  Expanded(child: _priceCol(Icons.account_balance_wallet, 'Total Amount', total, topBarColor)),
+                                  VerticalDivider(width: 1, color: Colors.black26),
+                                  Expanded(child: _priceCol(Icons.person, "Driver's Earning", driverEarning, topBarColor)),
+                                  VerticalDivider(width: 1, color: Colors.black26),
+                                  Expanded(child: _priceCol(Icons.percent, 'Commission', commission, topBarColor)),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 10.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 7. poster
+                            Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: postedBy == null ? null : openSheet,
+                                  child: CircleAvatar(
+                                    radius: 20.r,
+                                    backgroundColor: topBarColor.withOpacity(0.12),
+                                    backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
+                                    child: postedBy?['profileImage'] == null ? Icon(Icons.emoji_events, color: topBarColor, size: 20.sp) : null,
+                                  ),
+                                ),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: postedBy == null ? null : openSheet,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(children: [
+                                          Flexible(child: Text(postedBy?['fullName'] as String? ?? (mine ? (currentUserName ?? 'You') : 'User'), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black))),
+                                          if ((postedBy?['isVerified'] == true) || memberType == 'verified' || memberType == 'golden') ...[
+                                            SizedBox(width: 4.w),
+                                            Icon(Icons.verified, size: 14.sp, color: const Color(0xFF2196F3)),
+                                          ],
+                                        ]),
+                                        Text(
+                                          [postedBy?['agencyName'], postedBy?['city'], postedBy?['state']].where((e) => e != null && (e as String).isNotEmpty).join(', '),
+                                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (badgeText != null)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                    decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
+                                    child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 12.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 10.h),
+
+                            // 8. actions (gated)
+                            if (canContact)
+                              Row(
+                                children: [
+                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 22), 'Phone',
+                                      (mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : openSheet),
+                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 22), 'Whatsapp',
+                                      (mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : openSheet),
+                                  _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 22), 'Advice',
+                                      () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
+                                  _ratingAction(rating),
+                                  _action(Icon(Icons.report, color: Colors.red.shade400, size: 22), 'Report',
+                                      () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Report submitted')))),
+                                ],
+                              )
+                            else
+                              GestureDetector(
+                                onTap: null,
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: Text('Become a premium member to contact immediately',
+                                      textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red)),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -452,20 +351,8 @@ class RequirementCardWidget extends StatelessWidget {
                           child: Transform.rotate(
                             angle: -0.2,
                             child: _buildStampBadge(
-                              text: isCancelled
-                                  ? 'CANCELLED'
-                                  : isOnHold
-                                      ? 'ON HOLD'
-                                      : hasCurrentUserAccepted
-                                          ? 'ACCEPTED'
-                                          : 'BOOKED',
-                              color: isCancelled
-                                  ? Colors.grey[600]!
-                                  : isOnHold
-                                      ? Colors.orange[800]!
-                                      : hasCurrentUserAccepted
-                                          ? Colors.green[700]!
-                                          : Colors.red[700]!,
+                              text: isCancelled ? 'CANCELLED' : isOnHold ? 'ON HOLD' : hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
+                              color: isCancelled ? Colors.grey[600]! : isOnHold ? Colors.orange[800]! : hasCurrentUserAccepted ? Colors.green[700]! : Colors.red[700]!,
                             ),
                           ),
                         ),
@@ -480,6 +367,93 @@ class RequirementCardWidget extends StatelessWidget {
     );
   }
 
+  Widget _chip(String text, Color color, {bool filled = false}) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: filled ? color.withOpacity(0.12) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(6.r),
+        border: filled ? Border.all(color: color.withOpacity(0.5)) : null,
+      ),
+      child: Text(text, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: filled ? color : Colors.grey[700])),
+    );
+  }
+
+  Widget _priceCol(IconData icon, String label, num amount, Color color) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 16.sp, color: color),
+        SizedBox(height: 4.h),
+        Text('₹${amount.round()}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+        SizedBox(height: 2.h),
+        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
+      ],
+    );
+  }
+
+  Widget _action(Widget icon, String label, VoidCallback? onTap) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            SizedBox(height: 4.h),
+            Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _ratingAction(double rating) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.star, size: 16.sp, color: Colors.amber),
+            SizedBox(width: 2.w),
+            Text(rating > 0 ? rating.toStringAsFixed(1) : '—', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+          ]),
+          SizedBox(height: 4.h),
+          Text('Rating', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
+
+  (String, Color) _statusInfo(String? status) {
+    switch (status) {
+      case 'accepted':
+        return ('Booked', Colors.red.shade600);
+      case 'on_hold':
+        return ('On Hold', Colors.orange.shade700);
+      case 'cancelled':
+        return ('Cancelled', Colors.grey.shade600);
+      default:
+        return ('Open', Colors.green.shade600);
+    }
+  }
+
+  String _dayLabel(dynamic date) {
+    if (date == null) return '';
+    try {
+      final d = DateTime.parse(date.toString());
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final that = DateTime(d.year, d.month, d.day);
+      final diff = that.difference(today).inDays;
+      if (diff == 0) return 'Today';
+      if (diff == 1) return 'Tomorrow';
+      return _formatDate(date);
+    } catch (_) {
+      return _formatDate(date);
+    }
+  }
+
   Widget _buildStampBadge({required String text, required Color color}) {
     return SizedBox(
       width: 110.w,
@@ -490,64 +464,28 @@ class RequirementCardWidget extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                ],
-              ),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.star, color: color, size: 9.sp),
+                SizedBox(width: 2.w),
+                Icon(Icons.star, color: color, size: 9.sp),
+                SizedBox(width: 2.w),
+                Icon(Icons.star, color: color, size: 9.sp),
+              ]),
               SizedBox(height: 3.h),
-              Text(
-                text,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 2,
-                ),
-              ),
+              Text(text, style: TextStyle(color: color, fontSize: 14.sp, fontWeight: FontWeight.w900, letterSpacing: 2)),
               SizedBox(height: 3.h),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                ],
-              ),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.star, color: color, size: 9.sp),
+                SizedBox(width: 2.w),
+                Icon(Icons.star, color: color, size: 9.sp),
+                SizedBox(width: 2.w),
+                Icon(Icons.star, color: color, size: 9.sp),
+              ]),
             ],
           ),
         ),
       ),
     );
-  }
-
-  IconData _getTripTypeIcon(String? tripType) {
-    switch (tripType) {
-      case 'one_way': return Icons.arrow_forward;
-      case 'round_trip': return Icons.loop;
-      case 'airport_transfer': return Icons.flight;
-      case 'local': return Icons.location_city;
-      case 'outstation': return Icons.map;
-      default: return Icons.route;
-    }
-  }
-
-  Color _getTripTypeColor() {
-    switch (requirement['tripType']) {
-      case 'one_way': return AppColors.info;
-      case 'round_trip': return AppColors.success;
-      case 'airport_transfer': return AppColors.memberPremium;
-      case 'local': return AppColors.warning;
-      case 'outstation': return AppColors.primary;
-      default: return AppColors.textSecondary;
-    }
   }
 
   String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
@@ -566,23 +504,6 @@ class RequirementCardWidget extends StatelessWidget {
     const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[m];
   }
-
-  String _timeAgo(dynamic createdAt) {
-    if (createdAt == null) return '';
-    try {
-      final created = DateTime.parse(createdAt.toString()).toLocal();
-      final diff = DateTime.now().difference(created);
-      if (diff.inDays >= 1) return '${diff.inDays}d ago';
-      if (diff.inHours >= 1) {
-        final mins = diff.inMinutes % 60;
-        return mins > 0 ? '${diff.inHours}hr ${mins}m ago' : '${diff.inHours}hr ago';
-      }
-      if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
-      return 'just now';
-    } catch (_) {
-      return '';
-    }
-  }
 }
 
 class _WatermarkPainter extends CustomPainter {
@@ -596,12 +517,7 @@ class _WatermarkPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: Colors.grey.withOpacity(0.2),
-          letterSpacing: 1.2,
-        ),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.withOpacity(0.2), letterSpacing: 1.2),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
@@ -609,16 +525,13 @@ class _WatermarkPainter extends CustomPainter {
     canvas.save();
     canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    final diagLen = (size.width * size.width + size.height * size.height);
-    final steps = (diagLen / colGap).ceil() + 4;
     final rows = (size.height / rowGap).ceil() + 4;
+    final cols = (size.width / colGap).ceil() + 4;
 
     for (int row = -2; row < rows; row++) {
-      for (int col = -2; col < steps; col++) {
-        final x = col * colGap;
-        final y = row * rowGap;
+      for (int col = -2; col < cols; col++) {
         canvas.save();
-        canvas.translate(x, y);
+        canvas.translate(col * colGap, row * rowGap);
         canvas.rotate(angle);
         tp.paint(canvas, Offset.zero);
         canvas.restore();
