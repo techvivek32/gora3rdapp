@@ -142,6 +142,10 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/my-profile',
+        builder: (_, __) => const MyProfilePage(),
+      ),
+      GoRoute(
         path: '/kyc',
         builder: (_, __) => const KycPage(),
       ),

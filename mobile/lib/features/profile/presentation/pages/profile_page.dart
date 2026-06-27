@@ -36,134 +36,44 @@ class ProfilePage extends StatelessWidget {
           body: CustomScrollView(
             slivers: [
               SliverAppBar(
-                expandedHeight: 200.h,
                 pinned: true,
                 backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 automaticallyImplyLeading: false,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined, color: Colors.white),
-                    tooltip: 'Edit Profile',
-                    onPressed: () => _showEditSheet(context, user),
-                  ),
-                ],
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.primary, AppColors.primaryDark],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(height: 8.h),
-                          Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 40.r,
-                                backgroundColor: Colors.white,
-                                backgroundImage: user?['profileImage'] != null
-                                    ? NetworkImage(user!['profileImage'] as String)
-                                    : null,
-                                child: user?['profileImage'] == null
-                                    ? Icon(Icons.person, size: 40.sp, color: AppColors.primary)
-                                    : null,
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  user?['fullName'] as String? ?? 'User',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: Colors.white, fontSize: 20.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins'),
-                                ),
-                              ),
-                              if (user?['isVerified'] == true || user?['verificationStatus'] == 'verified') ...[
-                                SizedBox(width: 6.w),
-                                Icon(Icons.verified, color: Colors.white, size: 20.sp),
-                              ],
-                            ],
-                          ),
-                          SizedBox(height: 6.h),
-                          // Current plan badge
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20.r),
-                              border: Border.all(color: Colors.white.withOpacity(0.4)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(planIcon, color: Colors.white, size: 13.sp),
-                                SizedBox(width: 5.w),
-                                Text(planLabel, style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+                centerTitle: true,
+                title: Text('Settings', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
               ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.all(16.r),
                   child: Column(
                     children: [
-                      // Account info card
-                      _InfoCard(
-                        title: 'Account Information',
-                        trailing: GestureDetector(
-                          onTap: () => _showEditSheet(context, user),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.edit_outlined, size: 13.sp, color: AppColors.primary),
-                                SizedBox(width: 4.w),
-                                Text('Edit', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
-                              ],
-                            ),
-                          ),
-                        ),
-                        children: [
-                          _InfoRow(Icons.phone, 'Mobile', user?['mobile'] as String? ?? '-'),
-                          _InfoRow(Icons.email_outlined, 'Email', user?['email'] as String? ?? '-'),
-                          _InfoRow(Icons.business_outlined, 'Agency', user?['agencyName'] as String? ?? '-'),
-                          _InfoRow(Icons.location_city_outlined, 'City', user?['city'] as String? ?? '-'),
-                          _InfoRow(Icons.map_outlined, 'State', user?['state'] as String? ?? '-'),
-                        ],
-                      ),
-                      SizedBox(height: 12.h),
-
                       
-                      // Activity card
-                      _InfoCard(
-                        title: 'Activity',
-                        children: [
-                          _InfoRow(Icons.post_add, 'Requirements Posted', '${user?['requirementsPosted'] ?? 0}'),
-                          _InfoRow(Icons.directions_car_outlined, 'Vehicles Posted', '${user?['vehiclesPosted'] ?? 0}'),
-                        ],
-                      ),
-                      SizedBox(height: 12.h),
 
-                      // Membership card
+                      // My Profile — avatar + name + plan
+                      Container(
+                        margin: EdgeInsets.only(bottom: 8.h),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8.r),
+                          border: Border.all(color: AppColors.border),
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 3, offset: const Offset(0, 1))],
+                        ),
+                        child: ListTile(
+                          onTap: () => context.push('/my-profile'),
+                          leading: CircleAvatar(
+                            radius: 22.r,
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            backgroundImage: user?['profileImage'] != null ? NetworkImage(user!['profileImage'] as String) : null,
+                            child: user?['profileImage'] == null ? Icon(Icons.person, color: AppColors.primary, size: 24.sp) : null,
+                          ),
+                          title: Text(user?['fullName'] as String? ?? 'User', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                          subtitle: Text(planLabel, style: TextStyle(fontSize: 12.sp, color: planColor, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                          trailing: const Icon(Icons.chevron_right, color: AppColors.textHint),
+                        ),
+                      ),
+                      
+                      // Membership card (top)
                       _InfoCard(
                         title: 'Membership',
                         children: [
@@ -207,12 +117,9 @@ class ProfilePage extends StatelessWidget {
                         ],
                       ),
                       SizedBox(height: 12.h),
-
-
+                      
                       _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification', onTap: () => context.push('/kyc')),
                       _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/notifications')),
-                      _ProfileAction(icon: Icons.chat_outlined, label: 'Messages', onTap: () => context.push('/chats')),
-                      _ProfileAction(icon: Icons.settings_outlined, label: 'Settings', onTap: () {}),
                       SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.logout,
@@ -248,14 +155,89 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  void _showEditSheet(BuildContext context, Map<String, dynamic>? user) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: context.read<AuthBloc>(),
-        child: _EditProfileSheet(user: user),
+}
+
+void showEditProfileSheet(BuildContext context, Map<String, dynamic>? user) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => BlocProvider.value(
+      value: context.read<AuthBloc>(),
+      child: _EditProfileSheet(user: user),
+    ),
+  );
+}
+
+/// Dedicated page that shows the account details + edit (opened from "My Profile").
+class MyProfilePage extends StatelessWidget {
+  const MyProfilePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('My Profile', style: TextStyle(fontFamily: 'Poppins')),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: BlocBuilder<AuthBloc, AuthState>(
+        builder: (context, state) {
+          final user = state is AuthAuthenticated ? state.user as Map<String, dynamic>? : null;
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(16.r),
+            child: Column(
+              children: [
+                Center(
+                  child: CircleAvatar(
+                    radius: 44.r,
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    backgroundImage: user?['profileImage'] != null ? NetworkImage(user!['profileImage'] as String) : null,
+                    child: user?['profileImage'] == null ? Icon(Icons.person, size: 40.sp, color: AppColors.primary) : null,
+                  ),
+                ),
+                SizedBox(height: 10.h),
+                Text(user?['fullName'] as String? ?? 'User',
+                    style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                SizedBox(height: 16.h),
+                _InfoCard(
+                  title: 'Account Information',
+                  trailing: GestureDetector(
+                    onTap: () => showEditProfileSheet(context, user),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                      decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(8.r)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined, size: 13.sp, color: AppColors.primary),
+                          SizedBox(width: 4.w),
+                          Text('Edit', style: TextStyle(fontSize: 12.sp, color: AppColors.primary, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        ],
+                      ),
+                    ),
+                  ),
+                  children: [
+                    _InfoRow(Icons.phone, 'Mobile', user?['mobile'] as String? ?? '-'),
+                    _InfoRow(Icons.email_outlined, 'Email', user?['email'] as String? ?? '-'),
+                    _InfoRow(Icons.business_outlined, 'Agency', user?['agencyName'] as String? ?? '-'),
+                    _InfoRow(Icons.location_city_outlined, 'City', user?['city'] as String? ?? '-'),
+                    _InfoRow(Icons.map_outlined, 'State', user?['state'] as String? ?? '-'),
+                  ],
+                ),
+                SizedBox(height: 12.h),
+                _InfoCard(
+                  title: 'Activity',
+                  children: [
+                    _InfoRow(Icons.post_add, 'Requirements Posted', '${user?['requirementsPosted'] ?? 0}'),
+                    _InfoRow(Icons.directions_car_outlined, 'Vehicles Posted', '${user?['vehiclesPosted'] ?? 0}'),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
