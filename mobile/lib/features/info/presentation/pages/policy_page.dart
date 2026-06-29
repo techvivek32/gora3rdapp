@@ -73,12 +73,12 @@ const Map<String, PolicyContent> kPolicies = {
     subtitle: 'Please read these penalty policies carefully to avoid any deductions.',
     sections: [
       PolicySection(bullets: [
-        'ड्यूटी एक्सेप्ट करने के बाद गाड़ी नहीं लगने पर ₹500 की पेनल्टी लगेगी।',
-        'बुकिंग एक्सेप्ट करने के 5 मिनट बाद कैंसिल करने पर ₹100, 15 मिनट बाद ₹500 और 30 मिनट बाद ₹500 की पेनल्टी लगेगी।',
-        'अर्जेंट वाली बुकिंग एक्सेप्ट करने के 15 मिनट तक कैंसिल करने पर ₹500, 30 मिनट तक ₹500 और उसके बाद कैंसिल करने पर ₹1500 की पेनल्टी लगेगी।',
-        'पिकअप टाइम से लेट होने पर कस्टमर की कंप्लेंट आती है तो आपके पेनल्टी लग सकती है।',
-        'बुकिंग में दी हुई डिटेल वाली गाड़ी और ड्राइवर ही भेजें। डिटेल चेंज होने पर कंपनी या बुकिंग पोस्टर को जरूर बताएं — अलग नंबर की गाड़ी/ड्राइवर भेजने पर पेनल्टी लग सकती है।',
-        'CAT बुकिंग में पिकअप टाइम से 45 मिनट का समय फ्री होगा, उसके बाद हैचबैक ₹120/-, सेडान ₹150/-, SUV ₹200/- प्रति घंटा वेटिंग चार्ज होगा।',
+        'If a driver accepts a duty but fails to provide the vehicle, a penalty of ₹500 will be charged.',
+        'If a booking is cancelled 5 minutes after acceptance, a ₹100 penalty will apply. If cancelled 15 minutes or 30 minutes after acceptance, a ₹500 penalty will be charged.',
+        'For Urgent bookings, cancelling within 15 minutes of acceptance will incur a ₹500 penalty, cancelling within 30 minutes will also incur a ₹500 penalty, and cancelling after 30 minutes will result in a ₹1,500 penalty.',
+        'If the customer reports that you arrived late for pickup, a penalty may be imposed based on the complaint.',
+        'Only send the driver and vehicle details that were provided in the booking. If there is any change, you must inform the company or the booking poster. Sending a different driver or vehicle without prior notice may result in a penalty.',
+        'For CAT bookings, the first 45 minutes from the scheduled pickup time are free. After that, waiting charges will apply per hour: Hatchback – ₹120, Sedan – ₹150, SUV – ₹200.',
       ]),
     ],
   ),
@@ -87,12 +87,14 @@ const Map<String, PolicyContent> kPolicies = {
     icon: Icons.account_balance_wallet_outlined,
     subtitle: '🔒 Fraud Protection',
     sections: [
-      
+      PolicySection(heading: 'Purpose', paragraphs: [
+        'Reduce fraud between drivers and agents while building trust.',
+      ]),
       PolicySection(heading: 'Rules', bullets: [
-        '✅ Driver aur Agent dono ke wallet me minimum ₹500 balance hona zaruri hai.',
-        '✅ ₹500 se kam balance hone par: Call Disabled, WhatsApp Disabled, Booking Confirm Disabled.',
-        '✅ Valid Fraud Complaint prove hone par: ₹100 se ₹500 tak penalty wallet se deduct ki ja sakti hai.',
-        '✅ False Complaint karne wale user par bhi action liya ja sakta hai.',
+        'Both drivers and agents must maintain a minimum wallet balance of ₹500.',
+        'If the wallet balance falls below ₹500: Calling, WhatsApp, and Booking Confirmation features will be disabled.',
+        'If a fraud complaint is found to be valid, a penalty of ₹100 to ₹500 may be deducted from the wallet.',
+        'Users who file false or misleading complaints may also face appropriate action.',
       ]),
       PolicySection(heading: 'Fraud Examples', bullets: [
         'Fake Duty Post',
@@ -101,7 +103,9 @@ const Map<String, PolicyContent> kPolicies = {
         'Advance Payment Fraud',
         'No Response After Confirmation',
       ]),
-      
+      PolicySection(heading: 'Goal', paragraphs: [
+        'To ensure each user has a security amount on the platform, reducing fake users and fraud activities while building trust for both drivers and agents.',
+      ]),
     ],
   ),
 };
