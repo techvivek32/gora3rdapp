@@ -63,7 +63,7 @@ export class User {
   @Prop({ type: [String], default: [] })
   fcmTokens: string[];
 
-  @Prop({ default: true })
+  @Prop({ default: false })
   notificationsEnabled: boolean;
 
   @Prop({ default: 0, min: 0 })

@@ -9,6 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/marquee_text.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/home_bloc.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
@@ -25,12 +26,16 @@ class _HomePageState extends State<HomePage> {
   // TODO: replace with your real support number.
   static const _supportNumber = '+919587090620';
 
-  bool _alertsOn = true;
+  bool _alertsOn = false;
 
   @override
   void initState() {
     super.initState();
     context.read<HomeBloc>().add(LoadHomeDataEvent());
+    // Reflect the user's saved notification setting (defaults off).
+    final auth = context.read<AuthBloc>().state;
+    final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
+    _alertsOn = user?['notificationsEnabled'] == true;
     // Register this device for push notifications (user is authenticated here).
     PushNotificationService.instance.registerToken();
   }
