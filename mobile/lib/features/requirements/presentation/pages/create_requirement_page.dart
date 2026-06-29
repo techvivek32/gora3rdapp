@@ -38,6 +38,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   // Location lat/lng from map picker
   double? _pickupLat, _pickupLng;
   double? _dropLat, _dropLng;
+  String? _pickupCity, _dropCity; // clean city names for filtering
   double? _computedDistance;
   bool _loadingDistance = false;
 
@@ -223,6 +224,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
         _pickupCtrl.text = result.address;
         _pickupLat = result.lat;
         _pickupLng = result.lng;
+        _pickupCity = result.city;
       });
       _updateDistance();
     }
@@ -277,6 +279,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
         _dropCtrl.text = result.address;
         _dropLat = result.lat;
         _dropLng = result.lng;
+        _dropCity = result.city;
       });
       _updateDistance();
     }
@@ -291,6 +294,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     final data = <String, dynamic>{
       'pickupCity': _pickupCtrl.text.trim(),
       'dropCity': _dropCtrl.text.trim(),
+      if (_pickupCity != null && _pickupCity!.isNotEmpty) 'pickupCityName': _pickupCity!.trim(),
+      if (_dropCity != null && _dropCity!.isNotEmpty) 'dropCityName': _dropCity!.trim(),
       'vehicleType': _vehicleType,
       'tripType': _tripType,
       'stops': _stops

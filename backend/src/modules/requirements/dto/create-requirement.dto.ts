@@ -23,6 +23,16 @@ export class CreateRequirementDto {
   @IsString()
   dropState?: string;
 
+  @ApiPropertyOptional({ example: 'Ahmedabad' })
+  @IsOptional()
+  @IsString()
+  pickupCityName?: string;
+
+  @ApiPropertyOptional({ example: 'Ahmedabad' })
+  @IsOptional()
+  @IsString()
+  dropCityName?: string;
+
   @ApiProperty({ enum: VehicleType })
   @IsEnum(VehicleType)
   vehicleType: VehicleType;

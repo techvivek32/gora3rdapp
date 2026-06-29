@@ -9,9 +9,10 @@ import '../../../../core/theme/app_theme.dart';
 
 class LocationPickerResult {
   final String address;
+  final String city; // clean city name (e.g. "Ahmedabad") for filtering
   final double lat;
   final double lng;
-  const LocationPickerResult({required this.address, required this.lat, required this.lng});
+  const LocationPickerResult({required this.address, this.city = '', required this.lat, required this.lng});
 }
 
 class LocationPickerPage extends StatefulWidget {
@@ -37,6 +38,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   GoogleMapController? _mapCtrl;
   late LatLng _center;
   String _address = 'Move the map to select location';
+  String _city = '';
   bool _loading = false;
   bool _pinMoving = false;
   Timer? _debounce;
@@ -88,13 +90,21 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       );
       final data = res.data as Map<String, dynamic>;
       final addrObj = data['address'] as Map<String, dynamic>? ?? {};
+      // Clean city name for filtering (district = city for most Indian cities).
+      final city = (addrObj['city'] ??
+              addrObj['town'] ??
+              addrObj['municipality'] ??
+              addrObj['state_district'] ??
+              addrObj['village'] ??
+              addrObj['county'] ??
+              '') as String;
       final parts = <String>[
         if ((addrObj['road'] ?? addrObj['suburb'] ?? '') != '') (addrObj['road'] ?? addrObj['suburb'] ?? '') as String,
-        if ((addrObj['city'] ?? addrObj['town'] ?? addrObj['village'] ?? addrObj['county'] ?? '') != '')
-          (addrObj['city'] ?? addrObj['town'] ?? addrObj['village'] ?? addrObj['county'] ?? '') as String,
+        if (city.isNotEmpty) city,
         if ((addrObj['state'] ?? '') != '') (addrObj['state'] ?? '') as String,
       ];
       setState(() {
+        _city = city;
         _address = parts.isNotEmpty ? parts.join(', ') : (data['display_name'] as String? ?? 'Unknown location');
         _loading = false;
       });
@@ -197,6 +207,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     if (_loading) return;
     Navigator.of(context).pop(LocationPickerResult(
       address: _address,
+      city: _city,
       lat: _center.latitude,
       lng: _center.longitude,
     ));

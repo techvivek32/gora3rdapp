@@ -1,6 +1,7 @@
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/constants/indian_cities.dart';
 import '../../../../core/network/api_client.dart';
 
 part 'home_event.dart';
@@ -80,12 +81,24 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     if (state is! HomeLoaded) return;
     final current = state as HomeLoaded;
     if (current.availableCities.isNotEmpty) return;
+
+    List<String> adminCities = [];
     try {
       final res = await apiClient.get('/cities');
-      final cities = (res.data['data'] as List<dynamic>? ?? [])
+      adminCities = (res.data['data'] as List<dynamic>? ?? [])
           .map((c) => (c as Map<String, dynamic>)['name'] as String)
           .toList();
-      emit(current.copyWith(availableCities: cities));
     } catch (_) {}
+
+    // Show the full all-India list plus any admin-added cities, de-duplicated
+    // (case-insensitive) and sorted alphabetically.
+    final byKey = <String, String>{};
+    for (final c in [...kIndianCities, ...adminCities]) {
+      final name = c.trim();
+      if (name.isEmpty) continue;
+      byKey.putIfAbsent(name.toLowerCase(), () => name);
+    }
+    final all = byKey.values.toList()..sort();
+    emit(current.copyWith(availableCities: all));
   }
 }

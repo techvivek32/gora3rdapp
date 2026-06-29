@@ -64,12 +64,20 @@ export class RequirementsService {
       status: { $in: [BookingStatus.ACTIVE, BookingStatus.ON_HOLD, BookingStatus.ACCEPTED] },
     };
 
-    // Filter by user's business cities if they have set them
+    // Filter by user's business cities if they have set them. Match leniently:
+    // a requirement counts if any business city appears in its clean city name or
+    // its detailed pickup/drop address (case-insensitive).
     if (user?.businessCities?.length > 0 && !query.pickupCity) {
-      filter.$or = [
-        { pickupCity: { $in: user.businessCities } },
-        { dropCity: { $in: user.businessCities } },
-      ];
+      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const cityRegexes = user.businessCities
+        .filter((c) => c && c.trim())
+        .map((c) => new RegExp(escape(c.trim()), 'i'));
+      filter.$or = cityRegexes.flatMap((rx) => [
+        { pickupCityName: rx },
+        { dropCityName: rx },
+        { pickupCity: rx },
+        { dropCity: rx },
+      ]);
     }
 
     if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');

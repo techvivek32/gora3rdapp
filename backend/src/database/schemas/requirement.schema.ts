@@ -27,6 +27,14 @@ export class Requirement {
   @Prop()
   dropState: string;
 
+  // Clean city name (e.g. "Ahmedabad") used for business-city matching, distinct
+  // from pickupCity which holds the detailed display address.
+  @Prop({ trim: true })
+  pickupCityName: string;
+
+  @Prop({ trim: true })
+  dropCityName: string;
+
   @Prop({ type: Object })
   pickupCoordinates: {
     lat: number;
