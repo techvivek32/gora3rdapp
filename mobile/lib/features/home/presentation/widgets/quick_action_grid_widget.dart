@@ -43,7 +43,7 @@ class QuickActionGridWidget extends StatelessWidget {
         crossAxisCount: 3,
         mainAxisSpacing: 12.w,
         crossAxisSpacing: 12.w,
-        childAspectRatio: 1,
+        childAspectRatio: 0.75, // < 1 makes the cards taller (more height, same width)
         children: List.generate(actions.length, (index) {
           return _QuickActionCard(
             action: actions[index],
