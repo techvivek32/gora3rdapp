@@ -158,7 +158,21 @@ class RequirementCardWidget extends StatelessWidget {
                                   ],
                                 ),
                                 const Spacer(),
-                                _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(), topBarColor, filled: true),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(), topBarColor, filled: true),
+                                    if (requirement['tripType'] == 'round_trip')
+                                      Builder(builder: (_) {
+                                        final d = _roundTripDays(requirement['travelDate'], requirement['returnDate']);
+                                        if (d.isEmpty) return const SizedBox.shrink();
+                                        return Padding(
+                                          padding: EdgeInsets.only(top: 4.h),
+                                          child: Text(d, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: topBarColor)),
+                                        );
+                                      }),
+                                  ],
+                                ),
                               ],
                             ),
                             SizedBox(height: 10.h),
@@ -475,6 +489,16 @@ class RequirementCardWidget extends StatelessWidget {
       default:
         return ('Open', Colors.green.shade600);
     }
+  }
+
+  // Inclusive day count between travel and return dates, e.g. 30 Jun -> 2 Jul = "3 days".
+  String _roundTripDays(dynamic travel, dynamic ret) {
+    final t = DateTime.tryParse(travel?.toString() ?? '');
+    final r = DateTime.tryParse(ret?.toString() ?? '');
+    if (t == null || r == null) return '';
+    final days = DateTime(r.year, r.month, r.day).difference(DateTime(t.year, t.month, t.day)).inDays + 1;
+    if (days < 1) return '';
+    return '$days day${days == 1 ? '' : 's'}';
   }
 
   String _dayLabel(dynamic date) {

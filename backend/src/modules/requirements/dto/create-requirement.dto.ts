@@ -68,6 +68,15 @@ export class CreateRequirementDto {
   @IsNotEmpty()
   travelTime: string;
 
+  @ApiPropertyOptional({ example: '2024-12-17' })
+  @IsOptional()
+  returnDate?: Date;
+
+  @ApiPropertyOptional({ example: '06:00 PM' })
+  @IsOptional()
+  @IsString()
+  returnTime?: string;
+
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()
   @IsNumber()

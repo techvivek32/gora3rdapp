@@ -123,6 +123,17 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
         _travelTime = TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
       } catch (_) {}
     }
+    if (r['returnDate'] != null) {
+      try {
+        _returnDate = DateTime.parse(r['returnDate'].toString());
+      } catch (_) {}
+    }
+    if (r['returnTime'] != null) {
+      try {
+        final p = (r['returnTime'] as String).split(':');
+        _returnTime = TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
+      } catch (_) {}
+    }
     // Recompute distance through the route if we have coordinates.
     if (_pickupLat != null && _dropLat != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _updateDistance());
@@ -304,6 +315,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
           .toList(),
       'travelDate': _travelDate!.toIso8601String().split('T').first,
       'travelTime': _travelTime != null ? '${_travelTime!.hour.toString().padLeft(2, '0')}:${_travelTime!.minute.toString().padLeft(2, '0')}' : '00:00',
+      if (_tripType == 'round_trip' && _returnDate != null)
+        'returnDate': _returnDate!.toIso8601String().split('T').first,
+      if (_tripType == 'round_trip' && _returnTime != null)
+        'returnTime': '${_returnTime!.hour.toString().padLeft(2, '0')}:${_returnTime!.minute.toString().padLeft(2, '0')}',
       'notes': _notesCtrl.text.trim(),
       if (_computedDistance != null) 'estimatedDistance': _computedDistance!.round(),
       'fare': _currentFare.round(),

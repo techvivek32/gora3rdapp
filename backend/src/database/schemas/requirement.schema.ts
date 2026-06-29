@@ -65,6 +65,13 @@ export class Requirement {
   @Prop({ required: true })
   travelTime: string;
 
+  // Round-trip return date/time (optional).
+  @Prop({ type: Date })
+  returnDate: Date;
+
+  @Prop()
+  returnTime: string;
+
   @Prop({ default: 1, min: 1 })
   numberOfVehicles: number;
 
