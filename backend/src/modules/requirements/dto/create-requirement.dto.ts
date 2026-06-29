@@ -1,6 +1,24 @@
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType, TripType } from '../../../common/enums/vehicle-type.enum';
+
+export class StopDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+}
 
 export class CreateRequirementDto {
   @ApiProperty({ example: 'Jaipur' })
@@ -90,8 +108,10 @@ export class CreateRequirementDto {
   dropCoordinates?: { lat: number; lng: number; address?: string };
 
   // Intermediate stops between pickup and drop.
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: [StopDto] })
   @IsOptional()
   @IsArray()
-  stops?: { address?: string; lat?: number; lng?: number }[];
+  @ValidateNested({ each: true })
+  @Type(() => StopDto)
+  stops?: StopDto[];
 }

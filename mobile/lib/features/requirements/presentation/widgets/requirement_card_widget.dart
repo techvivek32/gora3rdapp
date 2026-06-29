@@ -75,7 +75,6 @@ class RequirementCardWidget extends StatelessWidget {
         final num driverEarning = (requirement['fare'] as num?) ?? 0;
         final num commission = (requirement['commission'] as num?) ?? 0;
         final notes = (requirement['notes'] as String?)?.trim() ?? '';
-        final stopsCount = (requirement['stops'] as List?)?.length ?? 0;
         final rating = (postedBy?['rating'] as num?)?.toDouble() ?? 0;
         final canContact = isCurrentUserPremium || isCurrentUserOwner;
         final mobile = postedBy?['mobile'] as String?;
@@ -166,44 +165,81 @@ class RequirementCardWidget extends StatelessWidget {
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 
-                            // 3. FROM -> [km] -> TO (single line each)
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: Column(
+                            // 3. Vertical route: FROM -> stops -> TO
+                            Builder(builder: (context) {
+                              final rawStops = requirement['stops'];
+                              // Keep only well-formed stop entries (maps with an address).
+                              final stops = rawStops is List
+                                  ? rawStops.whereType<Map>().where((m) => (m['address'] ?? '').toString().trim().isNotEmpty).toList()
+                                  : const <Map>[];
+
+                              Widget point(IconData icon, Color color, String label, String text, {required bool showLine}) {
+                                return IntrinsicHeight(
+                                  child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('FROM', style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
-                                      Text(requirement['pickupCity'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                      Column(
+                                        children: [
+                                          Icon(icon, size: 14.sp, color: color),
+                                          if (showLine)
+                                            Expanded(
+                                              child: Container(
+                                                width: 2,
+                                                margin: EdgeInsets.symmetric(vertical: 2.h),
+                                                color: Colors.grey.shade400,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                      SizedBox(width: 10.w),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.only(bottom: showLine ? 10.h : 0),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(label, style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                                              Text(text,
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                                SizedBox(width: 8.w),
-                                Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.arrow_forward, size: 16.sp, color: topBarColor),
-                                    if (requirement['estimatedDistance'] != null)
-                                      Text('${requirement['estimatedDistance']} KM',
-                                          style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.bold, color: topBarColor)),
-                                    if (stopsCount > 0)
-                                      Text('$stopsCount mid stop${stopsCount == 1 ? '' : 's'}',
-                                          style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+                                );
+                              }
+
+                              final timeline = Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  point(Icons.trip_origin, Colors.green, 'FROM', requirement['pickupCity'] as String? ?? '', showLine: true),
+                                  ...stops.asMap().entries.map((e) {
+                                    return point(Icons.add_location_alt, topBarColor, 'STOP ${e.key + 1}', (e.value['address'] ?? '').toString(), showLine: true);
+                                  }),
+                                  point(Icons.location_on, Colors.red, 'TO', requirement['dropCity'] as String? ?? '', showLine: false),
+                                ],
+                              );
+
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Total distance, vertical, on the left of the route.
+                                  if (requirement['estimatedDistance'] != null) ...[
+                                    RotatedBox(
+                                      quarterTurns: 3,
+                                      child: Text('${requirement['estimatedDistance']} KM',
+                                          style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: topBarColor)),
+                                    ),
+                                    SizedBox(width: 8.w),
                                   ],
-                                ),
-                                SizedBox(width: 8.w),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text('TO', style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
-                                      Text(requirement['dropCity'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.end, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                                  Expanded(child: timeline),
+                                ],
+                              );
+                            }),
                             SizedBox(height: 10.h),
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
