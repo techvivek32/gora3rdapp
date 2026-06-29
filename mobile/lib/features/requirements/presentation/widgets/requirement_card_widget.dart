@@ -120,47 +120,32 @@ class RequirementCardWidget extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 1. ID + status + secure payment / menu
+                            // Header: status (Open) + requirement ID, trip type / secure on the right
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _chip('ID-${requirement['requirementId'] ?? requirement['bookingId'] ?? ''}', AppColors.textSecondary),
-                                SizedBox(width: 8.w),
-                                Row(mainAxisSize: MainAxisSize.min, children: [
-                                  Icon(Icons.circle, size: 8.sp, color: statusColor),
-                                  SizedBox(width: 4.w),
-                                  Text(statusLabel, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: statusColor)),
-                                ]),
-                                const Spacer(),
-                                if (menu != null)
-                                  menu!
-                                else
-                                  Row(mainAxisSize: MainAxisSize.min, children: [
-                                    Icon(Icons.verified_user, size: 13.sp, color: topBarColor),
-                                    SizedBox(width: 3.w),
-                                    Text('SECURE', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w700, color: topBarColor)),
-                                  ]),
-                              ],
-                            ),
-                            SizedBox(height: 10.h),
-                            Divider(height: 1, color: Colors.black26),
-                            SizedBox(height: 10.h),
-
-                            // 2. date + trip type
-                            Row(
-                              children: [
-                                Icon(Icons.calendar_month, size: 16.sp, color: topBarColor),
-                                SizedBox(width: 6.w),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(_dayLabel(requirement['travelDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                    Text('#${requirement['bookingId'] ?? ''}', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
-                                  ],
+                                Padding(
+                                  padding: EdgeInsets.only(top: 4.h),
+                                  child: Icon(Icons.circle, size: 10.sp, color: statusColor),
                                 ),
-                                const Spacer(),
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(statusLabel, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: statusColor)),
+                                      Text('ID-${requirement['requirementId'] ?? requirement['bookingId'] ?? ''}',
+                                          style: TextStyle(fontSize: 11.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                                    ],
+                                  ),
+                                ),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
+                                    if (menu != null) ...[
+                                      menu!,
+                                      SizedBox(height: 6.h),
+                                    ],
                                     _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(), topBarColor, filled: true),
                                     if (requirement['tripType'] == 'round_trip')
                                       Builder(builder: (_) {
@@ -499,22 +484,6 @@ class RequirementCardWidget extends StatelessWidget {
     final days = DateTime(r.year, r.month, r.day).difference(DateTime(t.year, t.month, t.day)).inDays + 1;
     if (days < 1) return '';
     return '$days day${days == 1 ? '' : 's'}';
-  }
-
-  String _dayLabel(dynamic date) {
-    if (date == null) return '';
-    try {
-      final d = DateTime.parse(date.toString());
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final that = DateTime(d.year, d.month, d.day);
-      final diff = that.difference(today).inDays;
-      if (diff == 0) return 'Today';
-      if (diff == 1) return 'Tomorrow';
-      return _formatDate(date);
-    } catch (_) {
-      return _formatDate(date);
-    }
   }
 
   Widget _buildStampBadge({required String text, required Color color}) {
