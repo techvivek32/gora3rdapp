@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -18,7 +18,7 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class SubscriptionsService {
-  private razorpay: Razorpay;
+  private readonly logger = new Logger(SubscriptionsService.name);
 
   constructor(
     @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
@@ -26,11 +26,18 @@ export class SubscriptionsService {
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private configService: ConfigService,
-  ) {
-    this.razorpay = new Razorpay({
-      key_id: configService.get('razorpay.keyId'),
-      key_secret: configService.get('razorpay.keySecret'),
-    });
+  ) {}
+
+  // Lazily build the Razorpay client so missing credentials produce a clear
+  // error instead of crashing the whole service at startup.
+  private getRazorpay(): Razorpay {
+    const keyId = this.configService.get<string>('razorpay.keyId');
+    const keySecret = this.configService.get<string>('razorpay.keySecret');
+    if (!keyId || !keySecret) {
+      this.logger.error('Razorpay credentials are not configured (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).');
+      throw new BadRequestException('Payment gateway is not configured. Please contact support.');
+    }
+    return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
   async getActivePlans() {
@@ -48,12 +55,18 @@ export class SubscriptionsService {
     const amount = (plan.discountedPrice || plan.price) * 100; // Razorpay uses paise
     const orderId = generatePaymentOrderId();
 
-    const razorpayOrder = await this.razorpay.orders.create({
-      amount,
-      currency: 'INR',
-      receipt: orderId,
-      notes: { planId: planId.toString(), userId },
-    });
+    let razorpayOrder;
+    try {
+      razorpayOrder = await this.getRazorpay().orders.create({
+        amount,
+        currency: 'INR',
+        receipt: orderId,
+        notes: { planId: planId.toString(), userId },
+      });
+    } catch (e: any) {
+      this.logger.error(`Razorpay order creation failed: ${e?.error?.description ?? e?.message ?? e}`);
+      throw new BadRequestException('Could not start payment. Please try again later.');
+    }
 
     const payment = await this.paymentModel.create({
       orderId,

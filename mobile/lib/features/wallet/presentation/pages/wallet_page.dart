@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -83,7 +84,7 @@ class _WalletPageState extends State<WalletPage> {
       _openRazorpay(order);
     } catch (e) {
       setState(() => _processing = false);
-      _snack('Could not start payment. Please try again.');
+      _snack(ErrorMapper.message(e));
     }
   }
 

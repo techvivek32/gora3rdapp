@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -10,17 +10,22 @@ import { CreateTopUpDto, VerifyTopUpDto } from './dto/wallet.dto';
 
 @Injectable()
 export class WalletService {
-  private razorpay: Razorpay;
+  private readonly logger = new Logger(WalletService.name);
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     private configService: ConfigService,
-  ) {
-    this.razorpay = new Razorpay({
-      key_id: configService.get('razorpay.keyId'),
-      key_secret: configService.get('razorpay.keySecret'),
-    });
+  ) {}
+
+  private getRazorpay(): Razorpay {
+    const keyId = this.configService.get<string>('razorpay.keyId');
+    const keySecret = this.configService.get<string>('razorpay.keySecret');
+    if (!keyId || !keySecret) {
+      this.logger.error('Razorpay credentials are not configured (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).');
+      throw new BadRequestException('Payment gateway is not configured. Please contact support.');
+    }
+    return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
   async getWallet(userId: string) {
@@ -38,12 +43,18 @@ export class WalletService {
     const amount = Math.round(dto.amount);
     if (amount < 1) throw new BadRequestException('Enter a valid amount');
 
-    const order = await this.razorpay.orders.create({
-      amount: amount * 100, // paise
-      currency: 'INR',
-      receipt: `wallet_${Date.now()}`,
-      notes: { userId, type: 'wallet_topup' },
-    });
+    let order;
+    try {
+      order = await this.getRazorpay().orders.create({
+        amount: amount * 100, // paise
+        currency: 'INR',
+        receipt: `wallet_${Date.now()}`,
+        notes: { userId, type: 'wallet_topup' },
+      });
+    } catch (e: any) {
+      this.logger.error(`Razorpay order creation failed: ${e?.error?.description ?? e?.message ?? e}`);
+      throw new BadRequestException('Could not start payment. Please try again later.');
+    }
 
     await this.txModel.create({
       userId: new Types.ObjectId(userId),
