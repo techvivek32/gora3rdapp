@@ -22,7 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   // TODO: replace with your real support number.
-  static const _supportNumber = '+919876543210';
+  static const _supportNumber = '+919587090620';
 
   bool _alertsOn = true;
 
