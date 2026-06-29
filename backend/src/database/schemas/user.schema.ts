@@ -66,6 +66,9 @@ export class User {
   @Prop({ default: true })
   notificationsEnabled: boolean;
 
+  @Prop({ default: 0, min: 0 })
+  walletBalance: number;
+
   @Prop({ default: 0, min: 0, max: 5 })
   rating: number;
 
