@@ -31,7 +31,12 @@ export class WalletService {
   async getWallet(userId: string) {
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select('walletBalance').lean(),
-      this.txModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).limit(20).lean(),
+      // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
+      this.txModel
+        .find({ userId: new Types.ObjectId(userId), status: 'success' })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean(),
     ]);
     return {
       message: 'Wallet retrieved',
