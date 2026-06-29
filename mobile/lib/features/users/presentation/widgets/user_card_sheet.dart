@@ -45,12 +45,40 @@ Future<void> showUserCardSheet(BuildContext context, Map<String, dynamic> user) 
   );
 }
 
-class _UserCardSheet extends StatelessWidget {
+class _UserCardSheet extends StatefulWidget {
   final Map<String, dynamic> user;
   const _UserCardSheet({required this.user});
 
   @override
+  State<_UserCardSheet> createState() => _UserCardSheetState();
+}
+
+class _UserCardSheetState extends State<_UserCardSheet> {
+  late Map<String, dynamic> _user;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = Map<String, dynamic>.from(widget.user);
+    // Passed-in data (e.g. a requirement's postedBy) can be partial and miss the
+    // phone number — fetch the full profile so contact actions work.
+    final mobile = _user['mobile'];
+    if ((mobile == null || (mobile is String && mobile.isEmpty)) && _user['_id'] != null) {
+      _enrich();
+    }
+  }
+
+  Future<void> _enrich() async {
+    try {
+      final res = await getIt<ApiClient>().get('/users/card/${_user['_id']}');
+      final data = Map<String, dynamic>.from(res.data['data'] as Map);
+      if (mounted) setState(() => _user = {..._user, ...data});
+    } catch (_) {}
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = _user;
     final name = (user['fullName'] ?? '') as String;
     final agency = user['agencyName'] as String?;
     final city = user['city'] as String?;
