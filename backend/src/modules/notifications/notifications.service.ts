@@ -17,7 +17,14 @@ export class NotificationsService {
   ) {}
 
   async notifyNewRequirement(requirement: any) {
-    const cities = [requirement.pickupCity, requirement.dropCity];
+    // Match on the clean city names first (e.g. "Rajkot"), falling back to the
+    // detailed addresses, so a user who selected only "Rajkot" is notified.
+    const cities = [
+      requirement.pickupCityName,
+      requirement.dropCityName,
+      requirement.pickupCity,
+      requirement.dropCity,
+    ].filter(Boolean);
 
     // Find users with matching business cities who have notifications enabled
     const targetUsers = await this.userModel
@@ -33,6 +40,12 @@ export class NotificationsService {
       .lean();
 
     if (targetUsers.length === 0) return;
+
+    // Poster contact info for the notification (Call / WhatsApp actions).
+    const poster = await this.userModel
+      .findById(requirement.postedBy)
+      .select('mobile fullName agencyName')
+      .lean();
 
     const allTokens = targetUsers.flatMap((u) => u.fcmTokens).filter(Boolean);
     const userIds = targetUsers.map((u) => u._id);
@@ -69,8 +82,14 @@ export class NotificationsService {
             body: `${requirement.pickupCity} → ${requirement.dropCity} | ${requirement.vehicleType}`,
             data: {
               requirementId: requirement._id.toString(),
-              bookingId: requirement.bookingId,
+              bookingId: `${requirement.bookingId ?? ''}`,
               type: NotificationType.NEW_REQUIREMENT,
+              pickupCity: `${requirement.pickupCity ?? ''}`,
+              dropCity: `${requirement.dropCity ?? ''}`,
+              vehicleType: `${requirement.vehicleType ?? ''}`,
+              tripType: `${requirement.tripType ?? ''}`,
+              posterName: `${poster?.agencyName || poster?.fullName || ''}`,
+              posterMobile: `${poster?.mobile ?? ''}`,
             },
           });
         } catch (error) {

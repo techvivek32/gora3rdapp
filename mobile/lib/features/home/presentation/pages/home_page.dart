@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/services/push_notification_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/app_logo.dart';
@@ -30,6 +31,8 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     context.read<HomeBloc>().add(LoadHomeDataEvent());
+    // Register this device for push notifications (user is authenticated here).
+    PushNotificationService.instance.registerToken();
   }
 
   @override

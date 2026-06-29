@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/requirements/presentation/bloc/requirements_bloc.dart';
@@ -40,6 +41,9 @@ void main() async {
 
   // Dependency Injection
   await configureDependencies();
+
+  // Push notifications (permission, channel, foreground/tap handlers)
+  await PushNotificationService.instance.init();
 
   // Orientation
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

@@ -44,10 +44,10 @@ class _GoRouterRefreshStream extends ChangeNotifier {
 }
 
 class AppRouter {
-  static final _rootNavigatorKey = GlobalKey<NavigatorState>();
+  static final rootNavigatorKey = GlobalKey<NavigatorState>();
 
   static GoRouter createRouter(AuthBloc authBloc) => GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     debugLogDiagnostics: true,
     initialLocation: '/splash',
     refreshListenable: _GoRouterRefreshStream(authBloc.stream),
