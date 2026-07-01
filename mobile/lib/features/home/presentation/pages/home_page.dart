@@ -23,15 +23,17 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // TODO: replace with your real support number.
   static const _supportNumber = '+919587090620';
 
   bool _alertsOn = false;
+  bool _awaitingOverlayGrant = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     context.read<HomeBloc>().add(LoadHomeDataEvent());
     // Reflect the user's saved notification setting (defaults off).
     final auth = context.read<AuthBloc>().state;
@@ -43,7 +45,27 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back from the "Display over other apps" settings page — confirm the grant.
+    if (state == AppLifecycleState.resumed && _awaitingOverlayGrant) {
+      _awaitingOverlayGrant = false;
+      isOverlayPermissionGranted().then((granted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(granted
+                ? 'On-screen alerts enabled — requirements will pop over other apps.'
+                : 'Permission not granted yet. Turn on "Display over other apps" to see pop-ups.'),
+            backgroundColor: granted ? Colors.green : Colors.redAccent,
+          ),
+        );
+      });
+    }
   }
 
   Future<void> _toggleAlerts(bool value) async {
@@ -69,15 +91,21 @@ class _HomePageState extends State<HomePage> {
           title: const Text('Show alerts over other apps'),
           content: const Text(
             'To pop new ride requirements on your screen even while you are using other '
-            'apps or on the home screen, allow "Display over other apps" for Gora Cabs.',
+            'apps or on the home screen, Gora Cabs needs the "Display over other apps" '
+            'permission.\n\nOn the settings screen that opens, tap "Permissions" or '
+            '"Other permissions" and turn ON "Display over other apps" (on Xiaomi/Redmi '
+            'it may be called "Display pop-up windows while running in the background").',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Allow')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Open settings')),
           ],
         ),
       );
-      if (go == true) await requestOverlayPermission();
+      if (go == true) {
+        _awaitingOverlayGrant = true;
+        await requestOverlayPermission();
+      }
     } catch (_) {}
   }
 

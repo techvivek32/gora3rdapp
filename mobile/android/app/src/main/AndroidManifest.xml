@@ -73,5 +73,15 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Phone dialer & WhatsApp launched from the overlay card -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <!-- MIUI/HyperOS security center for the overlay-permission editor -->
+        <package android:name="com.miui.securitycenter"/>
     </queries>
 </manifest>

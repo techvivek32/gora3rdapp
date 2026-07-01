@@ -1,26 +1,54 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+/// Native channel (registered in MainActivity) that opens the "Display over
+/// other apps" settings robustly across OEMs — the plugin's default intent opens
+/// a blank/black page on MIUI/HyperOS, so we route through native fallbacks.
+const _overlayPermChannel = MethodChannel('gora/overlay');
 
 /// Whether the "Display over other apps" permission is granted (Android only).
 Future<bool> isOverlayPermissionGranted() async {
   if (!Platform.isAndroid) return false;
   try {
-    return await FlutterOverlayWindow.isPermissionGranted();
+    return await _overlayPermChannel.invokeMethod<bool>('canDrawOverlays') ?? false;
   } catch (_) {
-    return false;
+    // Native channel not available (e.g. app not rebuilt) — use plugin/permission_handler.
+    try {
+      return await FlutterOverlayWindow.isPermissionGranted();
+    } catch (_) {
+      try {
+        return await Permission.systemAlertWindow.isGranted;
+      } catch (_) {
+        return false;
+      }
+    }
   }
 }
 
-/// Opens the system "Display over other apps" settings page (Android only).
+/// Opens the system "Display over other apps" settings page (Android only),
+/// picking an OEM-appropriate intent with fallbacks.
 Future<void> requestOverlayPermission() async {
   if (!Platform.isAndroid) return;
   try {
-    await FlutterOverlayWindow.requestPermission();
-  } catch (_) {}
+    await _overlayPermChannel.invokeMethod('openOverlaySettings');
+  } catch (_) {
+    // Native channel missing (old build) — open the app settings page directly
+    // instead of the plugin's blank overlay intent, so the user never sees a
+    // black screen and can flip the permission manually.
+    try {
+      await openAppSettings();
+    } catch (_) {
+      try {
+        await FlutterOverlayWindow.requestPermission();
+      } catch (_) {}
+    }
+  }
 }
 
 /// Key used to hand the FCM payload to the overlay isolate reliably (the
