@@ -6,10 +6,16 @@ import android.os.Build
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "gora/overlay"
+
+    // Must match flutter_overlay_window's OverlayConstants.CACHED_TAG.
+    private val overlayEngineCacheTag = "myCachedEngine"
+    private val overlayActionChannel = "gora/overlay_actions"
+    private var overlayActionRegistered = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -24,6 +30,49 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // The overlay runs in a separate Flutter engine with no plugins and no
+        // Activity, so url_launcher can't work there. Register a native channel on
+        // that engine so the overlay's Call/WhatsApp buttons can launch intents.
+        registerOverlayActionChannel()
+    }
+
+    private fun registerOverlayActionChannel() {
+        if (overlayActionRegistered) return
+        val overlayEngine = FlutterEngineCache.getInstance().get(overlayEngineCacheTag) ?: return
+        MethodChannel(overlayEngine.dartExecutor.binaryMessenger, overlayActionChannel)
+            .setMethodCallHandler { call, result ->
+                val number = (call.argument<String>("number") ?: "").filter { it.isDigit() || it == '+' }
+                when (call.method) {
+                    "call" -> {
+                        launchIntent(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$number")))
+                        result.success(true)
+                    }
+                    "whatsapp" -> {
+                        launchIntent(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number")))
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        overlayActionRegistered = true
+    }
+
+    /**
+     * Start an activity from a non-Activity context. Uses the application context +
+     * NEW_TASK because the app is in the background when the overlay is tapped; the
+     * SYSTEM_ALERT_WINDOW permission exempts us from background-activity-start limits.
+     */
+    private fun launchIntent(intent: Intent) {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            applicationContext.startActivity(intent)
+        } catch (_: Exception) {
+            // No handler (e.g. WhatsApp not installed) — ignore.
+        }
     }
 
     private fun canDrawOverlays(): Boolean {

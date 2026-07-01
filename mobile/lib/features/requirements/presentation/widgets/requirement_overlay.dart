@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 /// Native channel (registered in MainActivity) that opens the "Display over
 /// other apps" settings robustly across OEMs — the plugin's default intent opens
@@ -56,6 +55,11 @@ Future<void> requestOverlayPermission() async {
 /// message-channel broadcast can race the overlay engine startup, so we also
 /// persist the payload and read it back when the overlay boots).
 const _kOverlayPayloadKey = 'gora_overlay_payload';
+
+/// Native channel registered on the overlay engine (see MainActivity). The
+/// overlay runs in its own engine with no plugins/Activity, so url_launcher
+/// can't launch the dialer/WhatsApp from here — we go through native instead.
+const _overlayActionChannel = MethodChannel('gora/overlay_actions');
 
 const _primary = Color(0xFFFF6D00);
 const _primaryLight = Color(0xFFFFE0B2);
@@ -156,8 +160,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final m = _s('posterMobile');
     if (m.isEmpty) return;
     try {
-      await launchUrl(Uri.parse('tel:$m'),
-          mode: LaunchMode.externalApplication);
+      await _overlayActionChannel.invokeMethod('call', {'number': m});
     } catch (_) {}
     await FlutterOverlayWindow.closeOverlay();
   }
@@ -167,8 +170,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     if (m.isEmpty) return;
     if (m.length == 10) m = '91$m';
     try {
-      await launchUrl(Uri.parse('https://wa.me/$m'),
-          mode: LaunchMode.externalApplication);
+      await _overlayActionChannel.invokeMethod('whatsapp', {'number': m});
     } catch (_) {}
     await FlutterOverlayWindow.closeOverlay();
   }
