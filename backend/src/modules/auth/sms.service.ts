@@ -29,6 +29,19 @@ export class SmsService {
         .replace('{mobile}', encodeURIComponent(local10))
         .replace('{message}', encodeURIComponent(message))
         .replace('{otp}', encodeURIComponent(otp));
+    } else if (sms.apiUrl.includes('smsindori') || sms.apiUrl.includes('tokenkeyapi')) {
+      // SMS Indori token-key HTTP API (http-tokenkeyapi.php).
+      const params = new URLSearchParams({
+        'authentic-key': sms.authKey,
+        senderid: sms.senderId,
+        route: sms.route,
+        number: `91${local10}`,
+        message,
+      });
+      if (sms.templateId) params.set('templateid', sms.templateId);
+      if (sms.entityId) params.set('entityid', sms.entityId);
+      const sep = sms.apiUrl.includes('?') ? '&' : '?';
+      url = `${sms.apiUrl}${sep}${params.toString()}`;
     } else {
       // Common DLT HTTP API shape. Adjust param names to match your gateway if needed.
       const params = new URLSearchParams({
