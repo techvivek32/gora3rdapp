@@ -22,6 +22,8 @@ export class SmsService {
       return;
     }
 
+    const isIndori = sms.apiUrl.includes('smsindori') || sms.apiUrl.includes('tokenkeyapi');
+
     let url: string;
     if (sms.apiUrl.includes('{mobile}') || sms.apiUrl.includes('{message}') || sms.apiUrl.includes('{otp}')) {
       // Provider-agnostic: the env URL already has the right param names.
@@ -29,19 +31,24 @@ export class SmsService {
         .replace('{mobile}', encodeURIComponent(local10))
         .replace('{message}', encodeURIComponent(message))
         .replace('{otp}', encodeURIComponent(otp));
-    } else if (sms.apiUrl.includes('smsindori') || sms.apiUrl.includes('tokenkeyapi')) {
+    } else if (isIndori) {
       // SMS Indori token-key HTTP API (http-tokenkeyapi.php).
-      const params = new URLSearchParams({
-        'authentic-key': sms.authKey,
-        senderid: sms.senderId,
-        route: sms.route,
-        number: `91${local10}`,
-        message,
-      });
-      if (sms.templateId) params.set('templateid', sms.templateId);
-      if (sms.entityId) params.set('entityid', sms.entityId);
+      // Build the query with encodeURIComponent so spaces become %20, NOT '+'
+      // (URLSearchParams uses '+'). This gateway forwards the message verbatim, so
+      // a literal '+' in place of spaces breaks the DLT template match and the
+      // operator silently drops it. It also delivers to the bare 10-digit number.
+      const q = [
+        `authentic-key=${encodeURIComponent(sms.authKey)}`,
+        `senderid=${encodeURIComponent(sms.senderId)}`,
+        `route=${encodeURIComponent(sms.route)}`,
+        `number=${encodeURIComponent(local10)}`,
+        `message=${encodeURIComponent(message)}`,
+      ];
+      if (sms.templateId) q.push(`templateid=${encodeURIComponent(sms.templateId)}`);
+      // NOTE: do NOT send entityid — this gateway drops the message (operator-side)
+      // when entityid is included, even though it still returns a msg-id.
       const sep = sms.apiUrl.includes('?') ? '&' : '?';
-      url = `${sms.apiUrl}${sep}${params.toString()}`;
+      url = `${sms.apiUrl}${sep}${q.join('&')}`;
     } else {
       // Common DLT HTTP API shape. Adjust param names to match your gateway if needed.
       const params = new URLSearchParams({
@@ -59,10 +66,13 @@ export class SmsService {
 
     try {
       const res = await fetch(url, { method: 'GET' });
-      const body = await res.text();
-      if (!res.ok) {
+      const body = (await res.text()).trim();
+      // SMS Indori returns "msg-id : ..." on success and a plain error string
+      // (still HTTP 200) on failure, so also require a msg-id for that gateway.
+      const accepted = res.ok && (!isIndori || /msg-?id/i.test(body));
+      if (!accepted) {
         this.logger.error(`SMS send failed (${res.status}): ${body}`);
-        throw new Error(`gateway returned ${res.status}`);
+        throw new Error(`gateway error: ${body || res.status}`);
       }
       this.logger.log(`OTP sent to ${mobile} (gateway response: ${body.slice(0, 200)})`);
     } catch (e) {
