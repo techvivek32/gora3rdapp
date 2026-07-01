@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/wallet/wallet_guard.dart';
 import '../bloc/requirements_bloc.dart';
 import 'location_picker_page.dart';
 
@@ -296,7 +297,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_travelDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'), backgroundColor: AppColors.error));
@@ -333,9 +334,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     final bloc = context.read<RequirementsBloc>();
     if (_isEdit) {
       bloc.add(UpdateRequirementEvent(id: widget.requirementId!, data: data));
-    } else {
-      bloc.add(CreateRequirementEvent(data: data));
+      return;
     }
+    // Gate: posting a requirement needs a minimum wallet balance.
+    if (!await ensureMinWalletBalance(context, action: 'post a requirement')) return;
+    bloc.add(CreateRequirementEvent(data: data));
   }
 
 

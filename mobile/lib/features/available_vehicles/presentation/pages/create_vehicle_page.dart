@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/wallet/wallet_guard.dart';
 import '../../../../core/widgets/city_autocomplete_field.dart';
 import '../bloc/vehicles_bloc.dart';
 
@@ -79,7 +80,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
     return '$hour:$minute $period';
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_availableDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select available date'), backgroundColor: AppColors.error));
@@ -99,9 +100,11 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
     final bloc = context.read<VehiclesBloc>();
     if (_isEdit) {
       bloc.add(UpdateVehicleEvent(id: widget.vehicleId!, data: data));
-    } else {
-      bloc.add(CreateVehicleEvent(data));
+      return;
     }
+    // Gate: posting an available vehicle needs a minimum wallet balance.
+    if (!await ensureMinWalletBalance(context, action: 'post a vehicle')) return;
+    bloc.add(CreateVehicleEvent(data));
   }
 
   @override
