@@ -36,8 +36,18 @@ async function bootstrap() {
   app.use(compression());
 
   // CORS configuration
+  const allowedOrigins = corsOrigins.map((o) => o.trim()).filter(Boolean);
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production' ? corsOrigins : true,
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow non-browser clients (mobile apps / curl) that send no Origin header,
+      // any localhost / 127.0.0.1 origin on any port (Flutter web dev), and the
+      // configured production origins.
+      const isLocalhost = !!origin && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      if (!origin || isLocalhost || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Refresh-Token', 'X-Device-ID'],
     credentials: true,
