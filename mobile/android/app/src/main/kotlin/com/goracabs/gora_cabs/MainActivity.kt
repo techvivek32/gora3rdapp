@@ -41,35 +41,16 @@ class MainActivity : FlutterActivity() {
      * intents and stop at the first one that resolves.
      */
     private fun openOverlaySettings() {
-        val intents = mutableListOf<Intent>()
-
-        val appDetails = Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.parse("package:$packageName"),
+        // Order of preference:
+        // 1) The app-specific "Display over other apps" toggle (verified to render
+        //    correctly, including on MIUI/HyperOS).
+        // 2) The full overlay-permission list.
+        // 3) The app-details page as a guaranteed fallback.
+        val intents = listOf(
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")),
+            Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION),
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")),
         )
-
-        val manufacturer = Build.MANUFACTURER.lowercase()
-        val isXiaomi = manufacturer.contains("xiaomi") ||
-            manufacturer.contains("redmi") ||
-            manufacturer.contains("poco")
-
-        if (isXiaomi) {
-            // MIUI / HyperOS: both the AOSP overlay page and the securitycenter
-            // permission-editor deep-link frequently open a blank/black screen on
-            // newer builds. The standard App-info page is the one screen that
-            // always renders, so open it directly; the user turns on "Other
-            // permissions -> Display over other apps" from there.
-            intents.add(appDetails)
-        } else {
-            // Standard AOSP overlay-permission page for this app.
-            intents.add(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-            )
-            // Standard AOSP overlay-permission full list (no package data).
-            intents.add(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-            // Last resort: this app's details page.
-            intents.add(appDetails)
-        }
 
         // Try each in order; startActivity throws ActivityNotFoundException when an
         // intent can't be handled (more reliable than resolveActivity, which is
