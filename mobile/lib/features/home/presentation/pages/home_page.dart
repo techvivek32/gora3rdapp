@@ -10,6 +10,7 @@ import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../requirements/presentation/widgets/requirement_overlay.dart';
 import '../bloc/home_bloc.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
@@ -51,7 +52,33 @@ class _HomePageState extends State<HomePage> {
       await getIt<ApiClient>().put('/users/notifications', data: {'enabled': value});
     } catch (_) {
       if (mounted) setState(() => _alertsOn = !value); // revert on failure
+      return;
     }
+    // Turning alerts on: also ask for the "Display over other apps" permission so
+    // requirement cards can float over other apps while the app runs in the background.
+    if (value) await _ensureOverlayPermission();
+  }
+
+  Future<void> _ensureOverlayPermission() async {
+    try {
+      if (await isOverlayPermissionGranted()) return;
+      if (!mounted) return;
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Show alerts over other apps'),
+          content: const Text(
+            'To pop new ride requirements on your screen even while you are using other '
+            'apps or on the home screen, allow "Display over other apps" for Gora Cabs.',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
+            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Allow')),
+          ],
+        ),
+      );
+      if (go == true) await requestOverlayPermission();
+    } catch (_) {}
   }
 
   @override

@@ -10,6 +10,7 @@ import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'features/requirements/presentation/widgets/requirement_overlay.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/requirements/presentation/bloc/requirements_bloc.dart';
 import 'features/available_vehicles/presentation/bloc/vehicles_bloc.dart';
@@ -23,9 +24,24 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
     debugPrint('Background FCM: ${message.notification?.title}');
+    // App is in the background/terminated — float the requirement card over
+    // whatever the user is doing (Truecaller-style), if it's a requirement push
+    // and the "Display over other apps" permission was granted.
+    final data = message.data;
+    if ((data['requirementId'] ?? '').toString().isNotEmpty) {
+      await showRequirementOverlay(Map<String, dynamic>.from(data));
+    }
   } catch (e) {
     debugPrint('Firebase background handler error: $e');
   }
+}
+
+/// Separate Flutter entry point that renders the floating overlay window.
+/// Referenced by name ("overlayMain") from the native OverlayService.
+@pragma('vm:entry-point')
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const RequirementOverlay());
 }
 
 void main() async {
