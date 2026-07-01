@@ -25,6 +25,14 @@ export class WalletTransaction {
 
   @Prop()
   note: string;
+
+  // Set when the transaction is an admin manual adjustment (audit trail).
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  adminId: Types.ObjectId;
+
+  // 'razorpay' (top-up) or 'admin' (manual adjustment).
+  @Prop({ type: String, enum: ['razorpay', 'admin'], default: 'razorpay' })
+  source: string;
 }
 
 export const WalletTransactionSchema = SchemaFactory.createForClass(WalletTransaction);

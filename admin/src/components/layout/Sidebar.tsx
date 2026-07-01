@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, MapPin, Bell, CreditCard,
   BarChart3, Flag, Image, Settings, ChevronDown, LogOut, Shield,
-  FileText, Megaphone, Star, Map, BadgeCheck
+  FileText, Megaphone, Star, Map, BadgeCheck, Wallet
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -33,6 +33,7 @@ const navigation = [
     items: [
       { href: '/subscriptions', label: 'Memberships', icon: Star },
       { href: '/payments', label: 'Payments', icon: CreditCard },
+      { href: '/wallets', label: 'Wallet Management', icon: Wallet },
     ],
   },
   {

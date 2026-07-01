@@ -60,6 +60,11 @@ export const adminApi = {
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
   approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
 
+  // ─── Wallets ───────────────────────────────────────────────────────────────
+  getWallets: (params: any) => apiClient.get('/admin/wallets', { params }),
+  adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string }) =>
+    apiClient.post(`/admin/wallets/${userId}/adjust`, data),
+
   // ─── Cities ────────────────────────────────────────────────────────────────
   getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
   createCity: (data: any) => apiClient.post('/admin/cities', data),

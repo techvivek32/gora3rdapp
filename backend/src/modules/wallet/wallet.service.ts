@@ -6,7 +6,7 @@ import Razorpay from 'razorpay';
 import * as crypto from 'crypto';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
-import { CreateTopUpDto, VerifyTopUpDto } from './dto/wallet.dto';
+import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto } from './dto/wallet.dto';
 
 @Injectable()
 export class WalletService {
@@ -112,6 +112,81 @@ export class WalletService {
     return {
       message: 'Wallet credited successfully',
       data: { balance: user?.walletBalance ?? 0, amount: tx.amount },
+    };
+  }
+
+  // ─── Admin ───────────────────────────────────────────────────────────────
+
+  /** Paginated list of users with their wallet balance (admin wallet management). */
+  async getAllWalletsForAdmin(query: { page?: number; limit?: number; search?: string }) {
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, unknown> = {};
+    const search = (query.search || '').trim();
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ fullName: rx }, { mobile: rx }, { email: rx }, { agencyName: rx }];
+    }
+
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select('fullName mobile email agencyName city walletBalance membershipType')
+        .sort({ walletBalance: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    return {
+      message: 'Wallets retrieved',
+      data: {
+        data: users,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      },
+    };
+  }
+
+  /** Manually add (credit) or cut (debit) a user's wallet balance with a reason. */
+  async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto) {
+    const amount = Math.round(dto.amount);
+    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+
+    const user = await this.userModel.findById(userId).select('walletBalance fullName');
+    if (!user) throw new NotFoundException('User not found');
+
+    const current = user.walletBalance ?? 0;
+    if (dto.type === 'debit' && amount > current) {
+      throw new BadRequestException(
+        `Cannot cut ₹${amount}. User's balance is only ₹${current}.`,
+      );
+    }
+
+    const delta = dto.type === 'credit' ? amount : -amount;
+
+    // Record the transaction first (visible in the user's app wallet history).
+    await this.txModel.create({
+      userId: new Types.ObjectId(userId),
+      amount,
+      type: dto.type,
+      status: 'success',
+      note: dto.reason,
+      source: 'admin',
+      adminId: new Types.ObjectId(adminId),
+    });
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(userId, { $inc: { walletBalance: delta } }, { new: true })
+      .select('walletBalance');
+
+    return {
+      message: dto.type === 'credit'
+        ? `Added ₹${amount} to ${user.fullName}'s wallet`
+        : `Cut ₹${amount} from ${user.fullName}'s wallet`,
+      data: { balance: updated?.walletBalance ?? 0 },
     };
   }
 }
