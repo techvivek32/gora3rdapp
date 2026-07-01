@@ -45,8 +45,7 @@ export class SmsService {
         `message=${encodeURIComponent(message)}`,
       ];
       if (sms.templateId) q.push(`templateid=${encodeURIComponent(sms.templateId)}`);
-      // NOTE: do NOT send entityid — this gateway drops the message (operator-side)
-      // when entityid is included, even though it still returns a msg-id.
+      if (sms.entityId) q.push(`entityid=${encodeURIComponent(sms.entityId)}`);
       const sep = sms.apiUrl.includes('?') ? '&' : '?';
       url = `${sms.apiUrl}${sep}${q.join('&')}`;
     } else {
