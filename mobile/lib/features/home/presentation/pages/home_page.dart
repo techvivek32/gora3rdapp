@@ -87,18 +87,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (!mounted) return;
       final go = await showDialog<bool>(
         context: context,
-        builder: (_) => AlertDialog(
+        useRootNavigator: true,
+        builder: (dialogCtx) => AlertDialog(
           title: const Text('Show alerts over other apps'),
           content: const Text(
             'To pop new ride requirements on your screen even while you are using other '
             'apps or on the home screen, Gora Cabs needs the "Display over other apps" '
-            'permission.\n\nOn the settings screen that opens, tap "Permissions" or '
-            '"Other permissions" and turn ON "Display over other apps" (on Xiaomi/Redmi '
-            'it may be called "Display pop-up windows while running in the background").',
+            'permission.',
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Not now')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Open settings')),
+            TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Not now')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogCtx, true), child: const Text('Open settings')),
           ],
         ),
       );

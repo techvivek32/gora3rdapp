@@ -27,17 +27,18 @@ Future<bool> ensureMinWalletBalance(BuildContext context, {required String actio
 
   await showDialog(
     context: context,
-    builder: (_) => AlertDialog(
+    useRootNavigator: true,
+    builder: (dialogCtx) => AlertDialog(
       title: const Text('Add money to continue'),
       content: Text(
         'You need a minimum wallet balance of ₹$kMinWalletBalance to $action.\n\n'
         'Your current balance is ₹${balance.toStringAsFixed(0)}. Please add money to your wallet.',
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancel')),
         ElevatedButton(
           onPressed: () {
-            Navigator.pop(context);
+            Navigator.pop(dialogCtx);
             context.push('/wallet');
           },
           child: const Text('Open Wallet'),

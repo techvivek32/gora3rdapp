@@ -16,7 +16,8 @@ const _overlayPermChannel = MethodChannel('gora/overlay');
 Future<bool> isOverlayPermissionGranted() async {
   if (!Platform.isAndroid) return false;
   try {
-    return await _overlayPermChannel.invokeMethod<bool>('canDrawOverlays') ?? false;
+    return await _overlayPermChannel.invokeMethod<bool>('canDrawOverlays') ??
+        false;
   } catch (_) {
     // Native channel not available (e.g. app not rebuilt) — use plugin/permission_handler.
     try {
@@ -81,9 +82,9 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
     }
 
     await FlutterOverlayWindow.showOverlay(
-      height: 760,
+      height: WindowSize.matchParent,
       width: WindowSize.matchParent,
-      alignment: OverlayAlignment.topCenter,
+      alignment: OverlayAlignment.center,
       flag: OverlayFlag.defaultFlag,
       visibility: NotificationVisibility.visibilityPublic,
       positionGravity: PositionGravity.none,
@@ -155,7 +156,8 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final m = _s('posterMobile');
     if (m.isEmpty) return;
     try {
-      await launchUrl(Uri.parse('tel:$m'), mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse('tel:$m'),
+          mode: LaunchMode.externalApplication);
     } catch (_) {}
     await FlutterOverlayWindow.closeOverlay();
   }
@@ -165,14 +167,16 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     if (m.isEmpty) return;
     if (m.length == 10) m = '91$m';
     try {
-      await launchUrl(Uri.parse('https://wa.me/$m'), mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse('https://wa.me/$m'),
+          mode: LaunchMode.externalApplication);
     } catch (_) {}
     await FlutterOverlayWindow.closeOverlay();
   }
 
   @override
   Widget build(BuildContext context) {
-    final poster = _s('posterName').isNotEmpty ? _s('posterName') : 'New Requirement';
+    final poster =
+        _s('posterName').isNotEmpty ? _s('posterName') : 'New Requirement';
     final bookingId = _s('bookingId');
     final vehicle = _cap(_s('vehicleType'));
     final trip = _cap(_s('tripType'));
@@ -184,136 +188,206 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 16, offset: Offset(0, 6))],
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Brand bar
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  color: _primary,
-                  child: Row(
-                    children: [
-                      const Icon(Icons.local_taxi, color: Colors.white, size: 20),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text('New Vehicle Requirement',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-                      ),
-                      GestureDetector(
-                        onTap: () => FlutterOverlayWindow.closeOverlay(),
-                        child: const Icon(Icons.close, color: Colors.white, size: 22),
-                      ),
+        // Dim the rest of the screen; tapping outside the card dismisses it.
+        color: Colors.black45,
+        child: GestureDetector(
+          onTap: () => FlutterOverlayWindow.closeOverlay(),
+          child: Center(
+            child: GestureDetector(
+              onTap: () {}, // absorb taps on the card so it doesn't dismiss
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 16,
+                          offset: Offset(0, 6))
                     ],
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(14),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          const CircleAvatar(radius: 15, backgroundColor: _primaryLight, child: Icon(Icons.person, size: 18, color: _primary)),
-                          const SizedBox(width: 8),
-                          Expanded(child: Text(poster, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15), overflow: TextOverflow.ellipsis)),
-                          if (bookingId.isNotEmpty)
-                            Text('#$bookingId', style: const TextStyle(fontWeight: FontWeight.w700, color: _primary, fontSize: 13)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          const Icon(Icons.directions_car, color: _primary, size: 20),
-                          const SizedBox(width: 6),
-                          Text(vehicle.isEmpty ? 'Vehicle' : vehicle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                          const Spacer(),
-                          if (trip.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade300)),
-                              child: Text(trip, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                            ),
-                        ],
-                      ),
-                      const Divider(height: 18),
-                      _routeRow(Colors.green, 'A', from.isEmpty ? '—' : from),
-                      const SizedBox(height: 6),
-                      _routeRow(Colors.red, 'B', to.isEmpty ? '—' : to),
-                      if (note.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // Brand bar
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        color: _primary,
+                        child: Row(
                           children: [
-                            Icon(Icons.chat_bubble_outline, size: 16, color: Colors.grey.shade600),
-                            const SizedBox(width: 6),
-                            Expanded(child: Text(note, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.3))),
+                            const Icon(Icons.local_taxi,
+                                color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text('New Vehicle Requirement',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 15)),
+                            ),
+                            GestureDetector(
+                              onTap: () => FlutterOverlayWindow.closeOverlay(),
+                              child: const Icon(Icons.close,
+                                  color: Colors.white, size: 22),
+                            ),
                           ],
                         ),
-                      ],
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: hasMobile ? _call : null,
-                              icon: const Icon(Icons.call, size: 18, color: Colors.white),
-                              label: const Text('Call'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 11),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: hasMobile ? _whatsapp : null,
-                              icon: const Icon(Icons.chat, size: 18, color: Colors.white),
-                              label: const Text('WhatsApp'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 11),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => FlutterOverlayWindow.closeOverlay(),
-                          child: const Text('Dismiss', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600)),
+                      Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                const CircleAvatar(
+                                    radius: 15,
+                                    backgroundColor: _primaryLight,
+                                    child: Icon(Icons.person,
+                                        size: 18, color: _primary)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                    child: Text(poster,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15),
+                                        overflow: TextOverflow.ellipsis)),
+                                if (bookingId.isNotEmpty)
+                                  Text('#$bookingId',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: _primary,
+                                          fontSize: 13)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Icon(Icons.directions_car,
+                                    color: _primary, size: 20),
+                                const SizedBox(width: 6),
+                                Text(vehicle.isEmpty ? 'Vehicle' : vehicle,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700)),
+                                const Spacer(),
+                                if (trip.isNotEmpty)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: Colors.grey.shade300)),
+                                    child: Text(trip,
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600)),
+                                  ),
+                              ],
+                            ),
+                            const Divider(height: 18),
+                            _routeRow(
+                                Colors.green, 'A', from.isEmpty ? '—' : from),
+                            const SizedBox(height: 6),
+                            _routeRow(Colors.red, 'B', to.isEmpty ? '—' : to),
+                            if (note.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.chat_bubble_outline,
+                                      size: 16, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                      child: Text(note,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontSize: 12, height: 1.3))),
+                                ],
+                              ),
+                            ],
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: hasMobile ? _call : null,
+                                    icon: const Icon(Icons.call,
+                                        size: 18, color: Colors.white),
+                                    label: const Text('Call'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 11),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: hasMobile ? _whatsapp : null,
+                                    icon: const Icon(Icons.chat,
+                                        size: 18, color: Colors.white),
+                                    label: const Text('WhatsApp'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF25D366),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 11),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Center(
+                              child: TextButton(
+                                onPressed: () =>
+                                    FlutterOverlayWindow.closeOverlay(),
+                                child: const Text('Dismiss',
+                                    style: TextStyle(
+                                        color: Colors.grey,
+                                        fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+                ), // Container
+              ), // Padding (horizontal)
+            ), // inner GestureDetector (absorb taps)
+          ), // Center
+        ), // outer GestureDetector (tap outside to dismiss)
+      ), // Material
     );
   }
 
   Widget _routeRow(Color color, String label, String text) => Row(
         children: [
-          CircleAvatar(radius: 10, backgroundColor: color, child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold))),
+          CircleAvatar(
+              radius: 10,
+              backgroundColor: color,
+              child: Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold))),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600),
+                  overflow: TextOverflow.ellipsis)),
         ],
       );
 }
