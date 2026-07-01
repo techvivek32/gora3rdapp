@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "123456789012",
-    "project_id": "gora-cabs-app",
-    "storage_bucket": "gora-cabs-app.appspot.com"
+    "project_number": "374887648422",
+    "project_id": "gora-3rd",
+    "storage_bucket": "gora-3rd.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:123456789012:android:abcdef1234567890abcdef",
+        "mobilesdk_app_id": "1:374887648422:android:5a1256d0f5cc4782437867",
         "android_client_info": {
           "package_name": "com.goracabs.gora_cabs"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDummyKeyForDebugBuildOnlyNotReal"
+          "current_key": "AIzaSyAatttu113mWEIOtMB4xJnz1SoVzxFpHGY"
         }
       ],
       "services": {
