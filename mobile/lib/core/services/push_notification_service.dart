@@ -7,6 +7,7 @@ import '../di/injection.dart';
 import '../network/api_client.dart';
 import '../router/app_router.dart';
 import '../utils/contact_launcher.dart';
+import '../../features/requirements/presentation/widgets/requirement_alert.dart';
 
 // Must match the channelId the backend sets on the FCM android payload.
 const _channel = AndroidNotificationChannel(
@@ -78,6 +79,14 @@ class PushNotificationService {
   Future<void> _showLocal(RemoteMessage message) async {
     final n = message.notification;
     final data = message.data;
+
+    // App is in the foreground here — show the rich on-screen popup card.
+    final ctx = AppRouter.rootNavigatorKey.currentContext;
+    if (ctx != null && (data['requirementId'] ?? '').toString().isNotEmpty) {
+      showRequirementAlert(ctx, Map<String, dynamic>.from(data));
+      return;
+    }
+
     final title = n?.title ?? '🚕 New Vehicle Requirement';
     final mobile = (data['posterMobile'] ?? '').toString();
 
@@ -108,6 +117,8 @@ class PushNotificationService {
           channelDescription: _channel.description,
           importance: Importance.high,
           priority: Priority.high,
+          fullScreenIntent: true, // pop over the lock screen like a call
+          category: AndroidNotificationCategory.call,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
               ? const []
@@ -146,7 +157,11 @@ class PushNotificationService {
     if (!openApp) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx == null) return;
-    // Open the requirements feed where the new request will appear.
-    ctx.push('/requirements');
+    // Show the rich popup card if this was a requirement, else open the feed.
+    if ((data['requirementId'] ?? '').toString().isNotEmpty) {
+      showRequirementAlert(ctx, Map<String, dynamic>.from(data));
+    } else {
+      ctx.push('/requirements');
+    }
   }
 }

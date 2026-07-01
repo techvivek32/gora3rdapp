@@ -1,0 +1,162 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
+
+/// Full-screen-style popup shown when a "new requirement" push arrives while the
+/// app is open (or when the user taps the notification).
+Future<void> showRequirementAlert(BuildContext context, Map<String, dynamic> data) {
+  return showDialog(
+    context: context,
+    barrierDismissible: true,
+    barrierColor: Colors.black54,
+    builder: (_) => _RequirementAlert(data: data),
+  );
+}
+
+class _RequirementAlert extends StatelessWidget {
+  final Map<String, dynamic> data;
+  const _RequirementAlert({required this.data});
+
+  String _str(String key) => (data[key] ?? '').toString();
+
+  String _cap(String s) => s.isEmpty ? s : s.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+
+  @override
+  Widget build(BuildContext context) {
+    final poster = _str('posterName').isNotEmpty ? _str('posterName') : 'agent';
+    final mobile = _str('posterMobile');
+    final bookingId = _str('bookingId');
+    final vehicle = _cap(_str('vehicleType'));
+    final trip = _cap(_str('tripType'));
+    final from = _str('pickupCity');
+    final to = _str('dropCity');
+    final note = _str('notes');
+    final id = _str('requirementId');
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: agent + booking id
+              Row(
+                children: [
+                  const CircleAvatar(radius: 16, backgroundColor: AppColors.primaryLight, child: Icon(Icons.person, size: 18, color: AppColors.primary)),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)),
+                    child: Text(poster, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  ),
+                  const Spacer(),
+                  if (bookingId.isNotEmpty)
+                    Text('#$bookingId', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.memberPremium)),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Vehicle row
+              Row(
+                children: [
+                  const Icon(Icons.directions_car, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 8),
+                  Text(vehicle.isEmpty ? 'Vehicle' : vehicle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const Spacer(),
+                  if (trip.isNotEmpty) _tag(trip),
+                ],
+              ),
+              const Divider(height: 20),
+
+              // From
+              _routePoint(Colors.green, 'A', from.isEmpty ? '—' : from),
+              Padding(
+                padding: const EdgeInsets.only(left: 11, top: 2, bottom: 2),
+                child: Row(children: [
+                  Container(width: 2, height: 16, color: Colors.grey.shade300),
+                  const SizedBox(width: 18),
+                  Text(trip.isEmpty ? '' : trip, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                ]),
+              ),
+              _routePoint(Colors.red, 'B', to.isEmpty ? '—' : to),
+
+              if (note.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.chat_bubble_outline, size: 18, color: Colors.grey.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(note, style: const TextStyle(fontSize: 13, height: 1.4))),
+                  ],
+                ),
+              ],
+
+              const SizedBox(height: 8),
+              Text('just now', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+              const SizedBox(height: 14),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        if (id.isNotEmpty) context.push('/requirements');
+                      },
+                      icon: const Icon(Icons.flag_outlined, size: 18),
+                      label: const Text('View'),
+                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: mobile.isEmpty ? null : () => callNumber(mobile),
+                      icon: const Icon(Icons.call, size: 18, color: Colors.white),
+                      label: const Text('Call'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tag(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
+        child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      );
+
+  Widget _routePoint(Color color, String label, String text) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(radius: 11, backgroundColor: color, child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+        ],
+      );
+}
