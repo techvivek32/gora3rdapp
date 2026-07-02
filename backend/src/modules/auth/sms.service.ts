@@ -45,7 +45,7 @@ export class SmsService {
         `message=${encodeURIComponent(message)}`,
       ];
       if (sms.templateId) q.push(`templateid=${encodeURIComponent(sms.templateId)}`);
-      if (sms.entityId) q.push(`entityid=${encodeURIComponent(sms.entityId)}`);
+      // Intentionally NOT sending entityid — the known-working requests omitted it.
       const sep = sms.apiUrl.includes('?') ? '&' : '?';
       url = `${sms.apiUrl}${sep}${q.join('&')}`;
     } else {
@@ -62,6 +62,11 @@ export class SmsService {
       const sep = sms.apiUrl.includes('?') ? '&' : '?';
       url = `${sms.apiUrl}${sep}${params.toString()}`;
     }
+
+    // TEMP DEBUG: log the exact outgoing message + URL so we can compare against
+    // a known-working request. Remove once OTP delivery is confirmed.
+    this.logger.log(`SMS OUT -> number=${local10} route=${sms.route} msg="${message}"`);
+    this.logger.log(`SMS URL -> ${url}`);
 
     try {
       const res = await fetch(url, { method: 'GET' });
