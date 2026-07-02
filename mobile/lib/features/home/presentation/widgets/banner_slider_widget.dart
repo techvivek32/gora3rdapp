@@ -68,18 +68,18 @@ class _BannerSliderWidgetState extends State<BannerSliderWidget> {
           ),
         ),
         if (widget.banners.length > 1) ...[
-          SizedBox(height: 8.h),
+          SizedBox(height: 10.h),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(widget.banners.length, (i) {
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
-                width: i == _current ? 24.w : 8.w,
-                height: 8.h,
-                margin: EdgeInsets.symmetric(horizontal: 4.w),
+                width: i == _current ? 34.w : 13.w,
+                height: 13.h,
+                margin: EdgeInsets.symmetric(horizontal: 5.w),
                 decoration: BoxDecoration(
-                  color: i == _current ? AppColors.primary : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(4.r),
+                  color: i == _current ? AppColors.primary : Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(7.r),
                 ),
               );
             }),
