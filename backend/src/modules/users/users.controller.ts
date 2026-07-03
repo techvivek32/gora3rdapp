@@ -54,6 +54,12 @@ export class UsersController {
     return this.usersService.getReferralInfo(userId);
   }
 
+  @Get('referral-leaderboard')
+  @ApiOperation({ summary: 'Top inviters ranked by referral count' })
+  getReferralLeaderboard(@CurrentUser('sub') userId: string) {
+    return this.usersService.getReferralLeaderboard(userId);
+  }
+
   @Get('lookup')
   @ApiOperation({ summary: 'Find a user by mobile number' })
   lookupByMobile(@Query('mobile') mobile: string) {

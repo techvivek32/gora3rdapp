@@ -144,6 +144,30 @@ export class UsersService {
     };
   }
 
+  // Leaderboard ranked by how many users each person referred. Users who haven't
+  // invited anyone still appear (with 0), so the board is never empty. Admins are
+  // excluded.
+  async getReferralLeaderboard(currentUserId?: string) {
+    const top = await this.userModel
+      .find({ role: { $nin: ['admin', 'super_admin'] } })
+      .select('fullName agencyName profileImage city referralCount')
+      .sort({ referralCount: -1, createdAt: 1 })
+      .limit(50)
+      .lean();
+
+    const leaderboard = top.map((u, i) => ({
+      rank: i + 1,
+      _id: u._id,
+      name: u.fullName || u.agencyName || 'User',
+      city: u.city ?? '',
+      profileImage: u.profileImage ?? '',
+      count: u.referralCount ?? 0,
+      isMe: currentUserId ? u._id.toString() === currentUserId : false,
+    }));
+
+    return { message: 'Leaderboard retrieved', data: leaderboard };
+  }
+
   async updateProfile(userId: string, dto: UpdateProfileDto) {
     const user = await this.userModel.findByIdAndUpdate(
       userId,
