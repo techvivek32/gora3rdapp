@@ -154,7 +154,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             child: ListView.separated(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.only(left: 16.r, right: 16.r, top: 16.r, bottom: 140.h),
+              padding: EdgeInsets.only(left: 8.r, right: 8.r, top: 16.r, bottom: 140.h),
               itemCount: items.length,
               separatorBuilder: (_, __) => SizedBox(height: 16.h),
               itemBuilder: (context, index) {

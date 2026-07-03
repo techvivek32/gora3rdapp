@@ -97,7 +97,7 @@ class RequirementCardWidget extends StatelessWidget {
                   onTap!();
                 },
           child: Container(
-            margin: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+            margin: EdgeInsets.symmetric(horizontal: 2.w, vertical: 6.h),
             decoration: BoxDecoration(
               color: cardBg,
               borderRadius: BorderRadius.circular(10.r),
