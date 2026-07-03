@@ -5,6 +5,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { Payment, PaymentDocument } from '../../database/schemas/payment.schema';
+import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { Subscription, SubscriptionDocument, SubscriptionPlan, SubscriptionPlanDocument, SubscriptionStatus } from '../../database/schemas/subscription.schema';
 import { Report, ReportDocument, ReportStatus } from '../../database/schemas/report.schema';
 import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
@@ -22,6 +23,7 @@ export class AdminService {
     @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(WalletTransaction.name) private walletTxModel: Model<WalletTransactionDocument>,
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
@@ -521,24 +523,66 @@ export class AdminService {
     };
   }
 
+  // Combined transaction history: subscription payments + wallet top-ups.
   async getPayments(query: any) {
-    const { page, limit, skip } = getPaginationParams(query);
-    const filter: any = {};
-    if (query.status) filter.status = query.status;
-    if (query.search) filter.$or = [
-      { orderId: new RegExp(query.search, 'i') },
-      { razorpayPaymentId: new RegExp(query.search, 'i') },
-    ];
+    const { page, limit } = getPaginationParams(query);
+    const search = (query.search || '').trim();
+    const rx = search ? new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
-    const [payments, total] = await Promise.all([
-      this.paymentModel
-        .find(filter)
-        .populate('userId', 'fullName email mobile')
-        .populate('planId', 'name membershipType')
-        .sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
-      this.paymentModel.countDocuments(filter),
-    ]);
+    const paymentFilter: any = {};
+    if (query.status) paymentFilter.status = query.status;
+    if (rx) paymentFilter.$or = [{ orderId: rx }, { razorpayPaymentId: rx }];
 
-    return { message: 'Payments retrieved', data: buildPaginatedResult(payments, total, page, limit) };
+    // Subscription/plan payments.
+    const payments = await this.paymentModel
+      .find(paymentFilter)
+      .populate('userId', 'fullName email mobile')
+      .populate('planId', 'name membershipType')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Wallet top-ups (money the user added). Only include when the status filter
+    // isn't set to something a wallet credit can't be.
+    const includeWallet = !query.status || ['success', 'paid'].includes(query.status);
+    const walletFilter: any = { type: 'credit', status: 'success' };
+    if (rx) walletFilter.razorpayOrderId = rx;
+    const walletTxns = includeWallet
+      ? await this.walletTxModel
+          .find(walletFilter)
+          .populate('userId', 'fullName email mobile')
+          .sort({ createdAt: -1 })
+          .lean()
+      : [];
+
+    // Normalize both into the payments-table shape. Wallet amounts are in rupees,
+    // Payment amounts are in paise (the UI divides by 100), so scale wallet ×100.
+    const unified = [
+      ...payments.map((p: any) => ({
+        _id: p._id,
+        orderId: p.orderId,
+        userId: p.userId,
+        planId: p.planId,
+        amount: p.amount,
+        method: p.method || 'razorpay',
+        status: p.status,
+        createdAt: p.createdAt,
+      })),
+      ...walletTxns.map((w: any) => ({
+        _id: w._id,
+        orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
+        userId: w.userId,
+        planId: { name: w.source === 'admin' ? 'Wallet Adjustment' : 'Wallet Top-up', membershipType: 'wallet' },
+        amount: (w.amount || 0) * 100,
+        method: w.source === 'admin' ? 'admin' : 'razorpay',
+        status: w.status,
+        createdAt: w.createdAt,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = unified.length;
+    const start = (page - 1) * limit;
+    const paged = unified.slice(start, start + limit);
+
+    return { message: 'Payments retrieved', data: buildPaginatedResult(paged, total, page, limit) };
   }
 }
