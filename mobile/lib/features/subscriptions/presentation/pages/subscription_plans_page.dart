@@ -56,6 +56,9 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   void initState() {
     super.initState();
     context.read<SubscriptionBloc>().add(LoadPlansEvent());
+    // Refresh the profile so KYC/verification status is up to date (the cached
+    // auth user can be stale from an earlier login, before the user got verified).
+    context.read<AuthBloc>().add(const AuthReloadProfileEvent());
     if (!kIsWeb) {
       _razorpay = Razorpay();
       _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
@@ -230,7 +233,9 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
             return const Center(child: Text('No plans available', style: TextStyle(fontFamily: 'Poppins')));
           }
 
-          final authState = context.read<AuthBloc>().state;
+          // watch (not read) so the page rebuilds once the profile reload finishes
+          // and the KYC notice / buy gate reflect the up-to-date verification.
+          final authState = context.watch<AuthBloc>().state;
           final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
           final currentMembership = user?['membershipType'] as String? ?? 'new';
           final currentColIndex = _membershipCol[currentMembership] ?? 0;
