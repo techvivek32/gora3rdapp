@@ -44,6 +44,12 @@ export class AdminController {
     return this.adminService.getReferralLeaderboard(query);
   }
 
+  @Get('users/:id')
+  @ApiOperation({ summary: 'Get a single user' })
+  getUser(@Param('id') id: string) {
+    return this.adminService.getUser(id);
+  }
+
   @Put('users/:id')
   @ApiOperation({ summary: 'Update user' })
   updateUser(@Param('id') id: string, @Body() data: any) {

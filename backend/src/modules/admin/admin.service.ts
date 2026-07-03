@@ -106,6 +106,17 @@ export class AdminService {
     return { message: 'Users retrieved', data: buildPaginatedResult(users, total, page, limit) };
   }
 
+  // Single user detail for the admin user page.
+  async getUser(id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('User not found');
+    const user = await this.userModel
+      .findById(id)
+      .select('-password -refreshToken -fcmTokens')
+      .lean();
+    if (!user) throw new NotFoundException('User not found');
+    return { message: 'User retrieved', data: user };
+  }
+
   // Invitation leaderboard — all users ranked by how many they referred.
   async getReferralLeaderboard(query: any) {
     const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };

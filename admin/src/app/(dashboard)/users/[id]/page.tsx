@@ -45,7 +45,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
 
-  const user = data?.data?.data;
+  // API client unwraps res.data; backend returns { data: user } → data.data is the user.
+  const user = (data as any)?.data;
   if (!user) return <div className="text-center py-12 text-gray-500">User not found</div>;
 
   return (
