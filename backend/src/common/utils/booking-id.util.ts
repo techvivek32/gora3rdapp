@@ -20,3 +20,13 @@ export function generatePaymentOrderId(): string {
   const timestamp = Date.now().toString().slice(-8);
   return `PAY${timestamp}`;
 }
+
+/** Short, human-friendly referral code, e.g. "GORA7K3QF". */
+export function generateReferralCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return `GORA${code}`;
+}

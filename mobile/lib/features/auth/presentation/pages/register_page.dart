@@ -34,6 +34,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _mobileCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
+  final _referralCtrl = TextEditingController();
   String _selectedRole = 'travel_agency';
   bool _obscure = true;
 
@@ -72,6 +73,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _mobileCtrl.dispose();
     _passwordCtrl.dispose();
     _agencyCtrl.dispose();
+    _referralCtrl.dispose();
     for (final d in _docs.values) {
       d.numberCtrl.dispose();
     }
@@ -179,6 +181,7 @@ class _RegisterPageState extends State<RegisterPage> {
         agencyName: _agencyCtrl.text.trim().isEmpty ? null : _agencyCtrl.text.trim(),
         role: _selectedRole,
         otp: otp,
+        referralCode: _referralCtrl.text.trim().isEmpty ? null : _referralCtrl.text.trim(),
       );
       final failure = result.fold((f) => f, (_) => null);
       if (failure != null) {
@@ -403,6 +406,17 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _referralCtrl,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: const InputDecoration(
+                    labelText: 'Referral Code (Optional)',
+                    hintText: 'e.g. GORA7K3QF',
+                    prefixIcon: Icon(Icons.card_giftcard_outlined),
+                  ),
+                ),
 
                 const SizedBox(height: 28),
                 Align(

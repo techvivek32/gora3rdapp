@@ -22,6 +22,7 @@ import { LoginSendOtpDto, LoginVerifyOtpDto } from './dto/login-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
+import { generateReferralCode } from '../../common/utils/booking-id.util';
 
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const OTP_MAX_ATTEMPTS = 5;
@@ -134,6 +135,14 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(dto.password, 12);
 
+    // Resolve the referrer (if a valid code was entered).
+    let referredBy = null;
+    const enteredCode = (dto.referralCode || '').trim().toUpperCase();
+    if (enteredCode) {
+      const referrer = await this.userModel.findOne({ referralCode: enteredCode }).select('_id');
+      if (referrer) referredBy = referrer._id;
+    }
+
     const user = await this.userModel.create({
       fullName: dto.fullName,
       email: dto.email.toLowerCase(),
@@ -145,7 +154,14 @@ export class AuthService {
       role: dto.role || UserRole.DRIVER,
       membershipType: MembershipType.NEW,
       isActive: true,
+      referralCode: await this.generateUniqueReferralCode(),
+      referredBy,
     });
+
+    // Credit the referrer's invite count.
+    if (referredBy) {
+      await this.userModel.findByIdAndUpdate(referredBy, { $inc: { referralCount: 1 } });
+    }
 
     const tokens = await this.generateTokens(user);
     await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
@@ -162,6 +178,16 @@ export class AuthService {
         ...tokens,
       },
     };
+  }
+
+  // Generate a referral code that isn't already taken (retries a few times).
+  private async generateUniqueReferralCode(): Promise<string> {
+    for (let i = 0; i < 5; i++) {
+      const code = generateReferralCode();
+      const exists = await this.userModel.exists({ referralCode: code });
+      if (!exists) return code;
+    }
+    return `${generateReferralCode()}${Date.now().toString().slice(-3)}`;
   }
 
   async login(dto: LoginDto) {

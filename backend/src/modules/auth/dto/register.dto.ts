@@ -48,6 +48,11 @@ export class RegisterDto {
   @IsString()
   profileImage?: string;
 
+  @ApiPropertyOptional({ example: 'GORA7K3QF', description: "Referrer's invite code" })
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
+
   @ApiProperty({ example: '123456', description: 'OTP sent to the mobile number' })
   @IsString()
   @IsNotEmpty()

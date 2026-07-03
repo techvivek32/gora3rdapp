@@ -10,6 +10,7 @@ import { RateUserDto } from './dto/rate-user.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+import { generateReferralCode } from '../../common/utils/booking-id.util';
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
@@ -104,6 +105,43 @@ export class UsersService {
 
     if (!user) throw new NotFoundException('User not found');
     return { message: 'Profile retrieved', data: user };
+  }
+
+  // Referral code + how many users this person invited (+ the invited list).
+  async getReferralInfo(userId: string) {
+    let user = await this.userModel.findById(userId).select('referralCode referralCount');
+    if (!user) throw new NotFoundException('User not found');
+
+    // Backfill a code for accounts created before the referral system existed.
+    if (!user.referralCode) {
+      for (let i = 0; i < 5; i++) {
+        const code = generateReferralCode();
+        if (!(await this.userModel.exists({ referralCode: code }))) {
+          user = await this.userModel.findByIdAndUpdate(
+            userId,
+            { referralCode: code },
+            { new: true },
+          ).select('referralCode referralCount');
+          break;
+        }
+      }
+    }
+
+    const invited = await this.userModel
+      .find({ referredBy: new Types.ObjectId(userId) })
+      .select('fullName agencyName profileImage city createdAt')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    return {
+      message: 'Referral info retrieved',
+      data: {
+        code: user?.referralCode ?? '',
+        count: invited.length,
+        invited,
+      },
+    };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {

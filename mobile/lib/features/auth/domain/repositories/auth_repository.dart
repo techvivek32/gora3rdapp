@@ -26,6 +26,7 @@ abstract class AuthRepository {
     String? state,
     String role = 'driver',
     String? otp,
+    String? referralCode,
   });
 
   Future<Either<Failure, Map<String, dynamic>>> verifyOtp({

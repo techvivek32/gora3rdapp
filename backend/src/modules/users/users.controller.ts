@@ -48,6 +48,12 @@ export class UsersController {
     return this.usersService.updateBusinessCities(userId, cities);
   }
 
+  @Get('referral-info')
+  @ApiOperation({ summary: 'Get my referral code and how many users I invited' })
+  getReferralInfo(@CurrentUser('sub') userId: string) {
+    return this.usersService.getReferralInfo(userId);
+  }
+
   @Get('lookup')
   @ApiOperation({ summary: 'Find a user by mobile number' })
   lookupByMobile(@Query('mobile') mobile: string) {

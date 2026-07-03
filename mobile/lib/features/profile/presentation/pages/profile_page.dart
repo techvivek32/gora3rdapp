@@ -119,6 +119,7 @@ class ProfilePage extends StatelessWidget {
                       SizedBox(height: 12.h),
                       
                       _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'My Wallet', onTap: () => context.push('/wallet')),
+                      _ProfileAction(icon: Icons.card_giftcard_outlined, label: 'Invite Friends', onTap: () => context.push('/invite')),
                       _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification', onTap: () => context.push('/kyc')),
                       _ProfileAction(icon: Icons.flag_outlined, label: 'My Reports', onTap: () => context.push('/my-reports')),
                       _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/notifications')),

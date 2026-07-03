@@ -116,6 +116,16 @@ export class User {
   @Prop({ default: 0 })
   vehiclesPosted: number;
 
+  // Referral / invite system
+  @Prop({ trim: true, uppercase: true })
+  referralCode: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  referredBy: Types.ObjectId;
+
+  @Prop({ default: 0 })
+  referralCount: number;
+
   @Prop()
   firebaseUid: string;
 
@@ -142,6 +152,8 @@ UserSchema.index({ verificationStatus: 1, verificationSubmittedAt: -1 });
 UserSchema.index({ createdAt: -1 });
 UserSchema.index({ lastActive: -1 });
 UserSchema.index({ firebaseUid: 1 });
+UserSchema.index({ referralCode: 1 }, { unique: true, sparse: true });
+UserSchema.index({ referredBy: 1 });
 
 // Virtual for membership status
 UserSchema.virtual('isMembershipActive').get(function () {

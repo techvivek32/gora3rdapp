@@ -22,6 +22,7 @@ import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/kyc_page.dart';
 import '../../features/info/presentation/pages/policy_page.dart';
 import '../../features/wallet/presentation/pages/wallet_page.dart';
+import '../../features/referral/presentation/pages/invite_page.dart';
 import '../../features/reports/presentation/pages/my_reports_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/chat/presentation/pages/chat_list_page.dart';
@@ -155,6 +156,10 @@ class AppRouter {
       GoRoute(
         path: '/policy/:id',
         builder: (_, state) => PolicyPage(id: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/invite',
+        builder: (_, __) => const InvitePage(),
       ),
       GoRoute(
         path: '/wallet',
