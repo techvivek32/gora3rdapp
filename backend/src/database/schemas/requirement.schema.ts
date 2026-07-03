@@ -87,6 +87,10 @@ export class Requirement {
   @Prop({ type: Number, default: 0 })
   totalAmount: number;
 
+  // true when the poster used the app-suggested fare (vs typing a custom one).
+  @Prop({ type: Boolean })
+  isAppSuggested: boolean;
+
   @Prop({ trim: true })
   notes: string;
 

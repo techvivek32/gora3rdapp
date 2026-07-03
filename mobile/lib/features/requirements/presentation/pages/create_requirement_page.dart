@@ -288,6 +288,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'fare': _currentFare.round(),
       'commission': _commission.round(),
       'totalAmount': _total.round(),
+      'isAppSuggested': !_useCustomFare,
       if (_pickupLat != null && _pickupLng != null)
         'pickupCoordinates': {'lat': _pickupLat, 'lng': _pickupLng, 'address': _pickupCtrl.text.trim()},
       if (_dropLat != null && _dropLng != null)

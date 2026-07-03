@@ -1,4 +1,4 @@
-import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { VehicleType, TripType } from '../../../common/enums/vehicle-type.enum';
@@ -102,6 +102,11 @@ export class CreateRequirementDto {
   @IsOptional()
   @IsNumber()
   totalAmount?: number;
+
+  @ApiPropertyOptional({ description: 'true = app-suggested fare, false = custom fare' })
+  @IsOptional()
+  @IsBoolean()
+  isAppSuggested?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

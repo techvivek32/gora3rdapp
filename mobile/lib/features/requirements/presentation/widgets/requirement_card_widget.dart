@@ -74,6 +74,7 @@ class RequirementCardWidget extends StatelessWidget {
         final num total = (requirement['totalAmount'] as num?) ?? 0;
         final num driverEarning = (requirement['fare'] as num?) ?? 0;
         final num commission = (requirement['commission'] as num?) ?? 0;
+        final bool isAppSuggested = requirement['isAppSuggested'] == true;
         final notes = (requirement['notes'] as String?)?.trim() ?? '';
         final rating = (postedBy?['rating'] as num?)?.toDouble() ?? 0;
         final canContact = isCurrentUserPremium || isCurrentUserOwner;
@@ -287,18 +288,35 @@ class RequirementCardWidget extends StatelessWidget {
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 
-                            // 6. pricing breakdown
-                            IntrinsicHeight(
-                              child: Row(
-                                children: [
-                                  Expanded(child: _priceCol(Icons.account_balance_wallet, 'Total Amount', total, topBarColor)),
-                                  VerticalDivider(width: 1, color: Colors.black26),
-                                  Expanded(child: _priceCol(Icons.person, "Driver's Earning", driverEarning, topBarColor)),
-                                  VerticalDivider(width: 1, color: Colors.black26),
-                                  Expanded(child: _priceCol(Icons.percent, 'Commission', commission, topBarColor)),
-                                ],
+                            // 6. pricing — app-suggested shows a single fare line;
+                            // a custom fare shows the full 3-column breakdown.
+                            if (isAppSuggested)
+                              Padding(
+                                padding: EdgeInsets.symmetric(vertical: 2.h),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text('₹${total.round()}', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    SizedBox(width: 8.w),
+                                    Icon(Icons.auto_awesome, size: 15.sp, color: topBarColor),
+                                    SizedBox(width: 4.w),
+                                    Text('App Suggested Fare',
+                                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: topBarColor)),
+                                  ],
+                                ),
+                              )
+                            else
+                              IntrinsicHeight(
+                                child: Row(
+                                  children: [
+                                    Expanded(child: _priceCol(Icons.account_balance_wallet, 'Total Amount', total, topBarColor)),
+                                    VerticalDivider(width: 1, color: Colors.black26),
+                                    Expanded(child: _priceCol(Icons.person, "Driver's Earning", driverEarning, topBarColor)),
+                                    VerticalDivider(width: 1, color: Colors.black26),
+                                    Expanded(child: _priceCol(Icons.percent, 'Commission', commission, topBarColor)),
+                                  ],
+                                ),
                               ),
-                            ),
                             SizedBox(height: 10.h),
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
@@ -423,9 +441,7 @@ class RequirementCardWidget extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 16.sp, color: color),
-        SizedBox(height: 4.h),
-        Text('₹${amount.round()}', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+        Text('₹${amount.round()}', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
         SizedBox(height: 2.h),
         Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
       ],
