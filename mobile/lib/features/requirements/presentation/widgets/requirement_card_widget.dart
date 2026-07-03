@@ -259,13 +259,13 @@ class RequirementCardWidget extends StatelessWidget {
                                   ),
                                 ),
                                 Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
                                   decoration: BoxDecoration(color: topBarColor, borderRadius: BorderRadius.circular(8.r)),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 12.sp, color: Colors.white)),
+                                      Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                                     ],
                                   ),
                                 ),
