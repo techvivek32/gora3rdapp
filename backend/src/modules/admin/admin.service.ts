@@ -106,6 +106,36 @@ export class AdminService {
     return { message: 'Users retrieved', data: buildPaginatedResult(users, total, page, limit) };
   }
 
+  // Invitation leaderboard — all users ranked by how many they referred.
+  async getReferralLeaderboard(query: any) {
+    const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };
+    const search = (query.search || '').trim();
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ fullName: rx }, { mobile: rx }, { agencyName: rx }, { referralCode: rx }];
+    }
+
+    const users = await this.userModel
+      .find(filter)
+      .select('fullName agencyName mobile city profileImage referralCode referralCount')
+      .sort({ referralCount: -1, createdAt: 1 })
+      .limit(200)
+      .lean();
+
+    const data = users.map((u, i) => ({
+      rank: i + 1,
+      _id: u._id,
+      name: u.fullName || u.agencyName || 'User',
+      mobile: u.mobile ?? '',
+      city: u.city ?? '',
+      profileImage: u.profileImage ?? '',
+      referralCode: u.referralCode ?? '',
+      count: u.referralCount ?? 0,
+    }));
+
+    return { message: 'Referral leaderboard retrieved', data };
+  }
+
   async updateUser(id: string, data: Partial<any>) {
     const user = await this.userModel.findByIdAndUpdate(id, data, { new: true }).select('-password -refreshToken');
     if (!user) throw new NotFoundException('User not found');

@@ -60,6 +60,9 @@ export const adminApi = {
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
   approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
 
+  // ─── Referrals ─────────────────────────────────────────────────────────────
+  getReferralLeaderboard: (params?: any) => apiClient.get('/admin/referral-leaderboard', { params }),
+
   // ─── Wallets ───────────────────────────────────────────────────────────────
   getWallets: (params: any) => apiClient.get('/admin/wallets', { params }),
   adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string }) =>

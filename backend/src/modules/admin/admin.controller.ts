@@ -38,6 +38,12 @@ export class AdminController {
     return this.adminService.getUsers(query);
   }
 
+  @Get('referral-leaderboard')
+  @ApiOperation({ summary: 'Invitation leaderboard (users ranked by referrals)' })
+  getReferralLeaderboard(@Query() query: any) {
+    return this.adminService.getReferralLeaderboard(query);
+  }
+
   @Put('users/:id')
   @ApiOperation({ summary: 'Update user' })
   updateUser(@Param('id') id: string, @Body() data: any) {
