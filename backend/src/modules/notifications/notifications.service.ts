@@ -27,7 +27,7 @@ export class NotificationsService {
     ].filter(Boolean);
 
     // Find users with matching business cities who have notifications enabled
-    const targetUsers = await this.userModel
+    const candidates = await this.userModel
       .find({
         businessCities: { $in: cities },
         notificationsEnabled: true,
@@ -36,8 +36,17 @@ export class NotificationsService {
         _id: { $ne: requirement.postedBy },
         fcmTokens: { $exists: true, $ne: [] },
       })
-      .select('fcmTokens _id')
+      .select('fcmTokens _id alertVehicleTypes alertTripTypes')
       .lean();
+
+    // Respect each user's alert filters — an empty filter means "all".
+    const reqVehicle = requirement.vehicleType;
+    const reqTrip = requirement.tripType;
+    const targetUsers = candidates.filter((u) => {
+      const vOk = !u.alertVehicleTypes?.length || u.alertVehicleTypes.includes(reqVehicle);
+      const tOk = !u.alertTripTypes?.length || u.alertTripTypes.includes(reqTrip);
+      return vOk && tOk;
+    });
 
     if (targetUsers.length === 0) return;
 

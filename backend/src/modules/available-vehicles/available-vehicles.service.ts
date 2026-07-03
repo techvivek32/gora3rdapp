@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
@@ -9,7 +9,6 @@ import { MembershipType } from '../../common/enums/user-role.enum';
 import { generateVehicleListingId } from '../../common/utils/booking-id.util';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 import { NotificationsService } from '../notifications/notifications.service';
-import { MIN_WALLET_BALANCE } from '../../common/constants/wallet.constant';
 
 @Injectable()
 export class AvailableVehiclesService {
@@ -20,13 +19,6 @@ export class AvailableVehiclesService {
   ) {}
 
   async create(userId: string, dto: CreateAvailableVehicleDto) {
-    const user = await this.userModel.findById(userId).select('walletBalance');
-    if (!user || (user.walletBalance ?? 0) < MIN_WALLET_BALANCE) {
-      throw new BadRequestException(
-        `You need a minimum wallet balance of ₹${MIN_WALLET_BALANCE} to post a vehicle listing. Please add money to your wallet.`,
-      );
-    }
-
     const listing = await this.vehicleModel.create({
       ...dto,
       listingId: generateVehicleListingId(),

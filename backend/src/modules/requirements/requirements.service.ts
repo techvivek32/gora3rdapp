@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
@@ -17,7 +17,6 @@ import {
   getPaginationParams,
   buildPaginatedResult,
 } from '../../common/utils/pagination.util';
-import { MIN_WALLET_BALANCE } from '../../common/constants/wallet.constant';
 
 @Injectable()
 export class RequirementsService {
@@ -28,13 +27,6 @@ export class RequirementsService {
   ) {}
 
   async create(userId: string, dto: CreateRequirementDto) {
-    const user = await this.userModel.findById(userId).select('walletBalance');
-    if (!user || (user.walletBalance ?? 0) < MIN_WALLET_BALANCE) {
-      throw new BadRequestException(
-        `You need a minimum wallet balance of ₹${MIN_WALLET_BALANCE} to post a requirement. Please add money to your wallet.`,
-      );
-    }
-
     const bookingId = generateBookingId();
     const requirementId = generateRequirementId();
 

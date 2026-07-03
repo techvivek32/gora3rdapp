@@ -66,6 +66,14 @@ export class User {
   @Prop({ default: true })
   notificationsEnabled: boolean;
 
+  // Alert filters: only notify this user for requirements matching these vehicle
+  // and trip types. Empty array = no filter (match all).
+  @Prop({ type: [String], default: [] })
+  alertVehicleTypes: string[];
+
+  @Prop({ type: [String], default: [] })
+  alertTripTypes: string[];
+
   @Prop({ default: 0, min: 0 })
   walletBalance: number;
 

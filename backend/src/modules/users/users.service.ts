@@ -232,8 +232,16 @@ export class UsersService {
     return { message: 'User card retrieved', data: await this.withVehicles(targetUser) };
   }
 
-  async toggleNotifications(userId: string, enabled: boolean) {
-    await this.userModel.findByIdAndUpdate(userId, { notificationsEnabled: enabled });
+  async toggleNotifications(
+    userId: string,
+    enabled: boolean,
+    vehicleTypes?: string[],
+    tripTypes?: string[],
+  ) {
+    const update: Record<string, unknown> = { notificationsEnabled: enabled };
+    if (Array.isArray(vehicleTypes)) update.alertVehicleTypes = vehicleTypes;
+    if (Array.isArray(tripTypes)) update.alertTripTypes = tripTypes;
+    await this.userModel.findByIdAndUpdate(userId, update);
     return { message: `Notifications ${enabled ? 'enabled' : 'disabled'}` };
   }
 

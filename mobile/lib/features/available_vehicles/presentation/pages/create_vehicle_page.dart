@@ -4,7 +4,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/wallet/wallet_guard.dart';
 import '../../../../core/widgets/city_autocomplete_field.dart';
 import '../bloc/vehicles_bloc.dart';
 
@@ -102,8 +101,6 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       bloc.add(UpdateVehicleEvent(id: widget.vehicleId!, data: data));
       return;
     }
-    // Gate: posting an available vehicle needs a minimum wallet balance.
-    if (!await ensureMinWalletBalance(context, action: 'post a vehicle')) return;
     bloc.add(CreateVehicleEvent(data));
   }
 

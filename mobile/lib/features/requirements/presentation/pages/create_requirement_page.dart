@@ -6,7 +6,6 @@ import 'package:dio/dio.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/wallet/wallet_guard.dart';
 import '../bloc/requirements_bloc.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
 import 'location_picker_page.dart' show haversineDistanceKm;
@@ -300,8 +299,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       bloc.add(UpdateRequirementEvent(id: widget.requirementId!, data: data));
       return;
     }
-    // Gate: posting a requirement needs a minimum wallet balance.
-    if (!await ensureMinWalletBalance(context, action: 'post a requirement')) return;
     bloc.add(CreateRequirementEvent(data: data));
   }
 

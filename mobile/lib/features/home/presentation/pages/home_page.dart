@@ -12,6 +12,7 @@ import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../requirements/presentation/widgets/requirement_overlay.dart';
 import '../bloc/home_bloc.dart';
+import '../widgets/alert_filter_sheet.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
 import '../widgets/user_search_widget.dart';
@@ -69,16 +70,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _toggleAlerts(bool value) async {
-    setState(() => _alertsOn = value);
-    try {
-      await getIt<ApiClient>().put('/users/notifications', data: {'enabled': value});
-    } catch (_) {
-      if (mounted) setState(() => _alertsOn = !value); // revert on failure
+    // Turning OFF — just disable, no filter sheet.
+    if (!value) {
+      setState(() => _alertsOn = false);
+      try {
+        await getIt<ApiClient>().put('/users/notifications', data: {'enabled': false});
+      } catch (_) {
+        if (mounted) setState(() => _alertsOn = true);
+      }
       return;
     }
-    // Turning alerts on: also ask for the "Display over other apps" permission so
-    // requirement cards can float over other apps while the app runs in the background.
-    if (value) await _ensureOverlayPermission();
+
+    // Turning ON — first let the user pick which vehicle/ride types to be alerted for.
+    final auth = context.read<AuthBloc>().state;
+    final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
+    final initialVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
+    final initialTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
+
+    final filters = await showAlertFilterSheet(context, initialVehicles: initialVehicles, initialTrips: initialTrips);
+    if (filters == null) return; // dismissed → keep the toggle off
+
+    setState(() => _alertsOn = true);
+    try {
+      await getIt<ApiClient>().put('/users/notifications', data: {
+        'enabled': true,
+        'vehicleTypes': filters['vehicles'],
+        'tripTypes': filters['trips'],
+      });
+    } catch (_) {
+      if (mounted) setState(() => _alertsOn = false);
+      return;
+    }
+    // Then ask for the "Display over other apps" permission so requirement cards can
+    // float over other apps while the app runs in the background.
+    await _ensureOverlayPermission();
   }
 
   Future<void> _ensureOverlayPermission() async {

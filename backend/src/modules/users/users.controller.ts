@@ -95,12 +95,14 @@ export class UsersController {
   }
 
   @Put('notifications')
-  @ApiOperation({ summary: 'Toggle notifications' })
+  @ApiOperation({ summary: 'Toggle notifications and set alert filters' })
   toggleNotifications(
     @CurrentUser('sub') userId: string,
     @Body('enabled') enabled: boolean,
+    @Body('vehicleTypes') vehicleTypes?: string[],
+    @Body('tripTypes') tripTypes?: string[],
   ) {
-    return this.usersService.toggleNotifications(userId, enabled);
+    return this.usersService.toggleNotifications(userId, enabled, vehicleTypes, tripTypes);
   }
 
   @Post('fcm-token')
