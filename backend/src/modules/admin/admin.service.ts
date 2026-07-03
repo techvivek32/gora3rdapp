@@ -5,7 +5,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { Payment, PaymentDocument } from '../../database/schemas/payment.schema';
-import { Subscription, SubscriptionDocument } from '../../database/schemas/subscription.schema';
+import { Subscription, SubscriptionDocument, SubscriptionPlan, SubscriptionPlanDocument, SubscriptionStatus } from '../../database/schemas/subscription.schema';
 import { Report, ReportDocument, ReportStatus } from '../../database/schemas/report.schema';
 import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
 import { City, CityDocument } from '../../database/schemas/city.schema';
@@ -23,6 +23,7 @@ export class AdminService {
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
     @InjectModel(Banner.name) private bannerModel: Model<BannerDocument>,
     @InjectModel(City.name) private cityModel: Model<CityDocument>,
@@ -244,9 +245,17 @@ export class AdminService {
     return { message: 'Verification rejected', data: user };
   }
 
-  async upgradeMembership(id: string, membershipType: MembershipType, daysToAdd = 30) {
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + daysToAdd);
+  async upgradeMembership(id: string, membershipType: MembershipType, daysToAdd?: number) {
+    // Prefer the plan's own duration; fall back to the passed value or 30 days.
+    const plan = await this.planModel
+      .findOne({ membershipType, isActive: true })
+      .sort({ price: 1 })
+      .lean();
+
+    const days = daysToAdd ?? plan?.durationDays ?? 30;
+    const startDate = new Date();
+    const expiresAt = new Date(startDate);
+    expiresAt.setDate(expiresAt.getDate() + days);
 
     const user = await this.userModel.findByIdAndUpdate(id, {
       membershipType,
@@ -256,6 +265,26 @@ export class AdminService {
     }, { new: true });
 
     if (!user) throw new NotFoundException('User not found');
+
+    // Mark previous active subscriptions as expired, then record this admin-granted
+    // membership as an active subscription so it shows in the Memberships list.
+    await this.subscriptionModel.updateMany(
+      { userId: new Types.ObjectId(id), status: SubscriptionStatus.ACTIVE },
+      { status: SubscriptionStatus.EXPIRED },
+    );
+
+    if (plan) {
+      await this.subscriptionModel.create({
+        userId: new Types.ObjectId(id),
+        planId: plan._id,
+        status: SubscriptionStatus.ACTIVE,
+        startDate,
+        endDate: expiresAt,
+        amount: plan.discountedPrice > 0 && plan.discountedPrice < plan.price ? plan.discountedPrice : plan.price,
+        membershipType,
+      });
+    }
+
     return { message: `Membership upgraded to ${membershipType}`, data: user };
   }
 

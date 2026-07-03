@@ -1,18 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { UserActionsMenu } from '@/components/users/UserActionsMenu';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
 import { formatDate, getRelativeTime } from '@/lib/utils';
-import { Search, Filter, Download, UserCheck, Shield } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Search, Download, Shield, Eye } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface User {
@@ -34,7 +33,6 @@ interface User {
 }
 
 export default function UsersPage() {
-  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
@@ -54,22 +52,6 @@ export default function UsersPage() {
   const data = rawData as any;
   const users = data?.data?.data || [];
   const meta = data?.data?.meta;
-
-  const verifyMutation = useMutation({
-    mutationFn: (userId: string) => adminApi.verifyUser(userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('User verified successfully');
-    },
-  });
-
-  const blockMutation = useMutation({
-    mutationFn: (userId: string) => adminApi.blockUser(userId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-      toast.success('User blocked');
-    },
-  });
 
   const columns: ColumnDef<User>[] = [
     {
@@ -171,11 +153,13 @@ export default function UsersPage() {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }) => (
-        <UserActionsMenu
-          user={row.original}
-          onVerify={() => verifyMutation.mutate(row.original._id)}
-          onBlock={() => blockMutation.mutate(row.original._id)}
-        />
+        <Link
+          href={`/users/${row.original._id}`}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 hover:text-orange-700"
+        >
+          <Eye className="w-4 h-4" />
+          View
+        </Link>
       ),
     },
   ];
