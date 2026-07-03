@@ -128,14 +128,6 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     bloc.add(CreateOrderEvent(_pendingPlanId!));
   }
 
-  void _testActivate(Map<String, dynamic> plan) {
-    if (!_isVerified()) {
-      _promptKyc();
-      return;
-    }
-    context.read<SubscriptionBloc>().add(TestActivateSubscriptionEvent(plan['_id'] as String));
-  }
-
   void _openRazorpay(Map<String, dynamic> order) {
     if (kIsWeb || _razorpay == null) return;
     final authState = context.read<AuthBloc>().state;
@@ -241,6 +233,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           final currentColIndex = _membershipCol[currentMembership] ?? 0;
           final currentIcon = _planIcons[currentColIndex];
           final currentName = currentColIndex == 0 ? 'Free' : _planNames[currentColIndex];
+          final validTill = _formatExpiry(user?['membershipExpiresAt']);
 
           final visiblePlans = _filtered(plans);
 
@@ -249,7 +242,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildCurrentPlanBanner(currentIcon, currentName, currentColIndex),
+                _buildCurrentPlanBanner(currentIcon, currentName, currentColIndex, validTill),
                 SizedBox(height: 16.h),
 
                 if (!_isVerified()) ...[
@@ -272,7 +265,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     );
   }
 
-  Widget _buildCurrentPlanBanner(IconData icon, String name, int colIndex) {
+  Widget _buildCurrentPlanBanner(IconData icon, String name, int colIndex, String? validTill) {
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
@@ -310,7 +303,9 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                 ),
                 SizedBox(height: 2.h),
                 Text(
-                  colIndex == 0 ? 'Upgrade to unlock premium features' : 'Enjoying premium membership',
+                  colIndex == 0
+                      ? 'Upgrade to unlock premium features'
+                      : (validTill != null ? 'Valid till $validTill' : 'Enjoying premium membership'),
                   style: TextStyle(color: Colors.white70, fontSize: 11.sp, fontFamily: 'Poppins'),
                 ),
               ],
@@ -360,7 +355,11 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final duration = (plan['duration'] as String?) ?? 'monthly';
     final durationText = _durationLabel[duration] ?? '/ $duration';
     final isPopular = plan['isPopular'] == true;
+    final isGolden = type == 'golden';
     final isCurrent = type == currentMembership;
+
+    // Top ribbon per plan (Golden = Best Value, Popular = Most Popular).
+    final String? badge = isGolden ? '👑 Best Value' : (isPopular ? '⭐ Most Popular' : null);
 
     // Use the plan's own features if present, else derive from the comparison table.
     final List<String> feats = (plan['features'] as List?)?.map((e) => e.toString()).toList() ??
@@ -371,88 +370,108 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: isPopular ? color : AppColors.border, width: isPopular ? 1.5 : 1),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        border: Border.all(color: (isPopular || isGolden) ? color : AppColors.border, width: (isPopular || isGolden) ? 1.5 : 1),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          if (isPopular)
+          if (badge != null)
             Container(
               width: double.infinity,
               padding: EdgeInsets.symmetric(vertical: 5.h),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(15.r)),
-              ),
-              child: Text('⭐ Most Popular',
+              color: color,
+              child: Text(badge,
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
             ),
           Padding(
-            padding: EdgeInsets.all(16.r),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(10.r),
-                      decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                      child: Icon(icon, color: color, size: 22.sp),
+            padding: EdgeInsets.all(14.r),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 1) LEFT: icon + plan name
+                  SizedBox(
+                    width: 68.w,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(10.r),
+                          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+                          child: Icon(icon, color: color, size: 22.sp),
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(plan['name'] as String? ?? _planNames[col],
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp, color: color, fontFamily: 'Poppins')),
+                      ],
                     ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Text(plan['name'] as String? ?? _planNames[col],
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, color: color, fontFamily: 'Poppins')),
+                  ),
+                  VerticalDivider(width: 14.w, thickness: 1, color: AppColors.border),
+                  // 2) CENTER: plan details (features)
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: feats
+                          .take(6)
+                          .map((f) => Padding(
+                                padding: EdgeInsets.symmetric(vertical: 3.h),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(Icons.check_circle, color: color, size: 14.sp),
+                                    SizedBox(width: 6.w),
+                                    Expanded(
+                                      child: Text(f,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 11.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                                    ),
+                                  ],
+                                ),
+                              ))
+                          .toList(),
                     ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                  ),
+                  VerticalDivider(width: 14.w, thickness: 1, color: AppColors.border),
+                  // 3) RIGHT: price + buy button
+                  SizedBox(
+                    width: 86.w,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         if (disc > 0 && disc < price)
                           Text('₹${(price / 100).toStringAsFixed(0)}',
-                              style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontSize: 12.sp, fontFamily: 'Poppins')),
+                              style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontSize: 11.sp, fontFamily: 'Poppins')),
                         Text('₹${(eff / 100).toStringAsFixed(0)}',
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22.sp, color: color, fontFamily: 'Poppins')),
                         Text(durationText, style: TextStyle(fontSize: 10.sp, color: AppColors.textHint, fontFamily: 'Poppins')),
+                        SizedBox(height: 10.h),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: (isLoading || isCurrent) ? null : () => _buyPlan(plan),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: color,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: color.withValues(alpha: 0.4),
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                            ),
+                            child: Text(isCurrent ? 'Current' : (col == 1 ? 'Upgrade' : 'Buy Now'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                          ),
+                        ),
                       ],
                     ),
-                  ],
-                ),
-                SizedBox(height: 12.h),
-                ...feats.take(6).map((f) => Padding(
-                      padding: EdgeInsets.symmetric(vertical: 3.h),
-                      child: Row(
-                        children: [
-                          Icon(Icons.check_circle, color: color, size: 16.sp),
-                          SizedBox(width: 8.w),
-                          Expanded(child: Text(f, style: TextStyle(fontSize: 12.sp, fontFamily: 'Poppins', color: AppColors.textPrimary))),
-                        ],
-                      ),
-                    )),
-                SizedBox(height: 14.h),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: (isLoading || isCurrent) ? null : () => _buyPlan(plan),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: color,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: color.withValues(alpha: 0.4),
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(vertical: 13.h),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                    ),
-                    child: Text(isCurrent ? 'Current Plan' : 'Buy Now',
-                        style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                   ),
-                ),
-                if (!isCurrent)
-                  TextButton(
-                    onPressed: isLoading ? null : () => _testActivate(plan),
-                    child: Text('Test Activate (No Payment)',
-                        style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -557,4 +576,13 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   }
 
   double get _featureColWidth => 120.w;
+
+  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  String? _formatExpiry(dynamic v) {
+    if (v == null) return null;
+    final d = DateTime.tryParse(v.toString());
+    if (d == null) return null;
+    return '${d.day} ${_months[d.month - 1]} ${d.year}';
+  }
 }
