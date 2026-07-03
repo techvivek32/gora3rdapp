@@ -1,4 +1,4 @@
-package com.goracabs.gora_cabs
+package com.taxi.call_taxi_partner
 
 import android.content.Intent
 import android.net.Uri
