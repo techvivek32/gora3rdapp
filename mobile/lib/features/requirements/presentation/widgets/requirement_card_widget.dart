@@ -296,7 +296,7 @@ class RequirementCardWidget extends StatelessWidget {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text('₹${total.round()}', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    Text('₹${total.round()}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                                     SizedBox(width: 8.w),
                                     Icon(Icons.auto_awesome, size: 15.sp, color: topBarColor),
                                     SizedBox(width: 4.w),

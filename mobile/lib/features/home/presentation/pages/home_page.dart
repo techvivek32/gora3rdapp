@@ -129,8 +129,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Gora Cabs', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Taxi Partner', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                    Text('Gora Taxi', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                    Text('Partner', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
                   ],
                 ),
               ],
@@ -222,6 +222,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // Search a partner by phone number
                 const UserSearchWidget(),
                 SizedBox(height: 10.h),
+
+                // Scrolling account-verification reminder
+                SizedBox(
+                  height: 28.h,
+                  child: MarqueeText(
+                    text:
+                        'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  ),
+                ),
+                SizedBox(height: 12.h),
 
                 // Quick Actions
                 Padding(
