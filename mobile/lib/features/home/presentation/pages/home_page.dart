@@ -257,7 +257,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
                   ),
                 ),
-                SizedBox(height: 12.h),
+                SizedBox(height: 2.h),
 
                 // Quick Actions
                 Padding(
