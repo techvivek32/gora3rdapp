@@ -303,53 +303,55 @@ class RequirementCardWidget extends StatelessWidget {
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 
-                            // 7. poster
-                            Row(
-                              children: [
-                                GestureDetector(
-                                  onTap: postedBy == null ? null : openSheet,
-                                  child: CircleAvatar(
-                                    radius: 20.r,
-                                    backgroundColor: topBarColor.withOpacity(0.12),
-                                    backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
-                                    child: postedBy?['profileImage'] == null ? Icon(Icons.emoji_events, color: topBarColor, size: 20.sp) : null,
-                                  ),
-                                ),
-                                SizedBox(width: 10.w),
-                                Expanded(
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
+                            // 7. poster — only shown to premium members / the owner.
+                            if (canContact) ...[
+                              Row(
+                                children: [
+                                  GestureDetector(
                                     onTap: postedBy == null ? null : openSheet,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(children: [
-                                          Flexible(child: Text(postedBy?['fullName'] as String? ?? (mine ? (currentUserName ?? 'You') : 'User'), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black))),
-                                          if ((postedBy?['isVerified'] == true) || memberType == 'verified' || memberType == 'golden') ...[
-                                            SizedBox(width: 4.w),
-                                            Icon(Icons.verified, size: 14.sp, color: const Color(0xFF2196F3)),
-                                          ],
-                                        ]),
-                                        Text(
-                                          [postedBy?['agencyName'], postedBy?['city'], postedBy?['state']].where((e) => e != null && (e as String).isNotEmpty).join(', '),
-                                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
-                                        ),
-                                      ],
+                                    child: CircleAvatar(
+                                      radius: 20.r,
+                                      backgroundColor: topBarColor.withOpacity(0.12),
+                                      backgroundImage: postedBy?['profileImage'] != null ? NetworkImage(postedBy!['profileImage'] as String) : null,
+                                      child: postedBy?['profileImage'] == null ? Icon(Icons.emoji_events, color: topBarColor, size: 20.sp) : null,
                                     ),
                                   ),
-                                ),
-                                if (badgeText != null)
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                    decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
-                                    child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                  SizedBox(width: 10.w),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      behavior: HitTestBehavior.opaque,
+                                      onTap: postedBy == null ? null : openSheet,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(children: [
+                                            Flexible(child: Text(postedBy?['fullName'] as String? ?? (mine ? (currentUserName ?? 'You') : 'User'), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black))),
+                                            if ((postedBy?['isVerified'] == true) || memberType == 'verified' || memberType == 'golden') ...[
+                                              SizedBox(width: 4.w),
+                                              Icon(Icons.verified, size: 14.sp, color: const Color(0xFF2196F3)),
+                                            ],
+                                          ]),
+                                          Text(
+                                            [postedBy?['agencyName'], postedBy?['city'], postedBy?['state']].where((e) => e != null && (e as String).isNotEmpty).join(', '),
+                                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
-                              ],
-                            ),
-                            SizedBox(height: 12.h),
-                            Divider(height: 1, color: Colors.black26),
-                            SizedBox(height: 10.h),
+                                  if (badgeText != null)
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                      decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
+                                      child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                    ),
+                                ],
+                              ),
+                              SizedBox(height: 12.h),
+                              Divider(height: 1, color: Colors.black26),
+                              SizedBox(height: 10.h),
+                            ],
 
                             // 8. actions (gated)
                             if (canContact)
