@@ -116,6 +116,18 @@ export class AdminController {
     return this.adminService.getRequirements(query);
   }
 
+  @Put('requirements/:id')
+  @ApiOperation({ summary: 'Edit a requirement' })
+  updateRequirement(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateRequirement(id, data);
+  }
+
+  @Delete('requirements/:id')
+  @ApiOperation({ summary: 'Delete a requirement' })
+  deleteRequirement(@Param('id') id: string) {
+    return this.adminService.deleteRequirement(id);
+  }
+
   // ─── Subscriptions ─────────────────────────────────────────────────────────
   @Get('subscriptions')
   @ApiOperation({ summary: 'Get all subscriptions' })
@@ -128,6 +140,18 @@ export class AdminController {
   @ApiOperation({ summary: 'Get all available vehicles' })
   getVehicles(@Query() query: any) {
     return this.adminService.getVehicles(query);
+  }
+
+  @Put('vehicles/:id')
+  @ApiOperation({ summary: 'Edit an available vehicle' })
+  updateVehicle(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateVehicle(id, data);
+  }
+
+  @Delete('vehicles/:id')
+  @ApiOperation({ summary: 'Delete an available vehicle' })
+  deleteVehicle(@Param('id') id: string) {
+    return this.adminService.deleteVehicle(id);
   }
 
   // ─── Cities ────────────────────────────────────────────────────────────────

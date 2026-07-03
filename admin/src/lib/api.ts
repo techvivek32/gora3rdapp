@@ -51,10 +51,13 @@ export const adminApi = {
 
   // ─── Requirements ──────────────────────────────────────────────────────────
   getRequirements: (params: any) => apiClient.get('/admin/requirements', { params }),
-  deleteRequirement: (id: string) => apiClient.delete(`/requirements/${id}`),
+  updateRequirement: (id: string, data: any) => apiClient.put(`/admin/requirements/${id}`, data),
+  deleteRequirement: (id: string) => apiClient.delete(`/admin/requirements/${id}`),
 
   // ─── Vehicles ──────────────────────────────────────────────────────────────
   getVehicles: (params: any) => apiClient.get('/admin/vehicles', { params }),
+  updateVehicle: (id: string, data: any) => apiClient.put(`/admin/vehicles/${id}`, data),
+  deleteVehicle: (id: string) => apiClient.delete(`/admin/vehicles/${id}`),
 
   // ─── Payments ──────────────────────────────────────────────────────────────
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),

@@ -350,6 +350,35 @@ export class AdminService {
     return { message: 'Vehicles retrieved', data: buildPaginatedResult(vehicles, total, page, limit) };
   }
 
+  // ─── Admin edit/delete for requirements & vehicles (bypass ownership) ──────
+  async updateRequirement(id: string, data: Partial<any>) {
+    const req = await this.requirementModel
+      .findByIdAndUpdate(id, data, { new: true })
+      .populate('postedBy', 'fullName agencyName mobile membershipType');
+    if (!req) throw new NotFoundException('Requirement not found');
+    return { message: 'Requirement updated', data: req };
+  }
+
+  async deleteRequirement(id: string) {
+    const req = await this.requirementModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    if (!req) throw new NotFoundException('Requirement not found');
+    return { message: 'Requirement deleted' };
+  }
+
+  async updateVehicle(id: string, data: Partial<any>) {
+    const vehicle = await this.vehicleModel
+      .findByIdAndUpdate(id, data, { new: true })
+      .populate('postedBy', 'fullName agencyName mobile membershipType');
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+    return { message: 'Vehicle updated', data: vehicle };
+  }
+
+  async deleteVehicle(id: string) {
+    const vehicle = await this.vehicleModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
+    if (!vehicle) throw new NotFoundException('Vehicle not found');
+    return { message: 'Vehicle deleted' };
+  }
+
   // Cities CRUD
   async createCity(data: Partial<any>) {
     const slug = data.name.toLowerCase().replace(/\s+/g, '-');
