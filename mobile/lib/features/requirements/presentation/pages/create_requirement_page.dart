@@ -8,7 +8,8 @@ import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/wallet/wallet_guard.dart';
 import '../bloc/requirements_bloc.dart';
-import 'location_picker_page.dart';
+import '../../../../core/widgets/address_autocomplete_field.dart';
+import 'location_picker_page.dart' show haversineDistanceKm;
 
 class CreateRequirementPage extends StatefulWidget {
   // When [existing] is provided the page acts as an edit form for that requirement.
@@ -221,51 +222,34 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     });
   }
 
-  Future<void> _openPickup() async {
-    final result = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(
-          title: 'Pick Pickup Location',
-          initialLat: _pickupLat,
-          initialLng: _pickupLng,
-        ),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _pickupCtrl.text = result.address;
-        _pickupLat = result.lat;
-        _pickupLng = result.lng;
-        _pickupCity = result.city;
-      });
-      _updateDistance();
-    }
+  void _onPickupSelected(String address, double lat, double lng, String? city) {
+    setState(() {
+      _pickupLat = lat;
+      _pickupLng = lng;
+      _pickupCity = (city == null || city.isEmpty) ? address : city;
+    });
+    _updateDistance();
   }
 
-  Future<void> _openStop(_Stop stop) async {
-    final result = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(
-          title: 'Pick Stop Location',
-          initialLat: stop.lat,
-          initialLng: stop.lng,
-        ),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        stop.ctrl.text = result.address;
-        stop.lat = result.lat;
-        stop.lng = result.lng;
-      });
-      _updateDistance();
-    }
+  void _onDropSelected(String address, double lat, double lng, String? city) {
+    setState(() {
+      _dropLat = lat;
+      _dropLng = lng;
+      _dropCity = (city == null || city.isEmpty) ? address : city;
+    });
+    _updateDistance();
+  }
+
+  void _onStopSelected(_Stop stop, String address, double lat, double lng, String? city) {
+    setState(() {
+      stop.lat = lat;
+      stop.lng = lng;
+    });
+    _updateDistance();
   }
 
   void _addStop() {
-    final stop = _Stop();
-    setState(() => _stops.add(stop));
-    _openStop(stop);
+    setState(() => _stops.add(_Stop()));
   }
 
   void _removeStop(int index) {
@@ -274,27 +258,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       _stops.removeAt(index);
     });
     _updateDistance();
-  }
-
-  Future<void> _openDrop() async {
-    final result = await Navigator.of(context).push<LocationPickerResult>(
-      MaterialPageRoute(
-        builder: (_) => LocationPickerPage(
-          title: 'Pick Drop Location',
-          initialLat: _dropLat,
-          initialLng: _dropLng,
-        ),
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        _dropCtrl.text = result.address;
-        _dropLat = result.lat;
-        _dropLng = result.lng;
-        _dropCity = result.city;
-      });
-      _updateDistance();
-    }
   }
 
   Future<void> _submit() async {
@@ -370,21 +333,12 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                   children: [
                     Text('Route Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
-                    TextFormField(
+                    AddressAutocompleteField(
                       controller: _pickupCtrl,
-                      readOnly: true,
-                      onTap: _openPickup,
-                      decoration: InputDecoration(
-                        labelText: 'Pickup Location *',
-                        prefixIcon: Icon(Icons.location_on_outlined, color: AppColors.primary),
-                        suffixIcon: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
-                      ),
-                      validator: (v) => v == null || v.isEmpty ? 'Tap to pick pickup location' : null,
+                      label: 'Pickup Location *',
+                      prefixIcon: Icons.location_on_outlined,
+                      onSelected: _onPickupSelected,
+                      validator: (v) => v == null || v.isEmpty ? 'Enter pickup location' : null,
                     ),
                     SizedBox(height: 12.h),
 
@@ -394,43 +348,26 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       final stop = e.value;
                       return Padding(
                         padding: EdgeInsets.only(bottom: 12.h),
-                        child: TextFormField(
+                        child: AddressAutocompleteField(
                           controller: stop.ctrl,
-                          readOnly: true,
-                          onTap: () => _openStop(stop),
-                          decoration: InputDecoration(
-                            labelText: 'Stop ${i + 1}',
-                            prefixIcon: Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
-                            suffixIcon: IconButton(
-                              icon: Icon(Icons.close, color: AppColors.error, size: 20.sp),
-                              tooltip: 'Remove stop',
-                              onPressed: () => _removeStop(i),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
-                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                          label: 'Stop ${i + 1}',
+                          prefixIcon: Icons.add_location_alt_outlined,
+                          onSelected: (a, lat, lng, city) => _onStopSelected(stop, a, lat, lng, city),
+                          suffix: IconButton(
+                            icon: Icon(Icons.close, color: AppColors.error, size: 20.sp),
+                            tooltip: 'Remove stop',
+                            onPressed: () => _removeStop(i),
                           ),
                         ),
                       );
                     }),
 
-                    TextFormField(
+                    AddressAutocompleteField(
                       controller: _dropCtrl,
-                      readOnly: true,
-                      onTap: _openDrop,
-                      decoration: InputDecoration(
-                        labelText: 'Drop Location *',
-                        prefixIcon: Icon(Icons.location_off_outlined, color: AppColors.primary),
-                        suffixIcon: Icon(Icons.map_outlined, color: AppColors.primary, size: 20.sp),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
-                      ),
-                      validator: (v) => v == null || v.isEmpty ? 'Tap to pick drop location' : null,
+                      label: 'Drop Location *',
+                      prefixIcon: Icons.location_off_outlined,
+                      onSelected: _onDropSelected,
+                      validator: (v) => v == null || v.isEmpty ? 'Enter drop location' : null,
                     ),
                     SizedBox(height: 4.h),
                     Align(

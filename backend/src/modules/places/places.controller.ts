@@ -1,0 +1,24 @@
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { PlacesService } from './places.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+
+@ApiTags('Places')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
+@Controller('places')
+export class PlacesController {
+  constructor(private readonly placesService: PlacesService) {}
+
+  @Get('autocomplete')
+  @ApiOperation({ summary: 'Google Places autocomplete predictions for an address query' })
+  autocomplete(@Query('input') input: string) {
+    return this.placesService.autocomplete(input);
+  }
+
+  @Get('details')
+  @ApiOperation({ summary: 'Resolve a place_id to address + coordinates + city' })
+  details(@Query('placeId') placeId: string) {
+    return this.placesService.details(placeId);
+  }
+}
