@@ -37,9 +37,9 @@ class MainNavPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, selectedIndex: selectedIndex, onTap: () => context.go('/')),
-            _NavItem(icon: Icons.search_rounded, label: 'Needs', index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/requirements')),
+            _NavItem(icon: Icons.search_rounded, label: 'Requirement', index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/requirements')),
             const SizedBox(width: 48),
-            _NavItem(icon: Icons.directions_car_rounded, label: 'Cabs', index: 2, selectedIndex: selectedIndex, onTap: () => context.go('/vehicles')),
+            _NavItem(icon: Icons.directions_car_rounded, label: 'Available', index: 2, selectedIndex: selectedIndex, onTap: () => context.go('/vehicles')),
             _NavItem(icon: Icons.settings_rounded, label: 'Settings', index: 3, selectedIndex: selectedIndex, onTap: () => context.go('/profile')),
           ],
         ),

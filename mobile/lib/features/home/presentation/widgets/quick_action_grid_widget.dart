@@ -83,8 +83,8 @@ class _QuickActionCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(action.icon, color: textColor, size: 28.sp),
-            SizedBox(height: 6.h),
+            Icon(action.icon, color: textColor, size: 40.sp),
+            SizedBox(height: 8.h),
             Text(
               action.label,
               style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: textColor, fontFamily: 'Poppins'),

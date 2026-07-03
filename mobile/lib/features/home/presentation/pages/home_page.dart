@@ -221,7 +221,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
                 // Search a partner by phone number
                 const UserSearchWidget(),
-                SizedBox(height: 20.h),
+                SizedBox(height: 10.h),
 
                 // Quick Actions
                 Padding(
