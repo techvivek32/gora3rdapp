@@ -669,9 +669,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       ],
                     ),
                     
-                    SizedBox(height: 16.h),
-                    
-                    // Fare Details
+                    if (_useCustomFare) SizedBox(height: 16.h),
+
+                    // Fare details box — only shown when entering your own fare.
+                    if (_useCustomFare)
                     Container(
                       padding: EdgeInsets.all(16.r),
                       decoration: BoxDecoration(
@@ -741,88 +742,48 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                               ],
                             ),
                           ],
-                          if (_useCustomFare) ...[
-                            TextFormField(
-                              controller: _customFareCtrl,
-                              keyboardType: TextInputType.numberWithOptions(decimal: true),
-                              decoration: InputDecoration(
-                                labelText: 'Enter Your Fare (₹)',
-                                hintText: _suggestedFare > 0 ? 'Minimum ₹${_suggestedFare.toStringAsFixed(0)}' : 'Enter your fare',
-                                filled: true,
-                                fillColor: Colors.white,
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
-                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
-                                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
-                              ),
-                              onChanged: (value) {
-                                setState(() {});
-                              },
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter your fare';
-                                }
-                                final entered = double.tryParse(value);
-                                if (entered == null) {
-                                  return 'Please enter valid number';
-                                }
-                                if (entered < _suggestedFare) {
-                                  return 'Minimum fare is ₹${_suggestedFare.toStringAsFixed(0)}';
-                                }
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: 16.h),
-                          ],
-                          if (!_useCustomFare) SizedBox(height: 16.h),
-                          Divider(color: AppColors.primary.withOpacity(0.2)),
-                          SizedBox(height: 16.h),
-                          
-                          // Breakdown
+                          SizedBox(height: 12.h),
+                          // Driver Fee (left) + Commission (right) in one row.
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Base Fare',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              Text(
-                                '₹${_currentFare.toStringAsFixed(0)}',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(
-                                child: Text(
-                                  'Commission (₹)',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 14.sp,
-                                    color: AppColors.textSecondary,
+                                child: TextFormField(
+                                  controller: _customFareCtrl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => setState(() {}),
+                                  decoration: InputDecoration(
+                                    labelText: 'Driver Fee (₹)',
+                                    hintText: _suggestedFare > 0 ? 'Min ₹${_suggestedFare.toStringAsFixed(0)}' : 'Fare',
+                                    prefixText: '₹ ',
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
+                                    filled: true,
+                                    fillColor: Colors.white,
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
+                                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                                   ),
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) return 'Enter fare';
+                                    final entered = double.tryParse(value);
+                                    if (entered == null) return 'Invalid';
+                                    if (entered < _suggestedFare) return 'Min ₹${_suggestedFare.toStringAsFixed(0)}';
+                                    return null;
+                                  },
                                 ),
                               ),
-                              SizedBox(
-                                width: 110.w,
+                              SizedBox(width: 12.w),
+                              Expanded(
                                 child: TextFormField(
                                   controller: _commissionCtrl,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  textAlign: TextAlign.right,
                                   onChanged: (_) => setState(() {}),
                                   decoration: InputDecoration(
-                                    isDense: true,
+                                    labelText: 'Commission (₹)',
                                     prefixText: '₹ ',
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
                                     filled: true,
                                     fillColor: Colors.white,
                                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r), borderSide: BorderSide(color: AppColors.border)),
