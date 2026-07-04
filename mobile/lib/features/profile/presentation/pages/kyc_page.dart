@@ -44,6 +44,10 @@ class _KycPageState extends State<KycPage> {
       ? ['aadhar', 'pan', 'drivingLicense', 'vehicleRc']
       : ['aadhar', 'pan', 'drivingLicense'];
 
+  // Documents can only be edited/submitted when the verification hasn't been sent
+  // yet or was rejected. Pending & verified are read-only.
+  bool get _locked => _status == 'pending' || _status == 'verified';
+
   @override
   void initState() {
     super.initState();
@@ -168,21 +172,27 @@ class _KycPageState extends State<KycPage> {
                   const SizedBox(height: 16),
                   const Text('Documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
-                  const Text(
-                    'Add your document number and a clear photo, then submit for verification.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  Text(
+                    _locked
+                        ? (_status == 'verified'
+                            ? 'Your documents are verified and can no longer be changed.'
+                            : 'Your documents are under review. You can\'t change them until the review is complete.')
+                        : 'Add your document number and a clear photo, then submit for verification.',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),
                   ..._visibleKeys.map((k) => _buildDocTile(_docs[k]!)),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _submitting ? null : _submit,
-                    style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                    child: _submitting
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text(_status == 'verified' ? 'Update Documents' : 'Submit for Verification',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  ),
+                  // Only submittable before first submission or after a rejection.
+                  if (!_locked)
+                    ElevatedButton(
+                      onPressed: _submitting ? null : _submit,
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: _submitting
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text(_status == 'rejected' ? 'Re-submit Documents' : 'Submit for Verification',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    ),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -269,6 +279,7 @@ class _KycPageState extends State<KycPage> {
           children: [
             TextField(
               controller: doc.numberCtrl,
+              enabled: !_locked,
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: '${doc.label} Number',
@@ -278,7 +289,7 @@ class _KycPageState extends State<KycPage> {
             ),
             const SizedBox(height: 10),
             InkWell(
-              onTap: () => _pickImage(doc),
+              onTap: _locked ? null : () => _pickImage(doc),
               borderRadius: BorderRadius.circular(10),
               child: Container(
                 height: 140,
@@ -289,9 +300,9 @@ class _KycPageState extends State<KycPage> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: doc.newBytes != null
-                    ? _imageWithEdit(Image.memory(doc.newBytes!, fit: BoxFit.cover))
+                    ? _imageWithEdit(Image.memory(doc.newBytes!, fit: BoxFit.cover), locked: _locked)
                     : (doc.existingImage != null
-                        ? _imageWithEdit(Image.network(doc.existingImage!, fit: BoxFit.cover))
+                        ? _imageWithEdit(Image.network(doc.existingImage!, fit: BoxFit.cover), locked: _locked)
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -308,20 +319,21 @@ class _KycPageState extends State<KycPage> {
     );
   }
 
-  Widget _imageWithEdit(Widget image) {
+  Widget _imageWithEdit(Widget image, {bool locked = false}) {
     return Stack(
       fit: StackFit.expand,
       children: [
         image,
-        Positioned(
-          right: 8,
-          top: 8,
-          child: Container(
-            padding: const EdgeInsets.all(4),
-            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-            child: const Icon(Icons.edit, color: Colors.white, size: 16),
+        if (!locked)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+              child: const Icon(Icons.edit, color: Colors.white, size: 16),
+            ),
           ),
-        ),
       ],
     );
   }

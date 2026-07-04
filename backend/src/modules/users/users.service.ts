@@ -180,6 +180,20 @@ export class UsersService {
   }
 
   async submitVerification(userId: string, dto: SubmitVerificationDto) {
+    // Once submitted, documents are locked while pending or after being verified —
+    // only a rejected (or never-submitted) user may (re)submit.
+    const current = await this.userModel.findById(userId).select('verificationStatus');
+    if (
+      current?.verificationStatus === VerificationStatus.PENDING ||
+      current?.verificationStatus === VerificationStatus.VERIFIED
+    ) {
+      throw new BadRequestException(
+        current.verificationStatus === VerificationStatus.VERIFIED
+          ? 'Your documents are already verified and cannot be changed.'
+          : 'Your documents are under review and cannot be changed until it is complete.',
+      );
+    }
+
     const { agencyName, ...documents } = dto;
 
     // Keep only the document entries that were actually provided.
