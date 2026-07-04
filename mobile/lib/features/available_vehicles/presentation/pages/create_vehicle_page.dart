@@ -21,6 +21,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   final _formKey = GlobalKey<FormState>();
   final _notesCtrl = TextEditingController();
   String _vehicleType = 'sedan';
+  String _tripType = 'one_way';
   DateTime? _availableDate;
   TimeOfDay? _availableTime;
 
@@ -45,6 +46,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   void _populateFromExisting(Map<String, dynamic> v) {
     _notesCtrl.text = (v['notes'] ?? '') as String;
     _vehicleType = (v['vehicleType'] as String?) ?? 'sedan';
+    _tripType = (v['tripType'] as String?) ?? 'one_way';
 
     _currentCity = (v['currentCity'] ?? '') as String;
     _currentState = v['currentState'] as String?;
@@ -91,6 +93,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
       'destinationCity': _destCity.trim().isEmpty ? null : _destCity.trim(),
       if (_destState != null && _destState!.isNotEmpty) 'destinationState': _destState,
       'vehicleType': _vehicleType,
+      'tripType': _tripType,
       'availableDate': _availableDate!.toIso8601String().split('T').first,
       'availableTime': _availableTime != null ? '${_availableTime!.hour.toString().padLeft(2, '0')}:${_availableTime!.minute.toString().padLeft(2, '0')}' : '00:00',
       'notes': _notesCtrl.text.trim(),
@@ -164,6 +167,23 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                   ),
                   items: _vehicleTypes.map((v) => DropdownMenuItem(value: v['value'], child: Text(v['label']!, style: TextStyle(fontFamily: 'Poppins')))).toList(),
                   onChanged: (v) => setState(() => _vehicleType = v!),
+                ),
+                SizedBox(height: 12.h),
+                DropdownButtonFormField<String>(
+                  value: _tripType,
+                  decoration: InputDecoration(
+                    labelText: 'Trip Type',
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'one_way', child: Text('One Way', style: TextStyle(fontFamily: 'Poppins'))),
+                    DropdownMenuItem(value: 'round_trip', child: Text('Round Trip', style: TextStyle(fontFamily: 'Poppins'))),
+                  ],
+                  onChanged: (v) => setState(() => _tripType = v!),
                 ),
                 SizedBox(height: 20.h),
 

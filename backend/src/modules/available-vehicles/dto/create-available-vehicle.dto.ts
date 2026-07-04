@@ -10,6 +10,7 @@ export class CreateAvailableVehicleDto {
   @ApiPropertyOptional() @IsOptional() currentCoordinates?: { lat: number; lng: number; address?: string };
   @ApiPropertyOptional() @IsOptional() destinationCoordinates?: { lat: number; lng: number; address?: string };
   @ApiProperty({ enum: VehicleType }) @IsEnum(VehicleType) vehicleType: VehicleType;
+  @ApiPropertyOptional({ example: 'one_way', description: 'one_way | round_trip' }) @IsOptional() @IsString() tripType?: string;
   @ApiPropertyOptional({ example: 'RJ14AB1234' }) @IsOptional() @IsString() vehicleNumber?: string;
   @ApiPropertyOptional({ example: 'Suresh Kumar' }) @IsOptional() @IsString() driverName?: string;
   @ApiPropertyOptional({ example: '+919876543210' }) @IsOptional() @IsString() driverMobile?: string;

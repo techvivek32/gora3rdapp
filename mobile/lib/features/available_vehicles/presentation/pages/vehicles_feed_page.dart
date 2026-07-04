@@ -472,8 +472,21 @@ class VehicleCard extends StatelessWidget {
                               children: [
                                 Icon(Icons.directions_car, size: 18.sp, color: topBarColor),
                                 SizedBox(width: 8.w),
-                                Text('${vehicleTypeLabel(vehicle['vehicleType'] as String?)} is available',
-                                    style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                Expanded(
+                                  child: Text('${vehicleTypeLabel(vehicle['vehicleType'] as String?)} is available',
+                                      style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                ),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                                  decoration: BoxDecoration(
+                                    color: topBarColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Text(
+                                    (vehicle['tripType'] as String?) == 'round_trip' ? 'Round Trip' : 'One Way',
+                                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: topBarColor),
+                                  ),
+                                ),
                               ],
                             ),
 

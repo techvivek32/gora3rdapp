@@ -27,6 +27,9 @@ export class AvailableVehicle {
   @Prop({ type: String, enum: VehicleType, required: true })
   vehicleType: VehicleType;
 
+  @Prop({ type: String, default: 'one_way' })
+  tripType: string;
+
   @Prop({ trim: true, uppercase: true })
   vehicleNumber: string;
 

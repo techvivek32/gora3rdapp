@@ -29,6 +29,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   final _commissionCtrl = TextEditingController(text: '0');
   String _vehicleType = 'sedan';
   String _tripType = 'one_way';
+  String _fuelType = 'any';
   final List<_Stop> _stops = [];
   DateTime? _travelDate;
   TimeOfDay? _travelTime;
@@ -51,6 +52,12 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   
   final _vehicleTypes = kVehicleTypes;
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
+  final _fuelTypes = const [
+    {'value': 'any', 'label': 'Any Fuel'},
+    {'value': 'diesel', 'label': 'Diesel'},
+    {'value': 'petrol', 'label': 'Petrol'},
+    {'value': 'cng', 'label': 'CNG'},
+  ];
 
   // Calculate total suggested fare
   double get _suggestedFare => _distance * _ratePerKm;
@@ -91,6 +98,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _notesCtrl.text = (r['notes'] ?? '') as String;
     _vehicleType = (r['vehicleType'] as String?) ?? 'sedan';
     _tripType = (r['tripType'] as String?) ?? 'one_way';
+    _fuelType = (r['fuelType'] as String?) ?? 'any';
 
     final pc = r['pickupCoordinates'] as Map?;
     if (pc != null) {
@@ -272,6 +280,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       if (_dropCity != null && _dropCity!.isNotEmpty) 'dropCityName': _dropCity!.trim(),
       'vehicleType': _vehicleType,
       'tripType': _tripType,
+      'fuelType': _fuelType,
       'stops': _stops
           .where((s) => s.ctrl.text.trim().isNotEmpty)
           .map((s) => {'address': s.ctrl.text.trim(), 'lat': s.lat, 'lng': s.lng})
@@ -411,6 +420,20 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       ),
                       items: _vehicleTypes.map((v) => DropdownMenuItem(value: v['value'], child: Text(v['label']!, style: TextStyle(fontFamily: 'Poppins')))).toList(),
                       onChanged: (v) => setState(() => _vehicleType = v!),
+                    ),
+                    SizedBox(height: 12.h),
+                    DropdownButtonFormField<String>(
+                      value: _fuelType,
+                      decoration: InputDecoration(
+                        labelText: 'Fuel Type',
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
+                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
+                      ),
+                      items: _fuelTypes.map((f) => DropdownMenuItem(value: f['value'], child: Text(f['label']!, style: TextStyle(fontFamily: 'Poppins')))).toList(),
+                      onChanged: (v) => setState(() => _fuelType = v!),
                     ),
                   ],
                 ),

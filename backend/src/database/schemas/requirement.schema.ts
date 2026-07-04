@@ -59,6 +59,9 @@ export class Requirement {
   @Prop({ type: String, enum: TripType, required: true })
   tripType: TripType;
 
+  @Prop({ type: String, default: 'any' })
+  fuelType: string;
+
   @Prop({ required: true, type: Date })
   travelDate: Date;
 

@@ -254,7 +254,7 @@ class RequirementCardWidget extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(_formatVehicleType(requirement['vehicleType']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                      Text('Any Fuel | Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                      Text('${_formatFuel(requirement['fuelType'])} | Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
                                     ],
                                   ),
                                 ),
@@ -539,6 +539,20 @@ class RequirementCardWidget extends StatelessWidget {
   }
 
   String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
+
+  String _formatFuel(dynamic type) {
+    final t = (type ?? 'any').toString().toLowerCase();
+    switch (t) {
+      case 'diesel':
+        return 'Diesel';
+      case 'petrol':
+        return 'Petrol';
+      case 'cng':
+        return 'CNG';
+      default:
+        return 'Any Fuel';
+    }
+  }
 
   String _formatDate(dynamic date) {
     if (date == null) return '';

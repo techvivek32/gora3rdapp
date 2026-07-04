@@ -59,6 +59,11 @@ export class CreateRequirementDto {
   @IsEnum(TripType)
   tripType: TripType;
 
+  @ApiPropertyOptional({ example: 'any', description: 'any | diesel | petrol | cng' })
+  @IsOptional()
+  @IsString()
+  fuelType?: string;
+
   @ApiProperty({ example: '2024-12-15' })
   @IsNotEmpty()
   travelDate: Date;
