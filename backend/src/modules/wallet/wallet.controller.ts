@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { CreateTopUpDto, VerifyTopUpDto } from './dto/wallet.dto';
+import { CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto } from './dto/wallet.dto';
 
 @ApiTags('Wallet')
 @ApiBearerAuth('access-token')
@@ -28,5 +28,11 @@ export class WalletController {
   @ApiOperation({ summary: 'Verify the payment and credit the wallet' })
   verify(@CurrentUser('sub') userId: string, @Body() dto: VerifyTopUpDto) {
     return this.walletService.verifyTopUp(userId, dto);
+  }
+
+  @Post('withdraw')
+  @ApiOperation({ summary: 'Request a withdrawal (debits the wallet until reviewed)' })
+  withdraw(@CurrentUser('sub') userId: string, @Body() dto: RequestWithdrawalDto) {
+    return this.walletService.requestWithdrawal(userId, dto);
   }
 }

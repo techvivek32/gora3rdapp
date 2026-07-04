@@ -30,8 +30,9 @@ export class WalletTransaction {
   @Prop({ type: Types.ObjectId, ref: 'User' })
   adminId: Types.ObjectId;
 
-  // 'razorpay' (top-up) or 'admin' (manual adjustment).
-  @Prop({ type: String, enum: ['razorpay', 'admin'], default: 'razorpay' })
+  // 'razorpay' (top-up), 'admin' (manual adjustment), 'withdrawal' (debit for a
+  // withdrawal request) or 'refund' (credit back on a rejected withdrawal).
+  @Prop({ type: String, enum: ['razorpay', 'admin', 'withdrawal', 'refund'], default: 'razorpay' })
   source: string;
 }
 

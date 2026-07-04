@@ -129,6 +129,123 @@ class _WalletPageState extends State<WalletPage> {
     _snack('Payment failed: ${response.message ?? ''}');
   }
 
+  Future<void> _showWithdrawSheet() async {
+    final amountCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final bankCtrl = TextEditingController();
+    final accCtrl = TextEditingController();
+    final ifscCtrl = TextEditingController();
+    bool submitting = false;
+
+    InputDecoration dec(String label, IconData icon) => InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, size: 20),
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        );
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> submit() async {
+            final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
+            if (amt < 1) return _snack('Enter a valid amount');
+            if (amt > _balance) return _snack('You can withdraw at most ₹${_balance.toStringAsFixed(0)}');
+            if (nameCtrl.text.trim().isEmpty ||
+                bankCtrl.text.trim().isEmpty ||
+                accCtrl.text.trim().isEmpty ||
+                ifscCtrl.text.trim().isEmpty) {
+              return _snack('Please fill all bank details');
+            }
+            setSheet(() => submitting = true);
+            try {
+              await _api.post('/wallet/withdraw', data: {
+                'amount': amt,
+                'accountHolderName': nameCtrl.text.trim(),
+                'bankName': bankCtrl.text.trim(),
+                'accountNumber': accCtrl.text.trim(),
+                'ifsc': ifscCtrl.text.trim().toUpperCase(),
+              });
+              if (ctx.mounted) Navigator.pop(ctx);
+              _snack('Withdrawal request submitted for review.', error: false);
+              await _load();
+            } catch (e) {
+              setSheet(() => submitting = false);
+              _snack(ErrorMapper.message(e));
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Withdraw Money', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Available balance: ₹${_balance.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: dec('Amount (₹)', Icons.currency_rupee),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(controller: nameCtrl, textCapitalization: TextCapitalization.words, decoration: dec('Account Holder Name', Icons.person_outline)),
+                  const SizedBox(height: 12),
+                  TextField(controller: bankCtrl, textCapitalization: TextCapitalization.words, decoration: dec('Bank Name', Icons.account_balance_outlined)),
+                  const SizedBox(height: 12),
+                  TextField(controller: accCtrl, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: dec('Account Number', Icons.numbers)),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ifscCtrl,
+                    textCapitalization: TextCapitalization.characters,
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]'))],
+                    decoration: dec('IFSC Code', Icons.qr_code),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: submitting ? null : submit,
+                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                      child: submitting
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Confirm Withdrawal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('The amount is held from your wallet until an admin reviews the request. If rejected, it is refunded.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    amountCtrl.dispose();
+    nameCtrl.dispose();
+    bankCtrl.dispose();
+    accCtrl.dispose();
+    ifscCtrl.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -176,6 +293,20 @@ class _WalletPageState extends State<WalletPage> {
                       child: _processing
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Text('Add Money', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: (_processing || _balance <= 0) ? null : _showWithdrawSheet,
+                      icon: const Icon(Icons.account_balance_outlined, size: 20),
+                      label: const Text('Withdraw', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),

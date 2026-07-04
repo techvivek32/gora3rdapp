@@ -6,7 +6,8 @@ import Razorpay from 'razorpay';
 import * as crypto from 'crypto';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
-import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto } from './dto/wallet.dto';
+import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/schemas/withdrawal-request.schema';
+import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto } from './dto/wallet.dto';
 
 @Injectable()
 export class WalletService {
@@ -15,6 +16,7 @@ export class WalletService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
+    @InjectModel(WithdrawalRequest.name) private withdrawalModel: Model<WithdrawalRequestDocument>,
     private configService: ConfigService,
   ) {}
 
@@ -188,5 +190,106 @@ export class WalletService {
         : `Cut ₹${amount} from ${user.fullName}'s wallet`,
       data: { balance: updated?.walletBalance ?? 0 },
     };
+  }
+
+  // ─── Withdrawals ───────────────────────────────────────────────────────────
+
+  /** User requests a withdrawal. Amount is debited immediately and held until an
+   *  admin approves (kept) or rejects (refunded). */
+  async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
+    const amount = Math.round(dto.amount);
+    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+
+    const user = await this.userModel.findById(userId).select('walletBalance');
+    if (!user) throw new NotFoundException('User not found');
+
+    const current = user.walletBalance ?? 0;
+    if (amount > current) {
+      throw new BadRequestException(`You can withdraw at most ₹${current}.`);
+    }
+
+    // Debit the wallet now (held against the request).
+    await this.txModel.create({
+      userId: new Types.ObjectId(userId),
+      amount,
+      type: 'debit',
+      status: 'success',
+      note: 'Withdrawal request',
+      source: 'withdrawal',
+    });
+    const updated = await this.userModel
+      .findByIdAndUpdate(userId, { $inc: { walletBalance: -amount } }, { new: true })
+      .select('walletBalance');
+
+    const request = await this.withdrawalModel.create({
+      userId: new Types.ObjectId(userId),
+      amount,
+      accountHolderName: dto.accountHolderName,
+      bankName: dto.bankName,
+      accountNumber: dto.accountNumber,
+      ifsc: dto.ifsc,
+      status: 'pending',
+    });
+
+    return {
+      message: 'Withdrawal request submitted. It will be processed after review.',
+      data: { balance: updated?.walletBalance ?? 0, request },
+    };
+  }
+
+  /** Admin: list withdrawal requests (optionally filtered by status). */
+  async getWithdrawals(status?: string) {
+    const filter: any = {};
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) filter.status = status;
+    const requests = await this.withdrawalModel
+      .find(filter)
+      .populate('userId', 'fullName mobile email agencyName city walletBalance')
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+    return { message: 'Withdrawal requests', data: requests };
+  }
+
+  /** Admin: approve a pending withdrawal (amount was already debited). */
+  async approveWithdrawal(adminId: string, id: string) {
+    const request = await this.withdrawalModel.findById(id);
+    if (!request) throw new NotFoundException('Withdrawal request not found');
+    if (request.status !== 'pending') {
+      throw new BadRequestException(`This request is already ${request.status}.`);
+    }
+    request.status = 'approved';
+    request.processedBy = new Types.ObjectId(adminId);
+    request.processedAt = new Date();
+    await request.save();
+    return { message: 'Withdrawal approved', data: request };
+  }
+
+  /** Admin: reject a pending withdrawal and refund the held amount. */
+  async rejectWithdrawal(adminId: string, id: string, dto: RejectWithdrawalDto) {
+    const request = await this.withdrawalModel.findById(id);
+    if (!request) throw new NotFoundException('Withdrawal request not found');
+    if (request.status !== 'pending') {
+      throw new BadRequestException(`This request is already ${request.status}.`);
+    }
+
+    // Refund the held amount back to the user's wallet.
+    await this.txModel.create({
+      userId: request.userId,
+      amount: request.amount,
+      type: 'credit',
+      status: 'success',
+      note: `Withdrawal rejected: ${dto.reason}`,
+      source: 'refund',
+      adminId: new Types.ObjectId(adminId),
+    });
+    await this.userModel.findByIdAndUpdate(request.userId, { $inc: { walletBalance: request.amount } });
+
+    request.status = 'rejected';
+    request.rejectionReason = dto.reason;
+    request.processedBy = new Types.ObjectId(adminId);
+    request.processedAt = new Date();
+    await request.save();
+
+    return { message: 'Withdrawal rejected and amount refunded', data: request };
   }
 }

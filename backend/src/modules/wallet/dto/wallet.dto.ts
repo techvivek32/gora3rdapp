@@ -25,6 +25,45 @@ export class VerifyTopUpDto {
   razorpaySignature: string;
 }
 
+export class RequestWithdrawalDto {
+  @ApiProperty({ example: 500 })
+  @IsNumber()
+  @Min(1)
+  amount: number;
+
+  @ApiProperty({ example: 'Ramesh Kumar' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  accountHolderName: string;
+
+  @ApiProperty({ example: 'State Bank of India' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(80)
+  bankName: string;
+
+  @ApiProperty({ example: '123456789012' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  accountNumber: string;
+
+  @ApiProperty({ example: 'SBIN0001234' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(20)
+  ifsc: string;
+}
+
+export class RejectWithdrawalDto {
+  @ApiProperty({ example: 'Invalid bank details' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  reason: string;
+}
+
 export class AdjustWalletDto {
   @ApiProperty({ example: 500, description: 'Amount to add or cut (always positive)' })
   @IsNumber()

@@ -6,7 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { AdjustWalletDto } from './dto/wallet.dto';
+import { AdjustWalletDto, RejectWithdrawalDto } from './dto/wallet.dto';
 
 @ApiTags('Admin Wallets')
 @ApiBearerAuth('access-token')
@@ -30,5 +30,29 @@ export class WalletAdminController {
     @Body() dto: AdjustWalletDto,
   ) {
     return this.walletService.adjustWallet(adminId, userId, dto);
+  }
+
+  // ─── Withdrawals ───────────────────────────────────────────────────────────
+
+  @Get('withdrawals')
+  @ApiOperation({ summary: 'List withdrawal requests' })
+  getWithdrawals(@Query('status') status?: string) {
+    return this.walletService.getWithdrawals(status);
+  }
+
+  @Post('withdrawals/:id/approve')
+  @ApiOperation({ summary: 'Approve a withdrawal request' })
+  approveWithdrawal(@CurrentUser('sub') adminId: string, @Param('id') id: string) {
+    return this.walletService.approveWithdrawal(adminId, id);
+  }
+
+  @Post('withdrawals/:id/reject')
+  @ApiOperation({ summary: 'Reject a withdrawal request and refund the amount' })
+  rejectWithdrawal(
+    @CurrentUser('sub') adminId: string,
+    @Param('id') id: string,
+    @Body() dto: RejectWithdrawalDto,
+  ) {
+    return this.walletService.rejectWithdrawal(adminId, id, dto);
   }
 }

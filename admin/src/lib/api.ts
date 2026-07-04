@@ -81,6 +81,11 @@ export const adminApi = {
   adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string }) =>
     apiClient.post(`/admin/wallets/${userId}/adjust`, data),
 
+  // ─── Withdrawals ─────────────────────────────────────────────────────────────
+  getWithdrawals: (params?: { status?: string }) => apiClient.get('/admin/wallets/withdrawals', { params }),
+  approveWithdrawal: (id: string) => apiClient.post(`/admin/wallets/withdrawals/${id}/approve`),
+  rejectWithdrawal: (id: string, reason: string) => apiClient.post(`/admin/wallets/withdrawals/${id}/reject`, { reason }),
+
   // ─── Cities ────────────────────────────────────────────────────────────────
   getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
   createCity: (data: any) => apiClient.post('/admin/cities', data),
