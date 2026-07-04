@@ -17,7 +17,6 @@ import '../widgets/alert_filter_sheet.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
 import '../widgets/user_search_widget.dart';
-import '../widgets/card_search_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -173,7 +172,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('Gora Taxi', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Partner', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+                    Text('Partner', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
                   ],
                 ),
               ],
@@ -255,24 +254,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Search a posted requirement / available cab by its display ID
-                SizedBox(height: 10.h),
-                const CardSearchWidget(),
-                SizedBox(height: 6.h),
-
-                // Quick access: My Booking, My Vehicles & My Alert (above the banner)
-                Padding(
-                  padding: EdgeInsets.fromLTRB(12.w, 4.h, 12.w, 6.h),
-                  child: Row(
-                    children: [
-                      _topTile(Icons.event_note_rounded, 'My Booking', () => context.push('/my-requirements')),
-                      SizedBox(width: 10.w),
-                      _topTile(Icons.directions_car_rounded, 'My Vehicles', () => context.push('/my-vehicles')),
-                      SizedBox(width: 10.w),
-                      _topTile(Icons.notifications_active_rounded, 'My Alert', () => _toggleAlerts(true)),
-                    ],
-                  ),
-                ),
+                SizedBox(height: 8.h),
 
                 // Banner Slider
                 BlocBuilder<HomeBloc, HomeState>(
@@ -320,79 +302,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
 
-                // Brand footer
-                _buildBrandFooter(),
                 SizedBox(height: 24.h),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _topTile(IconData icon, String label, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 12.h),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: AppColors.border),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: AppColors.primary, size: 24.sp),
-              SizedBox(height: 6.h),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBrandFooter() {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 16.h),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Gora Cabs',
-            style: TextStyle(
-              fontSize: 26.sp,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textHint.withValues(alpha: 0.5),
-            ),
-          ),
-          SizedBox(height: 8.h),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.favorite, color: Colors.red, size: 14),
-              SizedBox(width: 6.w),
-              Text('Made in India', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-            ],
-          ),
-          SizedBox(height: 4.h),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.location_on, color: AppColors.primary, size: 14),
-              SizedBox(width: 6.w),
-              Text('Crafted in Rajasthan', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
-            ],
           ),
         ],
       ),
