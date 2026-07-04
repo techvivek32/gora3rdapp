@@ -10,12 +10,6 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/subscription_bloc.dart';
 
 // col index: 0=Free, 1=Active, 2=Premium, 3=Golden
-const _planColors = [
-  AppColors.textHint,
-  AppColors.memberActive,
-  AppColors.memberPremium,
-  AppColors.memberGolden,
-];
 const _planIcons = [
   Icons.person_outline,
   Icons.verified_user,
@@ -23,22 +17,27 @@ const _planIcons = [
   Icons.emoji_events,
 ];
 const _planNames = ['Free', 'Active', 'Premium', 'Golden'];
-const _features = [
-  ['View Contact Details', false, true, true, true],
-  ['Post Requirements', true, true, true, true],
-  ['Post Available Cabs', true, true, true, true],
-  ['Business Cities Filter', false, true, true, true],
-  ['Featured Listings', false, false, true, true],
-  ['Priority Support', false, false, true, true],
-  ['Unlimited Listings', false, false, false, true],
-];
 
 const _membershipCol = {'new': 0, 'active': 1, 'verified': 1, 'premium': 2, 'golden': 3};
-const _durationLabel = {
-  'monthly': '/ month',
-  'quarterly': '/ 3 months',
-  'half_yearly': '/ 6 months',
-  'yearly': '/ year',
+
+// Per-tier presentation for the grouped plans layout.
+const _tierOrder = ['active', 'premium', 'golden'];
+const _tierColor = {
+  'active': AppColors.memberActive,
+  'premium': AppColors.memberPremium,
+  'golden': AppColors.memberGolden,
+};
+const _tierIcon = {
+  'active': Icons.verified_user,
+  'premium': Icons.diamond_outlined,
+  'golden': Icons.emoji_events,
+};
+const _tierTitle = {'active': 'Active Plan', 'premium': 'Premium Plan', 'golden': 'Golden Plan'};
+const _tierBadge = {'premium': 'Most Popular', 'golden': 'Best Value'};
+const _tierFeatureLabel = {
+  'active': 'Basic Features',
+  'premium': 'All Premium Features',
+  'golden': 'All Golden Features',
 };
 
 class SubscriptionPlansPage extends StatefulWidget {
@@ -51,6 +50,7 @@ class SubscriptionPlansPage extends StatefulWidget {
 class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   Razorpay? _razorpay;
   String? _pendingPlanId;
+  final Set<String> _collapsed = {}; // tiers the user has collapsed
 
   @override
   void initState() {
@@ -179,6 +179,12 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 12.w),
+            child: Icon(Icons.emoji_events, color: Colors.white, size: 24.sp),
+          ),
+        ],
       ),
       body: BlocConsumer<SubscriptionBloc, SubscriptionState>(
         listener: (context, state) {
@@ -235,14 +241,22 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           final currentName = currentColIndex == 0 ? 'Free' : _planNames[currentColIndex];
           final validTill = _formatExpiry(user?['membershipExpiresAt']);
 
-          final visiblePlans = _filtered(plans);
+          // Group plans by tier (active/premium/golden), each sorted 1→3→6 months.
+          final byTier = <String, List<Map<String, dynamic>>>{};
+          for (final p in _filtered(plans)) {
+            final t = (p['membershipType'] as String?) ?? 'active';
+            byTier.putIfAbsent(t, () => []).add(p);
+          }
+          for (final list in byTier.values) {
+            list.sort((a, b) => ((a['durationDays'] as num?) ?? 0).compareTo((b['durationDays'] as num?) ?? 0));
+          }
 
           return SingleChildScrollView(
             padding: EdgeInsets.all(16.r),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildCurrentPlanBanner(currentIcon, currentName, currentColIndex, validTill),
+                _buildCurrentPlanBanner(currentIcon, currentName, currentColIndex, validTill, user?['membershipExpiresAt']),
                 SizedBox(height: 16.h),
 
                 if (!_isVerified()) ...[
@@ -250,12 +264,15 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                   SizedBox(height: 16.h),
                 ],
 
-                // Buyable plan cards
-                ...visiblePlans.map((p) => _buildPlanCard(p, currentMembership, isOrdering)),
-                SizedBox(height: 8.h),
+                // One collapsible section per tier, each with 1 / 3 / 6-month cards.
+                for (final tier in _tierOrder)
+                  if ((byTier[tier] ?? []).isNotEmpty) ...[
+                    _buildTierSection(tier, byTier[tier]!, isOrdering),
+                    SizedBox(height: 16.h),
+                  ],
 
-                // Static (non-selectable) feature comparison
-                _buildComparisonTable(),
+                SizedBox(height: 4.h),
+                _buildTrustBar(),
                 SizedBox(height: 24.h),
               ],
             ),
@@ -265,7 +282,8 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     );
   }
 
-  Widget _buildCurrentPlanBanner(IconData icon, String name, int colIndex, String? validTill) {
+  Widget _buildCurrentPlanBanner(IconData icon, String name, int colIndex, String? validTill, dynamic expiryRaw) {
+    final daysLeft = _daysRemaining(expiryRaw);
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
@@ -305,7 +323,9 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                 Text(
                   colIndex == 0
                       ? 'Upgrade to unlock premium features'
-                      : (validTill != null ? 'Valid till $validTill' : 'Enjoying premium membership'),
+                      : (validTill != null
+                          ? 'Valid till $validTill${daysLeft != null ? '  ($daysLeft days remaining)' : ''}'
+                          : 'Enjoying premium membership'),
                   style: TextStyle(color: Colors.white70, fontSize: 11.sp, fontFamily: 'Poppins'),
                 ),
               ],
@@ -344,142 +364,21 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     );
   }
 
-  Widget _buildPlanCard(Map<String, dynamic> plan, String currentMembership, bool isLoading) {
-    final type = (plan['membershipType'] as String?) ?? 'active';
-    final col = _membershipCol[type] ?? 1;
-    final color = _planColors[col];
-    final icon = _planIcons[col];
-    final price = (plan['price'] as num?) ?? 0;
-    final disc = (plan['discountedPrice'] as num?) ?? 0;
-    final eff = (disc > 0 && disc < price) ? disc : price;
-    final duration = (plan['duration'] as String?) ?? 'monthly';
-    final durationText = _durationLabel[duration] ?? '/ $duration';
-    final isPopular = plan['isPopular'] == true;
-    final isGolden = type == 'golden';
-    final isCurrent = type == currentMembership;
+  // ── Grouped tier section: header + 1/3/6-month duration cards ──────────────
+  Widget _buildTierSection(String tier, List<Map<String, dynamic>> tierPlans, bool isLoading) {
+    final color = _tierColor[tier] ?? AppColors.memberActive;
+    final icon = _tierIcon[tier] ?? Icons.verified_user;
+    final title = _tierTitle[tier] ?? tier;
+    final badge = _tierBadge[tier];
+    final collapsed = _collapsed.contains(tier);
 
-    // Top ribbon per plan (Golden = Best Value, Popular = Most Popular).
-    final String? badge = isGolden ? '👑 Best Value' : (isPopular ? '⭐ Most Popular' : null);
-
-    // Use the plan's own features if present, else derive from the comparison table.
-    final List<String> feats = (plan['features'] as List?)?.map((e) => e.toString()).toList() ??
-        _features.where((f) => f[col + 1] == true).map((f) => f[0] as String).toList();
-
-    return Container(
-      margin: EdgeInsets.only(bottom: 14.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: (isPopular || isGolden) ? color : AppColors.border, width: (isPopular || isGolden) ? 1.5 : 1),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, 2))],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          if (badge != null)
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(vertical: 5.h),
-              color: color,
-              child: Text(badge,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-            ),
-          Padding(
-            padding: EdgeInsets.all(14.r),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 1) LEFT: icon + plan name
-                  SizedBox(
-                    width: 68.w,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(10.r),
-                          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                          child: Icon(icon, color: color, size: 22.sp),
-                        ),
-                        SizedBox(height: 6.h),
-                        Text(plan['name'] as String? ?? _planNames[col],
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.sp, color: color, fontFamily: 'Poppins')),
-                      ],
-                    ),
-                  ),
-                  VerticalDivider(width: 14.w, thickness: 1, color: AppColors.border),
-                  // 2) CENTER: plan details (features)
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: feats
-                          .take(6)
-                          .map((f) => Padding(
-                                padding: EdgeInsets.symmetric(vertical: 3.h),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(Icons.check_circle, color: color, size: 14.sp),
-                                    SizedBox(width: 6.w),
-                                    Expanded(
-                                      child: Text(f,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 11.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-                                    ),
-                                  ],
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                  ),
-                  VerticalDivider(width: 14.w, thickness: 1, color: AppColors.border),
-                  // 3) RIGHT: price + buy button
-                  SizedBox(
-                    width: 86.w,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (disc > 0 && disc < price)
-                          Text('₹${(price / 100).toStringAsFixed(0)}',
-                              style: TextStyle(decoration: TextDecoration.lineThrough, color: AppColors.textHint, fontSize: 11.sp, fontFamily: 'Poppins')),
-                        Text('₹${(eff / 100).toStringAsFixed(0)}',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22.sp, color: color, fontFamily: 'Poppins')),
-                        Text(durationText, style: TextStyle(fontSize: 10.sp, color: AppColors.textHint, fontFamily: 'Poppins')),
-                        SizedBox(height: 10.h),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: (isLoading || isCurrent) ? null : () => _buyPlan(plan),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: color,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: color.withValues(alpha: 0.4),
-                              elevation: 0,
-                              padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 4.w),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                            ),
-                            child: Text(isCurrent ? 'Current' : (col == 1 ? 'Upgrade' : 'Buy Now'),
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+    // 1-month price is the baseline for computing savings on longer durations.
+    final oneMonth = tierPlans.firstWhere(
+      (p) => ((p['durationDays'] as num?) ?? 0) <= 31,
+      orElse: () => tierPlans.first,
     );
-  }
+    final oneMonthRupees = ((oneMonth['price'] as num?) ?? 0) / 100;
 
-  Widget _buildComparisonTable() {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -487,95 +386,174 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
         border: Border.all(color: AppColors.border),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
+      padding: EdgeInsets.all(14.r),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
-            child: Text('Feature Comparison',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-          ),
-          _buildPlanHeaderRow(),
-          Divider(height: 1, color: AppColors.border),
-          ..._features.map(_buildFeatureRow),
-          SizedBox(height: 8.h),
-        ],
-      ),
-    );
-  }
-
-  // Static header — display only, not tappable.
-  Widget _buildPlanHeaderRow() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.h),
-      child: Row(
-        children: [
-          SizedBox(width: _featureColWidth),
-          ...List.generate(4, (col) {
-            final color = _planColors[col];
-            return Expanded(
-              child: Container(
-                margin: EdgeInsets.all(4.r),
-                padding: EdgeInsets.symmetric(vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: color.withValues(alpha: 0.2)),
+          InkWell(
+            onTap: () => setState(() => collapsed ? _collapsed.remove(tier) : _collapsed.add(tier)),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(8.r),
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  child: Icon(icon, color: Colors.white, size: 18.sp),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_planIcons[col], color: color, size: 18.sp),
-                    SizedBox(height: 4.h),
-                    Text(_planNames[col],
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10.sp, color: color, fontFamily: 'Poppins')),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureRow(List<dynamic> row) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: _featureColWidth,
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
-              child: Text(row[0] as String, style: TextStyle(fontSize: 12.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                SizedBox(width: 10.w),
+                Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                SizedBox(width: 8.w),
+                if (badge != null)
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20.r)),
+                    child: Text(badge, style: TextStyle(color: color, fontSize: 10.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                  ),
+                const Spacer(),
+                Icon(collapsed ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up, color: AppColors.textSecondary),
+              ],
             ),
           ),
-          ...List.generate(4, (col) {
-            final color = _planColors[col];
-            final has = row[col + 1] as bool;
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 10.h),
-                child: Center(
-                  child: has
-                      ? Icon(Icons.check_circle, color: color, size: 18.sp)
-                      : Icon(Icons.close, color: AppColors.textHint.withValues(alpha: 0.35), size: 16.sp),
-                ),
+          if (!collapsed) ...[
+            SizedBox(height: 14.h),
+            // IntrinsicHeight bounds the vertical extent so the cards can be equal
+            // height (stretch) inside the scroll view.
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (int i = 0; i < tierPlans.length; i++) ...[
+                    if (i > 0) SizedBox(width: 8.w),
+                    Expanded(child: _buildDurationCard(tier, tierPlans[i], color, oneMonthRupees, isLoading)),
+                  ],
+                ],
               ),
-            );
-          }),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  double get _featureColWidth => 120.w;
+  Widget _buildDurationCard(String tier, Map<String, dynamic> plan, Color color, double oneMonthRupees, bool isLoading) {
+    final priceRupees = ((plan['price'] as num?) ?? 0) / 100;
+    final priceRupeesInt = priceRupees.round();
+    final days = ((plan['durationDays'] as num?) ?? 30).toInt();
+    final months = (days / 30).round().clamp(1, 12);
+    final perMonth = months > 0 ? (priceRupees / months).round() : priceRupeesInt;
+    final label = months == 1 ? '1 Month' : '$months Months';
+    int savePct = 0;
+    if (months > 1 && oneMonthRupees > 0) {
+      final full = oneMonthRupees * months;
+      savePct = (((full - priceRupees) / full) * 100).round();
+    }
+    final featureLabel = _tierFeatureLabel[tier] ?? 'Features';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      padding: EdgeInsets.all(8.r),
+      child: Column(
+        mainAxisSize: MainAxisSize.max,
+        children: [
+          Text(label, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.sp, color: color, fontFamily: 'Poppins')),
+          SizedBox(height: 3.h),
+          // Reserve the badge row on every card so prices align across durations.
+          SizedBox(
+            height: 15.h,
+            child: savePct > 0
+                ? Container(
+                    padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                    decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(6.r)),
+                    child: Text('SAVE $savePct%', style: TextStyle(color: AppColors.success, fontSize: 8.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                  )
+                : null,
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 6.h),
+            child: Divider(height: 1, color: color.withValues(alpha: 0.2)),
+          ),
+          Text('₹$priceRupeesInt', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19.sp, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+          SizedBox(height: 2.h),
+          Text(months == 1 ? 'per month' : '₹$perMonth / month',
+              style: TextStyle(fontSize: 8.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+          SizedBox(height: 8.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle, color: color, size: 11.sp),
+              SizedBox(width: 3.w),
+              Flexible(
+                child: Text(featureLabel,
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 8.sp, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+              ),
+            ],
+          ),
+          const Spacer(),
+          SizedBox(height: 8.h),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: isLoading ? null : () => _buyPlan(plan),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 2.w),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+              ),
+              child: Text('Choose Plan', textAlign: TextAlign.center, style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrustBar() {
+    Widget item(IconData icon, Color color, String title, String subtitle) {
+      return Expanded(
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 22.sp),
+            SizedBox(height: 4.h),
+            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+            SizedBox(height: 2.h),
+            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 8.5.sp, fontFamily: 'Poppins', color: AppColors.textSecondary)),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 8.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          item(Icons.verified_user, AppColors.memberActive, 'Secure Payment', '100% Safe & Secure'),
+          Container(width: 1, height: 36.h, color: AppColors.border),
+          item(Icons.bolt, AppColors.success, 'Instant Activation', 'Benefits on activation'),
+          Container(width: 1, height: 36.h, color: AppColors.border),
+          item(Icons.headset_mic, AppColors.primary, '24x7 Support', 'Always with you'),
+        ],
+      ),
+    );
+  }
+
+  int? _daysRemaining(dynamic v) {
+    if (v == null) return null;
+    final d = DateTime.tryParse(v.toString());
+    if (d == null) return null;
+    final diff = d.difference(DateTime.now()).inDays;
+    return diff > 0 ? diff : null;
+  }
 
   static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

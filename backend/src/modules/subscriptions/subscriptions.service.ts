@@ -60,7 +60,8 @@ export class SubscriptionsService {
     const plan = await this.planModel.findById(planId);
     if (!plan) throw new NotFoundException('Plan not found');
 
-    const amount = (plan.discountedPrice || plan.price) * 100; // Razorpay uses paise
+    // Plan prices are stored in paise, which is exactly what Razorpay expects.
+    const amount = plan.discountedPrice || plan.price;
     const orderId = generatePaymentOrderId();
 
     let razorpayOrder;

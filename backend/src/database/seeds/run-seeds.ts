@@ -59,68 +59,43 @@ async function runSeeds() {
     console.log('Cities already seeded');
   }
 
-  // Seed subscription plans
-  const plansCount = await SubscriptionPlan.countDocuments();
-  if (plansCount === 0) {
-    const plans = [
-      {
-        name: 'Active Monthly',
-        description: 'Get access to business cities filtering and network features',
-        membershipType: 'active',
-        duration: 'monthly',
-        price: 49900,
-        discountedPrice: 29900,
-        durationDays: 30,
-        features: ['View 10 contact details/month', 'Business cities filtering', 'Post unlimited requirements', 'Post up to 5 vehicles/month'],
-        isActive: true,
-        isPopular: false,
-        sortOrder: 1,
-      },
-      {
-        name: 'Verified Monthly',
-        description: 'Verified badge + expanded contact access',
-        membershipType: 'verified',
-        duration: 'monthly',
-        price: 99900,
-        discountedPrice: 79900,
-        durationDays: 30,
-        features: ['View 50 contact details/month', 'Verified badge on profile', 'Business cities filtering', 'Post unlimited requirements', 'Post unlimited vehicles', 'Priority listing'],
-        isActive: true,
-        isPopular: false,
-        sortOrder: 2,
-      },
-      {
-        name: 'Premium Monthly',
-        description: 'Full contact access and featured listings',
-        membershipType: 'premium',
-        duration: 'monthly',
-        price: 199900,
-        discountedPrice: 149900,
-        durationDays: 30,
-        features: ['Unlimited contact views', 'Gold badge + Featured listings', 'Business cities filtering', 'Unlimited requirements & vehicles', 'Priority notifications', 'Chat access'],
-        isActive: true,
-        isPopular: true,
-        sortOrder: 3,
-      },
-      {
-        name: 'Golden Annual',
-        description: 'Top-tier membership with all premium benefits for a full year',
-        membershipType: 'golden',
-        duration: 'yearly',
-        price: 1999900,
-        discountedPrice: 1499900,
-        durationDays: 365,
-        features: ['Unlimited everything', 'Golden crown badge', 'Featured listing priority #1', 'Dedicated support', 'Early access to new features', 'City management for your fleet'],
-        isActive: true,
-        isPopular: false,
-        sortOrder: 4,
-      },
-    ];
-    await SubscriptionPlan.insertMany(plans);
-    console.log(`${plans.length} subscription plans seeded`);
-  } else {
-    console.log('Subscription plans already seeded');
-  }
+  // Seed subscription plans — every tier offers 1 / 3 / 6-month durations.
+  // Prices are stored in paise (₹ × 100). This block always re-seeds so pricing
+  // changes here are applied on `npm run seed`.
+  const activeFeatures = ['Basic Features', 'View 10 contact details/month', 'Business cities filtering', 'Post unlimited requirements', 'Post up to 5 vehicles/month'];
+  const premiumFeatures = ['All Premium Features', 'Unlimited contact views', 'Gold badge + Featured listings', 'Unlimited requirements & vehicles', 'Priority notifications', 'Chat access'];
+  const goldenFeatures = ['All Golden Features', 'Unlimited everything', 'Golden crown badge', 'Featured listing priority #1', 'Dedicated support', 'City management for your fleet'];
+
+  // [membershipType, durationDays, durationKey, price(₹), features, sortOrder, isPopular]
+  const planMatrix: Array<[string, number, string, number, string[], number, boolean]> = [
+    ['active', 30, '1_month', 99, activeFeatures, 1, false],
+    ['active', 90, '3_months', 249, activeFeatures, 2, false],
+    ['active', 180, '6_months', 449, activeFeatures, 3, false],
+    ['premium', 30, '1_month', 199, premiumFeatures, 4, true],
+    ['premium', 90, '3_months', 499, premiumFeatures, 5, true],
+    ['premium', 180, '6_months', 899, premiumFeatures, 6, true],
+    ['golden', 30, '1_month', 299, goldenFeatures, 7, false],
+    ['golden', 90, '3_months', 699, goldenFeatures, 8, false],
+    ['golden', 180, '6_months', 1199, goldenFeatures, 9, false],
+  ];
+  const durationName: Record<string, string> = { '1_month': '1 Month', '3_months': '3 Months', '6_months': '6 Months' };
+  const tierName: Record<string, string> = { active: 'Active', premium: 'Premium', golden: 'Golden' };
+  const plans = planMatrix.map(([type, days, key, rupees, features, sortOrder, isPopular]) => ({
+    name: `${tierName[type]} ${durationName[key]}`,
+    description: `${tierName[type]} membership for ${durationName[key].toLowerCase()}`,
+    membershipType: type,
+    duration: key,
+    price: rupees * 100, // paise
+    discountedPrice: 0,
+    durationDays: days,
+    features,
+    isActive: true,
+    isPopular,
+    sortOrder,
+  }));
+  await SubscriptionPlan.deleteMany({});
+  await SubscriptionPlan.insertMany(plans);
+  console.log(`${plans.length} subscription plans seeded`);
 
   await mongoose.disconnect();
   console.log('Seeding complete!');
