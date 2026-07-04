@@ -32,6 +32,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   bool _alertsOn = false;
   bool _awaitingOverlayGrant = false;
+  // Remember the user's last-saved alert picks so reopening the sheet shows them.
+  List<String> _alertVehicles = [];
+  List<String> _alertTrips = [];
 
   @override
   void initState() {
@@ -42,6 +45,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;
+    _alertVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
+    _alertTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     // Register this device for push notifications (user is authenticated here).
     PushNotificationService.instance.registerToken();
   }
@@ -83,22 +88,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
-    // Turning ON — first let the user pick which vehicle/ride types to be alerted for.
-    final auth = context.read<AuthBloc>().state;
-    final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
-    final initialVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
-    final initialTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
-
-    final filters = await showAlertFilterSheet(context, initialVehicles: initialVehicles, initialTrips: initialTrips);
+    // Turning ON — pre-select the user's last-saved picks so nothing is lost.
+    final filters = await showAlertFilterSheet(context, initialVehicles: _alertVehicles, initialTrips: _alertTrips);
     if (filters == null) return; // dismissed → keep the toggle off
 
-    setState(() => _alertsOn = true);
+    final savedVehicles = filters['vehicles'] ?? [];
+    final savedTrips = filters['trips'] ?? [];
+    setState(() {
+      _alertsOn = true;
+      _alertVehicles = savedVehicles;
+      _alertTrips = savedTrips;
+    });
     try {
       await getIt<ApiClient>().put('/users/notifications', data: {
         'enabled': true,
-        'vehicleTypes': filters['vehicles'],
-        'tripTypes': filters['trips'],
+        'vehicleTypes': savedVehicles,
+        'tripTypes': savedTrips,
       });
+      // Keep the cached user in sync so reopening the sheet (even after a rebuild)
+      // shows the same picks.
+      if (!mounted) return;
+      final auth = context.read<AuthBloc>().state;
+      if (auth is AuthAuthenticated && auth.user is Map) {
+        final u = auth.user as Map<String, dynamic>;
+        u['notificationsEnabled'] = true;
+        u['alertVehicleTypes'] = savedVehicles;
+        u['alertTripTypes'] = savedTrips;
+      }
     } catch (_) {
       if (mounted) setState(() => _alertsOn = false);
       return;
@@ -244,7 +260,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 const CardSearchWidget(),
                 SizedBox(height: 6.h),
 
-                // Quick access: My Booking & My Vehicles (above the banner)
+                // Quick access: My Booking, My Vehicles & My Alert (above the banner)
                 Padding(
                   padding: EdgeInsets.fromLTRB(12.w, 4.h, 12.w, 6.h),
                   child: Row(
@@ -252,6 +268,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       _topTile(Icons.event_note_rounded, 'My Booking', () => context.push('/my-requirements')),
                       SizedBox(width: 10.w),
                       _topTile(Icons.directions_car_rounded, 'My Vehicles', () => context.push('/my-vehicles')),
+                      SizedBox(width: 10.w),
+                      _topTile(Icons.notifications_active_rounded, 'My Alert', () => _toggleAlerts(true)),
                     ],
                   ),
                 ),
@@ -330,7 +348,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             children: [
               Icon(icon, color: AppColors.primary, size: 24.sp),
               SizedBox(height: 6.h),
-              Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins'),
+              ),
             ],
           ),
         ),

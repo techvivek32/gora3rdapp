@@ -17,6 +17,7 @@ Future<Map<String, List<String>>?> showAlertFilterSheet(
   return showModalBottomSheet<Map<String, List<String>>>(
     context: context,
     isScrollControlled: true,
+    useRootNavigator: true, // cover the bottom nav bar + center FAB so nothing overlaps
     backgroundColor: Colors.white,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
     builder: (_) => _AlertFilterSheet(initialVehicles: initialVehicles, initialTrips: initialTrips),
@@ -53,7 +54,7 @@ class _AlertFilterSheetState extends State<_AlertFilterSheet> {
                   Icon(Icons.filter_alt_rounded, color: AppColors.primary, size: 22.sp),
                   SizedBox(width: 8.w),
                   Expanded(
-                    child: Text('Alert Filters', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
+                    child: Text('My Alert', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins')),
                   ),
                 ],
               ),
