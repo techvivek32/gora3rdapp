@@ -126,9 +126,7 @@ class ProfilePage extends StatelessWidget {
                       SizedBox(height: 12.h),
 
                       // About & Policies
-                      _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'Security Wallet System', onTap: () => context.push('/policy/wallet')),
-                      _ProfileAction(icon: Icons.gavel_rounded, label: 'Penalty Policy', onTap: () => context.push('/policy/penalty')),
-                      _ProfileAction(icon: Icons.policy_outlined, label: 'Policies', onTap: () => context.push('/policy/policies')),
+                      _ProfileAction(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', onTap: () => context.push('/policy/privacy')),
                       _ProfileAction(icon: Icons.description_outlined, label: 'Terms & Conditions', onTap: () => context.push('/policy/terms')),
                       _ProfileAction(icon: Icons.info_outline, label: 'About Us', onTap: () => context.push('/policy/about')),
                       SizedBox(height: 12.h),

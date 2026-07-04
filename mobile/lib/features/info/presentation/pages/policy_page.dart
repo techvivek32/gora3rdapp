@@ -47,6 +47,59 @@ const Map<String, PolicyContent> kPolicies = {
         'The app may include links to other services, provided for your convenience; they do not signify endorsement.',
         'By using this app, you agree to the terms and conditions outlined above.',
       ]),
+      PolicySection(heading: 'Penalty Policy', paragraphs: [
+        'Please read these penalty rules carefully to avoid any deductions:',
+      ], bullets: [
+        'If a driver accepts a duty but fails to provide the vehicle, a penalty of ₹500 will be charged.',
+        'If a booking is cancelled 5 minutes after acceptance, a ₹100 penalty will apply. If cancelled 15 minutes or 30 minutes after acceptance, a ₹500 penalty will be charged.',
+        'For Urgent bookings, cancelling within 15 minutes of acceptance will incur a ₹500 penalty, cancelling within 30 minutes will also incur a ₹500 penalty, and cancelling after 30 minutes will result in a ₹1,500 penalty.',
+        'If the customer reports that you arrived late for pickup, a penalty may be imposed based on the complaint.',
+        'Only send the driver and vehicle details that were provided in the booking. If there is any change, you must inform the company or the booking poster. Sending a different driver or vehicle without prior notice may result in a penalty.',
+        'For CAT bookings, the first 45 minutes from the scheduled pickup time are free. After that, waiting charges will apply per hour: Hatchback – ₹120, Sedan – ₹150, SUV – ₹200.',
+      ]),
+    ],
+  ),
+  'privacy': PolicyContent(
+    title: 'Privacy Policy',
+    icon: Icons.privacy_tip_outlined,
+    subtitle: 'How we protect your data, wallet and platform trust.',
+    sections: [
+      PolicySection(heading: 'Your Privacy', paragraphs: [
+        'Gora Cabs respects your privacy. We collect only the information needed to verify members and operate the platform — such as your name, mobile number, KYC documents and city. This information is used solely to run the service and is never sold to third parties.',
+        'Your contact number is shared with other members only as required to complete a booking. Contact details are gated by membership to protect you from spam and misuse.',
+      ]),
+      // ── Security Wallet System ──────────────────────────────────────────────
+      PolicySection(heading: 'Security Wallet System 🔒', paragraphs: [
+        'The Security Wallet reduces fraud between drivers and agents while building trust on the platform.',
+      ]),
+      PolicySection(heading: 'Wallet Rules', bullets: [
+        'Both drivers and agents must maintain a minimum wallet balance of ₹500.',
+        'If the wallet balance falls below ₹500: Calling, WhatsApp, and Booking Confirmation features will be disabled.',
+        'If a fraud complaint is found to be valid, a penalty of ₹100 to ₹500 may be deducted from the wallet.',
+        'Users who file false or misleading complaints may also face appropriate action.',
+      ]),
+      PolicySection(heading: 'Fraud Examples', bullets: [
+        'Fake Duty Post',
+        'Booking Confirm karke Cancel karna',
+        'Wrong Information dena',
+        'Advance Payment Fraud',
+        'No Response After Confirmation',
+      ]),
+      PolicySection(heading: 'Goal', paragraphs: [
+        'To ensure each user keeps a security amount on the platform, reducing fake users and fraud activities while building trust for both drivers and agents.',
+      ]),
+      // ── Service & Copyright policies ────────────────────────────────────────
+      PolicySection(heading: 'About Service', paragraphs: [
+        'Gora Cabs is a platform dedicated to taxi-service availability and creation. We connect service providers with requirements to facilitate smooth transportation operations. By using this application, you acknowledge that we are a service aggregator and facilitator.',
+      ]),
+      PolicySection(heading: 'Copyright & Intellectual Property', paragraphs: [
+        'All content included in this application — text, graphics, logos, button icons, images and software — is the property of Gora Cabs and is protected by copyright laws.',
+        'Prohibition on Copying: You may not copy, reproduce, republish, upload, post, transmit or distribute any material from this application without prior written permission from us. Unauthorized use may violate copyright laws, trademark laws and other regulations.',
+      ]),
+      PolicySection(heading: 'General Terms of Use', paragraphs: [
+        'By accessing this application, you agree to use it only for lawful purposes. You are prohibited from posting or transmitting any material that constitutes or encourages conduct that would be a criminal offense or give rise to civil liability.',
+        'We reserve the right to modify these terms at any time. Your continued use of the application following any changes indicates your acceptance of the new terms.',
+      ]),
     ],
   ),
   'policies': PolicyContent(
