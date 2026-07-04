@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Put, Post, Body, Param, Query, UseGuards, UseInterceptors,
+  Controller, Get, Put, Post, Delete, Body, Param, Query, UseGuards, UseInterceptors,
   UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -28,6 +28,12 @@ export class UsersController {
   @ApiOperation({ summary: 'Update user profile' })
   updateProfile(@CurrentUser('sub') userId: string, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(userId, dto);
+  }
+
+  @Delete('account')
+  @ApiOperation({ summary: 'Delete (deactivate) the current user account' })
+  deleteAccount(@CurrentUser('sub') userId: string) {
+    return this.usersService.deleteAccount(userId);
   }
 
   @Post('verification')

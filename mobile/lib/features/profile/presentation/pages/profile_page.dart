@@ -152,6 +152,13 @@ class ProfilePage extends StatelessWidget {
                           ),
                         ),
                       ),
+                      SizedBox(height: 8.h),
+                      _ProfileAction(
+                        icon: Icons.delete_forever_outlined,
+                        label: 'Delete Account',
+                        color: AppColors.error,
+                        onTap: () => _confirmDeleteAccount(context),
+                      ),
                       SizedBox(height: 140.h),
                     ],
                   ),
@@ -164,6 +171,38 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Delete Account', style: TextStyle(fontFamily: 'Poppins')),
+        content: const Text(
+          'This will permanently delete your account and you will be signed out. '
+          'This action cannot be undone. Are you sure?',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await getIt<ApiClient>().delete('/users/account');
+      if (!context.mounted) return;
+      context.read<AuthBloc>().add(AuthLogoutEvent());
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete account. Please try again.'), backgroundColor: AppColors.error),
+      );
+    }
+  }
 }
 
 void showEditProfileSheet(BuildContext context, Map<String, dynamic>? user) {

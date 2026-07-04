@@ -259,6 +259,18 @@ export class UsersService {
     return { message: `Notifications ${enabled ? 'enabled' : 'disabled'}` };
   }
 
+  /** Self-service account deletion — deactivates the account so it can no longer
+   *  log in (login rejects inactive accounts). */
+  async deleteAccount(userId: string) {
+    const user = await this.userModel.findById(userId).select('_id');
+    if (!user) throw new NotFoundException('User not found');
+    await this.userModel.findByIdAndUpdate(userId, {
+      isActive: false,
+      fcmTokens: [],
+    });
+    return { message: 'Your account has been deleted.' };
+  }
+
   async updateFcmToken(userId: string, fcmToken: string, action: 'add' | 'remove' = 'add') {
     const update = action === 'add'
       ? { $addToSet: { fcmTokens: fcmToken } }
