@@ -25,16 +25,16 @@ class BannerCardWidget extends StatelessWidget {
     return GestureDetector(
       onTap: _onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 10.w),
-        height: 110.h,
+        margin: EdgeInsets.symmetric(horizontal: 8.w),
+        height: 220.h,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(10.r),
+          borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2)),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10.r),
+          borderRadius: BorderRadius.circular(16.r),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -67,7 +67,7 @@ class BannerCardWidget extends StatelessWidget {
                 padding: EdgeInsets.all(14.r),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     if (title.isNotEmpty)
                       Text(
