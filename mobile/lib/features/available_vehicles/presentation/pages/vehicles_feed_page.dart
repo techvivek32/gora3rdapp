@@ -14,7 +14,6 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../requirements/presentation/widgets/banner_card_widget.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
 import '../bloc/vehicles_bloc.dart';
-import '../widgets/vehicles_filter_sheet.dart';
 
 const _kCaution =
     'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.';
@@ -34,22 +33,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
   List<Map<String, dynamic>> _banners = [];
-  Map<String, dynamic> _filters = {};
 
-  void _openFilter() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => VehiclesFilterSheet(
-        initialFilters: _filters,
-        onApply: (filters) {
-          setState(() => _filters = filters);
-          context.read<VehiclesBloc>().add(LoadVehiclesEvent(filters: filters.isEmpty ? null : filters));
-        },
-      ),
-    );
-  }
 
   @override
   void initState() {
@@ -120,7 +104,6 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
             tooltip: 'My Vehicles',
             onPressed: () => context.push('/my-vehicles'),
           ),
-          IconButton(icon: const Icon(Icons.filter_list, color: Colors.white), tooltip: 'Filter', onPressed: _openFilter),
           IconButton(icon: Icon(Icons.add, color: Colors.white, size: 28.sp), onPressed: () => context.push('/vehicles/create')),
         ],
       ),

@@ -10,7 +10,6 @@ import '../../../../core/widgets/marquee_text.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/banner_card_widget.dart';
 import '../widgets/requirement_card_widget.dart';
-import '../widgets/requirements_filter_sheet.dart';
 
 const _kCaution =
     'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.';
@@ -79,18 +78,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             icon: Icon(Icons.history_rounded, color: Colors.white),
             tooltip: 'My Requirements',
             onPressed: () => context.push('/my-requirements'),
-          ),
-          IconButton(
-            icon: Icon(Icons.filter_list_rounded, color: Colors.white),
-            onPressed: () => showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24.r))),
-              builder: (_) => RequirementsFilterSheet(
-                initialFilters: const {},
-                onApply: (filters) => context.read<RequirementsBloc>().add(FilterRequirementsEvent(filters: filters)),
-              ),
-            ),
           ),
           IconButton(
             icon: Icon(Icons.add, color: Colors.white, size: 28.sp),
