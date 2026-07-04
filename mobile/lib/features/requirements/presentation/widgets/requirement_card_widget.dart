@@ -46,6 +46,9 @@ class RequirementCardWidget extends StatelessWidget {
         final isBooked = requirement['status'] == 'accepted';
         final isCancelled = requirement['status'] == 'cancelled';
         final isOnHold = requirement['status'] == 'on_hold';
+        // Cancelled / booked / on-hold posts are read-only for everyone except the
+        // owner (who still manages them from My Requirements via the menu).
+        final bool locked = (isCancelled || isBooked || isOnHold) && !isCurrentUserOwner;
 
         final memberType = (mine ? currentMembership : (postedBy?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
@@ -84,7 +87,7 @@ class RequirementCardWidget extends StatelessWidget {
         }
 
         return GestureDetector(
-          onTap: onTap == null
+          onTap: onTap == null || locked
               ? null
               : () {
                   if (isCancelled) return;
@@ -109,7 +112,12 @@ class RequirementCardWidget extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: _WatermarkPainter()))),
-                  Column(
+                  // Dim + block interaction on read-only (cancelled/booked/hold) cards.
+                  Opacity(
+                    opacity: locked ? 0.5 : 1.0,
+                    child: AbsorbPointer(
+                      absorbing: locked,
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
@@ -421,6 +429,8 @@ class RequirementCardWidget extends StatelessWidget {
                         ),
                       ),
                     ],
+                      ),
+                    ),
                   ),
                   if (isBooked || isCancelled || isOnHold)
                     Positioned.fill(
@@ -525,9 +535,15 @@ class RequirementCardWidget extends StatelessWidget {
   }
 
   Widget _buildStampBadge({required String text, required Color color}) {
-    return SizedBox(
-      width: 110.w,
-      height: 110.w,
+    return Container(
+      width: 150.w,
+      height: 150.w,
+      // Highlight the stamp so it pops against the dimmed card behind it.
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.85),
+        boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 12, spreadRadius: 1)],
+      ),
       child: CustomPaint(
         painter: _StampRingPainter(color: color),
         child: Center(
@@ -535,21 +551,21 @@ class RequirementCardWidget extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.star, color: color, size: 9.sp),
-                SizedBox(width: 2.w),
-                Icon(Icons.star, color: color, size: 9.sp),
-                SizedBox(width: 2.w),
-                Icon(Icons.star, color: color, size: 9.sp),
+                Icon(Icons.star, color: color, size: 12.sp),
+                SizedBox(width: 3.w),
+                Icon(Icons.star, color: color, size: 12.sp),
+                SizedBox(width: 3.w),
+                Icon(Icons.star, color: color, size: 12.sp),
               ]),
-              SizedBox(height: 3.h),
-              Text(text, style: TextStyle(color: color, fontSize: 14.sp, fontWeight: FontWeight.w900, letterSpacing: 2)),
-              SizedBox(height: 3.h),
+              SizedBox(height: 4.h),
+              Text(text, style: TextStyle(color: color, fontSize: 19.sp, fontWeight: FontWeight.w900, letterSpacing: 2)),
+              SizedBox(height: 4.h),
               Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.star, color: color, size: 9.sp),
-                SizedBox(width: 2.w),
-                Icon(Icons.star, color: color, size: 9.sp),
-                SizedBox(width: 2.w),
-                Icon(Icons.star, color: color, size: 9.sp),
+                Icon(Icons.star, color: color, size: 12.sp),
+                SizedBox(width: 3.w),
+                Icon(Icons.star, color: color, size: 12.sp),
+                SizedBox(width: 3.w),
+                Icon(Icons.star, color: color, size: 12.sp),
               ]),
             ],
           ),

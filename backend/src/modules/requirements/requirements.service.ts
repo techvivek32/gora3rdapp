@@ -61,7 +61,7 @@ export class RequirementsService {
     const user = await this.userModel.findById(userId);
     const filter: any = {
       isDeleted: false,
-      status: { $in: [BookingStatus.ACTIVE, BookingStatus.ON_HOLD, BookingStatus.ACCEPTED] },
+      status: { $in: [BookingStatus.ACTIVE, BookingStatus.ON_HOLD, BookingStatus.ACCEPTED, BookingStatus.CANCELLED] },
     };
 
     // Filter by user's business cities if they have set them. Match leniently:
