@@ -277,7 +277,7 @@ class MyProfilePage extends StatelessWidget {
                   title: 'Activity',
                   children: [
                     _InfoRow(Icons.post_add, 'Requirements Posted', '${user?['requirementsPosted'] ?? 0}'),
-                    _InfoRow(Icons.directions_car_outlined, 'Vehicles Posted', '${user?['vehiclesPosted'] ?? 0}'),
+                    _InfoRow(Icons.directions_car_outlined, 'Available cab Posted', '${user?['vehiclesPosted'] ?? 0}'),
                   ],
                 ),
                     ],

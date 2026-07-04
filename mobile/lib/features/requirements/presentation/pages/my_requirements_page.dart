@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/requirement_card_widget.dart';
-import '../widgets/cancel_reason_sheet.dart';
 
 class MyRequirementsPage extends StatefulWidget {
   const MyRequirementsPage({super.key});
@@ -205,10 +204,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         bloc.add(SetRequirementStatusEvent(id: id, status: 'active'));
         break;
       case 'cancel':
-        CancelReasonSheet.show(context, onConfirm: (reason) {
-          Navigator.pop(context); // close the reason sheet
-          bloc.add(CancelRequirementEvent(id: id, reason: reason));
-        });
+        bloc.add(CancelRequirementEvent(id: id, reason: ''));
         break;
     }
   }

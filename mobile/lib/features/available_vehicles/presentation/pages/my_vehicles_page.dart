@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../requirements/presentation/widgets/cancel_reason_sheet.dart';
 import '../bloc/vehicles_bloc.dart';
 import 'vehicles_feed_page.dart';
 
@@ -189,10 +188,7 @@ class _MyVehiclesPageState extends State<MyVehiclesPage> {
         bloc.add(SetVehicleStatusEvent(id: id, status: 'available'));
         break;
       case 'cancel':
-        CancelReasonSheet.show(context, onConfirm: (reason) {
-          Navigator.pop(context);
-          bloc.add(CancelVehicleEvent(id: id, reason: reason));
-        });
+        bloc.add(CancelVehicleEvent(id: id, reason: ''));
         break;
     }
   }
