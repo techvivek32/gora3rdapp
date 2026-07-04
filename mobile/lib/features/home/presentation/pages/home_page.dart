@@ -238,6 +238,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Quick access: My Booking & My Vehicles (above the banner)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 6.h),
+                  child: Row(
+                    children: [
+                      _topTile(Icons.event_note_rounded, 'My Booking', () => context.push('/my-requirements')),
+                      SizedBox(width: 10.w),
+                      _topTile(Icons.directions_car_rounded, 'My Vehicles', () => context.push('/my-vehicles')),
+                    ],
+                  ),
+                ),
+
                 // Banner Slider
                 BlocBuilder<HomeBloc, HomeState>(
                   builder: (context, state) => BannerSliderWidget(
@@ -291,6 +303,31 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _topTile(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 12.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24.sp),
+              SizedBox(height: 6.h),
+              Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+            ],
+          ),
+        ),
       ),
     );
   }
