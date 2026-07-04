@@ -173,7 +173,7 @@ class RequirementCardWidget extends StatelessWidget {
                                   ? rawStops.whereType<Map>().where((m) => (m['address'] ?? '').toString().trim().isNotEmpty).toList()
                                   : const <Map>[];
 
-                              Widget point(IconData icon, Color color, String label, String text, {required bool showLine}) {
+                              Widget point(IconData icon, Color color, String label, String text, {required bool showLine, String? legInfo}) {
                                 return IntrinsicHeight(
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,7 +198,9 @@ class RequirementCardWidget extends StatelessWidget {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(label, style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
+                                              // Label line, e.g. "STOP 1 | 94 km takes 1:34 hrs".
+                                              Text(legInfo == null ? label : '$label  |  $legInfo',
+                                                  style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
                                               Text(text,
                                                   maxLines: 2,
                                                   overflow: TextOverflow.ellipsis,
@@ -212,15 +214,22 @@ class RequirementCardWidget extends StatelessWidget {
                                 );
                               }
 
+                              final fromCoord = requirement['pickupCoordinates'];
+                              final dropCoord = requirement['dropCoordinates'];
                               final timeline = Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   point(Icons.trip_origin, Colors.green, 'FROM', requirement['pickupCity'] as String? ?? '', showLine: true),
                                   ...stops.asMap().entries.map((e) {
-                                    return point(Icons.add_location_alt, topBarColor, 'STOP ${e.key + 1}', (e.value['address'] ?? '').toString(), showLine: true);
+                                    // Distance from the previous point (pickup or prior stop) to this stop.
+                                    final prev = e.key == 0 ? fromCoord : stops[e.key - 1];
+                                    return point(Icons.add_location_alt, topBarColor, 'STOP ${e.key + 1}', (e.value['address'] ?? '').toString(),
+                                        showLine: true, legInfo: _legInfo(prev, e.value));
                                   }),
-                                  point(Icons.location_on, Colors.red, 'TO', requirement['dropCity'] as String? ?? '', showLine: false),
+                                  point(Icons.location_on, Colors.red, 'TO', requirement['dropCity'] as String? ?? '',
+                                      showLine: false,
+                                      legInfo: stops.isNotEmpty ? _legInfo(stops.last, dropCoord) : null),
                                 ],
                               );
 
@@ -540,6 +549,28 @@ class RequirementCardWidget extends StatelessWidget {
   }
 
   String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
+
+  double? _coordLat(dynamic m) => m is Map ? (m['lat'] as num?)?.toDouble() : null;
+  double? _coordLng(dynamic m) => m is Map ? (m['lng'] as num?)?.toDouble() : null;
+
+  /// Straight-line (Haversine) distance + estimated drive time between two coord
+  /// maps, formatted as "94 km takes 1:34 hrs". Null if coords are missing.
+  String? _legInfo(dynamic a, dynamic b) {
+    final la = _coordLat(a), lna = _coordLng(a), lb = _coordLat(b), lnb = _coordLng(b);
+    if (la == null || lna == null || lb == null || lnb == null) return null;
+    const r = 6371.0; // earth radius km
+    final dLat = (lb - la) * (pi / 180);
+    final dLng = (lnb - lna) * (pi / 180);
+    final h = sin(dLat / 2) * sin(dLat / 2) +
+        cos(la * (pi / 180)) * cos(lb * (pi / 180)) * sin(dLng / 2) * sin(dLng / 2);
+    final km = 2 * r * atan2(sqrt(h), sqrt(1 - h));
+    // Estimated drive time at ~50 km/h average.
+    const avgSpeed = 50.0;
+    final totalMin = (km / avgSpeed * 60).round();
+    final hrs = totalMin ~/ 60;
+    final mins = totalMin % 60;
+    return '${km.toStringAsFixed(0)} km takes $hrs:${mins.toString().padLeft(2, '0')} hrs';
+  }
 
   String _formatFuel(dynamic type) {
     final t = (type ?? 'any').toString().toLowerCase();
