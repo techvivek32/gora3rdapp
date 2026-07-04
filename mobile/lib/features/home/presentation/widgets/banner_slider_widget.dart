@@ -73,7 +73,7 @@ class _BannerSliderWidgetState extends State<BannerSliderWidget> {
     return Column(
       children: [
         SizedBox(
-          height: 220.h,
+          height: 175.h,
           child: PageView.builder(
             controller: _controller,
             onPageChanged: (i) => setState(() => _current = i),

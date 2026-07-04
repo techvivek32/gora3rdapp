@@ -155,6 +155,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
+        physics: const NeverScrollableScrollPhysics(),
         slivers: [
           // App Bar
           SliverAppBar(
@@ -265,13 +266,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 SizedBox(height: 12.h),
 
                 // Scrolling caution line
-                SizedBox(
-                  height: 28.h,
-                  child: MarqueeText(
-                    text:
-                        'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
-                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
-                  ),
+                MarqueeText(
+                  text:
+                      'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
+                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
                 ),
                 SizedBox(height: 10.h),
 
@@ -280,15 +278,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 SizedBox(height: 10.h),
 
                 // Scrolling account-verification reminder
-                SizedBox(
-                  height: 28.h,
-                  child: MarqueeText(
-                    text:
-                        'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
-                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
-                  ),
+                MarqueeText(
+                  text:
+                      'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
+                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
                 ),
-                SizedBox(height: 2.h),
+                SizedBox(height: 10.h),
 
                 // Quick Actions
                 Padding(
@@ -297,12 +292,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const QuickActionGridWidget(),
-                      SizedBox(height: 24.h),
                     ],
                   ),
                 ),
-
-                SizedBox(height: 24.h),
               ],
             ),
           ),
