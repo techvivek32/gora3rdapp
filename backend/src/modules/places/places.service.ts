@@ -16,15 +16,17 @@ export class PlacesService {
     return k;
   }
 
-  async autocomplete(input: string) {
+  async autocomplete(input: string, types?: string) {
     const q = (input || '').trim();
-    if (q.length < 2) return { message: 'ok', data: { predictions: [] } };
+    if (q.length < 1) return { message: 'ok', data: { predictions: [] } };
 
     const url = new URL('https://maps.googleapis.com/maps/api/place/autocomplete/json');
     url.searchParams.set('input', q);
     url.searchParams.set('key', this.key);
     url.searchParams.set('components', 'country:in');
     url.searchParams.set('language', 'en');
+    // Optional Google "types" filter, e.g. "(cities)" to restrict to city-level results.
+    if (types && types.trim()) url.searchParams.set('types', types.trim());
 
     try {
       const res = await fetch(url.toString());

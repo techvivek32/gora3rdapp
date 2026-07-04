@@ -12,8 +12,14 @@ export class PlacesController {
 
   @Get('autocomplete')
   @ApiOperation({ summary: 'Google Places autocomplete predictions for an address query' })
-  autocomplete(@Query('input') input: string) {
-    return this.placesService.autocomplete(input);
+  autocomplete(@Query('input') input: string, @Query('types') types?: string) {
+    return this.placesService.autocomplete(input, types);
+  }
+
+  @Get('cities')
+  @ApiOperation({ summary: 'Autocomplete Indian cities (city-level predictions only)' })
+  cities(@Query('input') input: string) {
+    return this.placesService.autocomplete(input, '(cities)');
   }
 
   @Get('details')

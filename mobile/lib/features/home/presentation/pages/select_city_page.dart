@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../../../../core/constants/indian_cities.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/home_bloc.dart';
 
@@ -17,6 +21,12 @@ class _SelectCityPageState extends State<SelectCityPage> {
   bool _isSaving = false;
   bool _justSaved = false;
 
+  // Long-tail town coverage via Google Places (catches small places like
+  // Salasar / Churu that aren't in the bundled list).
+  Timer? _debounce;
+  List<String> _remoteResults = [];
+  bool _remoteLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -25,8 +35,39 @@ class _SelectCityPageState extends State<SelectCityPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String q) {
+    setState(() => _searchQuery = q);
+    _debounce?.cancel();
+    final query = q.trim();
+    if (query.length < 2) {
+      setState(() { _remoteResults = []; _remoteLoading = false; });
+      return;
+    }
+    setState(() => _remoteLoading = true);
+    _debounce = Timer(const Duration(milliseconds: 350), () => _fetchRemote(query));
+  }
+
+  Future<void> _fetchRemote(String query) async {
+    try {
+      // "geocode" types cover cities, towns and villages (not just big cities).
+      final res = await getIt<ApiClient>().get('/places/autocomplete', params: {'input': query, 'types': 'geocode'});
+      final preds = (res.data['data']?['predictions'] as List?) ?? [];
+      final names = <String>[];
+      for (final p in preds) {
+        final main = (p['main'] ?? p['description'] ?? '').toString().trim();
+        if (main.isNotEmpty && !names.contains(main)) names.add(main);
+      }
+      if (!mounted || query != _searchQuery.trim()) return;
+      setState(() { _remoteResults = names; _remoteLoading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _remoteLoading = false);
+    }
   }
 
   @override
@@ -49,11 +90,28 @@ class _SelectCityPageState extends State<SelectCityPage> {
         final loadedState = state is HomeLoaded ? state : null;
         final allCities = loadedState?.availableCities ?? [];
         final selectedCities = loadedState?.selectedCities ?? [];
-        final citiesLoading = loadedState != null && allCities.isEmpty;
+        final query = _searchQuery.trim().toLowerCase();
+        final isSearching = query.isNotEmpty;
 
-        final filteredCities = _searchQuery.isEmpty
-            ? allCities
-            : allCities.where((c) => c.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+        // Full browsable list = admin-curated cities + bundled all-India cities.
+        final merged = <String>{...allCities, ...kIndianCities}.toList()..sort();
+        // While searching: all local matches + Google long-tail towns (deduped,
+        // case-insensitive). Local gives every known city instantly; Google fills
+        // in small towns/villages the bundled list is missing.
+        List<String> filteredCities;
+        if (isSearching) {
+          final localMatches = merged.where((c) => c.toLowerCase().contains(query));
+          final seen = <String>{};
+          filteredCities = [
+            for (final c in [...localMatches, ..._remoteResults])
+              if (seen.add(c.toLowerCase())) c,
+          ];
+        } else {
+          filteredCities = merged;
+        }
+        final showLoader = isSearching
+            ? (_remoteLoading && filteredCities.isEmpty)
+            : (state is HomeLoading && allCities.isEmpty);
 
         return Scaffold(
           backgroundColor: const Color(0xFFF8F8F8),
@@ -77,9 +135,9 @@ class _SelectCityPageState extends State<SelectCityPage> {
                 color: Colors.white,
                 child: TextField(
                   controller: _searchController,
-                  onChanged: (q) => setState(() => _searchQuery = q),
+                  onChanged: _onSearchChanged,
                   decoration: InputDecoration(
-                    hintText: 'Search cities...',
+                    hintText: 'Search any Indian city...',
                     hintStyle: TextStyle(color: const Color(0xFFAAAAAA), fontSize: 14.sp),
                     prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22.sp),
                     filled: true,
@@ -149,12 +207,14 @@ class _SelectCityPageState extends State<SelectCityPage> {
 
               // City list
               Expanded(
-                child: citiesLoading
+                child: showLoader
                     ? const Center(child: CircularProgressIndicator())
                     : filteredCities.isEmpty
                         ? Center(
                             child: Text(
-                              _searchQuery.isEmpty ? 'No cities available.\nAsk admin to add cities.' : 'No cities match "$_searchQuery"',
+                              isSearching
+                                  ? 'No Indian cities match "$_searchQuery"'
+                                  : 'Search above to find and add any Indian city.',
                               textAlign: TextAlign.center,
                               style: TextStyle(color: Colors.grey, fontSize: 14.sp),
                             ),
