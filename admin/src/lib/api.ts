@@ -68,6 +68,11 @@ export const adminApi = {
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
   approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
 
+  // ─── Support Chats ─────────────────────────────────────────────────────────
+  getSupportChats: () => apiClient.get('/admin/support/conversations'),
+  getSupportConversation: (userId: string) => apiClient.get(`/admin/support/conversations/${userId}`),
+  replySupport: (userId: string, text: string) => apiClient.post(`/admin/support/conversations/${userId}/reply`, { text }),
+
   // ─── Referrals ─────────────────────────────────────────────────────────────
   getReferralLeaderboard: (params?: any) => apiClient.get('/admin/referral-leaderboard', { params }),
 

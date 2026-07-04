@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/push_notification_service.dart';
@@ -191,6 +192,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     openWhatsApp(_supportNumber, message: 'Hello, I need help with Gora Cabs');
                   } else if (value == 'help') {
                     callNumber(_supportNumber);
+                  } else if (value == 'chat') {
+                    context.push('/support-chat');
                   }
                 },
                 itemBuilder: (context) => [
@@ -201,6 +204,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 18),
                         SizedBox(width: 10.w),
                         Text('WhatsApp', style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'chat',
+                    child: Row(
+                      children: [
+                        Icon(Icons.chat_bubble_outline, color: AppColors.primary, size: 18.sp),
+                        SizedBox(width: 10.w),
+                        Text('Chat', style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
                       ],
                     ),
                   ),

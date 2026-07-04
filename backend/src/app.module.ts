@@ -28,6 +28,7 @@ import { HealthModule } from './modules/health/health.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PlacesModule } from './modules/places/places.module';
+import { SupportModule } from './modules/support/support.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { PlacesModule } from './modules/places/places.module';
     SettingsModule,
     WalletModule,
     PlacesModule,
+    SupportModule,
   ],
 })
 export class AppModule {}
