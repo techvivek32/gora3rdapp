@@ -331,6 +331,9 @@ class VehicleCard extends StatelessWidget {
           }
         }
         final hasCurrentUserAccepted = currentUserId != null && acceptedByIds.contains(currentUserId);
+        // Cancelled / booked / on-hold listings are read-only for everyone except
+        // the owner (who still manages them from My Vehicles).
+        final bool locked = (isBooked || isOnHold || isCancelled) && !isCurrentUserOwner;
 
         final memberType = (mine ? currentMembership : (postedByMap?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
@@ -359,7 +362,7 @@ class VehicleCard extends StatelessWidget {
         final Color badgeBg = topBarColor.withOpacity(0.12);
 
         return GestureDetector(
-          onTap: onTap == null
+          onTap: onTap == null || locked
               ? null
               : () {
                   if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
@@ -394,7 +397,12 @@ class VehicleCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Column(
+                  // Dim + block interaction on read-only (cancelled/booked/hold) cards.
+                  Opacity(
+                    opacity: locked ? 0.5 : 1.0,
+                    child: AbsorbPointer(
+                      absorbing: locked,
+                      child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Container(
@@ -597,6 +605,8 @@ class VehicleCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                      ),
+                    ),
                   ),
                   if (isBooked || isOnHold || isCancelled)
                     Positioned.fill(
@@ -634,9 +644,15 @@ class VehicleCard extends StatelessWidget {
   }
 
   Widget _buildStampBadge({required String text, required Color color}) {
-    return SizedBox(
-      width: 110.w,
-      height: 110.w,
+    return Container(
+      width: 150.w,
+      height: 150.w,
+      // Highlight the stamp so it pops against the dimmed card behind it.
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.85),
+        boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 12, spreadRadius: 1)],
+      ),
       child: CustomPaint(
         painter: _StampRingPainter(color: color),
         child: Center(
@@ -646,32 +662,32 @@ class VehicleCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
+                  Icon(Icons.star, color: color, size: 12.sp),
+                  SizedBox(width: 3.w),
+                  Icon(Icons.star, color: color, size: 12.sp),
+                  SizedBox(width: 3.w),
+                  Icon(Icons.star, color: color, size: 12.sp),
                 ],
               ),
-              SizedBox(height: 3.h),
+              SizedBox(height: 4.h),
               Text(
                 text,
                 style: TextStyle(
                   color: color,
-                  fontSize: 14.sp,
+                  fontSize: 19.sp,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 2,
                 ),
               ),
-              SizedBox(height: 3.h),
+              SizedBox(height: 4.h),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
-                  SizedBox(width: 2.w),
-                  Icon(Icons.star, color: color, size: 9.sp),
+                  Icon(Icons.star, color: color, size: 12.sp),
+                  SizedBox(width: 3.w),
+                  Icon(Icons.star, color: color, size: 12.sp),
+                  SizedBox(width: 3.w),
+                  Icon(Icons.star, color: color, size: 12.sp),
                 ],
               ),
             ],

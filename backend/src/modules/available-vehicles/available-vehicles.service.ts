@@ -40,7 +40,7 @@ export class AvailableVehiclesService {
 
     const filter: any = {
       isDeleted: false,
-      status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.ON_HOLD, AvailabilityStatus.BOOKED] },
+      status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.ON_HOLD, AvailabilityStatus.BOOKED, AvailabilityStatus.CANCELLED] },
     };
 
     if (user?.businessCities?.length > 0 && !query.currentCity) {
