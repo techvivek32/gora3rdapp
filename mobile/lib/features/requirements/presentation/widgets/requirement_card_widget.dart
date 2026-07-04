@@ -240,9 +240,9 @@ class RequirementCardWidget extends StatelessWidget {
                                 ],
                               );
                             }),
-                            SizedBox(height: 10.h),
+                            SizedBox(height: 4.h),
                             Divider(height: 1, color: Colors.black26),
-                            SizedBox(height: 10.h),
+                            SizedBox(height: 4.h),
 
                             // 4. vehicle + date/time box
                             Row(
@@ -254,7 +254,8 @@ class RequirementCardWidget extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(_formatVehicleType(requirement['vehicleType']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                      Text('${_formatFuel(requirement['fuelType'])} | Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                      Text(_formatFuel(requirement['fuelType']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                      Text('Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
                                     ],
                                   ),
                                 ),
@@ -264,8 +265,8 @@ class RequirementCardWidget extends StatelessWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 17.sp, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                                      Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                                     ],
                                   ),
                                 ),
@@ -284,9 +285,9 @@ class RequirementCardWidget extends StatelessWidget {
                               ]),
                             ],
 
-                            SizedBox(height: 10.h),
+                            SizedBox(height: 4.h),
                             Divider(height: 1, color: Colors.black26),
-                            SizedBox(height: 10.h),
+                            SizedBox(height: 4.h),
 
                             // 6. pricing — app-suggested shows a single fare line;
                             // a custom fare shows the full 3-column breakdown.
@@ -296,12 +297,12 @@ class RequirementCardWidget extends StatelessWidget {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text('₹${total.round()}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                                    SizedBox(width: 8.w),
-                                    Icon(Icons.auto_awesome, size: 15.sp, color: topBarColor),
-                                    SizedBox(width: 4.w),
                                     Text('App Suggested Fare',
                                         style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: topBarColor)),
+                                    Icon(Icons.auto_awesome, size: 15.sp, color: topBarColor),
+                                    SizedBox(width: 4.w),
+                                    Text('₹${total.round()}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    SizedBox(width: 8.w),
                                   ],
                                 ),
                               )
@@ -427,13 +428,13 @@ class RequirementCardWidget extends StatelessWidget {
 
   Widget _chip(String text, Color color, {bool filled = false}) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
       decoration: BoxDecoration(
         color: filled ? color.withOpacity(0.12) : Colors.grey[100],
-        borderRadius: BorderRadius.circular(6.r),
+        borderRadius: BorderRadius.circular(8.r),
         border: filled ? Border.all(color: color.withOpacity(0.5)) : null,
       ),
-      child: Text(text, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: filled ? color : Colors.grey[700])),
+      child: Text(text, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: filled ? color : Colors.grey[700])),
     );
   }
 
