@@ -25,8 +25,8 @@ class BannerCardWidget extends StatelessWidget {
     return GestureDetector(
       onTap: _onTap,
       child: Container(
-        margin: EdgeInsets.symmetric(horizontal: 8.w),
-        height: 220.h,
+        margin: EdgeInsets.symmetric(horizontal: 16.w),
+        height: 175.h,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
