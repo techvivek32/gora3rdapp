@@ -75,13 +75,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   // Calculate total
   double get _total => _currentFare + _commission;
 
-  bool get _isCustomFareBelowMin {
-    if (!_useCustomFare) return false;
-    final entered = double.tryParse(_customFareCtrl.text);
-    if (entered == null) return false;
-    if (_suggestedFare <= 0) return false;
-    return entered < _suggestedFare;
-  }
+  // Users may enter any amount now (no minimum enforced against the suggested fare).
+  bool get _isCustomFareBelowMin => false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -273,6 +268,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'), backgroundColor: AppColors.error));
       return;
     }
+    if (_travelTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel time'), backgroundColor: AppColors.error));
+      return;
+    }
     final data = <String, dynamic>{
       'pickupCity': _pickupCtrl.text.trim(),
       'dropCity': _dropCtrl.text.trim(),
@@ -450,7 +449,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                             onTap: () async {
                               final picked = await showDatePicker(
                                 context: context,
-                                initialDate: DateTime.now().add(const Duration(days: 1)),
+                                initialDate: _travelDate ?? DateTime.now(),
                                 firstDate: DateTime.now(),
                                 lastDate: DateTime.now().add(const Duration(days: 365)),
                               );
@@ -503,7 +502,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   SizedBox(width: 8.w),
                                   Expanded(
                                     child: Text(
-                                      _travelTime != null ? _formatTime(_travelTime!) : 'Time',
+                                      _travelTime != null ? _formatTime(_travelTime!) : 'Time *',
                                       style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _travelTime != null ? AppColors.textPrimary : AppColors.textHint),
                                     ),
                                   ),
@@ -727,14 +726,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                     color: _computedDistance != null ? AppColors.textPrimary : AppColors.textHint,
                                   ),
                                 ),
-                              Text(
-                                _settingsLoading ? 'Rate = loading...' : 'Rate = ₹${_ratePerKm.toStringAsFixed(0)}/km',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: _settingsLoading ? AppColors.textHint : AppColors.textPrimary,
-                                ),
-                              ),
                             ],
                           ),
                           SizedBox(height: 8.h),
@@ -775,7 +766,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   onChanged: (_) => setState(() {}),
                                   decoration: InputDecoration(
                                     labelText: 'Driver Fee (₹)',
-                                    hintText: _suggestedFare > 0 ? 'Min ₹${_suggestedFare.toStringAsFixed(0)}' : 'Fare',
+                                    hintText: _suggestedFare > 0 ? '₹${_suggestedFare.toStringAsFixed(0)}' : 'Fare',
                                     prefixText: '₹ ',
                                     isDense: true,
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
@@ -789,7 +780,6 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                     if (value == null || value.isEmpty) return 'Enter fare';
                                     final entered = double.tryParse(value);
                                     if (entered == null) return 'Invalid';
-                                    if (entered < _suggestedFare) return 'Min ₹${_suggestedFare.toStringAsFixed(0)}';
                                     return null;
                                   },
                                 ),
