@@ -10,6 +10,12 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/subscription_bloc.dart';
 
 // col index: 0=Free, 1=Active, 2=Premium, 3=Golden
+const _planColors = [
+  AppColors.textHint,
+  AppColors.memberActive,
+  AppColors.memberPremium,
+  AppColors.memberGolden,
+];
 const _planIcons = [
   Icons.person_outline,
   Icons.verified_user,
@@ -17,6 +23,20 @@ const _planIcons = [
   Icons.emoji_events,
 ];
 const _planNames = ['Free', 'Active', 'Premium', 'Golden'];
+// [icon, label, free, active, premium, golden]
+const _features = [
+  [Icons.person_outline, 'View Contact Details', false, true, true, true],
+  [Icons.send_outlined, 'Post Requirements', true, true, true, true],
+  [Icons.directions_car_outlined, 'Post Available Cabs', true, true, true, true],
+  [Icons.apartment_outlined, 'Business Cities Filter', false, true, true, true],
+  [Icons.star_border, 'Featured Listings', false, false, true, true],
+  [Icons.headset_mic_outlined, 'Priority Support', false, false, true, true],
+  [Icons.all_inclusive, 'Unlimited Listings', false, false, false, true],
+  [Icons.verified_user_outlined, 'Golden Verified Badge', false, false, false, true],
+  [Icons.badge_outlined, 'V-Card Ad Post', false, false, false, true],
+  [Icons.block_outlined, 'Ad-Free Experience', false, false, false, true],
+  [Icons.bookmark_border, '10 Booking Reference', false, false, false, true],
+];
 
 const _membershipCol = {'new': 0, 'active': 1, 'verified': 1, 'premium': 2, 'golden': 3};
 
@@ -272,7 +292,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                   ],
 
                 SizedBox(height: 4.h),
-                _buildTrustBar(),
+                _buildComparisonTable(),
                 SizedBox(height: 24.h),
               ],
             ),
@@ -513,39 +533,123 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     );
   }
 
-  Widget _buildTrustBar() {
-    Widget item(IconData icon, Color color, String title, String subtitle) {
-      return Expanded(
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 22.sp),
-            SizedBox(height: 4.h),
-            Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins', color: AppColors.textPrimary)),
-            SizedBox(height: 2.h),
-            Text(subtitle, textAlign: TextAlign.center, style: TextStyle(fontSize: 8.5.sp, fontFamily: 'Poppins', color: AppColors.textSecondary)),
-          ],
-        ),
-      );
-    }
-
+  Widget _buildComparisonTable() {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 8.w),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          item(Icons.verified_user, AppColors.memberActive, 'Secure Payment', '100% Safe & Secure'),
-          Container(width: 1, height: 36.h, color: AppColors.border),
-          item(Icons.bolt, AppColors.success, 'Instant Activation', 'Benefits on activation'),
-          Container(width: 1, height: 36.h, color: AppColors.border),
-          item(Icons.headset_mic, AppColors.primary, '24x7 Support', 'Always with you'),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 8.h),
+            child: Text('Feature Comparison',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+          ),
+          _buildPlanHeaderRow(),
+          Divider(height: 1, color: AppColors.border),
+          ..._features.map(_buildFeatureRow),
+          SizedBox(height: 16.h),
+          _buildPlanBenefitsHeading(),
+          SizedBox(height: 12.h),
         ],
       ),
     );
   }
+
+  // Header row: colored pill per plan (Free / Active / Premium / Golden).
+  Widget _buildPlanHeaderRow() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 4.h),
+      child: Row(
+        children: [
+          SizedBox(width: _featureColWidth),
+          ...List.generate(4, (col) {
+            final color = _planColors[col];
+            return Expanded(
+              child: Container(
+                margin: EdgeInsets.all(4.r),
+                padding: EdgeInsets.symmetric(vertical: 9.h, horizontal: 2.w),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Text(_planNames[col],
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.sp, color: Colors.white, fontFamily: 'Poppins')),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow(List<dynamic> row) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5))),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: _featureColWidth,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+              child: Row(
+                children: [
+                  Icon(row[0] as IconData, size: 18.sp, color: AppColors.textSecondary),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(row[1] as String,
+                        style: TextStyle(fontSize: 11.5.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ...List.generate(4, (col) {
+            final has = row[col + 2] as bool;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                child: Center(
+                  child: has
+                      ? Icon(Icons.check, color: const Color(0xFF22C55E), size: 20.sp)
+                      : Icon(Icons.close, color: const Color(0xFFEF4444), size: 20.sp),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  // "Plan Benefits" divider heading (orange rules on both sides).
+  Widget _buildPlanBenefitsHeading() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 24.w),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: AppColors.primary, thickness: 2)),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.w),
+            child: Text('Plan Benefits',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+          ),
+          Expanded(child: Divider(color: AppColors.primary, thickness: 2)),
+        ],
+      ),
+    );
+  }
+
+  double get _featureColWidth => 130.w;
 
   int? _daysRemaining(dynamic v) {
     if (v == null) return null;
