@@ -103,14 +103,20 @@ export class RequirementsService {
       this.requirementModel.countDocuments(filter),
     ]);
 
-    // Apply contact lock based on membership
+    // Apply contact lock based on membership. Keep this in sync with findOne()
+    // and the app card's `canContact` so the Phone/WhatsApp buttons always work
+    // when they are shown.
     const isPremium = user?.membershipType === MembershipType.PREMIUM ||
       user?.membershipType === MembershipType.GOLDEN ||
+      user?.membershipType === MembershipType.ACTIVE ||
+      user?.membershipType === MembershipType.VERIFIED ||
       user?.isPremium;
 
     const processedRequirements = requirements.map((req) => {
-      if (!isPremium) {
-        const postedBy = req.postedBy as any;
+      const postedBy = req.postedBy as any;
+      // The owner can always see their own number; premium tiers see everyone's.
+      const isOwner = postedBy && postedBy._id?.toString() === userId;
+      if (!isPremium && !isOwner) {
         if (postedBy) {
           // Only the phone number is gated for non-premium users; the profile
           // picture and agency name are public display info shown on the card.

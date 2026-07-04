@@ -385,10 +385,20 @@ class RequirementCardWidget extends StatelessWidget {
                             if (canContact)
                               Row(
                                 children: [
-                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 22), 'Phone',
-                                      (mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : openSheet),
-                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 22), 'Whatsapp',
-                                      (mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : openSheet),
+                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 22), 'Phone', () {
+                                    if (mobile != null && mobile.isNotEmpty) {
+                                      callNumber(mobile);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
+                                    }
+                                  }),
+                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 22), 'Whatsapp', () {
+                                    if (mobile != null && mobile.isNotEmpty) {
+                                      openWhatsApp(mobile);
+                                    } else {
+                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
+                                    }
+                                  }),
                                   _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 22), 'Advice',
                                       () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
                                   _ratingAction(rating),

@@ -69,8 +69,9 @@ export class AvailableVehiclesService {
       user?.isPremium;
 
     const processed = vehicles.map((v) => {
-      if (!isPremium) {
-        const postedBy = v.postedBy as any;
+      const postedBy = v.postedBy as any;
+      const isOwner = postedBy && postedBy._id?.toString() === userId;
+      if (!isPremium && !isOwner) {
         if (postedBy) postedBy.mobile = undefined;
         (v as any).driverMobile = undefined;
       }
