@@ -16,6 +16,12 @@ class LoadVehiclesEvent extends VehiclesEvent {
 
 class LoadMoreVehiclesEvent extends VehiclesEvent {}
 
+/// Silent background refresh: re-fetches and merges into the current list
+/// (updates changed cards + prepends new ones) WITHOUT a loading state.
+class RefreshVehiclesEvent extends VehiclesEvent {
+  const RefreshVehiclesEvent();
+}
+
 class CreateVehicleEvent extends VehiclesEvent {
   final Map<String, dynamic> data;
   const CreateVehicleEvent(this.data);

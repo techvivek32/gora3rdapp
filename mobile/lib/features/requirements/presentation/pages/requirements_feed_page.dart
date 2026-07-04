@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -30,6 +31,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   bool _lastHasMore = false;
   List<Map<String, dynamic>> _banners = [];
 
+  // Silent auto-refresh (no spinner, keeps scroll position).
+  Timer? _pollTimer;
+  double? _preRefreshMax;
+  double _preRefreshOffset = 0;
+
   static const _bannerEvery = 1; // insert a banner after every N requirement cards
 
   @override
@@ -38,6 +44,39 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     context.read<RequirementsBloc>().add(LoadRequirementsEvent());
     _scrollController.addListener(_onScroll);
     _loadBanners();
+    // Poll in the background so new posts / status changes appear live.
+    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _silentRefresh());
+  }
+
+  void _silentRefresh() {
+    if (!mounted) return;
+    final bloc = context.read<RequirementsBloc>();
+    if (bloc.state is! RequirementsLoaded) return;
+    // Remember scroll so we can keep the user in place if new cards are prepended.
+    if (_scrollController.hasClients) {
+      _preRefreshMax = _scrollController.position.maxScrollExtent;
+      _preRefreshOffset = _scrollController.offset;
+    } else {
+      _preRefreshMax = null;
+    }
+    bloc.add(const RefreshRequirementsEvent());
+  }
+
+  // After a silent refresh, if new cards were added above the viewport, shift the
+  // offset so the user stays on the same card instead of jumping.
+  void _restoreScrollAfterRefresh() {
+    final preMax = _preRefreshMax;
+    final preOffset = _preRefreshOffset;
+    _preRefreshMax = null;
+    if (preMax == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final newMax = _scrollController.position.maxScrollExtent;
+      final delta = newMax - preMax;
+      if (delta > 0 && preOffset > 0) {
+        _scrollController.jumpTo((preOffset + delta).clamp(0.0, newMax));
+      }
+    });
   }
 
   Future<void> _loadBanners() async {
@@ -85,7 +124,9 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           ),
         ],
       ),
-      body: BlocBuilder<RequirementsBloc, RequirementsState>(
+      body: BlocConsumer<RequirementsBloc, RequirementsState>(
+        listenWhen: (prev, curr) => curr is RequirementsLoaded,
+        listener: (context, state) => _restoreScrollAfterRefresh(),
         builder: (context, state) {
           if (state is RequirementsLoaded) {
             _lastLoadedRequirements = state.requirements;
@@ -314,6 +355,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }

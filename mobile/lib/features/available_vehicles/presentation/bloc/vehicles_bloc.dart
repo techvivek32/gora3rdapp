@@ -10,6 +10,7 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
 
   VehiclesBloc(this.repository) : super(VehiclesInitial()) {
     on<LoadVehiclesEvent>(_onLoad);
+    on<RefreshVehiclesEvent>(_onRefresh);
     on<CreateVehicleEvent>(_onCreate);
     on<DeleteVehicleEvent>(_onDelete);
     on<LoadVehicleDetailEvent>(_onLoadDetail);
@@ -52,6 +53,47 @@ class VehiclesBloc extends Bloc<VehiclesEvent, VehiclesState> {
         emit(VehiclesLoaded(
           vehicles: List<Map<String, dynamic>>.from(data['data'] ?? []),
           myAccepted: myAccepted,
+        ));
+      },
+    );
+  }
+
+  Future<void> _onRefresh(RefreshVehiclesEvent event, Emitter<VehiclesState> emit) async {
+    final current = state;
+    if (current is! VehiclesLoaded) return;
+
+    final result = await repository.getVehicles(page: 1, filters: null);
+    final myAcceptedResult = await repository.getAcceptedByMe();
+
+    result.fold(
+      // Background refresh: swallow errors, keep the current list.
+      (_) {},
+      (data) {
+        final fetched = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        final myAccepted = myAcceptedResult.fold(
+          (_) => current.myAccepted,
+          (my) => List<Map<String, dynamic>>.from(my['data'] ?? []),
+        );
+
+        final fetchedById = {
+          for (final m in fetched)
+            if (m['_id'] != null) m['_id'].toString(): m,
+        };
+        final existingIds = current.vehicles
+            .map((c) => c['_id']?.toString())
+            .whereType<String>()
+            .toSet();
+
+        final updated = current.vehicles
+            .map((c) => fetchedById[c['_id']?.toString()] ?? c)
+            .toList();
+        final newOnes = fetched.where((m) => !existingIds.contains(m['_id']?.toString())).toList();
+
+        emit(VehiclesLoaded(
+          vehicles: [...newOnes, ...updated],
+          myAccepted: myAccepted,
+          hasMore: current.hasMore,
+          currentPage: current.currentPage,
         ));
       },
     );

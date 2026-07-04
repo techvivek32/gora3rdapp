@@ -12,6 +12,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
 
   RequirementsBloc(this.repository) : super(RequirementsInitial()) {
     on<LoadRequirementsEvent>(_onLoad);
+    on<RefreshRequirementsEvent>(_onRefresh);
     on<LoadMoreRequirementsEvent>(_onLoadMore);
     on<SearchRequirementsEvent>(_onSearch);
     on<FilterRequirementsEvent>(_onFilter);
@@ -54,6 +55,51 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
           myAccepted: myAccepted,
           isLoadingMore: false,
           hasMore: _hasMore,
+        ));
+      },
+    );
+  }
+
+  Future<void> _onRefresh(RefreshRequirementsEvent event, Emitter<RequirementsState> emit) async {
+    final current = state;
+    // Only refresh silently once the feed is already loaded; otherwise do nothing
+    // (the initial load handles the empty case).
+    if (current is! RequirementsLoaded) return;
+
+    final result = await repository.getRequirements(page: 1, filters: null);
+    final myAcceptedResult = await repository.getAcceptedByMe();
+
+    result.fold(
+      // Background refresh: swallow errors, keep showing the current list.
+      (_) {},
+      (data) {
+        final fetched = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        final myAccepted = myAcceptedResult.fold(
+          (_) => current.myAccepted,
+          (my) => List<Map<String, dynamic>>.from(my['data'] ?? []),
+        );
+
+        final fetchedById = {
+          for (final m in fetched)
+            if (m['_id'] != null) m['_id'].toString(): m,
+        };
+        final existingIds = current.requirements
+            .map((c) => c['_id']?.toString())
+            .whereType<String>()
+            .toSet();
+
+        // Update already-shown cards in place (status/price/etc changes)…
+        final updated = current.requirements
+            .map((c) => fetchedById[c['_id']?.toString()] ?? c)
+            .toList();
+        // …and prepend any brand-new posts at the top.
+        final newOnes = fetched.where((m) => !existingIds.contains(m['_id']?.toString())).toList();
+
+        emit(RequirementsLoaded(
+          requirements: [...newOnes, ...updated],
+          myAccepted: myAccepted,
+          isLoadingMore: false,
+          hasMore: current.hasMore,
         ));
       },
     );

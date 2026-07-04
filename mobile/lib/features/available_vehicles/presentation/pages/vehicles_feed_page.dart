@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -34,6 +35,10 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   bool _lastHasMore = false;
   List<Map<String, dynamic>> _banners = [];
 
+  // Silent auto-refresh (no spinner, keeps scroll position).
+  Timer? _pollTimer;
+  double? _preRefreshMax;
+  double _preRefreshOffset = 0;
 
   @override
   void initState() {
@@ -41,6 +46,35 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
     _scrollController.addListener(_onScroll);
     _loadBanners();
+    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _silentRefresh());
+  }
+
+  void _silentRefresh() {
+    if (!mounted) return;
+    final bloc = context.read<VehiclesBloc>();
+    if (bloc.state is! VehiclesLoaded) return;
+    if (_scrollController.hasClients) {
+      _preRefreshMax = _scrollController.position.maxScrollExtent;
+      _preRefreshOffset = _scrollController.offset;
+    } else {
+      _preRefreshMax = null;
+    }
+    bloc.add(const RefreshVehiclesEvent());
+  }
+
+  void _restoreScrollAfterRefresh() {
+    final preMax = _preRefreshMax;
+    final preOffset = _preRefreshOffset;
+    _preRefreshMax = null;
+    if (preMax == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final newMax = _scrollController.position.maxScrollExtent;
+      final delta = newMax - preMax;
+      if (delta > 0 && preOffset > 0) {
+        _scrollController.jumpTo((preOffset + delta).clamp(0.0, newMax));
+      }
+    });
   }
 
   Future<void> _loadBanners() async {
@@ -84,6 +118,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _scrollController.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -107,7 +142,9 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           IconButton(icon: Icon(Icons.add, color: Colors.white, size: 28.sp), onPressed: () => context.push('/vehicles/create')),
         ],
       ),
-      body: BlocBuilder<VehiclesBloc, VehiclesState>(
+      body: BlocConsumer<VehiclesBloc, VehiclesState>(
+        listenWhen: (prev, curr) => curr is VehiclesLoaded,
+        listener: (context, state) => _restoreScrollAfterRefresh(),
         builder: (context, state) {
           if (state is VehiclesLoaded) {
             _lastLoadedVehicles = state.vehicles;

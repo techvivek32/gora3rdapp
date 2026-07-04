@@ -13,6 +13,13 @@ class LoadRequirementsEvent extends RequirementsEvent {
 
 class LoadMoreRequirementsEvent extends RequirementsEvent {}
 
+/// Silent background refresh: re-fetches page 1 and merges the result into the
+/// current list (updates changed cards + prepends new ones) WITHOUT emitting a
+/// loading state, so the feed updates live without losing scroll position.
+class RefreshRequirementsEvent extends RequirementsEvent {
+  const RefreshRequirementsEvent();
+}
+
 class SearchRequirementsEvent extends RequirementsEvent {
   final String query;
   const SearchRequirementsEvent({required this.query});
