@@ -319,11 +319,11 @@ class RequirementCardWidget extends StatelessWidget {
                               IntrinsicHeight(
                                 child: Row(
                                   children: [
-                                    Expanded(child: _priceCol(Icons.account_balance_wallet, 'Total Amount', total, topBarColor)),
-                                    VerticalDivider(width: 1, color: Colors.black26),
                                     Expanded(child: _priceCol(Icons.person, "Driver's Earning", driverEarning, topBarColor)),
                                     VerticalDivider(width: 1, color: Colors.black26),
                                     Expanded(child: _priceCol(Icons.percent, 'Commission', commission, topBarColor)),
+                                    VerticalDivider(width: 1, color: Colors.black26),
+                                    Expanded(child: _priceCol(Icons.account_balance_wallet, 'Total Amount', total, topBarColor)),
                                   ],
                                 ),
                               ),
