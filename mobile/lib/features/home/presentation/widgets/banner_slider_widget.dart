@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -19,7 +20,20 @@ class _BannerSliderWidgetState extends State<BannerSliderWidget> {
   @override
   void initState() {
     super.initState();
+    _randomStart();
     _startAutoScroll();
+  }
+
+  // Start on a random banner instead of always the first one.
+  void _randomStart() {
+    if (widget.banners.length <= 1) {
+      _current = 0;
+      return;
+    }
+    _current = Random().nextInt(widget.banners.length);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _controller.hasClients) _controller.jumpToPage(_current);
+    });
   }
 
   void _startAutoScroll() {
@@ -40,7 +54,7 @@ class _BannerSliderWidgetState extends State<BannerSliderWidget> {
   void didUpdateWidget(BannerSliderWidget old) {
     super.didUpdateWidget(old);
     if (old.banners.length != widget.banners.length) {
-      _current = 0;
+      _randomStart();
       _startAutoScroll();
     }
   }
