@@ -45,6 +45,12 @@ export class RequirementsController {
     return this.requirementsService.getAcceptedByMe(userId);
   }
 
+  @Get('lookup')
+  @ApiOperation({ summary: 'Look up a requirement by its display ID (requirementId/bookingId)' })
+  lookup(@Query('code') code: string, @CurrentUser('sub') userId: string) {
+    return this.requirementsService.lookupByCode(code, userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get requirement details' })
   findOne(@Param('id') id: string, @CurrentUser('sub') userId: string) {

@@ -42,6 +42,12 @@ export class AvailableVehiclesController {
     return this.service.acceptVehicle(id, userId);
   }
 
+  @Get('lookup')
+  @ApiOperation({ summary: 'Look up a vehicle listing by its display ID (listingId)' })
+  lookup(@Query('code') code: string, @CurrentUser('sub') userId: string) {
+    return this.service.lookupByCode(code, userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get vehicle listing details' })
   findOne(@Param('id') id: string, @CurrentUser('sub') userId: string) {

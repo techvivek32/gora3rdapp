@@ -109,6 +109,23 @@ export class AvailableVehiclesService {
     return { message: 'Vehicle listing found', data: vehicle };
   }
 
+  /**
+   * Look up a vehicle listing by its display code (listingId), e.g. "ID-CAB123456"
+   * or "CAB123456". Used by the home-page ID search.
+   */
+  async lookupByCode(code: string, userId: string) {
+    const raw = (code || '').trim().replace(/^ID-/i, '').trim();
+    if (!raw) throw new NotFoundException('No vehicle found with this ID');
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(`^${escaped}$`, 'i');
+    const doc = await this.vehicleModel
+      .findOne({ isDeleted: { $ne: true }, listingId: rx })
+      .select('_id')
+      .lean();
+    if (!doc) throw new NotFoundException('No vehicle found with this ID');
+    return this.findOne(String(doc._id), userId);
+  }
+
   async update(id: string, userId: string, dto: Partial<CreateAvailableVehicleDto>) {
     const vehicle = await this.vehicleModel.findById(id);
     if (!vehicle) throw new NotFoundException('Vehicle listing not found');

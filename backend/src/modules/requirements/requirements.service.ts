@@ -167,6 +167,23 @@ export class RequirementsService {
     return { message: 'Requirement found', data: requirement };
   }
 
+  /**
+   * Look up a requirement by its display code (requirementId or bookingId),
+   * e.g. "ID-REQ95642459" or "REQ95642459". Used by the home-page ID search.
+   */
+  async lookupByCode(code: string, userId: string) {
+    const raw = (code || '').trim().replace(/^ID-/i, '').trim();
+    if (!raw) throw new NotFoundException('No booking found with this ID');
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rx = new RegExp(`^${escaped}$`, 'i');
+    const doc = await this.requirementModel
+      .findOne({ isDeleted: { $ne: true }, $or: [{ requirementId: rx }, { bookingId: rx }] })
+      .select('_id')
+      .lean();
+    if (!doc) throw new NotFoundException('No booking found with this ID');
+    return this.findOne(String(doc._id), userId);
+  }
+
   async update(id: string, userId: string, dto: UpdateRequirementDto) {
     const requirement = await this.requirementModel.findById(id);
     if (!requirement) throw new NotFoundException('Requirement not found');

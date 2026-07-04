@@ -17,6 +17,7 @@ import '../widgets/alert_filter_sheet.dart';
 import '../widgets/banner_slider_widget.dart';
 import '../widgets/quick_action_grid_widget.dart';
 import '../widgets/user_search_widget.dart';
+import '../widgets/card_search_widget.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -238,9 +239,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Search a posted requirement / available cab by its display ID
+                SizedBox(height: 10.h),
+                const CardSearchWidget(),
+                SizedBox(height: 6.h),
+
                 // Quick access: My Booking & My Vehicles (above the banner)
                 Padding(
-                  padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 6.h),
+                  padding: EdgeInsets.fromLTRB(12.w, 4.h, 12.w, 6.h),
                   child: Row(
                     children: [
                       _topTile(Icons.event_note_rounded, 'My Booking', () => context.push('/my-requirements')),
