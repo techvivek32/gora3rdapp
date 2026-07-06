@@ -30,6 +30,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   final _scrollController = ScrollController();
   final _searchCtrl = TextEditingController();
   final _apiClient = getIt<ApiClient>();
+  final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedVehicles = [];
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
@@ -101,6 +102,57 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     }
   }
 
+  Widget _buildVehicleFilterBar() {
+    final options = <Map<String, String>>[
+      {'value': 'all', 'label': 'All Vehicles'},
+      ...kVehicleTypes,
+    ];
+    return Container(
+      color: Colors.white,
+      height: 50.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        itemCount: options.length,
+        separatorBuilder: (_, __) => SizedBox(width: 8.w),
+        itemBuilder: (_, i) {
+          final o = options[i];
+          final isAll = o['value'] == 'all';
+          // "All Vehicles" is active only when no specific type is selected.
+          final selected = isAll ? _vehicleFilters.isEmpty : _vehicleFilters.contains(o['value']);
+          return GestureDetector(
+            onTap: () => setState(() {
+              if (isAll) {
+                _vehicleFilters.clear();
+              } else {
+                final v = o['value']!;
+                _vehicleFilters.contains(v) ? _vehicleFilters.remove(v) : _vehicleFilters.add(v);
+              }
+            }),
+            child: Container(
+              alignment: Alignment.center,
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : Colors.grey[100],
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1),
+              ),
+              child: Text(
+                o['label']!,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   bool _isExpired(Map<String, dynamic> v) {
     try {
       final dateStr = v['availableDate'] as String?;
@@ -142,6 +194,10 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           ),
           IconButton(icon: Icon(Icons.add, color: Colors.white, size: 28.sp), onPressed: () => context.push('/vehicles/create')),
         ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(50.h),
+          child: _buildVehicleFilterBar(),
+        ),
       ),
       body: BlocConsumer<VehiclesBloc, VehiclesState>(
         listenWhen: (prev, curr) => curr is VehiclesLoaded,
@@ -178,6 +234,12 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
           } else {
             vehicles = _lastLoadedVehicles.where((v) => !_isExpired(v)).toList();
             myAccepted = _lastMyAccepted.where((v) => !_isExpired(v)).toList();
+          }
+
+          // Apply the top vehicle-type filter (empty = All).
+          if (_vehicleFilters.isNotEmpty) {
+            vehicles = vehicles.where((v) => _vehicleFilters.contains(v['vehicleType'])).toList();
+            myAccepted = myAccepted.where((v) => _vehicleFilters.contains(v['vehicleType'])).toList();
           }
 
           final hasMyAccepted = myAccepted.isNotEmpty;

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -26,6 +27,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
   final _apiClient = getIt<ApiClient>();
   String _searchQuery = '';
+  final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
   List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
@@ -123,6 +125,10 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             onPressed: () => context.push('/requirements/create'),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: Size.fromHeight(50.h),
+          child: _buildVehicleFilterBar(),
+        ),
       ),
       body: BlocConsumer<RequirementsBloc, RequirementsState>(
         listenWhen: (prev, curr) => curr is RequirementsLoaded,
@@ -150,6 +156,12 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             requirements = _lastLoadedRequirements.where((r) => !_isExpired(r)).toList();
             myAccepted = _lastMyAccepted.where((r) => !_isExpired(r)).toList();
             isLoadingMore = false;
+          }
+
+          // Apply the top vehicle-type filter (empty = All).
+          if (_vehicleFilters.isNotEmpty) {
+            requirements = requirements.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
+            myAccepted = myAccepted.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
           }
 
           final hasMyAccepted = myAccepted.isNotEmpty;
@@ -333,6 +345,57 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             label: const Text('Post Requirement'),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVehicleFilterBar() {
+    final options = <Map<String, String>>[
+      {'value': 'all', 'label': 'All Vehicles'},
+      ...kVehicleTypes,
+    ];
+    return Container(
+      color: Colors.white,
+      height: 50.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        itemCount: options.length,
+        separatorBuilder: (_, __) => SizedBox(width: 8.w),
+        itemBuilder: (_, i) {
+          final o = options[i];
+          final isAll = o['value'] == 'all';
+          // "All Vehicles" is active only when no specific type is selected.
+          final selected = isAll ? _vehicleFilters.isEmpty : _vehicleFilters.contains(o['value']);
+          return GestureDetector(
+            onTap: () => setState(() {
+              if (isAll) {
+                _vehicleFilters.clear();
+              } else {
+                final v = o['value']!;
+                _vehicleFilters.contains(v) ? _vehicleFilters.remove(v) : _vehicleFilters.add(v);
+              }
+            }),
+            child: Container(
+              alignment: Alignment.center,
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : Colors.grey[100],
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1),
+              ),
+              child: Text(
+                o['label']!,
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: selected ? Colors.white : AppColors.textPrimary,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
