@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 
@@ -60,7 +59,6 @@ class _RequirementAlert extends StatelessWidget {
     final from = _str('pickupCity');
     final to = _str('dropCity');
     final note = _str('notes');
-    final id = _str('requirementId');
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
@@ -138,18 +136,6 @@ class _RequirementAlert extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        if (id.isNotEmpty) context.push('/requirements');
-                      },
-                      icon: const Icon(Icons.flag_outlined, size: 18),
-                      label: const Text('View'),
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
                     child: ElevatedButton.icon(
                       onPressed: mobile.isEmpty ? null : () => callNumber(mobile),
                       icon: const Icon(Icons.call, size: 18, color: Colors.white),
@@ -179,10 +165,16 @@ class _RequirementAlert extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Center(
-                child: TextButton(
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
