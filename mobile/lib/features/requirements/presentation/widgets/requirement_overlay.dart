@@ -175,10 +175,39 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     await FlutterOverlayWindow.closeOverlay();
   }
 
+  /// Travel date + time shown in place of the poster name, e.g. "16 Jul • 02:24 pm".
+  String _dateTimeLabel() {
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final rawDate = _s('travelDate');
+    String datePart = '';
+    if (rawDate.isNotEmpty) {
+      final d = rawDate.contains('T') ? rawDate.split('T').first : rawDate;
+      final p = d.split('-');
+      if (p.length == 3) {
+        final m = int.tryParse(p[1]) ?? 0;
+        datePart = '${int.tryParse(p[2]) ?? p[2]} ${(m >= 1 && m <= 12) ? months[m] : ''}'.trim();
+      }
+    }
+    // Convert "14:24" (24h) to "02:24 pm".
+    String timePart = '';
+    final rawTime = _s('travelTime');
+    final tp = rawTime.split(':');
+    if (tp.length >= 2) {
+      final h = int.tryParse(tp[0]) ?? 0;
+      final mm = tp[1].padLeft(2, '0');
+      final ampm = h >= 12 ? 'pm' : 'am';
+      final h12 = h % 12 == 0 ? 12 : h % 12;
+      timePart = '${h12.toString().padLeft(2, '0')}:$mm $ampm';
+    }
+    return [datePart, timePart].where((e) => e.isNotEmpty).join(' • ');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final poster =
-        _s('posterName').isNotEmpty ? _s('posterName') : 'New Requirement';
+    final dateTime = _dateTimeLabel();
+    final poster = dateTime.isNotEmpty
+        ? dateTime
+        : (_s('posterName').isNotEmpty ? _s('posterName') : 'New Requirement');
     final bookingId = _s('bookingId');
     final vehicle = _cap(_s('vehicleType'));
     final trip = _cap(_s('tripType'));
@@ -250,7 +279,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                 const CircleAvatar(
                                     radius: 15,
                                     backgroundColor: _primaryLight,
-                                    child: Icon(Icons.person,
+                                    child: Icon(Icons.access_time_rounded,
                                         size: 18, color: _primary)),
                                 const SizedBox(width: 8),
                                 Expanded(

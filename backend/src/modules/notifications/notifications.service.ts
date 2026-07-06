@@ -36,7 +36,7 @@ export class NotificationsService {
         _id: { $ne: requirement.postedBy },
         fcmTokens: { $exists: true, $ne: [] },
       })
-      .select('fcmTokens _id alertVehicleTypes alertTripTypes')
+      .select('fcmTokens _id alertVehicleTypes alertTripTypes membershipType isPremium')
       .lean();
 
     // Respect each user's alert filters — an empty filter means "all".
@@ -56,7 +56,6 @@ export class NotificationsService {
       .select('mobile fullName agencyName')
       .lean();
 
-    const allTokens = targetUsers.flatMap((u) => u.fcmTokens).filter(Boolean);
     const userIds = targetUsers.map((u) => u._id);
 
     const title = '🚕 New Vehicle Requirement';
@@ -80,32 +79,46 @@ export class NotificationsService {
 
     await this.notificationModel.insertMany(notifications);
 
-    // Send FCM push
-    if (allTokens.length > 0) {
+    // Contact (Call/WhatsApp) is a premium feature: only premium members get the
+    // poster's mobile in the overlay payload; others get an empty number so the
+    // overlay's Call/WhatsApp buttons stay disabled.
+    const isPremiumUser = (u: any) =>
+      ['active', 'verified', 'premium', 'golden'].includes(u.membershipType) || u.isPremium;
+    const premiumTokens = targetUsers.filter(isPremiumUser).flatMap((u) => u.fcmTokens).filter(Boolean);
+    const basicTokens = targetUsers.filter((u) => !isPremiumUser(u)).flatMap((u) => u.fcmTokens).filter(Boolean);
+
+    const baseData = {
+      requirementId: requirement._id.toString(),
+      bookingId: `${requirement.bookingId ?? ''}`,
+      type: NotificationType.NEW_REQUIREMENT,
+      pickupCity: `${requirement.pickupCity ?? ''}`,
+      dropCity: `${requirement.dropCity ?? ''}`,
+      vehicleType: `${requirement.vehicleType ?? ''}`,
+      tripType: `${requirement.tripType ?? ''}`,
+      travelDate: `${requirement.travelDate ? new Date(requirement.travelDate).toISOString() : ''}`,
+      travelTime: `${requirement.travelTime ?? ''}`,
+      posterName: `${poster?.agencyName || poster?.fullName || ''}`,
+    };
+    const pushBody = `${requirement.pickupCity} → ${requirement.dropCity} | ${requirement.vehicleType}`;
+
+    const sendToTokens = async (tokens: string[], posterMobile: string) => {
       const batchSize = 500;
-      for (let i = 0; i < allTokens.length; i += batchSize) {
-        const batch = allTokens.slice(i, i + batchSize);
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batch = tokens.slice(i, i + batchSize);
         try {
           await this.firebaseService.sendPushNotification(batch, {
             title,
-            body: `${requirement.pickupCity} → ${requirement.dropCity} | ${requirement.vehicleType}`,
-            data: {
-              requirementId: requirement._id.toString(),
-              bookingId: `${requirement.bookingId ?? ''}`,
-              type: NotificationType.NEW_REQUIREMENT,
-              pickupCity: `${requirement.pickupCity ?? ''}`,
-              dropCity: `${requirement.dropCity ?? ''}`,
-              vehicleType: `${requirement.vehicleType ?? ''}`,
-              tripType: `${requirement.tripType ?? ''}`,
-              posterName: `${poster?.agencyName || poster?.fullName || ''}`,
-              posterMobile: `${poster?.mobile ?? ''}`,
-            },
+            body: pushBody,
+            data: { ...baseData, posterMobile },
           });
         } catch (error) {
           this.logger.error('FCM batch send failed:', error.message);
         }
       }
-    }
+    };
+
+    await sendToTokens(premiumTokens, `${poster?.mobile ?? ''}`);
+    await sendToTokens(basicTokens, ''); // non-premium: no contact number
   }
 
   async notifyRequirementPosted(requirement: any) {
