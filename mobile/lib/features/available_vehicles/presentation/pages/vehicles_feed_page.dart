@@ -47,7 +47,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
     _scrollController.addListener(_onScroll);
     _loadBanners();
-    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _silentRefresh());
+    _pollTimer = Timer.periodic(const Duration(seconds: 300), (_) => _silentRefresh());
   }
 
   void _silentRefresh() {

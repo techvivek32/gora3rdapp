@@ -14,7 +14,10 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug'],
+    // In production keep only errors/warnings — 'log'/'debug' floods the CPU & disk.
+    logger: process.env.NODE_ENV === 'production'
+        ? ['error', 'warn']
+        : ['error', 'warn', 'log', 'debug'],
   });
 
   const configService = app.get(ConfigService);

@@ -47,7 +47,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     _scrollController.addListener(_onScroll);
     _loadBanners();
     // Poll in the background so new posts / status changes appear live.
-    _pollTimer = Timer.periodic(const Duration(seconds: 12), (_) => _silentRefresh());
+    _pollTimer = Timer.periodic(const Duration(seconds: 300), (_) => _silentRefresh());
   }
 
   void _silentRefresh() {

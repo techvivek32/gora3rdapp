@@ -48,7 +48,7 @@ export default function WithdrawalsPage() {
   const { data: raw, isLoading } = useQuery({
     queryKey: ['withdrawals', filter],
     queryFn: () => adminApi.getWithdrawals(filter === 'all' ? {} : { status: filter }),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
   const requests: Withdrawal[] = (raw as any)?.data || [];
 

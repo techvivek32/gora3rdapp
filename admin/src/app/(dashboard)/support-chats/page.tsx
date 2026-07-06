@@ -41,7 +41,7 @@ export default function SupportChatsPage() {
   const { data: chatsRaw } = useQuery({
     queryKey: ['support-chats'],
     queryFn: () => adminApi.getSupportChats(),
-    refetchInterval: 8000,
+    refetchInterval: 200000,
   });
   const conversations: Conversation[] = (chatsRaw as any)?.data || [];
 
@@ -117,7 +117,7 @@ function ConversationPanel({ conversation, onReplied }: { conversation: Conversa
   const { data: convRaw } = useQuery({
     queryKey: ['support-conv', conversation.userId],
     queryFn: () => adminApi.getSupportConversation(conversation.userId),
-    refetchInterval: 6000,
+    refetchInterval: 150000,
   });
   const messages: Message[] = (convRaw as any)?.data?.messages || [];
 

@@ -6,6 +6,8 @@ import { tap } from 'rxjs/operators';
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
+  private readonly isProd = process.env.NODE_ENV === 'production';
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const req = context.switchToHttp().getRequest();
     const { method, url, ip } = req;
@@ -16,7 +18,12 @@ export class LoggingInterceptor implements NestInterceptor {
       tap(() => {
         const res = context.switchToHttp().getResponse();
         const delay = Date.now() - now;
-        this.logger.log(`${method} ${url} ${res.statusCode} ${delay}ms - ${ip} ${userAgent}`);
+        // Production: only log slow requests (>1s) to save CPU/disk. Dev: log all.
+        if (!this.isProd) {
+          this.logger.log(`${method} ${url} ${res.statusCode} ${delay}ms - ${ip} ${userAgent}`);
+        } else if (delay > 1000) {
+          this.logger.warn(`SLOW ${method} ${url} ${res.statusCode} ${delay}ms`);
+        }
       }),
     );
   }
