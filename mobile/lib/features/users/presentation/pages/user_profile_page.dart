@@ -179,6 +179,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final vehicles = (user['vehicles'] as List?) ?? const [];
     final requirementsPosted = (user['requirementsPosted'] as num?)?.toInt() ?? 0;
     final vehiclesPosted = (user['vehiclesPosted'] as num?)?.toInt() ?? 0;
+    final walletBalance = (user['walletBalance'] as num?) ?? 0;
     final title = (agency != null && agency.isNotEmpty) ? agency : name;
     final businessCity = [city, state].where((e) => e != null && e.isNotEmpty).join(', ');
 
@@ -358,6 +359,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
               children: [
                 Expanded(child: _Stat(label: 'Member Since', value: _memberSince(user['createdAt']))),
                 Expanded(child: _Stat(label: 'No. Posts', value: '${requirementsPosted + vehiclesPosted}')),
+                Expanded(child: _Stat(label: 'Wallet', value: '₹${walletBalance.toStringAsFixed(0)}')),
               ],
             ),
           ),

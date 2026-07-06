@@ -14,7 +14,7 @@ import { generateReferralCode } from '../../common/utils/booking-id.util';
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
 
 @Injectable()
 export class UsersService {
