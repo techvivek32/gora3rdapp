@@ -357,23 +357,36 @@ class RequirementCardWidget extends StatelessWidget {
                                     child: GestureDetector(
                                       behavior: HitTestBehavior.opaque,
                                       onTap: postedBy == null ? null : openSheet,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Row(children: [
-                                            Flexible(child: Text(postedBy?['fullName'] as String? ?? (mine ? (currentUserName ?? 'You') : 'User'), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black))),
-                                            if ((postedBy?['isVerified'] == true) || memberType == 'verified' || memberType == 'golden') ...[
-                                              SizedBox(width: 4.w),
-                                              Icon(Icons.verified, size: 14.sp, color: const Color(0xFF2196F3)),
-                                            ],
-                                          ]),
-                                          Text(
-                                            [postedBy?['agencyName'], postedBy?['city'], postedBy?['state']].where((e) => e != null && (e as String).isNotEmpty).join(', '),
-                                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
-                                          ),
-                                        ],
-                                      ),
+                                      child: Builder(builder: (_) {
+                                        final agency = (postedBy?['agencyName'] as String?)?.trim() ?? '';
+                                        final full = (postedBy?['fullName'] as String?) ?? (mine ? (currentUserName ?? 'You') : 'User');
+                                        // Agency name on top (bold); person's name (+ city/state) below.
+                                        final topName = agency.isNotEmpty ? agency : full;
+                                        final belowParts = <String>[
+                                          if (agency.isNotEmpty) full,
+                                          ...[postedBy?['city'], postedBy?['state']]
+                                              .where((e) => e != null && (e as String).trim().isNotEmpty)
+                                              .cast<String>(),
+                                        ];
+                                        return Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(children: [
+                                              Flexible(child: Text(topName, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black))),
+                                              if ((postedBy?['isVerified'] == true) || memberType == 'verified' || memberType == 'golden') ...[
+                                                SizedBox(width: 4.w),
+                                                Icon(Icons.verified, size: 14.sp, color: const Color(0xFF2196F3)),
+                                              ],
+                                            ]),
+                                            if (belowParts.isNotEmpty)
+                                              Text(
+                                                belowParts.join(', '),
+                                                maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                                              ),
+                                          ],
+                                        );
+                                      }),
                                     ),
                                   ),
                                   if (badgeText != null)
