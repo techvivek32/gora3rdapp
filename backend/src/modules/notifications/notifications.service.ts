@@ -122,6 +122,11 @@ export class NotificationsService {
       travelDate: `${requirement.travelDate ? new Date(requirement.travelDate).toISOString() : ''}`,
       travelTime: `${requirement.travelTime ?? ''}`,
       posterName: `${poster?.agencyName || poster?.fullName || ''}`,
+      // Intermediate stops (addresses), one per line, shown between A and B.
+      stops: `${(requirement.stops ?? [])
+        .map((s: any) => `${s?.address ?? ''}`.trim())
+        .filter(Boolean)
+        .join('\n')}`,
     };
     const sendToTokens = async (tokens: string[], posterMobile: string) => {
       const batchSize = 500;

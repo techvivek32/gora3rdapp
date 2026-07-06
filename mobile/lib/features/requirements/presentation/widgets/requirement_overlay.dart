@@ -148,6 +148,13 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
 
   String _s(String k) => (_data[k] ?? '').toString();
 
+  /// Intermediate stop addresses (one per line in the payload), shown between A and B.
+  List<String> _stops() => _s('stops')
+      .split('\n')
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
+
   String _cap(String s) => s.isEmpty
       ? s
       : s
@@ -325,6 +332,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                             const Divider(height: 18),
                             _routeRow(
                                 Colors.green, 'A', from.isEmpty ? '—' : from),
+                            for (final stop in _stops()) ...[
+                              const SizedBox(height: 6),
+                              _routeRow(_primary, '•', stop),
+                            ],
                             const SizedBox(height: 6),
                             _routeRow(Colors.red, 'B', to.isEmpty ? '—' : to),
                             if (note.isNotEmpty) ...[
