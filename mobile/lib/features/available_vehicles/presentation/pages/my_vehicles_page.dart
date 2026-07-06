@@ -86,8 +86,13 @@ class _MyVehiclesPageState extends State<MyVehiclesPage> {
               );
             }
             if (state is MyVehiclesLoaded) {
-              final running = state.vehicles.where((v) => v['status'] != 'booked').toList();
-              final booked = state.vehicles.where((v) => v['status'] == 'booked').toList();
+              // Cancelled listings show under Booked (not Running).
+              final running = state.vehicles
+                  .where((v) => v['status'] != 'booked' && v['status'] != 'cancelled')
+                  .toList();
+              final booked = state.vehicles
+                  .where((v) => v['status'] == 'booked' || v['status'] == 'cancelled')
+                  .toList();
               return TabBarView(
                 children: [
                   _buildList(context, running, 'No running vehicles', showMenu: true),

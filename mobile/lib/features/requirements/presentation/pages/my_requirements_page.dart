@@ -99,8 +99,13 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
             }
 
             if (state is MyRequirementsLoaded) {
-              final running = state.requirements.where((r) => r['status'] != 'accepted').toList();
-              final booked = state.requirements.where((r) => r['status'] == 'accepted').toList();
+              // Cancelled posts show under Booked (not Running).
+              final running = state.requirements
+                  .where((r) => r['status'] != 'accepted' && r['status'] != 'cancelled')
+                  .toList();
+              final booked = state.requirements
+                  .where((r) => r['status'] == 'accepted' || r['status'] == 'cancelled')
+                  .toList();
               return TabBarView(
                 children: [
                   _buildList(context, running, 'No running requirements', showMenu: true),
