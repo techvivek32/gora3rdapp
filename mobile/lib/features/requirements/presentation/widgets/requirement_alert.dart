@@ -22,9 +22,37 @@ class _RequirementAlert extends StatelessWidget {
 
   String _cap(String s) => s.isEmpty ? s : s.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
 
+  /// Travel date + time shown in place of the agent name, e.g. "16 Jul • 02:24 pm".
+  String _dateTimeLabel() {
+    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final rawDate = _str('travelDate');
+    String datePart = '';
+    if (rawDate.isNotEmpty) {
+      final d = rawDate.contains('T') ? rawDate.split('T').first : rawDate;
+      final p = d.split('-');
+      if (p.length == 3) {
+        final m = int.tryParse(p[1]) ?? 0;
+        datePart = '${int.tryParse(p[2]) ?? p[2]} ${(m >= 1 && m <= 12) ? months[m] : ''}'.trim();
+      }
+    }
+    String timePart = '';
+    final tp = _str('travelTime').split(':');
+    if (tp.length >= 2) {
+      final h = int.tryParse(tp[0]) ?? 0;
+      final mm = tp[1].padLeft(2, '0');
+      final ampm = h >= 12 ? 'pm' : 'am';
+      final h12 = h % 12 == 0 ? 12 : h % 12;
+      timePart = '${h12.toString().padLeft(2, '0')}:$mm $ampm';
+    }
+    return [datePart, timePart].where((e) => e.isNotEmpty).join(' • ');
+  }
+
+  List<String> _stops() =>
+      _str('stops').split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
   @override
   Widget build(BuildContext context) {
-    final poster = _str('posterName').isNotEmpty ? _str('posterName') : 'agent';
+    final dateTime = _dateTimeLabel();
     final mobile = _str('posterMobile');
     final bookingId = _str('bookingId');
     final vehicle = _cap(_str('vehicleType'));
@@ -45,15 +73,15 @@ class _RequirementAlert extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header: agent + booking id
+              // Header: travel date/time + booking id
               Row(
                 children: [
-                  const CircleAvatar(radius: 16, backgroundColor: AppColors.primaryLight, child: Icon(Icons.person, size: 18, color: AppColors.primary)),
+                  const CircleAvatar(radius: 16, backgroundColor: AppColors.primaryLight, child: Icon(Icons.access_time_rounded, size: 18, color: AppColors.primary)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)),
-                    child: Text(poster, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    child: Text(dateTime.isEmpty ? 'New Requirement' : dateTime, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
                   ),
                   const Spacer(),
                   if (bookingId.isNotEmpty)
@@ -74,8 +102,12 @@ class _RequirementAlert extends StatelessWidget {
               ),
               const Divider(height: 20),
 
-              // From
+              // From → (stops) → To
               _routePoint(Colors.green, 'A', from.isEmpty ? '—' : from),
+              for (final stop in _stops()) ...[
+                const SizedBox(height: 4),
+                _routePoint(AppColors.primary, '•', stop),
+              ],
               Padding(
                 padding: const EdgeInsets.only(left: 11, top: 2, bottom: 2),
                 child: Row(children: [
@@ -102,7 +134,7 @@ class _RequirementAlert extends StatelessWidget {
               Text('just now', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
               const SizedBox(height: 14),
 
-              // Actions
+              // Actions — Call & WhatsApp (contact number only present for members).
               Row(
                 children: [
                   Expanded(
@@ -116,7 +148,7 @@ class _RequirementAlert extends StatelessWidget {
                       style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: mobile.isEmpty ? null : () => callNumber(mobile),
@@ -125,6 +157,21 @@ class _RequirementAlert extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.green.withValues(alpha: 0.4),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: mobile.isEmpty ? null : () => openWhatsApp(mobile),
+                      icon: const Icon(Icons.chat, size: 18, color: Colors.white),
+                      label: const Text('WhatsApp'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF25D366),
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF25D366).withValues(alpha: 0.4),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
