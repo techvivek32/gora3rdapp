@@ -58,8 +58,32 @@ export class NotificationsService {
 
     const userIds = targetUsers.map((u) => u._id);
 
-    const title = '🚕 New Vehicle Requirement';
-    const body = `Booking #${requirement.bookingId}\n${requirement.pickupCity} → ${requirement.dropCity}\n${requirement.vehicleType} | ${new Date(requirement.travelDate).toDateString()}`;
+    const titleCase = (s: any) =>
+      `${s ?? ''}`.replace(/_/g, ' ').split(' ').filter(Boolean)
+        .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+    const fmtDate = (d: any) => {
+      if (!d) return '';
+      const dt = new Date(d);
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      return `${dt.getUTCDate()} ${months[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+    };
+    const fmtTime = (t: any) => {
+      const parts = `${t ?? ''}`.split(':');
+      if (parts.length < 2) return '';
+      let h = parseInt(parts[0], 10);
+      const m = parts[1].padStart(2, '0');
+      const ampm = h >= 12 ? 'pm' : 'am';
+      h = h % 12 === 0 ? 12 : h % 12;
+      return `${h}:${m}${ampm}`;
+    };
+
+    // Push format:
+    //   Gora Taxi booking One Way trip
+    //   Jodhpur → Surat
+    //   Car type - Innova Crysta
+    //   Date time - 4 July 2026 | 5:00am
+    const title = `Gora Taxi booking ${titleCase(requirement.tripType)} trip`;
+    const body = `${requirement.pickupCity} → ${requirement.dropCity}\nCar type - ${titleCase(requirement.vehicleType)}\nDate time - ${fmtDate(requirement.travelDate)} | ${fmtTime(requirement.travelTime)}`;
 
     // Create notification records
     const notifications = userIds.map((userId) => ({
@@ -99,8 +123,6 @@ export class NotificationsService {
       travelTime: `${requirement.travelTime ?? ''}`,
       posterName: `${poster?.agencyName || poster?.fullName || ''}`,
     };
-    const pushBody = `${requirement.pickupCity} → ${requirement.dropCity} | ${requirement.vehicleType}`;
-
     const sendToTokens = async (tokens: string[], posterMobile: string) => {
       const batchSize = 500;
       for (let i = 0; i < tokens.length; i += batchSize) {
@@ -108,7 +130,7 @@ export class NotificationsService {
         try {
           await this.firebaseService.sendPushNotification(batch, {
             title,
-            body: pushBody,
+            body,
             data: { ...baseData, posterMobile },
           });
         } catch (error) {
