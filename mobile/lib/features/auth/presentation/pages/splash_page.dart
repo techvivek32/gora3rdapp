@@ -19,7 +19,7 @@ class SplashPage extends StatelessWidget {
       child: const Scaffold(
         body: SizedBox.expand(
           child: Image(
-            image: AssetImage('assets/images/loding_screen.jpeg'),
+            image: AssetImage('assets/images/loding_screen.png'),
             fit: BoxFit.cover,
           ),
         ),

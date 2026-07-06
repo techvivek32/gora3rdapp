@@ -20,7 +20,7 @@ class WelcomePage extends StatelessWidget {
         // top on very tall/short screens.
         child: const SizedBox.expand(
           child: Image(
-            image: AssetImage('assets/images/welcome.jpeg'),
+            image: AssetImage('assets/images/welcome.png'),
             fit: BoxFit.cover,
             alignment: Alignment.bottomCenter,
           ),

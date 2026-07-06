@@ -312,21 +312,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: MarqueeText(
                     text:
                         'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
-                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
                   ),
                 ),
-                SizedBox(height: 10.h),
+                SizedBox(height: 4.h),
 
                 // Quick Actions
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const QuickActionGridWidget(),
-                    ],
-                  ),
-                ),
+                const QuickActionGridWidget(),
               ],
             ),
           ),
