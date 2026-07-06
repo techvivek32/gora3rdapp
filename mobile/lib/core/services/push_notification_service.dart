@@ -7,6 +7,7 @@ import '../di/injection.dart';
 import '../network/api_client.dart';
 import '../router/app_router.dart';
 import '../utils/contact_launcher.dart';
+import '../utils/ring_player.dart';
 import '../../features/requirements/presentation/widgets/requirement_alert.dart';
 
 // Must match the channelId the backend sets on the FCM android payload.
@@ -83,6 +84,7 @@ class PushNotificationService {
     // App is in the foreground here — show the rich on-screen popup card.
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && (data['requirementId'] ?? '').toString().isNotEmpty) {
+      playRequirementRing();
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
     }

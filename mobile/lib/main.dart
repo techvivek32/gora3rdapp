@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
 import 'core/router/app_router.dart';
+import 'core/utils/ring_player.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/requirements/presentation/widgets/requirement_overlay.dart';
@@ -29,6 +30,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // and the "Display over other apps" permission was granted.
     final data = message.data;
     if ((data['requirementId'] ?? '').toString().isNotEmpty) {
+      await playRequirementRing();
       await showRequirementOverlay(Map<String, dynamic>.from(data));
     }
   } catch (e) {
