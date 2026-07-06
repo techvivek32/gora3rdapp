@@ -615,8 +615,18 @@ class RequirementCardWidget extends StatelessWidget {
   String _formatDate(dynamic date) {
     if (date == null) return '';
     try {
-      final d = DateTime.parse(date.toString());
-      return '${d.day} ${_monthName(d.month)}';
+      final raw = date.toString();
+      // Use only the calendar date part (before 'T') so the day never shifts
+      // because of the time-of-day or the device timezone.
+      final datePart = raw.contains('T') ? raw.split('T').first : raw;
+      final p = datePart.split('-');
+      if (p.length == 3) {
+        final m = int.parse(p[1]);
+        final d = int.parse(p[2]);
+        return '$d ${_monthName(m)}';
+      }
+      final dt = DateTime.parse(raw);
+      return '${dt.day} ${_monthName(dt.month)}';
     } catch (_) {
       return date.toString();
     }

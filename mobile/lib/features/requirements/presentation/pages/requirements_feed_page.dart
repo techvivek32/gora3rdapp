@@ -340,14 +340,14 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   bool _isExpired(Map<String, dynamic> req) {
     try {
       final dateStr = req['travelDate'] as String?;
-      final timeStr = (req['travelTime'] as String?) ?? '00:00';
       if (dateStr == null) return false;
-      final d = DateTime.parse(dateStr);
-      final timeParts = timeStr.split(':');
-      final h = int.tryParse(timeParts[0]) ?? 0;
-      final m = timeParts.length > 1 ? (int.tryParse(timeParts[1]) ?? 0) : 0;
-      final departure = DateTime(d.year, d.month, d.day, h, m);
-      return departure.isBefore(DateTime.now());
+      // Keep the requirement visible for the WHOLE travel day (ignore the time
+      // of day). Use only the date part so timezone never shifts the day.
+      final datePart = dateStr.contains('T') ? dateStr.split('T').first : dateStr;
+      final p = datePart.split('-');
+      if (p.length != 3) return false;
+      final endOfDay = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]), 23, 59, 59);
+      return endOfDay.isBefore(DateTime.now());
     } catch (_) {
       return false;
     }

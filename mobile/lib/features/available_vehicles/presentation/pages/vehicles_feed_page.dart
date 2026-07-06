@@ -104,13 +104,14 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   bool _isExpired(Map<String, dynamic> v) {
     try {
       final dateStr = v['availableDate'] as String?;
-      final timeStr = (v['availableTime'] as String?) ?? '00:00';
       if (dateStr == null) return false;
-      final d = DateTime.parse(dateStr);
-      final parts = timeStr.split(':');
-      final h = int.tryParse(parts[0]) ?? 0;
-      final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-      return DateTime(d.year, d.month, d.day, h, m).isBefore(DateTime.now());
+      // Keep the listing visible for the WHOLE available day (ignore the time of
+      // day). Use only the date part so timezone never shifts the day.
+      final datePart = dateStr.contains('T') ? dateStr.split('T').first : dateStr;
+      final p = datePart.split('-');
+      if (p.length != 3) return false;
+      final endOfDay = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]), 23, 59, 59);
+      return endOfDay.isBefore(DateTime.now());
     } catch (_) {
       return false;
     }
