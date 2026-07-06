@@ -390,14 +390,12 @@ class VehicleCard extends StatelessWidget {
 
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
-        bool isCurrentUserPremium = false;
         bool isCurrentUserOwner = mine;
         String? currentUserId;
         String? currentUserName;
         String? currentMembership;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
-          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
           currentUserId = user['_id'] as String?;
           currentUserName = user['fullName'] as String?;
           currentMembership = user['membershipType'] as String?;
@@ -636,40 +634,29 @@ class VehicleCard extends StatelessWidget {
                             Divider(height: 1, thickness: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 
-                            // 5. Actions: Call, WhatsApp, User Detail (gated by plan/ownership)
+                            // 5. Actions: Call, WhatsApp, User Detail (open to everyone)
                             Builder(builder: (context) {
-                              final canContact = isCurrentUserPremium || isCurrentUserOwner;
-                              if (!canContact) {
-                                return GestureDetector(
-                                  onTap: () => context.push('/subscriptions'),
-                                  child: SizedBox(
-                                    width: double.infinity,
-                                    child: Text(
-                                      'Become a premium member to contact immediately',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red),
-                                    ),
-                                  ),
-                                );
-                              }
-                              final mobile = postedByMap?['mobile'] as String?;
+                              final mobile = postedByMap?['mobile'] as String? ?? postedByMap?['driverMobile'] as String?;
                               void openSheet() {
                                 if (postedByMap != null) showUserCardSheet(context, Map<String, dynamic>.from(postedByMap));
                               }
+                              void snackNoNumber() => ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Contact number not available')),
+                                  );
                               return Row(
                                 children: [
                                   _CardAction(
                                     icon: const Icon(Icons.call, color: Colors.white, size: 18),
                                     circleColor: const Color(0xFF2196F3),
                                     label: 'Call',
-                                    onTap: (canContact && mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : openSheet,
+                                    onTap: (mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : snackNoNumber,
                                   ),
                                   SizedBox(width: 20.w),
                                   _CardAction(
                                     icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.white, size: 18),
                                     circleColor: const Color(0xFF25D366),
                                     label: 'Whatsapp',
-                                    onTap: (canContact && mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : openSheet,
+                                    onTap: (mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : snackNoNumber,
                                   ),
                                   const Spacer(),
                                   _CardAction(

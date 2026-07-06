@@ -62,23 +62,8 @@ export class AvailableVehiclesService {
       this.vehicleModel.countDocuments(filter),
     ]);
 
-    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
-      user?.membershipType === MembershipType.GOLDEN ||
-      user?.membershipType === MembershipType.ACTIVE ||
-      user?.membershipType === MembershipType.VERIFIED ||
-      user?.isPremium;
-
-    const processed = vehicles.map((v) => {
-      const postedBy = v.postedBy as any;
-      const isOwner = postedBy && postedBy._id?.toString() === userId;
-      if (!isPremium && !isOwner) {
-        if (postedBy) postedBy.mobile = undefined;
-        (v as any).driverMobile = undefined;
-      }
-      return v;
-    });
-
-    return buildPaginatedResult(processed, total, page, limit);
+    // Available Cabs contact details are open to everyone (no premium gate).
+    return buildPaginatedResult(vehicles, total, page, limit);
   }
 
   async findOne(id: string, userId: string) {
@@ -92,20 +77,8 @@ export class AvailableVehiclesService {
 
     await this.vehicleModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } });
 
-    const user = await this.userModel.findById(userId).select('membershipType isPremium isGolden');
-    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
-      user?.membershipType === MembershipType.GOLDEN ||
-      user?.membershipType === MembershipType.ACTIVE ||
-      user?.membershipType === MembershipType.VERIFIED ||
-      user?.isPremium;
-
-    if (!isPremium) {
-      (vehicle as any).driverMobile = undefined;
-      const postedBy = vehicle.postedBy as any;
-      if (postedBy) postedBy.mobile = undefined;
-    } else {
-      await this.vehicleModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
-    }
+    // Available Cabs contact details are open to everyone (no premium gate).
+    await this.vehicleModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
 
     return { message: 'Vehicle listing found', data: vehicle };
   }
