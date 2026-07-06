@@ -184,7 +184,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         physics: const NeverScrollableScrollPhysics(),
         slivers: [
@@ -279,15 +279,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: 8.h),
-
                 // Banner Slider
                 BlocBuilder<HomeBloc, HomeState>(
                   builder: (context, state) => BannerSliderWidget(
                     banners: state is HomeLoaded ? state.banners : [],
                   ),
                 ),
-                SizedBox(height: 12.h),
 
                 // Scrolling caution line
                 Container(
@@ -299,11 +296,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
                   ),
                 ),
-                SizedBox(height: 10.h),
 
                 // Search a partner by phone number
-                const UserSearchWidget(),
-                SizedBox(height: 10.h),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6.h),
+                  child: const UserSearchWidget(),
+                ),
 
                 // Scrolling account-verification reminder
                 Container(
@@ -315,9 +313,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
                   ),
                 ),
-                SizedBox(height: 4.h),
 
-                // Quick Actions
+                // Quick Actions — no gap, sits flush under the marquee
                 const QuickActionGridWidget(),
               ],
             ),
