@@ -22,7 +22,7 @@ class MainNavPage extends StatelessWidget {
     return Scaffold(
       body: child,
       floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.primary,
+        backgroundColor: Colors.black,
         onPressed: () => _showPostOptions(context),
         child: const Icon(Icons.add, color: Colors.white),
       ),

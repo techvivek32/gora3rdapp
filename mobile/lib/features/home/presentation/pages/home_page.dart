@@ -266,10 +266,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 SizedBox(height: 12.h),
 
                 // Scrolling caution line
-                MarqueeText(
-                  text:
-                      'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
-                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                Container(
+                  color: const Color.fromARGB(255, 88, 88, 88),
+                  padding: EdgeInsets.symmetric(vertical: 6.h),
+                  child: MarqueeText(
+                    text:
+                        'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                  ),
                 ),
                 SizedBox(height: 10.h),
 
@@ -278,10 +282,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 SizedBox(height: 10.h),
 
                 // Scrolling account-verification reminder
-                MarqueeText(
-                  text:
-                      'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
-                  style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+                Container(
+                  color: const Color.fromARGB(255, 88, 88, 88),
+                  padding: EdgeInsets.symmetric(vertical: 6.h),
+                  child: MarqueeText(
+                    text:
+                        'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
+                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  ),
                 ),
                 SizedBox(height: 10.h),
 
