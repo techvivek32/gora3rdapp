@@ -154,7 +154,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // size) so it lines up exactly under "Gora Taxi".
   Widget _buildBrandTitle() {
     final goraStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-    final partnerStyle = TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary);
+    final partnerStyle = TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary);
     final gw = _textWidth('Gora Taxi', goraStyle);
     final pw = _textWidth('Partner', partnerStyle);
     final sx = pw > 0 ? gw / pw : 1.0;

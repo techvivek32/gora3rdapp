@@ -17,13 +17,14 @@ class QuickActionGridWidget extends StatelessWidget {
       _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications', onTap: () => context.push('/notifications')),
     ];
 
+    const navy = Color(0xFF111827);
     final colors = [
       AppColors.primary,
-      Colors.black,
+      navy,
       AppColors.primary,
-      Colors.black,
+      navy,
       AppColors.primary,
-      Colors.black,
+      navy,
     ];
 
     final textColors = [
@@ -43,7 +44,7 @@ class QuickActionGridWidget extends StatelessWidget {
         crossAxisCount: 3,
         mainAxisSpacing: 12.w,
         crossAxisSpacing: 12.w,
-        childAspectRatio: 0.75, // < 1 makes the cards taller (more height, same width)
+        childAspectRatio: 0.72, // < 1 makes the cards taller (more height, same width)
         children: List.generate(actions.length, (index) {
           return _QuickActionCard(
             action: actions[index],
@@ -74,20 +75,36 @@ class _QuickActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: action.onTap,
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10.r, horizontal: 8.r),
+        padding: EdgeInsets.symmetric(vertical: 14.r, horizontal: 8.r),
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(18.r),
+          boxShadow: [
+            BoxShadow(color: bgColor.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(action.icon, color: textColor, size: 40.sp),
-            SizedBox(height: 8.h),
+            // Icon inside a glowing ring.
+            Container(
+              width: 62.r,
+              height: 62.r,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: textColor.withValues(alpha: 0.08),
+                border: Border.all(color: textColor.withValues(alpha: 0.4), width: 1.5),
+                boxShadow: [
+                  BoxShadow(color: textColor.withValues(alpha: 0.15), blurRadius: 8, spreadRadius: 1),
+                ],
+              ),
+              child: Icon(action.icon, color: textColor, size: 30.sp),
+            ),
+            SizedBox(height: 12.h),
             Text(
               action.label,
-              style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: textColor, fontFamily: 'Poppins'),
+              style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: textColor, fontFamily: 'Poppins'),
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

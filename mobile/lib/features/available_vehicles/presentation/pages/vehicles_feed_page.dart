@@ -482,7 +482,7 @@ class VehicleCard extends StatelessWidget {
                   ),
                   // Dim + block interaction on read-only (cancelled/booked/hold) cards.
                   Opacity(
-                    opacity: locked ? 0.5 : 1.0,
+                    opacity: locked ? 0.2 : 1.0,
                     child: AbsorbPointer(
                       absorbing: locked,
                       child: Column(
