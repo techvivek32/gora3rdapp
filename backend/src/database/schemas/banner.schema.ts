@@ -5,13 +5,14 @@ export type BannerDocument = Banner & Document;
 
 @Schema({ timestamps: true, collection: 'banners' })
 export class Banner {
-  @Prop({ required: true })
+  // Title is optional — an image-only banner is allowed.
+  @Prop()
   title: string;
 
   @Prop()
   subtitle: string;
 
-  @Prop()
+  @Prop({ required: true })
   imageUrl: string;
 
   @Prop()

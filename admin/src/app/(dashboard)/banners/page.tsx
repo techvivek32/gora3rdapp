@@ -108,7 +108,7 @@ export default function BannersPage() {
   };
 
   const handleSubmit = () => {
-    if (!form.title.trim()) return toast.error('Title is required');
+    if (!form.imageUrl.trim()) return toast.error('A banner image is required');
     if (editingId) updateMutation.mutate(form);
     else createMutation.mutate();
   };
@@ -207,7 +207,7 @@ export default function BannersPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
               <input
                 type="text"
                 placeholder="e.g. Special Offer"
@@ -261,7 +261,7 @@ export default function BannersPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={isBusy || !form.title.trim()}
+            disabled={isBusy || !form.imageUrl.trim()}
             className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
           >
             {isBusy ? (

@@ -431,7 +431,8 @@ class RequirementCardWidget extends StatelessWidget {
                               )
                             else
                               GestureDetector(
-                                onTap: null,
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => context.push('/subscriptions'),
                                 child: SizedBox(
                                   width: double.infinity,
                                   child: Text('Become a premium member to contact immediately',
