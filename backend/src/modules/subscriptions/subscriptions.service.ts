@@ -12,7 +12,6 @@ import { Payment, PaymentDocument, PaymentStatus } from '../../database/schemas/
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { MembershipType } from '../../common/enums/user-role.enum';
 import { generatePaymentOrderId } from '../../common/utils/booking-id.util';
-import { MIN_WALLET_BALANCE } from '../../common/constants/wallet.constant';
 import Razorpay from 'razorpay';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
@@ -50,13 +49,6 @@ export class SubscriptionsService {
   }
 
   async createPaymentOrder(userId: string, planId: string) {
-    const user = await this.userModel.findById(userId).select('walletBalance');
-    if (!user || (user.walletBalance ?? 0) < MIN_WALLET_BALANCE) {
-      throw new BadRequestException(
-        `You need a minimum wallet balance of ₹${MIN_WALLET_BALANCE} to buy a plan. Please add money to your wallet.`,
-      );
-    }
-
     const plan = await this.planModel.findById(planId);
     if (!plan) throw new NotFoundException('Plan not found');
 
@@ -181,13 +173,6 @@ export class SubscriptionsService {
   }
 
   async testActivateSubscription(userId: string, planId: string) {
-    const user = await this.userModel.findById(userId).select('walletBalance');
-    if (!user || (user.walletBalance ?? 0) < MIN_WALLET_BALANCE) {
-      throw new BadRequestException(
-        `You need a minimum wallet balance of ₹${MIN_WALLET_BALANCE} to buy a plan. Please add money to your wallet.`,
-      );
-    }
-
     const plan = await this.planModel.findById(planId);
     if (!plan) throw new Error('Plan not found');
 

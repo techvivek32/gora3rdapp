@@ -5,7 +5,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/wallet/wallet_guard.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/subscription_bloc.dart';
 
@@ -142,8 +141,6 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
       return;
     }
     final bloc = context.read<SubscriptionBloc>();
-    // Gate: buying a plan needs a minimum wallet balance.
-    if (!await ensureMinWalletBalance(context, action: 'buy a plan')) return;
     _pendingPlanId = plan['_id'] as String;
     bloc.add(CreateOrderEvent(_pendingPlanId!));
   }
