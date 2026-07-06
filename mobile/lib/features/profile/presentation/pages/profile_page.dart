@@ -505,7 +505,8 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
               Expanded(
                 child: SingleChildScrollView(
                   controller: scrollCtrl,
-                  padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 32.h),
+                  // Add the keyboard height so the focused field can scroll above it.
+                  padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 32.h + MediaQuery.of(context).viewInsets.bottom),
                   child: Form(
                     key: _formKey,
                     child: Column(
