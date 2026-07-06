@@ -150,6 +150,37 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  // Brand title: "Partner" is stretched horizontally (width only, same font
+  // size) so it lines up exactly under "Gora Taxi".
+  Widget _buildBrandTitle() {
+    final goraStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
+    final partnerStyle = TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.textPrimary);
+    final gw = _textWidth('Gora Taxi', goraStyle);
+    final pw = _textWidth('Partner', partnerStyle);
+    final sx = pw > 0 ? gw / pw : 1.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Gora Taxi', style: goraStyle),
+        Transform.scale(
+          scaleX: sx,
+          alignment: Alignment.centerLeft,
+          child: Text('Partner', style: partnerStyle),
+        ),
+      ],
+    );
+  }
+
+  double _textWidth(String text, TextStyle style) {
+    final tp = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    return tp.width;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -168,14 +199,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               children: [
                 AppLogo(size: 34.w, radius: 8.r),
                 SizedBox(width: 10.w),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Gora Taxi', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                    Text('Partner', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                  ],
-                ),
+                _buildBrandTitle(),
               ],
             ),
             titleSpacing: 12,
