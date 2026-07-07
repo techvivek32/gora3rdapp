@@ -46,9 +46,16 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
   // Platform settings (fetched from backend)
   double _ratePerKm = 20.0;
+  Map<String, double> _vehiclePrices = {};
   bool _settingsLoading = true;
 
   double get _distance => _computedDistance ?? 0.0;
+  
+  // Rate for the currently selected vehicle type
+  double get _rateForVehicle {
+    if (_vehiclePrices.containsKey(_vehicleType)) return _vehiclePrices[_vehicleType]!;
+    return _ratePerKm; // fallback to global rate
+  }
   
   final _vehicleTypes = kVehicleTypes;
   final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
@@ -60,7 +67,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   ];
 
   // Calculate total suggested fare
-  double get _suggestedFare => _distance * _ratePerKm;
+  double get _suggestedFare => _distance * _rateForVehicle;
   
   // Get fare to use
   double get _currentFare {
@@ -148,11 +155,14 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     try {
       final res = await Dio().get('${Env.apiBaseUrl}/settings');
       final body = res.data as Map<String, dynamic>?;
-      // Backend wraps all responses: { success, data: <actual payload> }
       final s = (body?['data'] as Map<String, dynamic>?) ?? body;
       if (s != null && mounted) {
         setState(() {
           _ratePerKm = (s['pricePerKm'] as num?)?.toDouble() ?? _ratePerKm;
+          final vp = s['vehiclePrices'];
+          if (vp is Map) {
+            _vehiclePrices = vp.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+          }
         });
       }
     } catch (_) {
@@ -716,14 +726,16 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   ],
                                 )
                               else
-                                Text(
-                                  _computedDistance != null
-                                      ? 'Route = ${_computedDistance!.toStringAsFixed(1)} KM'
-                                      : 'Route = — (pick locations)',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 14.sp,
-                                    color: _computedDistance != null ? AppColors.textPrimary : AppColors.textHint,
+                                Expanded(
+                                  child: Text(
+                                    _computedDistance != null
+                                        ? 'Route = ${_computedDistance!.toStringAsFixed(1)} KM  ·  ₹${_rateForVehicle.toStringAsFixed(0)}/km'
+                                        : 'Route = — (pick locations)',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 13.sp,
+                                      color: _computedDistance != null ? AppColors.textPrimary : AppColors.textHint,
+                                    ),
                                   ),
                                 ),
                             ],
@@ -766,7 +778,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   onChanged: (_) => setState(() {}),
                                   decoration: InputDecoration(
                                     labelText: 'Driver Fee (₹)',
-                                    hintText: _suggestedFare > 0 ? '₹${_suggestedFare.toStringAsFixed(0)}' : 'Fare',
+                                    hintText: _suggestedFare > 0 ? '₹${_suggestedFare.toStringAsFixed(0)} (${_rateForVehicle.toStringAsFixed(0)}/km)' : 'Fare',
                                     prefixText: '₹ ',
                                     isDense: true,
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),

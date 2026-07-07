@@ -3,6 +3,25 @@ import { Document } from 'mongoose';
 
 export type PlatformSettingsDocument = PlatformSettings & Document;
 
+// Default per-vehicle prices (₹/km)
+export const DEFAULT_VEHICLE_PRICES: Record<string, number> = {
+  hatchback: 12,
+  eeco: 13,
+  sedan: 15,
+  ertiga: 18,
+  rumion: 18,
+  carens: 18,
+  innova: 20,
+  crysta: 22,
+  hycross: 24,
+  tempo_traveller: 28,
+  urbania: 30,
+  trax_cruiser: 28,
+  small_coach: 35,
+  luxury_coach: 45,
+  premium: 25,
+};
+
 @Schema({ timestamps: true, collection: 'platform_settings' })
 export class PlatformSettings {
   @Prop({ required: true, unique: true, default: 'global' })
@@ -13,6 +32,9 @@ export class PlatformSettings {
 
   @Prop({ default: 10, min: 0, max: 100 })
   commissionPercent: number;
+
+  @Prop({ type: Object, default: DEFAULT_VEHICLE_PRICES })
+  vehiclePrices: Record<string, number>;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

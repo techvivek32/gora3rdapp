@@ -1,15 +1,34 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/Badge';
 import { adminApi } from '@/lib/api';
 
-export default function SettingsPage() {
-  const { data: session } = useSession();
+const VEHICLE_TYPES = [
+  { value: 'hatchback',       label: 'Hatchback Car' },
+  { value: 'eeco',            label: 'Ecco Car' },
+  { value: 'sedan',           label: 'Sedan Car' },
+  { value: 'ertiga',          label: 'SUV Ertiga Car' },
+  { value: 'rumion',          label: 'Toyota Rumion' },
+  { value: 'carens',          label: 'Kia Carens' },
+  { value: 'innova',          label: 'SUV Innova Car' },
+  { value: 'crysta',          label: 'SUV Crysta Car' },
+  { value: 'hycross',         label: 'Toyota Hycross' },
+  { value: 'tempo_traveller', label: 'Tempo Traveller' },
+  { value: 'urbania',         label: 'Force Urbania' },
+  { value: 'trax_cruiser',    label: 'Force Trax Cruiser' },
+  { value: 'small_coach',     label: 'Small Coach' },
+  { value: 'luxury_coach',    label: 'Luxury Coach' },
+  { value: 'premium',         label: 'Premium Car' },
+];
 
-  const [pricePerKm, setPricePerKm] = useState<number | ''>('');
-  const [commissionPercent, setCommissionPercent] = useState<number | ''>('');
+const DEFAULT_PRICES: Record<string, number> = {
+  hatchback: 12, eeco: 13, sedan: 15, ertiga: 18, rumion: 18, carens: 18,
+  innova: 20, crysta: 22, hycross: 24, tempo_traveller: 28, urbania: 30,
+  trax_cruiser: 28, small_coach: 35, luxury_coach: 45, premium: 25,
+};
+
+export default function SettingsPage() {
+  const [vehiclePrices, setVehiclePrices] = useState<Record<string, number>>(DEFAULT_PRICES);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -19,22 +38,21 @@ export default function SettingsPage() {
     adminApi.getSettings()
       .then((data: any) => {
         const s = data?.data ?? data;
-        setPricePerKm(s.pricePerKm ?? 20);
-        setCommissionPercent(s.commissionPercent ?? 10);
+        setVehiclePrices({ ...DEFAULT_PRICES, ...(s.vehiclePrices ?? {}) });
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
   }, []);
 
   const handleSave = async () => {
-    const pkm = Number(pricePerKm);
-    const cp = Number(commissionPercent);
-    if (!pkm || pkm < 1) return setError('Price per KM must be at least ₹1');
-    if (cp < 0 || cp > 100) return setError('Commission must be between 0 and 100');
+    for (const v of VEHICLE_TYPES) {
+      if (!vehiclePrices[v.value] || vehiclePrices[v.value] < 1)
+        return setError(`Price for ${v.label} must be at least ₹1`);
+    }
     setError('');
     setSaving(true);
     try {
-      await adminApi.updateSettings({ pricePerKm: pkm, commissionPercent: cp });
+      await adminApi.updateSettings({ vehiclePrices });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
@@ -44,42 +62,23 @@ export default function SettingsPage() {
     }
   };
 
-  const exampleDistance = 100;
-  const suggestedFare = Number(pricePerKm || 0) * exampleDistance;
-  const commission = suggestedFare * (Number(commissionPercent || 0) / 100);
-  const total = suggestedFare + commission;
+  const setPrice = (vehicle: string, val: string) => {
+    setSaved(false);
+    setVehiclePrices((prev) => ({ ...prev, [vehicle]: val === '' ? 0 : Number(val) }));
+  };
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-500 mt-1">Account and platform configuration</p>
-      </div>
-
-      {/* Admin Profile */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Admin Profile</h2>
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center">
-            <span className="text-brand-600 font-bold text-2xl">
-              {session?.user?.name?.[0]?.toUpperCase() || 'A'}
-            </span>
-          </div>
-          <div>
-            <p className="font-semibold text-lg">{session?.user?.name || 'Admin'}</p>
-            <p className="text-gray-500">{session?.user?.email}</p>
-            <Badge variant="warning" className="mt-1">
-              {(session?.user as any)?.role || 'admin'}
-            </Badge>
-          </div>
-        </div>
+        <p className="text-gray-500 mt-1">Platform pricing configuration</p>
       </div>
 
       {/* Pricing Configuration */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="font-semibold text-gray-900 mb-1">Pricing Configuration</h2>
         <p className="text-gray-500 text-sm mb-5">
-          These values are used in the mobile app to calculate suggested fare and commission on every requirement.
+          Set the price per KM for each vehicle type. The mobile app uses these rates to calculate the suggested fare when a user creates a requirement.
         </p>
 
         {loading ? (
@@ -89,69 +88,44 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Price per KM */}
+            {/* Per-vehicle price table — 2 columns */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Price per KM (₹)
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
-                <input
-                  type="number"
-                  min={1}
-                  step={0.5}
-                  value={pricePerKm}
-                  onChange={(e) => { setPricePerKm(e.target.value === '' ? '' : Number(e.target.value)); setSaved(false); }}
-                  className="w-full pl-8 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                  placeholder="e.g. 15"
-                />
+              <p className="text-sm font-medium text-gray-700 mb-3">Price per KM (₹) — by Vehicle Type</p>
+              <div className="grid grid-cols-2 gap-4">
+                {[0, 1].map((col) => (
+                  <div key={col} className="rounded-lg border border-gray-200 overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-gray-500">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left font-medium">Vehicle</th>
+                          <th className="px-4 py-2.5 text-right font-medium w-36">₹ / KM</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {VEHICLE_TYPES.filter((_, i) => i % 2 === col).map((v, i) => (
+                          <tr key={v.value} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-4 py-2 text-gray-800">{v.label}</td>
+                            <td className="px-4 py-2">
+                              <div className="relative flex justify-end">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₹</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step={0.5}
+                                  value={vehiclePrices[v.value] ?? ''}
+                                  onChange={(e) => setPrice(v.value, e.target.value)}
+                                  className="w-28 pl-6 pr-2 py-1.5 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-brand-500"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
               </div>
-              <p className="text-xs text-gray-400 mt-1">Fare per kilometre shown to users as the suggested price.</p>
             </div>
-
-            {/* Commission % */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Platform Commission (%)
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  value={commissionPercent}
-                  onChange={(e) => { setCommissionPercent(e.target.value === '' ? '' : Number(e.target.value)); setSaved(false); }}
-                  className="w-full pl-4 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
-                  placeholder="e.g. 10"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">%</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-1">Added on top of the base fare as the platform fee.</p>
-            </div>
-
-            {/* Live preview */}
-            {Number(pricePerKm) > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Preview — 100 KM trip
-                </p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Base Fare (100 km × ₹{pricePerKm}/km)</span>
-                    <span className="font-medium">₹{suggestedFare.toFixed(0)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Commission ({commissionPercent}%)</span>
-                    <span className="font-medium">₹{commission.toFixed(0)}</span>
-                  </div>
-                  <div className="flex justify-between pt-2 border-t border-gray-200 font-semibold">
-                    <span>Total</span>
-                    <span className="text-brand-600">₹{total.toFixed(0)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {error && (
               <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-4 py-2">
@@ -179,32 +153,7 @@ export default function SettingsPage() {
         )}
       </div>
 
-      {/* Platform Info */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Platform Info</h2>
-        <dl className="space-y-3">
-          {[
-            { label: 'Platform Name', value: 'Gora Cabs Admin' },
-            { label: 'API Version', value: 'v1' },
-            { label: 'Build', value: 'Production' },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex justify-between py-2 border-b border-gray-100 last:border-0">
-              <dt className="text-gray-500 text-sm">{label}</dt>
-              <dd className="font-medium text-sm">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-        <h3 className="font-semibold text-amber-800">Environment Variables Required</h3>
-        <p className="text-amber-700 text-sm mt-1">
-          Configure <code className="bg-amber-100 px-1 rounded">.env.local</code> with{' '}
-          <code className="bg-amber-100 px-1 rounded">NEXTAUTH_SECRET</code>,{' '}
-          <code className="bg-amber-100 px-1 rounded">NEXT_PUBLIC_API_URL</code>, and{' '}
-          <code className="bg-amber-100 px-1 rounded">NEXTAUTH_URL</code> before deploying.
-        </p>
-      </div>
     </div>
   );
 }

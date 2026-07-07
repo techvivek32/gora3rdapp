@@ -111,7 +111,7 @@ export const adminApi = {
 
   // ─── Platform Settings ─────────────────────────────────────────────────────
   getSettings: () => apiClient.get('/settings'),
-  updateSettings: (data: { pricePerKm?: number; commissionPercent?: number }) =>
+  updateSettings: (data: { pricePerKm?: number; commissionPercent?: number; vehiclePrices?: Record<string, number> }) =>
     apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

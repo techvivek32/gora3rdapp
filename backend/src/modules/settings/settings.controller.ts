@@ -22,7 +22,7 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update platform settings (admin only)' })
-  updateSettings(@Body() body: { pricePerKm?: number; commissionPercent?: number }) {
+  updateSettings(@Body() body: { pricePerKm?: number; commissionPercent?: number; vehiclePrices?: Record<string, number> }) {
     return this.settingsService.updateSettings(body);
   }
 }
