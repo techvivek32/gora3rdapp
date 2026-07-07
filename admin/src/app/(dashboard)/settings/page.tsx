@@ -14,10 +14,11 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    adminApi.getSettings()
+    adminApi.getAdminSettings()
       .then((data: any) => {
         const s = data?.data ?? data;
         setRzKeyId(s.razorpayKeyId ?? '');
+        setRzKeySecret(s.razorpayKeySecret ?? '');
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -34,7 +35,6 @@ export default function SettingsPage() {
         razorpayKeySecret: rzKeySecret.trim(),
       });
       setSaved(true);
-      setRzKeySecret('');
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
       setError(e.message || 'Failed to save');

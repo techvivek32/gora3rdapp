@@ -17,6 +17,15 @@ export class SettingsController {
     return this.settingsService.getPublicSettings();
   }
 
+  @Get('admin')
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get full settings including secrets (admin only)' })
+  getAdminSettings() {
+    return this.settingsService.getSettings();
+  }
+
   @Put()
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
