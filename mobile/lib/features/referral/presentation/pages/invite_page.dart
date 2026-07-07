@@ -47,7 +47,7 @@ class _InvitePageState extends State<InvitePage> {
   }
 
   String get _shareText =>
-      'Join me on Gora Cabs! 🚕\nUse my referral code *$_code* when you sign up.\nDownload the app and register with this code.';
+      'Join me on Gora Cabs! 🚕\nUse my referral code *$_code* when you sign up.\nDownload the app: https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner';
 
   void _copy() {
     Clipboard.setData(ClipboardData(text: _code));
