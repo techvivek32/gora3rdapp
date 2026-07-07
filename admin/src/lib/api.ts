@@ -120,6 +120,7 @@ export const adminApi = {
 
   // ─── Subscriptions ─────────────────────────────────────────────────────────
   getSubscriptionPlans: () => apiClient.get('/subscriptions/plans'),
+  getPlans: () => apiClient.get('/admin/subscription-plans'),
   getSubscriptions: (params: any) => apiClient.get('/admin/subscriptions', { params }),
   createPlan: (data: any) => apiClient.post('/admin/subscription-plans', data),
   updatePlan: (id: string, data: any) => apiClient.put(`/admin/subscription-plans/${id}`, data),

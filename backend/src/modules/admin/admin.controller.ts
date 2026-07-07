@@ -135,6 +135,31 @@ export class AdminController {
     return this.adminService.getSubscriptions(query);
   }
 
+  // ─── Subscription Plans (admin editable) ─────────────────────────────────────
+  @Get('subscription-plans')
+  @ApiOperation({ summary: 'List all subscription plans (incl. inactive)' })
+  getPlans() {
+    return this.adminService.getPlans();
+  }
+
+  @Post('subscription-plans')
+  @ApiOperation({ summary: 'Create a subscription plan' })
+  createPlan(@Body() data: any) {
+    return this.adminService.createPlan(data);
+  }
+
+  @Put('subscription-plans/:id')
+  @ApiOperation({ summary: 'Update a subscription plan' })
+  updatePlan(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updatePlan(id, data);
+  }
+
+  @Delete('subscription-plans/:id')
+  @ApiOperation({ summary: 'Delete a subscription plan' })
+  deletePlan(@Param('id') id: string) {
+    return this.adminService.deletePlan(id);
+  }
+
   // ─── Vehicles ──────────────────────────────────────────────────────────────
   @Get('vehicles')
   @ApiOperation({ summary: 'Get all available vehicles' })

@@ -290,6 +290,48 @@ export class AdminService {
     return { message: `Membership upgraded to ${membershipType}`, data: user };
   }
 
+  // ─── Subscription Plan management ────────────────────────────────────────────
+  async getPlans() {
+    const plans = await this.planModel.find().sort({ sortOrder: 1, price: 1 }).lean();
+    return { message: 'Plans retrieved', data: plans };
+  }
+
+  async createPlan(data: any) {
+    const plan = await this.planModel.create({
+      name: data.name,
+      description: data.description ?? '',
+      membershipType: data.membershipType,
+      duration: data.duration,
+      price: Math.round(Number(data.price) || 0),
+      discountedPrice: Math.round(Number(data.discountedPrice) || 0),
+      durationDays: Math.round(Number(data.durationDays) || 30),
+      features: Array.isArray(data.features) ? data.features : [],
+      isActive: data.isActive ?? true,
+      isPopular: data.isPopular ?? false,
+      sortOrder: Math.round(Number(data.sortOrder) || 0),
+    });
+    return { message: 'Plan created', data: plan };
+  }
+
+  async updatePlan(id: string, data: any) {
+    const update: any = {};
+    for (const k of ['name', 'description', 'membershipType', 'duration', 'features', 'isActive', 'isPopular']) {
+      if (data[k] !== undefined) update[k] = data[k];
+    }
+    for (const k of ['price', 'discountedPrice', 'durationDays', 'sortOrder']) {
+      if (data[k] !== undefined) update[k] = Math.round(Number(data[k]) || 0);
+    }
+    const plan = await this.planModel.findByIdAndUpdate(id, update, { new: true });
+    if (!plan) throw new NotFoundException('Plan not found');
+    return { message: 'Plan updated', data: plan };
+  }
+
+  async deletePlan(id: string) {
+    const plan = await this.planModel.findByIdAndDelete(id);
+    if (!plan) throw new NotFoundException('Plan not found');
+    return { message: 'Plan deleted' };
+  }
+
   async getRequirements(query: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };

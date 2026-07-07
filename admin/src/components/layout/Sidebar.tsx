@@ -34,6 +34,7 @@ const navigation = [
     label: 'Monetization',
     items: [
       { href: '/subscriptions', label: 'Memberships', icon: Star },
+      { href: '/plans', label: 'Plan Management', icon: BadgeCheck },
       { href: '/payments', label: 'Payments', icon: CreditCard },
       { href: '/wallets', label: 'Wallet Management', icon: Wallet },
       { href: '/withdrawals', label: 'Withdrawals', icon: Banknote },
