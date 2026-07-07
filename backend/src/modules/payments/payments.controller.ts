@@ -4,14 +4,14 @@ import { Request } from 'express';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { Public } from '../../common/decorators/roles.decorator';
 import * as crypto from 'crypto';
-import { ConfigService } from '@nestjs/config';
+import { SettingsService } from '../settings/settings.service';
 
 @ApiTags('Payments')
 @Controller('payments')
 export class PaymentsController {
   constructor(
     private readonly subscriptionsService: SubscriptionsService,
-    private readonly configService: ConfigService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Public()
@@ -23,7 +23,8 @@ export class PaymentsController {
     @Body() body: any,
     @Req() req: RawBodyRequest<Request>,
   ) {
-    const webhookSecret = this.configService.get<string>('razorpay.webhookSecret');
+    const keys = await this.settingsService.getRazorpayKeys();
+    const webhookSecret = keys.webhookSecret;
     const rawBody = req.rawBody?.toString() || JSON.stringify(body);
 
     const expectedSig = crypto

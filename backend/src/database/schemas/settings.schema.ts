@@ -35,6 +35,15 @@ export class PlatformSettings {
 
   @Prop({ type: Object, default: DEFAULT_VEHICLE_PRICES })
   vehiclePrices: Record<string, number>;
+
+  @Prop({ default: '' })
+  razorpayKeyId: string;
+
+  @Prop({ default: '' })
+  razorpayKeySecret: string;
+
+  @Prop({ default: '' })
+  razorpayWebhookSecret: string;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

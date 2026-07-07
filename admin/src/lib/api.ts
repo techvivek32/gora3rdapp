@@ -111,8 +111,14 @@ export const adminApi = {
 
   // ─── Platform Settings ─────────────────────────────────────────────────────
   getSettings: () => apiClient.get('/settings'),
-  updateSettings: (data: { pricePerKm?: number; commissionPercent?: number; vehiclePrices?: Record<string, number> }) =>
-    apiClient.put('/settings', data),
+  updateSettings: (data: {
+    pricePerKm?: number;
+    commissionPercent?: number;
+    vehiclePrices?: Record<string, number>;
+    razorpayKeyId?: string;
+    razorpayKeySecret?: string;
+    razorpayWebhookSecret?: string;
+  }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────
   sendNotification: (data: any) => apiClient.post('/admin/notifications/send', data),

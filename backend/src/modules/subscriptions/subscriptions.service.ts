@@ -14,6 +14,7 @@ import { MembershipType } from '../../common/enums/user-role.enum';
 import { generatePaymentOrderId } from '../../common/utils/booking-id.util';
 import Razorpay from 'razorpay';
 import { ConfigService } from '@nestjs/config';
+import { SettingsService } from '../settings/settings.service';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -26,15 +27,16 @@ export class SubscriptionsService {
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private configService: ConfigService,
+    private settingsService: SettingsService,
   ) {}
 
-  // Lazily build the Razorpay client so missing credentials produce a clear
-  // error instead of crashing the whole service at startup.
-  private getRazorpay(): Razorpay {
-    const keyId = this.configService.get<string>('razorpay.keyId');
-    const keySecret = this.configService.get<string>('razorpay.keySecret');
+  // Lazily build the Razorpay client — reads keys from DB first, falls back to env.
+  private async getRazorpay(): Promise<Razorpay> {
+    const keys = await this.settingsService.getRazorpayKeys();
+    const keyId = keys.keyId;
+    const keySecret = keys.keySecret;
     if (!keyId || !keySecret) {
-      this.logger.error('Razorpay credentials are not configured (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).');
+      this.logger.error('Razorpay credentials are not configured.');
       throw new BadRequestException('Payment gateway is not configured. Please contact support.');
     }
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
@@ -58,7 +60,7 @@ export class SubscriptionsService {
 
     let razorpayOrder;
     try {
-      razorpayOrder = await this.getRazorpay().orders.create({
+      razorpayOrder = await (await this.getRazorpay()).orders.create({
         amount,
         currency: 'INR',
         receipt: orderId,
@@ -84,7 +86,7 @@ export class SubscriptionsService {
         orderId: razorpayOrder.id,
         amount,
         currency: 'INR',
-        keyId: this.configService.get('razorpay.keyId'),
+        keyId: (await this.settingsService.getRazorpayKeys()).keyId,
         paymentId: payment._id,
         plan: {
           name: plan.name,
@@ -101,7 +103,8 @@ export class SubscriptionsService {
     razorpayPaymentId: string;
     razorpaySignature: string;
   }) {
-    const keySecret = this.configService.get('razorpay.keySecret');
+    const keys = await this.settingsService.getRazorpayKeys();
+    const keySecret = keys.keySecret;
     const expectedSignature = crypto
       .createHmac('sha256', keySecret)
       .update(`${data.razorpayOrderId}|${data.razorpayPaymentId}`)

@@ -12,9 +12,9 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get platform settings (public)' })
+  @ApiOperation({ summary: 'Get platform settings (public — secrets stripped)' })
   getSettings() {
-    return this.settingsService.getSettings();
+    return this.settingsService.getPublicSettings();
   }
 
   @Put()
@@ -22,7 +22,14 @@ export class SettingsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update platform settings (admin only)' })
-  updateSettings(@Body() body: { pricePerKm?: number; commissionPercent?: number; vehiclePrices?: Record<string, number> }) {
+  updateSettings(@Body() body: {
+    pricePerKm?: number;
+    commissionPercent?: number;
+    vehiclePrices?: Record<string, number>;
+    razorpayKeyId?: string;
+    razorpayKeySecret?: string;
+    razorpayWebhookSecret?: string;
+  }) {
     return this.settingsService.updateSettings(body);
   }
 }

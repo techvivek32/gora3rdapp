@@ -6,6 +6,7 @@ import { SubscriptionPlan, SubscriptionPlanSchema, Subscription, SubscriptionSch
 import { Payment, PaymentSchema } from '../../database/schemas/payment.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: User.name, schema: UserSchema },
     ]),
     NotificationsModule,
+    SettingsModule,
   ],
   controllers: [SubscriptionsController],
   providers: [SubscriptionsService],
