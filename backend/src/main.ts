@@ -105,7 +105,10 @@ async function bootstrap() {
     });
   }
 
-  await app.listen(port, '0.0.0.0');
+  // Bind to localhost only — nginx reverse-proxies public traffic to it. This
+  // keeps the API off the public internet so it can't be hit directly.
+  const host = process.env.BIND_HOST || '127.0.0.1';
+  await app.listen(port, host);
   console.log(`🚀 Gora Cabs API running on: http://localhost:${port}/${apiPrefix}`);
   console.log(`📄 Swagger docs: http://localhost:${port}/api/docs`);
 }
