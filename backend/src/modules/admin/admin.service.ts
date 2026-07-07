@@ -427,6 +427,20 @@ export class AdminService {
     return { message: 'Vehicle deleted' };
   }
 
+  async updateReview(id: string, data: Partial<any>) {
+    const review = await this.ratingModel
+      .findByIdAndUpdate(id, data, { new: true })
+      .populate('rater', 'fullName profileImage');
+    if (!review) throw new NotFoundException('Review not found');
+    return { message: 'Review updated', data: review };
+  }
+
+  async deleteReview(id: string) {
+    const review = await this.ratingModel.findByIdAndDelete(id);
+    if (!review) throw new NotFoundException('Review not found');
+    return { message: 'Review deleted' };
+  }
+
   // Cities CRUD
   async createCity(data: Partial<any>) {
     const slug = data.name.toLowerCase().replace(/\s+/g, '-');
@@ -579,14 +593,59 @@ export class AdminService {
     return { message: 'User requirements retrieved', data: requirements };
   }
 
+  async getUserVehicles(userId: string) {
+    const vehicles = await this.vehicleModel
+      .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return { message: 'User vehicles retrieved', data: vehicles };
+  }
+
   async getUserPayments(userId: string) {
+    // Subscription/plan payments
     const payments = await this.paymentModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate('planId', 'name membershipType')
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
-    return { message: 'User payments retrieved', data: payments };
+
+    // Wallet top-ups and adjustments
+    const walletTxns = await this.walletTxModel
+      .find({ userId: new Types.ObjectId(userId), type: 'credit', status: 'success' })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    // Normalize both into the same shape
+    const unified = [
+      ...payments.map((p: any) => ({
+        _id: p._id,
+        orderId: p.orderId,
+        userId: p.userId,
+        planId: p.planId,
+        amount: p.amount,
+        method: p.method || 'razorpay',
+        status: p.status,
+        createdAt: p.createdAt,
+      })),
+      ...walletTxns.map((w: any) => ({
+        _id: w._id,
+        orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
+        userId: w.userId,
+        planId: { name: w.source === 'admin' ? 'Wallet Adjustment' : 'Wallet Top-up', membershipType: 'wallet' },
+        amount: (w.amount || 0) * 100,
+        method: w.source === 'admin' ? 'admin' : 'razorpay',
+        status: w.status,
+        createdAt: w.createdAt,
+      })),
+    ];
+
+    // Sort by date descending
+    unified.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return { message: 'User payments retrieved', data: unified };
   }
 
   async getUserWithdrawals(userId: string) {

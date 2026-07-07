@@ -6,6 +6,8 @@ import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
+import { DataTable } from '@/components/ui/DataTable';
+import { Input } from '@/components/ui/Input';
 import { formatDate } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -13,7 +15,78 @@ import {
   ArrowLeft, Phone, Mail, Building2, MapPin, ShieldCheck,
   FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2,
   Calendar, User, CreditCard, ArrowUpRight, FileCheck, CheckSquare,
+  Eye, Pencil, Trash2, X,
 } from 'lucide-react';
+import type { ColumnDef } from '@tanstack/react-table';
+
+interface Requirement {
+  _id: string;
+  bookingId: string;
+  requirementId: string;
+  pickupCity: string;
+  dropCity: string;
+  vehicleType: string;
+  tripType: string;
+  travelDate: string;
+  status: string;
+  notes?: string;
+  totalAmount?: number;
+  fare?: number;
+  postedBy: { fullName: string; membershipType: string };
+  viewCount: number;
+  createdAt: string;
+}
+
+interface Vehicle {
+  _id: string;
+  listingId: string;
+  currentCity: string;
+  destinationCity?: string;
+  vehicleType: string;
+  vehicleNumber: string;
+  driverName: string;
+  status: string;
+  availableDate: string;
+  viewCount: number;
+  notes?: string;
+  postedBy: { fullName: string; membershipType: string };
+}
+
+interface Review {
+  _id: string;
+  stars: number;
+  review: string;
+  rater: { fullName: string; profileImage?: string };
+  createdAt: string;
+}
+
+const STATUS_COLORS: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
+  active: 'success',
+  pending: 'warning',
+  accepted: 'success',
+  completed: 'success',
+  cancelled: 'destructive',
+  on_hold: 'warning',
+  expired: 'secondary',
+};
+
+const VEHICLE_STATUS_COLORS: Record<string, 'default' | 'success' | 'destructive' | 'secondary'> = {
+  available: 'success',
+  booked: 'default',
+  expired: 'secondary',
+  inactive: 'destructive',
+};
+
+const VEHICLE_STATUSES = ['available', 'booked', 'expired', 'inactive'];
+
+const TRIP_COLORS: Record<string, string> = {
+  one_way: 'bg-blue-100 text-blue-700',
+  round_trip: 'bg-green-100 text-green-700',
+  airport_transfer: 'bg-purple-100 text-purple-700',
+  local: 'bg-orange-100 text-orange-700',
+  outstation: 'bg-teal-100 text-teal-700',
+};
+const TRIP_TYPES = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
 
 const DOCS = [
   { key: 'aadhar', label: 'Aadhaar Card' },
@@ -50,6 +123,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
+  const [activeView, setActiveView] = useState<'requirements' | 'vehicles'>('requirements');
+  const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
+  const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
+  const [reviewModal, setReviewModal] = useState<{ mode: 'view' | 'edit'; r: Review } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['user', id],
@@ -61,6 +138,184 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     queryFn: () => adminApi.getUserRequirements(id),
     enabled: activeTab === 'requests',
   });
+
+  const { data: vehiclesData } = useQuery({
+    queryKey: ['user-vehicles', id],
+    queryFn: () => adminApi.getUserVehicles(id),
+    enabled: activeTab === 'requests',
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (reqId: string) => adminApi.deleteRequirement(reqId),
+    onSuccess: () => { toast.success('Requirement deleted'); queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not delete'),
+  });
+
+  const deleteVehicleMutation = useMutation({
+    mutationFn: (vehicleId: string) => adminApi.deleteVehicle(vehicleId),
+    onSuccess: () => { toast.success('Vehicle deleted'); queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not delete'),
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId: string) => adminApi.deleteReview(reviewId),
+    onSuccess: () => { toast.success('Review deleted'); queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not delete'),
+  });
+
+  const columns: ColumnDef<Requirement>[] = [
+    {
+      accessorKey: 'bookingId',
+      header: 'Booking ID',
+      cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.getValue('bookingId')}</span>,
+    },
+    {
+      id: 'route',
+      header: 'Route',
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium">{row.original.pickupCity} → {row.original.dropCity}</p>
+          <span className={`text-xs px-2 py-0.5 rounded font-medium ${TRIP_COLORS[row.original.tripType] || 'bg-gray-100 text-gray-700'}`}>
+            {row.original.tripType?.replace('_', ' ').toUpperCase()}
+          </span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'vehicleType',
+      header: 'Vehicle',
+      cell: ({ row }) => <span className="capitalize">{row.getValue<string>('vehicleType')?.replace('_', ' ')}</span>,
+    },
+    {
+      accessorKey: 'travelDate',
+      header: 'Travel Date',
+      cell: ({ row }) => new Date(row.getValue('travelDate')).toLocaleDateString('en-IN'),
+    },
+    {
+      accessorKey: 'totalAmount',
+      header: 'Fare',
+      cell: ({ row }) => `₹${row.original.totalAmount ?? row.original.fare ?? 0}`,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => { const s = row.getValue('status') as string; return <Badge variant={STATUS_COLORS[s] || 'default'}>{s}</Badge>; },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <IconBtn title="View" onClick={() => setModal({ mode: 'view', r: row.original })}><Eye className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Edit" onClick={() => setModal({ mode: 'edit', r: row.original })}><Pencil className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this requirement?')) deleteMutation.mutate(row.original._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
+        </div>
+      ),
+    },
+  ];
+
+  const vehicleColumns: ColumnDef<Vehicle>[] = [
+    {
+      accessorKey: 'listingId',
+      header: 'Listing ID',
+      cell: ({ row }) => <span className="font-mono text-xs font-semibold">{row.getValue('listingId')}</span>,
+    },
+    {
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) => (
+        <span className="font-medium">
+          {row.original.currentCity}
+          {row.original.destinationCity ? ` → ${row.original.destinationCity}` : ''}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'vehicleType',
+      header: 'Type',
+      cell: ({ row }) => <span className="capitalize">{row.getValue<string>('vehicleType')?.replace('_', ' ')}</span>,
+    },
+    {
+      accessorKey: 'driverName',
+      header: 'Driver',
+    },
+    {
+      accessorKey: 'availableDate',
+      header: 'Available',
+      cell: ({ row }) => new Date(row.getValue('availableDate')).toLocaleDateString('en-IN'),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => { const s = row.getValue('status') as string; return <Badge variant={VEHICLE_STATUS_COLORS[s] || 'default'}>{s}</Badge>; },
+    },
+    { accessorKey: 'viewCount', header: 'Views' },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <IconBtn title="View" onClick={() => setVehicleModal({ mode: 'view', v: row.original })}><Eye className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Edit" onClick={() => setVehicleModal({ mode: 'edit', v: row.original })}><Pencil className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this vehicle listing?')) deleteVehicleMutation.mutate(row.original._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
+        </div>
+      ),
+    },
+  ];
+
+  const reviewColumns: ColumnDef<Review>[] = [
+    {
+      id: 'rater',
+      header: 'Rater',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+            {row.original.rater?.profileImage ? (
+              <img src={row.original.rater.profileImage} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-5 h-5 text-gray-500" />
+            )}
+          </div>
+          <span className="font-medium">{row.original.rater?.fullName || 'Anonymous'}</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'stars',
+      header: 'Rating',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star
+              key={i}
+              className={`w-4 h-4 ${i < row.original.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+            />
+          ))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'review',
+      header: 'Comment',
+      cell: ({ row }) => <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">{row.original.review || '—'}</p>,
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Date',
+      cell: ({ row }) => new Date(row.getValue('createdAt')).toLocaleDateString('en-IN'),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <IconBtn title="View" onClick={() => setReviewModal({ mode: 'view', r: row.original })}><Eye className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Edit" onClick={() => setReviewModal({ mode: 'edit', r: row.original })}><Pencil className="w-4 h-4" /></IconBtn>
+          <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this review?')) deleteReviewMutation.mutate(row.original._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
+        </div>
+      ),
+    },
+  ];
 
   const { data: paymentsData } = useQuery({
     queryKey: ['user-payments', id],
@@ -327,52 +582,47 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* Request List Tab */}
           {activeTab === 'requests' && (
             <div>
-              <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Requirements Posted</h3>
-              {(() => {
-                const items = (requestsData as any)?.data ?? [];
-                if (!items.length) return (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <ClipboardList className="w-10 h-10 text-gray-300 mb-2" />
-                    <p className="text-sm text-gray-400">No requirements posted yet.</p>
-                  </div>
-                );
-                return (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Booking ID</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Route</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Vehicle</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Travel Date</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Fare</th>
-                          <th className="pb-3 font-medium text-gray-500">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {items.map((r: any) => (
-                          <tr key={r._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <td className="py-3 pr-4 font-mono text-xs text-gray-600 dark:text-gray-400">{r.bookingId}</td>
-                            <td className="py-3 pr-4">
-                              <span className="font-medium text-gray-800 dark:text-gray-200">{r.pickupCity}</span>
-                              <span className="text-gray-400 mx-1">→</span>
-                              <span className="font-medium text-gray-800 dark:text-gray-200">{r.dropCity}</span>
-                            </td>
-                            <td className="py-3 pr-4 capitalize text-gray-600 dark:text-gray-400">{r.vehicleType?.replace(/_/g, ' ')}</td>
-                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{r.travelDate ? formatDate(r.travelDate) : '—'}</td>
-                            <td className="py-3 pr-4 text-gray-800 dark:text-gray-200">₹{r.fare ?? 0}</td>
-                            <td className="py-3">
-                              <Badge variant={r.status === 'active' ? 'success' : r.status === 'cancelled' ? 'destructive' : 'secondary'}>
-                                {r.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              })()}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {activeView === 'requirements' ? 'Requirements Posted' : 'Available Cabs'}
+                </h3>
+                <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setActiveView('requirements')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      activeView === 'requirements'
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    Requirements
+                  </button>
+                  <button
+                    onClick={() => setActiveView('vehicles')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                      activeView === 'vehicles'
+                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    Available Cabs
+                  </button>
+                </div>
+              </div>
+              
+              {activeView === 'requirements' ? (
+                <DataTable
+                  columns={columns}
+                  data={(requestsData as any)?.data ?? []}
+                  isLoading={false}
+                />
+              ) : (
+                <DataTable
+                  columns={vehicleColumns}
+                  data={(vehiclesData as any)?.data ?? []}
+                  isLoading={false}
+                />
+              )}
             </div>
           )}
 
@@ -476,41 +726,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {activeTab === 'reviews' && (
             <div>
               <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Reviews Received</h3>
-              {(() => {
-                const items = (reviewsData as any)?.data ?? [];
-                if (!items.length) return (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Star className="w-10 h-10 text-gray-300 mb-2" />
-                    <p className="text-sm text-gray-400">No reviews yet.</p>
-                  </div>
-                );
-                return (
-                  <div className="space-y-3">
-                    {items.map((r: any) => (
-                      <div key={r._id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {r.rater?.profileImage
-                            ? <img src={r.rater.profileImage} alt="" className="w-full h-full object-cover" />
-                            : <span className="text-orange-600 font-bold text-sm">{r.rater?.fullName?.[0]?.toUpperCase() ?? '?'}</span>
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-gray-800 dark:text-gray-200">{r.rater?.fullName ?? 'Unknown'}</p>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star key={i} className={`w-3.5 h-3.5 ${i < r.stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} />
-                              ))}
-                            </div>
-                          </div>
-                          {r.review && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{r.review}</p>}
-                          <p className="text-xs text-gray-400 mt-1">{r.createdAt ? formatDate(r.createdAt) : ''}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
+              <DataTable
+                columns={reviewColumns}
+                data={(reviewsData as any)?.data ?? []}
+                isLoading={false}
+              />
             </div>
           )}
 
@@ -553,6 +773,240 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
         </div>
+      </div>
+
+      {modal && (
+        <RequirementModal
+          req={modal.r}
+          mode={modal.mode}
+          user={user}
+          onClose={() => setModal(null)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); setModal(null); }}
+        />
+      )}
+
+      {vehicleModal && (
+        <VehicleModal
+          vehicle={vehicleModal.v}
+          mode={vehicleModal.mode}
+          user={user}
+          onClose={() => setVehicleModal(null)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); setVehicleModal(null); }}
+        />
+      )}
+
+      {reviewModal && (
+        <ReviewModal
+          review={reviewModal.r}
+          mode={reviewModal.mode}
+          user={user}
+          onClose={() => setReviewModal(null)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); setReviewModal(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function IconBtn({ children, onClick, title, danger }: { children: React.ReactNode; onClick: () => void; title: string; danger?: boolean }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 ${danger ? 'text-red-500' : 'text-gray-500'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function RequirementModal({ req, mode, user, onClose, onSaved }: { req: Requirement; mode: 'view' | 'edit'; user: any; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    status: req.status,
+    vehicleType: req.vehicleType,
+    tripType: req.tripType,
+    pickupCity: req.pickupCity,
+    dropCity: req.dropCity,
+    notes: req.notes || '',
+  });
+  const isEdit = mode === 'edit';
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.updateRequirement(req._id, form),
+    onSuccess: () => { toast.success('Requirement updated'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+            {isEdit ? 'Edit Requirement' : 'Requirement Details'} <span className="font-mono text-xs text-gray-400">{req.bookingId}</span>
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <Field label="Posted By">{req.postedBy?.fullName || user?.fullName || 'User'} <span className="text-gray-400">({req.postedBy?.membershipType || '—'})</span></Field>
+          <EditableRow label="Status" isEdit={isEdit} value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={['active', 'pending', 'accepted', 'completed', 'cancelled', 'on_hold', 'expired']} />
+          <EditableRow label="From (Pickup City)" isEdit={isEdit} value={form.pickupCity} onChange={(v) => setForm({ ...form, pickupCity: v })} />
+          <EditableRow label="To (Drop City)" isEdit={isEdit} value={form.dropCity} onChange={(v) => setForm({ ...form, dropCity: v })} />
+          <EditableRow label="Vehicle Type" isEdit={isEdit} value={form.vehicleType} onChange={(v) => setForm({ ...form, vehicleType: v })} />
+          <EditableRow label="Trip Type" isEdit={isEdit} value={form.tripType} onChange={(v) => setForm({ ...form, tripType: v })} options={TRIP_TYPES} />
+          <EditableRow label="Notes" isEdit={isEdit} value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+          {!isEdit && <Field label="Travel Date">{req.travelDate ? formatDate(req.travelDate) : '—'}</Field>}
+          {!isEdit && (req.totalAmount ?? req.fare) != null && <Field label="Total Amount">₹{req.totalAmount ?? req.fare ?? 0}</Field>}
+        </div>
+
+        {isEdit && (
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+      <p className="text-sm font-medium text-gray-800 dark:text-gray-100 capitalize">{children}</p>
+    </div>
+  );
+}
+
+function EditableRow({ label, isEdit, value, onChange, options }: { label: string; isEdit: boolean; value: string; onChange: (v: string) => void; options?: string[] }) {
+  if (!isEdit) return <Field label={label}>{(value || '—').replace(/_/g, ' ')}</Field>;
+  return (
+    <div>
+      <label className="text-xs text-gray-400 mb-1 block">{label}</label>
+      {options ? (
+        <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm capitalize">
+          {options.map((o) => <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>)}
+        </select>
+      ) : (
+        <Input value={value} onChange={(e) => onChange(e.target.value)} />
+      )}
+    </div>
+  );
+}
+
+function VehicleModal({ vehicle, mode, user, onClose, onSaved }: { vehicle: Vehicle; mode: 'view' | 'edit'; user: any; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    status: vehicle.status,
+    vehicleType: vehicle.vehicleType,
+    currentCity: vehicle.currentCity,
+    destinationCity: vehicle.destinationCity || '',
+    vehicleNumber: vehicle.vehicleNumber || '',
+    driverName: vehicle.driverName || '',
+    notes: vehicle.notes || '',
+  });
+  const isEdit = mode === 'edit';
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.updateVehicle(vehicle._id, form),
+    onSuccess: () => { toast.success('Vehicle updated'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+            {isEdit ? 'Edit Vehicle' : 'Vehicle Details'} <span className="font-mono text-xs text-gray-400">{vehicle.listingId}</span>
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <Field label="Posted By">{vehicle.postedBy?.fullName || user?.fullName || 'User'} <span className="text-gray-400">({vehicle.postedBy?.membershipType || '—'})</span></Field>
+          <EditableRow label="Status" isEdit={isEdit} value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={VEHICLE_STATUSES} />
+          <EditableRow label="Vehicle Type" isEdit={isEdit} value={form.vehicleType} onChange={(v) => setForm({ ...form, vehicleType: v })} />
+          <EditableRow label="From (Current City)" isEdit={isEdit} value={form.currentCity} onChange={(v) => setForm({ ...form, currentCity: v })} />
+          <EditableRow label="To (Destination)" isEdit={isEdit} value={form.destinationCity} onChange={(v) => setForm({ ...form, destinationCity: v })} />
+          <EditableRow label="Reg. Number" isEdit={isEdit} value={form.vehicleNumber} onChange={(v) => setForm({ ...form, vehicleNumber: v })} />
+          <EditableRow label="Driver Name" isEdit={isEdit} value={form.driverName} onChange={(v) => setForm({ ...form, driverName: v })} />
+          <EditableRow label="Notes" isEdit={isEdit} value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
+          {!isEdit && <Field label="Available Date">{new Date(vehicle.availableDate).toLocaleDateString('en-IN')}</Field>}
+        </div>
+
+        {isEdit && (
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewModal({ review, mode, user, onClose, onSaved }: { review: Review; mode: 'view' | 'edit'; user: any; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    stars: review.stars,
+    review: review.review || '',
+  });
+  const isEdit = mode === 'edit';
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.updateReview(review._id, form),
+    onSuccess: () => { toast.success('Review updated'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
+            {isEdit ? 'Edit Review' : 'Review Details'}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <Field label="Rated By">{review.rater?.fullName || 'Anonymous'}</Field>
+          <div>
+            <p className="text-xs text-gray-400 mb-1">Rating</p>
+            {isEdit ? (
+              <div className="flex items-center gap-2">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setForm({ ...form, stars: star })}
+                    className={`p-1 ${star <= form.stars ? 'text-yellow-400' : 'text-gray-300'}`}
+                  >
+                    <Star className="w-6 h-6" fill={star <= form.stars ? 'currentColor' : 'none'} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-5 h-5 ${i < review.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <EditableRow label="Comment" isEdit={isEdit} value={form.review} onChange={(v) => setForm({ ...form, review: v })} />
+          {!isEdit && <Field label="Date">{formatDate(review.createdAt)}</Field>}
+        </div>
+
+        {isEdit && (
+          <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+          </div>
+        )}
       </div>
     </div>
   );

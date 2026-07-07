@@ -47,6 +47,7 @@ export const adminApi = {
   upgradeMembership: (id: string, membershipType: string, daysToAdd?: number) =>
     apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd }),
   getUserRequirements: (id: string) => apiClient.get(`/admin/users/${id}/requirements`),
+  getUserVehicles: (id: string) => apiClient.get(`/admin/users/${id}/vehicles`),
   getUserPayments: (id: string) => apiClient.get(`/admin/users/${id}/payments`),
   getUserWithdrawals: (id: string) => apiClient.get(`/admin/users/${id}/withdrawals`),
   getUserReviews: (id: string) => apiClient.get(`/admin/users/${id}/reviews`),
@@ -68,6 +69,10 @@ export const adminApi = {
   getVehicles: (params: any) => apiClient.get('/admin/vehicles', { params }),
   updateVehicle: (id: string, data: any) => apiClient.put(`/admin/vehicles/${id}`, data),
   deleteVehicle: (id: string) => apiClient.delete(`/admin/vehicles/${id}`),
+
+  // ─── Reviews ───────────────────────────────────────────────────────────────
+  updateReview: (id: string, data: any) => apiClient.put(`/admin/reviews/${id}`, data),
+  deleteReview: (id: string) => apiClient.delete(`/admin/reviews/${id}`),
 
   // ─── Payments ──────────────────────────────────────────────────────────────
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),

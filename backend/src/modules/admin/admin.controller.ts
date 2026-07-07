@@ -90,6 +90,12 @@ export class AdminController {
     return this.adminService.getUserRequirements(id);
   }
 
+  @Get('users/:id/vehicles')
+  @ApiOperation({ summary: 'Get vehicles posted by a user' })
+  getUserVehicles(@Param('id') id: string) {
+    return this.adminService.getUserVehicles(id);
+  }
+
   @Get('users/:id/payments')
   @ApiOperation({ summary: 'Get payments made by a user' })
   getUserPayments(@Param('id') id: string) {
@@ -289,5 +295,18 @@ export class AdminController {
   @ApiOperation({ summary: 'Get all payments' })
   getPayments(@Query() query: any) {
     return this.adminService.getPayments(query);
+  }
+
+  // ─── Reviews ───────────────────────────────────────────────────────────────
+  @Put('reviews/:id')
+  @ApiOperation({ summary: 'Edit a review' })
+  updateReview(@Param('id') id: string, @Body() data: any) {
+    return this.adminService.updateReview(id, data);
+  }
+
+  @Delete('reviews/:id')
+  @ApiOperation({ summary: 'Delete a review' })
+  deleteReview(@Param('id') id: string) {
+    return this.adminService.deleteReview(id);
   }
 }
