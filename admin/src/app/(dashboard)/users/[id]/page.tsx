@@ -139,13 +139,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   const deleteMutation = useMutation({
     mutationFn: (reqId: string) => adminApi.deleteRequirement(reqId),
-    onSuccess: () => { toast.success('Requirement deleted'); queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); },
+    onSuccess: () => { toast.success('Requirement deleted'); queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
   });
 
   const deleteVehicleMutation = useMutation({
     mutationFn: (vehicleId: string) => adminApi.deleteVehicle(vehicleId),
-    onSuccess: () => { toast.success('Vehicle deleted'); queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); },
+    onSuccess: () => { toast.success('Vehicle deleted'); queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
   });
 

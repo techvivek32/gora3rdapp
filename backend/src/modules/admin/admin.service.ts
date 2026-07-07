@@ -410,6 +410,9 @@ export class AdminService {
   async deleteRequirement(id: string) {
     const req = await this.requirementModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!req) throw new NotFoundException('Requirement not found');
+    await this.userModel.findByIdAndUpdate(req.postedBy, {
+      $inc: { requirementsPosted: -1 },
+    });
     return { message: 'Requirement deleted' };
   }
 
@@ -424,6 +427,9 @@ export class AdminService {
   async deleteVehicle(id: string) {
     const vehicle = await this.vehicleModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!vehicle) throw new NotFoundException('Vehicle not found');
+    await this.userModel.findByIdAndUpdate(vehicle.postedBy, {
+      $inc: { vehiclesPosted: -1 },
+    });
     return { message: 'Vehicle deleted' };
   }
 
