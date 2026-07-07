@@ -427,20 +427,6 @@ export class AdminService {
     return { message: 'Vehicle deleted' };
   }
 
-  async updateReview(id: string, data: Partial<any>) {
-    const review = await this.ratingModel
-      .findByIdAndUpdate(id, data, { new: true })
-      .populate('rater', 'fullName profileImage');
-    if (!review) throw new NotFoundException('Review not found');
-    return { message: 'Review updated', data: review };
-  }
-
-  async deleteReview(id: string) {
-    const review = await this.ratingModel.findByIdAndDelete(id);
-    if (!review) throw new NotFoundException('Review not found');
-    return { message: 'Review deleted' };
-  }
-
   // Cities CRUD
   async createCity(data: Partial<any>) {
     const slug = data.name.toLowerCase().replace(/\s+/g, '-');

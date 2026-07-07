@@ -52,14 +52,6 @@ interface Vehicle {
   postedBy: { fullName: string; membershipType: string };
 }
 
-interface Review {
-  _id: string;
-  stars: number;
-  review: string;
-  rater: { fullName: string; profileImage?: string };
-  createdAt: string;
-}
-
 const STATUS_COLORS: Record<string, 'default' | 'success' | 'destructive' | 'warning' | 'secondary'> = {
   active: 'success',
   pending: 'warning',
@@ -126,7 +118,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [activeView, setActiveView] = useState<'requirements' | 'vehicles'>('requirements');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
   const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
-  const [reviewModal, setReviewModal] = useState<{ mode: 'view' | 'edit'; r: Review } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['user', id],
@@ -154,12 +145,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const deleteVehicleMutation = useMutation({
     mutationFn: (vehicleId: string) => adminApi.deleteVehicle(vehicleId),
     onSuccess: () => { toast.success('Vehicle deleted'); queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); },
-    onError: (e: any) => toast.error(e?.message || 'Could not delete'),
-  });
-
-  const deleteReviewMutation = useMutation({
-    mutationFn: (reviewId: string) => adminApi.deleteReview(reviewId),
-    onSuccess: () => { toast.success('Review deleted'); queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); },
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
   });
 
@@ -258,60 +243,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <IconBtn title="View" onClick={() => setVehicleModal({ mode: 'view', v: row.original })}><Eye className="w-4 h-4" /></IconBtn>
           <IconBtn title="Edit" onClick={() => setVehicleModal({ mode: 'edit', v: row.original })}><Pencil className="w-4 h-4" /></IconBtn>
           <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this vehicle listing?')) deleteVehicleMutation.mutate(row.original._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
-        </div>
-      ),
-    },
-  ];
-
-  const reviewColumns: ColumnDef<Review>[] = [
-    {
-      id: 'rater',
-      header: 'Rater',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
-            {row.original.rater?.profileImage ? (
-              <img src={row.original.rater.profileImage} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <User className="w-5 h-5 text-gray-500" />
-            )}
-          </div>
-          <span className="font-medium">{row.original.rater?.fullName || 'Anonymous'}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'stars',
-      header: 'Rating',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Star
-              key={i}
-              className={`w-4 h-4 ${i < row.original.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-            />
-          ))}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'review',
-      header: 'Comment',
-      cell: ({ row }) => <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs truncate">{row.original.review || '—'}</p>,
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'Date',
-      cell: ({ row }) => new Date(row.getValue('createdAt')).toLocaleDateString('en-IN'),
-    },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <IconBtn title="View" onClick={() => setReviewModal({ mode: 'view', r: row.original })}><Eye className="w-4 h-4" /></IconBtn>
-          <IconBtn title="Edit" onClick={() => setReviewModal({ mode: 'edit', r: row.original })}><Pencil className="w-4 h-4" /></IconBtn>
-          <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this review?')) deleteReviewMutation.mutate(row.original._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
         </div>
       ),
     },
@@ -726,11 +657,41 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {activeTab === 'reviews' && (
             <div>
               <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Reviews Received</h3>
-              <DataTable
-                columns={reviewColumns}
-                data={(reviewsData as any)?.data ?? []}
-                isLoading={false}
-              />
+              {(() => {
+                const items = (reviewsData as any)?.data ?? [];
+                if (!items.length) return (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Star className="w-10 h-10 text-gray-300 mb-2" />
+                    <p className="text-sm text-gray-400">No reviews yet.</p>
+                  </div>
+                );
+                return (
+                  <div className="space-y-3">
+                    {items.map((r: any) => (
+                      <div key={r._id} className="flex gap-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
+                        <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                          {r.rater?.profileImage
+                            ? <img src={r.rater.profileImage} alt="" className="w-full h-full object-cover" />
+                            : <span className="text-orange-600 font-bold text-sm">{r.rater?.fullName?.[0]?.toUpperCase() ?? '?'}</span>
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium text-gray-800 dark:text-gray-200">{r.rater?.fullName ?? 'Unknown'}</p>
+                            <div className="flex items-center gap-1">
+                              {Array.from({ length: 5 }).map((_, i) => (
+                                <Star key={i} className={`w-3.5 h-3.5 ${i < r.stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} />
+                              ))}
+                            </div>
+                          </div>
+                          {r.review && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{r.review}</p>}
+                          <p className="text-xs text-gray-400 mt-1">{r.createdAt ? formatDate(r.createdAt) : ''}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -792,16 +753,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           user={user}
           onClose={() => setVehicleModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); setVehicleModal(null); }}
-        />
-      )}
-
-      {reviewModal && (
-        <ReviewModal
-          review={reviewModal.r}
-          mode={reviewModal.mode}
-          user={user}
-          onClose={() => setReviewModal(null)}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); setReviewModal(null); }}
         />
       )}
     </div>
@@ -933,72 +884,6 @@ function VehicleModal({ vehicle, mode, user, onClose, onSaved }: { vehicle: Vehi
           <EditableRow label="Driver Name" isEdit={isEdit} value={form.driverName} onChange={(v) => setForm({ ...form, driverName: v })} />
           <EditableRow label="Notes" isEdit={isEdit} value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
           {!isEdit && <Field label="Available Date">{new Date(vehicle.availableDate).toLocaleDateString('en-IN')}</Field>}
-        </div>
-
-        {isEdit && (
-          <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ReviewModal({ review, mode, user, onClose, onSaved }: { review: Review; mode: 'view' | 'edit'; user: any; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({
-    stars: review.stars,
-    review: review.review || '',
-  });
-  const isEdit = mode === 'edit';
-
-  const mutation = useMutation({
-    mutationFn: () => adminApi.updateReview(review._id, form),
-    onSuccess: () => { toast.success('Review updated'); onSaved(); },
-    onError: (e: any) => toast.error(e?.message || 'Update failed'),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
-          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
-            {isEdit ? 'Edit Review' : 'Review Details'}
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          <Field label="Rated By">{review.rater?.fullName || 'Anonymous'}</Field>
-          <div>
-            <p className="text-xs text-gray-400 mb-1">Rating</p>
-            {isEdit ? (
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    type="button"
-                    onClick={() => setForm({ ...form, stars: star })}
-                    className={`p-1 ${star <= form.stars ? 'text-yellow-400' : 'text-gray-300'}`}
-                  >
-                    <Star className="w-6 h-6" fill={star <= form.stars ? 'currentColor' : 'none'} />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star
-                    key={i}
-                    className={`w-5 h-5 ${i < review.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          <EditableRow label="Comment" isEdit={isEdit} value={form.review} onChange={(v) => setForm({ ...form, review: v })} />
-          {!isEdit && <Field label="Date">{formatDate(review.createdAt)}</Field>}
         </div>
 
         {isEdit && (

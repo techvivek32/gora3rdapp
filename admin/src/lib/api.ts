@@ -70,10 +70,6 @@ export const adminApi = {
   updateVehicle: (id: string, data: any) => apiClient.put(`/admin/vehicles/${id}`, data),
   deleteVehicle: (id: string) => apiClient.delete(`/admin/vehicles/${id}`),
 
-  // ─── Reviews ───────────────────────────────────────────────────────────────
-  updateReview: (id: string, data: any) => apiClient.put(`/admin/reviews/${id}`, data),
-  deleteReview: (id: string) => apiClient.delete(`/admin/reviews/${id}`),
-
   // ─── Payments ──────────────────────────────────────────────────────────────
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
   approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
