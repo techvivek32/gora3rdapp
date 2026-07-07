@@ -58,7 +58,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   }
   
   final _vehicleTypes = kVehicleTypes;
-  final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
+  final _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local'];
   final _fuelTypes = const [
     {'value': 'any', 'label': 'Any Fuel'},
     {'value': 'diesel', 'label': 'Diesel'},

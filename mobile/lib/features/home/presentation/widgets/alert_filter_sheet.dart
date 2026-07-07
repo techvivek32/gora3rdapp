@@ -3,7 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 
-const _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
+const _tripTypes = ['one_way', 'round_trip', 'airport_transfer', 'local'];
 
 String _tripLabel(String v) => v.replaceAll('_', ' ').split(' ').map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
 
