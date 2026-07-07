@@ -118,6 +118,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [activeView, setActiveView] = useState<'requirements' | 'vehicles'>('requirements');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
   const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
+  const [reviewModal, setReviewModal] = useState<any | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['user', id],
@@ -145,6 +146,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const deleteVehicleMutation = useMutation({
     mutationFn: (vehicleId: string) => adminApi.deleteVehicle(vehicleId),
     onSuccess: () => { toast.success('Vehicle deleted'); queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not delete'),
+  });
+
+  const deleteReviewMutation = useMutation({
+    mutationFn: (reviewId: string) => adminApi.deleteReview(reviewId),
+    onSuccess: () => { toast.success('Review deleted'); queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
   });
 
@@ -678,10 +685,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className="font-medium text-gray-800 dark:text-gray-200">{r.rater?.fullName ?? 'Unknown'}</p>
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star key={i} className={`w-3.5 h-3.5 ${i < r.stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} />
-                              ))}
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star key={i} className={`w-3.5 h-3.5 ${i < r.stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} />
+                                ))}
+                              </div>
+                              <IconBtn title="Edit" onClick={() => setReviewModal(r)}><Pencil className="w-4 h-4" /></IconBtn>
+                              <IconBtn title="Delete" danger onClick={() => { if (confirm('Delete this review?')) deleteReviewMutation.mutate(r._id); }}><Trash2 className="w-4 h-4" /></IconBtn>
                             </div>
                           </div>
                           {r.review && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{r.review}</p>}
@@ -753,6 +764,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           user={user}
           onClose={() => setVehicleModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); setVehicleModal(null); }}
+        />
+      )}
+
+      {reviewModal && (
+        <ReviewModal
+          review={reviewModal}
+          onClose={() => setReviewModal(null)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setReviewModal(null); }}
         />
       )}
     </div>
@@ -892,6 +911,57 @@ function VehicleModal({ vehicle, mode, user, onClose, onSaved }: { vehicle: Vehi
             <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewModal({ review, onClose, onSaved }: { review: any; onClose: () => void; onSaved: () => void }) {
+  const [stars, setStars] = useState<number>(review.stars);
+  const [text, setText] = useState<string>(review.review || '');
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.updateReview(review._id, { stars, review: text }),
+    onSuccess: () => { toast.success('Review updated'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">Edit Review</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Reviewer</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{review.rater?.fullName ?? 'Unknown'}</p>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Stars</label>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((s) => (
+                <button key={s} onClick={() => setStars(s)}>
+                  <Star className={`w-6 h-6 ${s <= stars ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Review Text</label>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={3}
+              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+        </div>
       </div>
     </div>
   );

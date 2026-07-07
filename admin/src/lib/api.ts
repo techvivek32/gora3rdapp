@@ -51,6 +51,8 @@ export const adminApi = {
   getUserPayments: (id: string) => apiClient.get(`/admin/users/${id}/payments`),
   getUserWithdrawals: (id: string) => apiClient.get(`/admin/users/${id}/withdrawals`),
   getUserReviews: (id: string) => apiClient.get(`/admin/users/${id}/reviews`),
+  updateReview: (id: string, data: { stars?: number; review?: string }) => apiClient.put(`/admin/reviews/${id}`, data),
+  deleteReview: (id: string) => apiClient.delete(`/admin/reviews/${id}`),
   getUserSubscriptions: (id: string) => apiClient.get(`/admin/users/${id}/subscriptions`),
 
   // ─── Verification Requests ─────────────────────────────────────────────────

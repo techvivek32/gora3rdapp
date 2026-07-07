@@ -653,6 +653,38 @@ export class AdminService {
     return { message: 'User reviews retrieved', data: reviews };
   }
 
+  async updateReview(id: string, data: { stars?: number; review?: string }) {
+    const rating = await this.ratingModel.findByIdAndUpdate(id, data, { new: true }).populate('rater', 'fullName profileImage');
+    if (!rating) throw new NotFoundException('Review not found');
+    // Recompute rated user's average
+    const agg = await this.ratingModel.aggregate([
+      { $match: { ratedUser: rating.ratedUser } },
+      { $group: { _id: null, avg: { $avg: '$stars' }, count: { $sum: 1 } } },
+    ]);
+    if (agg[0]) {
+      await this.userModel.findByIdAndUpdate(rating.ratedUser, {
+        rating: Math.round(agg[0].avg * 10) / 10,
+        totalRatings: agg[0].count,
+      });
+    }
+    return { message: 'Review updated', data: rating };
+  }
+
+  async deleteReview(id: string) {
+    const rating = await this.ratingModel.findByIdAndDelete(id);
+    if (!rating) throw new NotFoundException('Review not found');
+    // Recompute rated user's average
+    const agg = await this.ratingModel.aggregate([
+      { $match: { ratedUser: rating.ratedUser } },
+      { $group: { _id: null, avg: { $avg: '$stars' }, count: { $sum: 1 } } },
+    ]);
+    await this.userModel.findByIdAndUpdate(rating.ratedUser, {
+      rating: agg[0] ? Math.round(agg[0].avg * 10) / 10 : 0,
+      totalRatings: agg[0]?.count ?? 0,
+    });
+    return { message: 'Review deleted' };
+  }
+
   async getUserSubscriptions(userId: string) {
     const subscriptions = await this.subscriptionModel
       .find({ userId: new Types.ObjectId(userId) })

@@ -114,6 +114,18 @@ export class AdminController {
     return this.adminService.getUserReviews(id);
   }
 
+  @Put('reviews/:id')
+  @ApiOperation({ summary: 'Edit a review' })
+  updateReview(@Param('id') id: string, @Body() data: { stars?: number; review?: string }) {
+    return this.adminService.updateReview(id, data);
+  }
+
+  @Delete('reviews/:id')
+  @ApiOperation({ summary: 'Delete a review' })
+  deleteReview(@Param('id') id: string) {
+    return this.adminService.deleteReview(id);
+  }
+
   @Get('users/:id/subscriptions')
   @ApiOperation({ summary: 'Get subscriptions of a user' })
   getUserSubscriptions(@Param('id') id: string) {
