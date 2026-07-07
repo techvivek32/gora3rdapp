@@ -44,8 +44,8 @@ export const adminApi = {
   verifyUser: (id: string) => apiClient.post(`/admin/users/${id}/verify`),
   blockUser: (id: string, reason?: string) => apiClient.post(`/admin/users/${id}/block`, { reason }),
   unblockUser: (id: string) => apiClient.post(`/admin/users/${id}/unblock`),
-  upgradeMembership: (id: string, membershipType: string, daysToAdd?: number) =>
-    apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd }),
+  upgradeMembership: (id: string, membershipType: string, daysToAdd?: number, planId?: string) =>
+    apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd, planId }),
   getUserRequirements: (id: string) => apiClient.get(`/admin/users/${id}/requirements`),
   getUserVehicles: (id: string) => apiClient.get(`/admin/users/${id}/vehicles`),
   getUserPayments: (id: string) => apiClient.get(`/admin/users/${id}/payments`),
@@ -54,6 +54,8 @@ export const adminApi = {
   updateReview: (id: string, data: { stars?: number; review?: string }) => apiClient.put(`/admin/reviews/${id}`, data),
   deleteReview: (id: string) => apiClient.delete(`/admin/reviews/${id}`),
   getUserSubscriptions: (id: string) => apiClient.get(`/admin/users/${id}/subscriptions`),
+  cancelSubscription: (id: string) => apiClient.post(`/admin/subscriptions/${id}/cancel`),
+  updateSubscriptionEndDate: (id: string, endDate: string) => apiClient.put(`/admin/subscriptions/${id}/end-date`, { endDate }),
 
   // ─── Verification Requests ─────────────────────────────────────────────────
   getVerificationRequests: (params: any) => apiClient.get('/admin/verification-requests', { params }),

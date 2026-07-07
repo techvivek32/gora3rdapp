@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
+import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface Subscription {
@@ -59,17 +60,21 @@ const columns: ColumnDef<Subscription>[] = [
     cell: ({ row }) => { const s = row.getValue('status') as string; return <Badge variant={STATUS_COLORS[s] || 'default'}>{s}</Badge>; },
   },
   {
-    accessorKey: 'startDate',
-    header: 'Start',
-    cell: ({ row }) => new Date(row.getValue('startDate')).toLocaleDateString('en-IN'),
-  },
-  {
-    accessorKey: 'endDate',
-    header: 'Expires',
+    id: 'period',
+    header: 'Period',
     cell: ({ row }) => {
-      const date = new Date(row.getValue('endDate'));
-      const isExpired = date < new Date();
-      return <span className={isExpired ? 'text-red-500' : ''}>{date.toLocaleDateString('en-IN')}</span>;
+      const start = row.original.startDate;
+      const end = row.original.endDate;
+      const isExpired = end && new Date(end) < new Date();
+      return (
+        <div className="text-sm">
+          <span className="text-gray-600 dark:text-gray-400">{start ? formatDate(start) : '—'}</span>
+          <span className="mx-1.5 text-gray-400">→</span>
+          <span className={isExpired ? 'text-red-500 font-medium' : 'text-gray-800 dark:text-gray-200 font-medium'}>
+            {end ? formatDate(end) : '—'}
+          </span>
+        </div>
+      );
     },
   },
 ];

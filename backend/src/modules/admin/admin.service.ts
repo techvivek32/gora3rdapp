@@ -251,17 +251,60 @@ export class AdminService {
     return { message: 'Verification rejected', data: user };
   }
 
-  async upgradeMembership(id: string, membershipType: MembershipType, daysToAdd?: number) {
-    // Prefer the plan's own duration; fall back to the passed value or 30 days.
-    const plan = await this.planModel
-      .findOne({ membershipType, isActive: true })
-      .sort({ price: 1 })
+  private readonly TIER_RANK: Record<string, number> = {
+    new: 0, active: 1, verified: 2, premium: 3, golden: 4,
+  };
+
+  async upgradeMembership(
+    id: string,
+    membershipType: MembershipType,
+    daysToAdd?: number,
+    planId?: string,
+  ) {
+    const plan = planId
+      ? await this.planModel.findById(planId).lean()
+      : await this.planModel.findOne({ membershipType, isActive: true }).sort({ price: 1 }).lean();
+
+    const currentUser = await this.userModel.findById(id).select('membershipType membershipExpiresAt').lean();
+    if (!currentUser) throw new NotFoundException('User not found');
+
+    const currentSub = await this.subscriptionModel
+      .findOne({ userId: new Types.ObjectId(id), status: SubscriptionStatus.ACTIVE })
+      .sort({ endDate: -1 })
       .lean();
 
+    const currentTier = this.TIER_RANK[currentUser.membershipType ?? 'new'] ?? 0;
+    const newTier = this.TIER_RANK[membershipType] ?? 0;
     const days = daysToAdd ?? plan?.durationDays ?? 30;
-    const startDate = new Date();
-    const expiresAt = new Date(startDate);
-    expiresAt.setDate(expiresAt.getDate() + days);
+    const now = new Date();
+
+    let startDate: Date;
+    let expiresAt: Date;
+
+    if (currentSub && currentSub.endDate > now) {
+      if (newTier === currentTier) {
+        // Same tier — extend from current end date
+        startDate = new Date(currentSub.endDate);
+        expiresAt = new Date(currentSub.endDate);
+        expiresAt.setDate(expiresAt.getDate() + days);
+      } else if (newTier > currentTier) {
+        // Higher tier — carry remaining days into new plan
+        const remainingDays = Math.ceil((currentSub.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        startDate = now;
+        expiresAt = new Date(now);
+        expiresAt.setDate(expiresAt.getDate() + days + remainingDays);
+      } else {
+        // Lower tier — replace
+        startDate = now;
+        expiresAt = new Date(now);
+        expiresAt.setDate(expiresAt.getDate() + days);
+      }
+      await this.subscriptionModel.findByIdAndUpdate(currentSub._id, { status: SubscriptionStatus.EXPIRED });
+    } else {
+      startDate = now;
+      expiresAt = new Date(now);
+      expiresAt.setDate(expiresAt.getDate() + days);
+    }
 
     const user = await this.userModel.findByIdAndUpdate(id, {
       membershipType,
@@ -272,13 +315,6 @@ export class AdminService {
 
     if (!user) throw new NotFoundException('User not found');
 
-    // Mark previous active subscriptions as expired, then record this admin-granted
-    // membership as an active subscription so it shows in the Memberships list.
-    await this.subscriptionModel.updateMany(
-      { userId: new Types.ObjectId(id), status: SubscriptionStatus.ACTIVE },
-      { status: SubscriptionStatus.EXPIRED },
-    );
-
     if (plan) {
       await this.subscriptionModel.create({
         userId: new Types.ObjectId(id),
@@ -287,7 +323,7 @@ export class AdminService {
         startDate,
         endDate: expiresAt,
         amount: plan.discountedPrice > 0 && plan.discountedPrice < plan.price ? plan.discountedPrice : plan.price,
-        membershipType,
+        membershipType: plan.membershipType,
       });
     }
 
@@ -699,6 +735,43 @@ export class AdminService {
       .limit(50)
       .lean();
     return { message: 'User subscriptions retrieved', data: subscriptions };
+  }
+
+  async cancelSubscription(subscriptionId: string) {
+    const sub = await this.subscriptionModel.findByIdAndUpdate(
+      subscriptionId,
+      { status: SubscriptionStatus.CANCELLED },
+      { new: true },
+    );
+    if (!sub) throw new NotFoundException('Subscription not found');
+    // If this was the active subscription, downgrade user to basic 'active' membership
+    const hasActive = await this.subscriptionModel.exists({
+      userId: sub.userId,
+      status: SubscriptionStatus.ACTIVE,
+    });
+    if (!hasActive) {
+      await this.userModel.findByIdAndUpdate(sub.userId, {
+        membershipType: MembershipType.ACTIVE,
+        isPremium: false,
+        isGolden: false,
+        membershipExpiresAt: null,
+      });
+    }
+    return { message: 'Subscription cancelled', data: sub };
+  }
+
+  async updateSubscriptionEndDate(subscriptionId: string, endDate: string) {
+    const sub = await this.subscriptionModel.findByIdAndUpdate(
+      subscriptionId,
+      { endDate: new Date(endDate) },
+      { new: true },
+    );
+    if (!sub) throw new NotFoundException('Subscription not found');
+    // Sync membershipExpiresAt on user if this is the active subscription
+    if (sub.status === SubscriptionStatus.ACTIVE) {
+      await this.userModel.findByIdAndUpdate(sub.userId, { membershipExpiresAt: new Date(endDate) });
+    }
+    return { message: 'Subscription end date updated', data: sub };
   }
 
   async getPayments(query: any) {

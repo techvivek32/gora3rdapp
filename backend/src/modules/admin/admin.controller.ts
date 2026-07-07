@@ -80,8 +80,9 @@ export class AdminController {
     @Param('id') id: string,
     @Body('membershipType') membershipType: MembershipType,
     @Body('daysToAdd') daysToAdd: number,
+    @Body('planId') planId: string,
   ) {
-    return this.adminService.upgradeMembership(id, membershipType, daysToAdd);
+    return this.adminService.upgradeMembership(id, membershipType, daysToAdd, planId);
   }
 
   @Get('users/:id/requirements')
@@ -130,6 +131,18 @@ export class AdminController {
   @ApiOperation({ summary: 'Get subscriptions of a user' })
   getUserSubscriptions(@Param('id') id: string) {
     return this.adminService.getUserSubscriptions(id);
+  }
+
+  @Post('subscriptions/:id/cancel')
+  @ApiOperation({ summary: 'Cancel a subscription' })
+  cancelSubscription(@Param('id') id: string) {
+    return this.adminService.cancelSubscription(id);
+  }
+
+  @Put('subscriptions/:id/end-date')
+  @ApiOperation({ summary: 'Update subscription end date' })
+  updateSubscriptionEndDate(@Param('id') id: string, @Body('endDate') endDate: string) {
+    return this.adminService.updateSubscriptionEndDate(id, endDate);
   }
 
   // ─── Verification Requests ─────────────────────────────────────────────────

@@ -119,6 +119,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
   const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
   const [reviewModal, setReviewModal] = useState<any | null>(null);
+  const [assignPlanModal, setAssignPlanModal] = useState(false);
+  const [editSubModal, setEditSubModal] = useState<any | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['user', id],
@@ -153,6 +155,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     mutationFn: (reviewId: string) => adminApi.deleteReview(reviewId),
     onSuccess: () => { toast.success('Review deleted'); queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
+  });
+
+  const cancelSubMutation = useMutation({
+    mutationFn: (subId: string) => adminApi.cancelSubscription(subId),
+    onSuccess: () => { toast.success('Subscription cancelled'); queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not cancel'),
   });
 
   const columns: ColumnDef<Requirement>[] = [
@@ -709,7 +717,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           {/* Subscription Tab */}
           {activeTab === 'subscription' && (
             <div>
-              <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Subscription History</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Subscription History</h3>
+                <Button onClick={() => setAssignPlanModal(true)}>Assign Plan</Button>
+              </div>
               {(() => {
                 const items = (subscriptionsData as any)?.data ?? [];
                 if (!items.length) return (
@@ -720,25 +731,41 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 );
                 return (
                   <div className="space-y-3">
-                    {items.map((s: any) => (
-                      <div key={s._id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
-                        <div className="flex items-center gap-3">
-                          <MembershipBadge type={s.membershipType ?? s.planId?.membershipType} />
-                          <div>
-                            <p className="font-medium text-gray-800 dark:text-gray-200">{s.planId?.name ?? 'Plan'}</p>
-                            <p className="text-xs text-gray-500">
-                              {s.startDate ? formatDate(s.startDate) : '—'} → {s.endDate ? formatDate(s.endDate) : '—'}
-                            </p>
+                    {items.map((s: any) => {
+                      const tier = s.membershipType ?? s.planId?.membershipType;
+                      const statusVariant = s.status === 'active' ? 'success' : s.status === 'expired' ? 'secondary' : 'destructive';
+                      return (
+                        <div key={s._id} className={`flex items-center justify-between p-4 rounded-xl border ${
+                          s.status === 'active'
+                            ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800'
+                            : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                        }`}>
+                          <div className="flex items-center gap-3">
+                            <MembershipBadge type={tier} />
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-gray-800 dark:text-gray-200">{s.planId?.name ?? 'Plan'}</p>
+                                <Badge variant={statusVariant}>{s.status}</Badge>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {s.startDate ? formatDate(s.startDate) : '—'} → {s.endDate ? formatDate(s.endDate) : '—'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="font-semibold text-gray-800 dark:text-gray-200">₹{Math.round((s.amount ?? 0) / 100).toLocaleString('en-IN')}</p>
+                            </div>
+                            {s.status === 'active' && (
+                              <div className="flex gap-1">
+                                <IconBtn title="Edit End Date" onClick={() => setEditSubModal(s)}><Pencil className="w-4 h-4" /></IconBtn>
+                                <IconBtn title="Cancel Plan" danger onClick={() => { if (confirm('Cancel this subscription?')) cancelSubMutation.mutate(s._id); }}><X className="w-4 h-4" /></IconBtn>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-800 dark:text-gray-200">₹{s.amount}</p>
-                          <Badge variant={s.status === 'active' ? 'success' : s.status === 'expired' ? 'secondary' : 'warning'}>
-                            {s.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 );
               })()}
@@ -772,6 +799,22 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           review={reviewModal}
           onClose={() => setReviewModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-reviews', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setReviewModal(null); }}
+        />
+      )}
+
+      {assignPlanModal && (
+        <AssignPlanModal
+          userId={id}
+          onClose={() => setAssignPlanModal(false)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setAssignPlanModal(false); }}
+        />
+      )}
+
+      {editSubModal && (
+        <EditSubEndDateModal
+          subscription={editSubModal}
+          onClose={() => setEditSubModal(null)}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setEditSubModal(null); }}
         />
       )}
     </div>
@@ -961,6 +1004,177 @@ function ReviewModal({ review, onClose, onSaved }: { review: any; onClose: () =>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditSubEndDateModal({ subscription, onClose, onSaved }: { subscription: any; onClose: () => void; onSaved: () => void }) {
+  const currentEnd = subscription.endDate ? new Date(subscription.endDate).toISOString().split('T')[0] : '';
+  const [endDate, setEndDate] = useState(currentEnd);
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.updateSubscriptionEndDate(subscription._id, endDate),
+    onSuccess: () => { toast.success('End date updated'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  });
+
+  const inputCls = 'w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">Edit End Date</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Plan</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{subscription.planId?.name ?? 'Plan'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 mb-0.5">Start Date</p>
+            <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{subscription.startDate ? formatDate(subscription.startDate) : '—'}</p>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">New End Date</label>
+            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+          </div>
+          {endDate && subscription.startDate && (
+            <p className="text-xs text-gray-500">
+              Duration: {Math.ceil((new Date(endDate).getTime() - new Date(subscription.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
+            </p>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!endDate}>Save</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignPlanModal({ userId, onClose, onSaved }: { userId: string; onClose: () => void; onSaved: () => void }) {
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+
+  const { data: plansData, isLoading: plansLoading } = useQuery({
+    queryKey: ['admin-plans'],
+    queryFn: () => adminApi.getPlans(),
+  });
+
+  const { data: userData } = useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => adminApi.getUser(userId),
+  });
+
+  const { data: subsData } = useQuery({
+    queryKey: ['user-subscriptions', userId],
+    queryFn: () => adminApi.getUserSubscriptions(userId),
+  });
+
+  const plans: any[] = (plansData as any)?.data ?? [];
+  const selectedPlan = plans.find((p) => p._id === selectedPlanId);
+  const currentUser = (userData as any)?.data;
+  const activeSub = ((subsData as any)?.data ?? []).find((s: any) => s.status === 'active');
+
+  const TIER_RANK: Record<string, number> = { new: 0, active: 1, verified: 2, premium: 3, golden: 4 };
+  const currentTier = TIER_RANK[currentUser?.membershipType ?? 'new'] ?? 0;
+  const newTier = TIER_RANK[selectedPlan?.membershipType ?? 'new'] ?? 0;
+  const days = selectedPlan?.durationDays ?? 0;
+  const now = new Date();
+  const activeEnd = activeSub ? new Date(activeSub.endDate) : null;
+  const hasActive = activeEnd && activeEnd > now;
+
+  let previewStart: Date | null = null;
+  let previewEnd: Date | null = null;
+  let previewNote = '';
+
+  if (selectedPlan && days > 0) {
+    if (hasActive) {
+      if (newTier === currentTier) {
+        previewStart = new Date(activeEnd!);
+        previewEnd = new Date(activeEnd!);
+        previewEnd.setDate(previewEnd.getDate() + days);
+        previewNote = `Same tier — extends from current end date`;
+      } else if (newTier > currentTier) {
+        const remaining = Math.ceil((activeEnd!.getTime() - now.getTime()) / 86400000);
+        previewStart = now;
+        previewEnd = new Date(now);
+        previewEnd.setDate(previewEnd.getDate() + days + remaining);
+        previewNote = `Upgrade — ${remaining} remaining days carried over`;
+      } else {
+        previewStart = now;
+        previewEnd = new Date(now);
+        previewEnd.setDate(previewEnd.getDate() + days);
+        previewNote = `Replaces current plan`;
+      }
+    } else {
+      previewStart = now;
+      previewEnd = new Date(now);
+      previewEnd.setDate(previewEnd.getDate() + days);
+      previewNote = `Fresh start`;
+    }
+  }
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.upgradeMembership(userId, selectedPlan?.membershipType, undefined, selectedPlanId),
+    onSuccess: () => { toast.success('Plan assigned successfully'); onSaved(); },
+    onError: (e: any) => toast.error(e?.message || 'Failed to assign plan'),
+  });
+
+  const selectCls = 'w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h2 className="font-bold text-lg text-gray-900 dark:text-white">Assign Plan</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <div className="p-5 space-y-4">
+          {hasActive && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              Current plan active until <span className="font-semibold">{activeEnd!.toLocaleDateString('en-IN')}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs text-gray-400 mb-1 block">Select Plan</label>
+            {plansLoading ? (
+              <div className="h-9 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
+            ) : (
+              <select value={selectedPlanId} onChange={(e) => setSelectedPlanId(e.target.value)} className={selectCls}>
+                <option value="">— Choose a plan —</option>
+                {plans.filter((p) => p.isActive).map((p) => {
+                  const price = p.discountedPrice > 0 && p.discountedPrice < p.price ? p.discountedPrice : p.price;
+                  return (
+                    <option key={p._id} value={p._id}>
+                      {p.name} ({p.membershipType}) — ₹{Math.round(price / 100).toLocaleString('en-IN')} / {p.durationDays}d
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+          </div>
+
+          {selectedPlan && previewEnd && (
+            <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg px-3 py-2 text-sm space-y-1">
+              <p className="font-medium text-orange-700 dark:text-orange-300 capitalize">{selectedPlan.membershipType} — {selectedPlan.name}</p>
+              <p className="text-xs text-orange-600/80 dark:text-orange-400/80">
+                {previewStart!.toLocaleDateString('en-IN')} → {previewEnd.toLocaleDateString('en-IN')} ({days} days)
+              </p>
+              <p className="text-xs text-orange-500/70 dark:text-orange-400/60">{previewNote}</p>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!selectedPlanId}>
+            Assign Plan
+          </Button>
         </div>
       </div>
     </div>

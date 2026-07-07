@@ -137,13 +137,57 @@ export class SubscriptionsService {
     return { message: 'Payment verified and subscription activated' };
   }
 
+  private readonly TIER_RANK: Record<string, number> = {
+    new: 0, active: 1, verified: 2, premium: 3, golden: 4,
+  };
+
   private async activateSubscription(userId: string, planId: string, paymentId: string) {
     const plan = await this.planModel.findById(planId);
     if (!plan) return;
 
-    const startDate = new Date();
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + plan.durationDays);
+    // Find current active subscription if any
+    const currentSub = await this.subscriptionModel
+      .findOne({ userId: new Types.ObjectId(userId), status: SubscriptionStatus.ACTIVE })
+      .sort({ endDate: -1 })
+      .lean();
+
+    const currentUser = await this.userModel.findById(userId).select('membershipType membershipExpiresAt').lean();
+    const currentTier = this.TIER_RANK[currentUser?.membershipType ?? 'new'] ?? 0;
+    const newTier = this.TIER_RANK[plan.membershipType] ?? 0;
+
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+
+    if (currentSub && currentSub.endDate > now) {
+      if (newTier === currentTier) {
+        // Same tier — extend from current end date
+        startDate = new Date(currentSub.endDate);
+        endDate = new Date(currentSub.endDate);
+        endDate.setDate(endDate.getDate() + plan.durationDays);
+        // Update old sub end date to now (replaced by extension)
+        await this.subscriptionModel.findByIdAndUpdate(currentSub._id, { status: SubscriptionStatus.EXPIRED });
+      } else if (newTier > currentTier) {
+        // Higher tier — upgrade: carry remaining days into new plan
+        const remainingMs = currentSub.endDate.getTime() - now.getTime();
+        const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
+        startDate = now;
+        endDate = new Date(now);
+        endDate.setDate(endDate.getDate() + plan.durationDays + remainingDays);
+        await this.subscriptionModel.findByIdAndUpdate(currentSub._id, { status: SubscriptionStatus.EXPIRED });
+      } else {
+        // Lower tier — just replace
+        startDate = now;
+        endDate = new Date(now);
+        endDate.setDate(endDate.getDate() + plan.durationDays);
+        await this.subscriptionModel.findByIdAndUpdate(currentSub._id, { status: SubscriptionStatus.EXPIRED });
+      }
+    } else {
+      // No active subscription — fresh start
+      startDate = now;
+      endDate = new Date(now);
+      endDate.setDate(endDate.getDate() + plan.durationDays);
+    }
 
     const subscription = await this.subscriptionModel.create({
       userId: new Types.ObjectId(userId),
