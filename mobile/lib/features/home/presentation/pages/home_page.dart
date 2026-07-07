@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/push_notification_service.dart';
@@ -26,8 +28,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  // TODO: replace with your real support number.
-  static const _supportNumber = '+919587090620';
+  String _supportPhone = '+919587090620';
+  String _supportWhatsapp = '+919587090620';
 
   bool _alertsOn = false;
   bool _awaitingOverlayGrant = false;
@@ -40,6 +42,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     context.read<HomeBloc>().add(LoadHomeDataEvent());
+    _fetchSupportContacts();
     // Reflect the user's saved notification setting (defaults off).
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
@@ -48,6 +51,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _alertTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     // Register this device for push notifications (user is authenticated here).
     PushNotificationService.instance.registerToken();
+  }
+
+  Future<void> _fetchSupportContacts() async {
+    try {
+      final res = await Dio().get('${Env.apiBaseUrl}/settings');
+      final body = res.data as Map<String, dynamic>?;
+      final s = (body?['data'] as Map<String, dynamic>?) ?? body;
+      if (s != null && mounted) {
+        setState(() {
+          if ((s['supportPhone'] as String?)?.isNotEmpty == true) _supportPhone = s['supportPhone'];
+          if ((s['supportWhatsapp'] as String?)?.isNotEmpty == true) _supportWhatsapp = s['supportWhatsapp'];
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -230,9 +247,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 onSelected: (value) {
                   if (value == 'whatsapp') {
-                    openWhatsApp(_supportNumber, message: 'Hello, I need help with Gora Cabs');
+                    openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs');
                   } else if (value == 'help') {
-                    callNumber(_supportNumber);
+                    callNumber(_supportPhone);
                   } else if (value == 'chat') {
                     context.push('/support-chat');
                   }

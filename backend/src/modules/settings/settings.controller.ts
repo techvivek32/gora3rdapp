@@ -38,6 +38,8 @@ export class SettingsController {
     razorpayKeyId?: string;
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;
+    supportPhone?: string;
+    supportWhatsapp?: string;
   }) {
     return this.settingsService.updateSettings(body);
   }

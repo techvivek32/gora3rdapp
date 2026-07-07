@@ -119,6 +119,8 @@ export const adminApi = {
     razorpayKeyId?: string;
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;
+    supportPhone?: string;
+    supportWhatsapp?: string;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

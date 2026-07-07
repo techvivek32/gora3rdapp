@@ -44,6 +44,12 @@ export class PlatformSettings {
 
   @Prop({ default: '' })
   razorpayWebhookSecret: string;
+
+  @Prop({ default: '' })
+  supportPhone: string;
+
+  @Prop({ default: '' })
+  supportWhatsapp: string;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);
