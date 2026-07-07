@@ -84,6 +84,36 @@ export class AdminController {
     return this.adminService.upgradeMembership(id, membershipType, daysToAdd);
   }
 
+  @Get('users/:id/requirements')
+  @ApiOperation({ summary: 'Get requirements posted by a user' })
+  getUserRequirements(@Param('id') id: string) {
+    return this.adminService.getUserRequirements(id);
+  }
+
+  @Get('users/:id/payments')
+  @ApiOperation({ summary: 'Get payments made by a user' })
+  getUserPayments(@Param('id') id: string) {
+    return this.adminService.getUserPayments(id);
+  }
+
+  @Get('users/:id/withdrawals')
+  @ApiOperation({ summary: 'Get withdrawal requests by a user' })
+  getUserWithdrawals(@Param('id') id: string) {
+    return this.adminService.getUserWithdrawals(id);
+  }
+
+  @Get('users/:id/reviews')
+  @ApiOperation({ summary: 'Get reviews received by a user' })
+  getUserReviews(@Param('id') id: string) {
+    return this.adminService.getUserReviews(id);
+  }
+
+  @Get('users/:id/subscriptions')
+  @ApiOperation({ summary: 'Get subscriptions of a user' })
+  getUserSubscriptions(@Param('id') id: string) {
+    return this.adminService.getUserSubscriptions(id);
+  }
+
   // ─── Verification Requests ─────────────────────────────────────────────────
   @Get('verification-requests')
   @ApiOperation({ summary: 'List KYC verification requests' })

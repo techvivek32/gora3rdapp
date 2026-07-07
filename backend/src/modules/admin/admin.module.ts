@@ -8,6 +8,8 @@ import { AvailableVehicle, AvailableVehicleSchema } from '../../database/schemas
 import { Payment, PaymentSchema } from '../../database/schemas/payment.schema';
 import { Subscription, SubscriptionSchema } from '../../database/schemas/subscription.schema';
 import { WalletTransaction, WalletTransactionSchema } from '../../database/schemas/wallet-transaction.schema';
+import { WithdrawalRequest, WithdrawalRequestSchema } from '../../database/schemas/withdrawal-request.schema';
+import { Rating, RatingSchema } from '../../database/schemas/rating.schema';
 import { Report, ReportSchema } from '../../database/schemas/report.schema';
 import { Banner, BannerSchema } from '../../database/schemas/banner.schema';
 import { City, CitySchema } from '../../database/schemas/city.schema';
@@ -25,6 +27,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Payment.name, schema: PaymentSchema },
       { name: Subscription.name, schema: SubscriptionSchema },
       { name: WalletTransaction.name, schema: WalletTransactionSchema },
+      { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
+      { name: Rating.name, schema: RatingSchema },
       { name: SubscriptionPlan.name, schema: SubscriptionPlanSchema },
       { name: Report.name, schema: ReportSchema },
       { name: Banner.name, schema: BannerSchema },

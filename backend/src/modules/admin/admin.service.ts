@@ -6,6 +6,8 @@ import { Requirement, RequirementDocument } from '../../database/schemas/require
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { Payment, PaymentDocument } from '../../database/schemas/payment.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
+import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/schemas/withdrawal-request.schema';
+import { Rating, RatingDocument } from '../../database/schemas/rating.schema';
 import { Subscription, SubscriptionDocument, SubscriptionPlan, SubscriptionPlanDocument, SubscriptionStatus } from '../../database/schemas/subscription.schema';
 import { Report, ReportDocument, ReportStatus } from '../../database/schemas/report.schema';
 import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
@@ -24,6 +26,8 @@ export class AdminService {
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     @InjectModel(WalletTransaction.name) private walletTxModel: Model<WalletTransactionDocument>,
+    @InjectModel(WithdrawalRequest.name) private withdrawalModel: Model<WithdrawalRequestDocument>,
+    @InjectModel(Rating.name) private ratingModel: Model<RatingDocument>,
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(Report.name) private reportModel: Model<ReportDocument>,
@@ -566,6 +570,54 @@ export class AdminService {
   }
 
   // Combined transaction history: subscription payments + wallet top-ups.
+  async getUserRequirements(userId: string) {
+    const requirements = await this.requirementModel
+      .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return { message: 'User requirements retrieved', data: requirements };
+  }
+
+  async getUserPayments(userId: string) {
+    const payments = await this.paymentModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .populate('planId', 'name membershipType')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return { message: 'User payments retrieved', data: payments };
+  }
+
+  async getUserWithdrawals(userId: string) {
+    const withdrawals = await this.withdrawalModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return { message: 'User withdrawals retrieved', data: withdrawals };
+  }
+
+  async getUserReviews(userId: string) {
+    const reviews = await this.ratingModel
+      .find({ ratedUser: new Types.ObjectId(userId) })
+      .populate('rater', 'fullName profileImage')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return { message: 'User reviews retrieved', data: reviews };
+  }
+
+  async getUserSubscriptions(userId: string) {
+    const subscriptions = await this.subscriptionModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .populate('planId', 'name membershipType duration durationDays')
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    return { message: 'User subscriptions retrieved', data: subscriptions };
+  }
+
   async getPayments(query: any) {
     const { page, limit } = getPaginationParams(query);
     const search = (query.search || '').trim();

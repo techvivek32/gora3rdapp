@@ -46,6 +46,11 @@ export const adminApi = {
   unblockUser: (id: string) => apiClient.post(`/admin/users/${id}/unblock`),
   upgradeMembership: (id: string, membershipType: string, daysToAdd?: number) =>
     apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd }),
+  getUserRequirements: (id: string) => apiClient.get(`/admin/users/${id}/requirements`),
+  getUserPayments: (id: string) => apiClient.get(`/admin/users/${id}/payments`),
+  getUserWithdrawals: (id: string) => apiClient.get(`/admin/users/${id}/withdrawals`),
+  getUserReviews: (id: string) => apiClient.get(`/admin/users/${id}/reviews`),
+  getUserSubscriptions: (id: string) => apiClient.get(`/admin/users/${id}/subscriptions`),
 
   // ─── Verification Requests ─────────────────────────────────────────────────
   getVerificationRequests: (params: any) => apiClient.get('/admin/verification-requests', { params }),
