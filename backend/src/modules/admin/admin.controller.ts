@@ -315,6 +315,12 @@ export class AdminController {
     return this.adminService.sendAdminNotification(data);
   }
 
+  @Post('users/:id/referral-count')
+  @ApiOperation({ summary: 'Update user referral count (add/deduct)' })
+  updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number) {
+    return this.adminService.updateUserReferralCount(id, delta);
+  }
+
   // ─── Payments ──────────────────────────────────────────────────────────────
   @Get('payments')
   @ApiOperation({ summary: 'Get all payments' })

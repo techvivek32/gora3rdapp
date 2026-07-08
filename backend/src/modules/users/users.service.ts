@@ -138,7 +138,7 @@ export class UsersService {
       message: 'Referral info retrieved',
       data: {
         code: user?.referralCode ?? '',
-        count: invited.length,
+        count: user?.referralCount ?? 0,
         invited,
       },
     };

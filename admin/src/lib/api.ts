@@ -85,6 +85,8 @@ export const adminApi = {
 
   // ─── Referrals ─────────────────────────────────────────────────────────────
   getReferralLeaderboard: (params?: any) => apiClient.get('/admin/referral-leaderboard', { params }),
+  updateUserReferralCount: (userId: string, delta: number) =>
+    apiClient.post(`/admin/users/${userId}/referral-count`, { delta }),
 
   // ─── Wallets ───────────────────────────────────────────────────────────────
   getWallets: (params: any) => apiClient.get('/admin/wallets', { params }),

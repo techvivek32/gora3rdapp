@@ -774,6 +774,17 @@ export class AdminService {
     return { message: 'Subscription end date updated', data: sub };
   }
 
+  async updateUserReferralCount(userId: string, delta: number) {
+    if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
+    const user = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $inc: { referralCount: delta } },
+      { new: true },
+    ).select('fullName referralCount');
+    if (!user) throw new NotFoundException('User not found');
+    return { message: `Referral count updated by ${delta}`, data: user };
+  }
+
   async getPayments(query: any) {
     const { page, limit } = getPaginationParams(query);
     const search = (query.search || '').trim();
