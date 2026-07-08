@@ -9,6 +9,7 @@ export interface PlaceValue {
   lat?: number;
   lng?: number;
   city?: string;
+  state?: string;
 }
 
 interface Prediction {
@@ -74,7 +75,7 @@ export function AddressAutocomplete({
     try {
       const res: any = await adminApi.placeDetails(p.placeId);
       const d = res?.data || {};
-      onSelect({ address: d.address || p.description, lat: d.lat, lng: d.lng, city: d.city });
+      onSelect({ address: d.address || p.description, lat: d.lat, lng: d.lng, city: d.city, state: d.state });
     } catch {
       onSelect({ address: p.description });
     }

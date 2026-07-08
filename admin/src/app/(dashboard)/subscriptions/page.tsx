@@ -22,8 +22,6 @@ interface Subscription {
 const STATUS_COLORS: Record<string, 'default' | 'success' | 'destructive' | 'secondary'> = {
   active: 'success',
   expired: 'secondary',
-  cancelled: 'destructive',
-  pending: 'default',
 };
 
 const columns: ColumnDef<Subscription>[] = [
@@ -96,7 +94,7 @@ export default function SubscriptionsPage() {
       </div>
 
       <div className="flex gap-2">
-        {['active', 'expired', 'cancelled', 'pending'].map((s) => (
+        {['active', 'expired'].map((s) => (
           <button
             key={s}
             onClick={() => { setStatus(s); setPage(1); }}

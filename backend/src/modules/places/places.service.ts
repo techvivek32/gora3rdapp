@@ -74,6 +74,9 @@ export class PlacesService {
           ['locality', 'administrative_area_level_3', 'administrative_area_level_2'].includes(t),
         ),
       );
+      const stateComp = comps.find((c) =>
+        c.types?.some((t: string) => t === 'administrative_area_level_1'),
+      );
       return {
         message: 'ok',
         data: {
@@ -81,6 +84,7 @@ export class PlacesService {
           lat: loc.lat ?? 0,
           lng: loc.lng ?? 0,
           city: cityComp?.long_name ?? '',
+          state: stateComp?.long_name ?? '',
         },
       };
     } catch (e: any) {
