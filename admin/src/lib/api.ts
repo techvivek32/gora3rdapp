@@ -69,6 +69,10 @@ export const adminApi = {
   updateRequirement: (id: string, data: any) => apiClient.put(`/admin/requirements/${id}`, data),
   deleteRequirement: (id: string) => apiClient.delete(`/admin/requirements/${id}`),
 
+  // ─── Places (Google autocomplete, proxied) ───────────────────────────────────
+  placesAutocomplete: (input: string) => apiClient.get('/places/autocomplete', { params: { input, types: 'geocode' } }),
+  placeDetails: (placeId: string) => apiClient.get('/places/details', { params: { placeId } }),
+
   // ─── Vehicles ──────────────────────────────────────────────────────────────
   getVehicles: (params: any) => apiClient.get('/admin/vehicles', { params }),
   updateVehicle: (id: string, data: any) => apiClient.put(`/admin/vehicles/${id}`, data),

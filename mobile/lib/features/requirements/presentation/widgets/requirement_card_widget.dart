@@ -241,14 +241,18 @@ class RequirementCardWidget extends StatelessWidget {
                                 ],
                               );
 
+                              // Prefer the summed legs so the total matches the
+                              // per-leg labels; else the stored road distance.
+                              final totalKm = _totalRouteKm(fromCoord, stops, dropCoord) ??
+                                  (requirement['estimatedDistance'] != null ? '${requirement['estimatedDistance']}' : null);
                               return Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   // Total distance, vertical, on the left of the route.
-                                  if (requirement['estimatedDistance'] != null) ...[
+                                  if (totalKm != null) ...[
                                     RotatedBox(
                                       quarterTurns: 3,
-                                      child: Text('${requirement['estimatedDistance']} KM',
+                                      child: Text('$totalKm KM',
                                           style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: topBarColor)),
                                     ),
                                     SizedBox(width: 8.w),
@@ -592,6 +596,33 @@ class RequirementCardWidget extends StatelessWidget {
 
   double? _coordLat(dynamic m) => m is Map ? (m['lat'] as num?)?.toDouble() : null;
   double? _coordLng(dynamic m) => m is Map ? (m['lng'] as num?)?.toDouble() : null;
+
+  /// Straight-line (Haversine) km between two coord maps, or null if missing.
+  double? _haversineKm(dynamic a, dynamic b) {
+    final la = _coordLat(a), lna = _coordLng(a), lb = _coordLat(b), lnb = _coordLng(b);
+    if (la == null || lna == null || lb == null || lnb == null) return null;
+    const r = 6371.0;
+    final dLat = (lb - la) * (pi / 180);
+    final dLng = (lnb - lna) * (pi / 180);
+    final h = sin(dLat / 2) * sin(dLat / 2) +
+        cos(la * (pi / 180)) * cos(lb * (pi / 180)) * sin(dLng / 2) * sin(dLng / 2);
+    return 2 * r * atan2(sqrt(h), sqrt(1 - h));
+  }
+
+  /// Total route distance = sum of pickup→stops→drop legs, so it always matches
+  /// the per-leg labels. Falls back to the stored estimatedDistance when the
+  /// coordinates needed to sum the legs aren't available.
+  String? _totalRouteKm(dynamic from, List stops, dynamic to) {
+    final points = <dynamic>[from, ...stops, to];
+    double sum = 0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final leg = _haversineKm(points[i], points[i + 1]);
+      if (leg == null) return null; // missing a coord → can't sum reliably
+      sum += leg;
+    }
+    if (sum <= 0) return null;
+    return sum.toStringAsFixed(0);
+  }
 
   /// Straight-line (Haversine) distance + estimated drive time between two coord
   /// maps, formatted as "94 km takes 1:34 hrs". Null if coords are missing.
