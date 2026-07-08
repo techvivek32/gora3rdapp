@@ -18,6 +18,7 @@ import {
   Eye, Pencil, Trash2, X,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { RequirementEditModal } from '@/components/requirements/RequirementEditModal';
 
 interface Requirement {
   _id: string;
@@ -78,7 +79,6 @@ const TRIP_COLORS: Record<string, string> = {
   local: 'bg-orange-100 text-orange-700',
   outstation: 'bg-teal-100 text-teal-700',
 };
-const TRIP_TYPES = ['one_way', 'round_trip', 'airport_transfer', 'local', 'outstation'];
 
 const DOCS = [
   { key: 'aadhar', label: 'Aadhaar Card' },
@@ -775,12 +775,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {modal && (
-        <RequirementModal
+        <RequirementEditModal
           req={modal.r}
           mode={modal.mode}
-          user={user}
           onClose={() => setModal(null)}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); setModal(null); }}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setModal(null); }}
         />
       )}
 
@@ -830,56 +829,6 @@ function IconBtn({ children, onClick, title, danger }: { children: React.ReactNo
     >
       {children}
     </button>
-  );
-}
-
-function RequirementModal({ req, mode, user, onClose, onSaved }: { req: Requirement; mode: 'view' | 'edit'; user: any; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({
-    status: req.status,
-    vehicleType: req.vehicleType,
-    tripType: req.tripType,
-    pickupCity: req.pickupCity,
-    dropCity: req.dropCity,
-    notes: req.notes || '',
-  });
-  const isEdit = mode === 'edit';
-
-  const mutation = useMutation({
-    mutationFn: () => adminApi.updateRequirement(req._id, form),
-    onSuccess: () => { toast.success('Requirement updated'); onSaved(); },
-    onError: (e: any) => toast.error(e?.message || 'Update failed'),
-  });
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-900">
-          <h2 className="font-bold text-lg text-gray-900 dark:text-white">
-            {isEdit ? 'Edit Requirement' : 'Requirement Details'} <span className="font-mono text-xs text-gray-400">{req.bookingId}</span>
-          </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          <Field label="Posted By">{req.postedBy?.fullName || user?.fullName || 'User'} <span className="text-gray-400">({req.postedBy?.membershipType || '—'})</span></Field>
-          <EditableRow label="Status" isEdit={isEdit} value={form.status} onChange={(v) => setForm({ ...form, status: v })} options={['active', 'pending', 'accepted', 'completed', 'cancelled', 'on_hold', 'expired']} />
-          <EditableRow label="From (Pickup City)" isEdit={isEdit} value={form.pickupCity} onChange={(v) => setForm({ ...form, pickupCity: v })} />
-          <EditableRow label="To (Drop City)" isEdit={isEdit} value={form.dropCity} onChange={(v) => setForm({ ...form, dropCity: v })} />
-          <EditableRow label="Vehicle Type" isEdit={isEdit} value={form.vehicleType} onChange={(v) => setForm({ ...form, vehicleType: v })} />
-          <EditableRow label="Trip Type" isEdit={isEdit} value={form.tripType} onChange={(v) => setForm({ ...form, tripType: v })} options={TRIP_TYPES} />
-          <EditableRow label="Notes" isEdit={isEdit} value={form.notes} onChange={(v) => setForm({ ...form, notes: v })} />
-          {!isEdit && <Field label="Travel Date">{req.travelDate ? formatDate(req.travelDate) : '—'}</Field>}
-          {!isEdit && (req.totalAmount ?? req.fare) != null && <Field label="Total Amount">₹{req.totalAmount ?? req.fare ?? 0}</Field>}
-        </div>
-
-        {isEdit && (
-          <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 
