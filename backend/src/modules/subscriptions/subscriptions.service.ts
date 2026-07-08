@@ -71,7 +71,7 @@ export class SubscriptionsService {
       // Surface Razorpay's real reason so misconfig (bad key/secret, live account
       // not activated, amount too small) is diagnosable instead of a generic 400.
       const reason = e?.error?.description || e?.description || e?.message || 'unknown error';
-      this.logger.error(`Razorpay order creation failed (amount=${amount}): ${reason}`);
+      this.logger.error(`Razorpay order creation failed (amount=${amountInPaise}): ${reason}`);
       throw new BadRequestException(`Payment could not start: ${reason}`);
     }
 
