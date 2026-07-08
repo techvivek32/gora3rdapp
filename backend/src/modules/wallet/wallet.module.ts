@@ -6,6 +6,7 @@ import { WalletService } from './wallet.service';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionSchema } from '../../database/schemas/wallet-transaction.schema';
 import { WithdrawalRequest, WithdrawalRequestSchema } from '../../database/schemas/withdrawal-request.schema';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { WithdrawalRequest, WithdrawalRequestSchema } from '../../database/schem
       { name: WalletTransaction.name, schema: WalletTransactionSchema },
       { name: WithdrawalRequest.name, schema: WithdrawalRequestSchema },
     ]),
+    SettingsModule,
   ],
   controllers: [WalletController, WalletAdminController],
   providers: [WalletService],

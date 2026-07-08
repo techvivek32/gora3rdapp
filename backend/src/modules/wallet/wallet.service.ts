@@ -8,6 +8,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/schemas/withdrawal-request.schema';
 import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto } from './dto/wallet.dto';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class WalletService {
@@ -18,13 +19,14 @@ export class WalletService {
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     @InjectModel(WithdrawalRequest.name) private withdrawalModel: Model<WithdrawalRequestDocument>,
     private configService: ConfigService,
+    private settingsService: SettingsService,
   ) {}
 
-  private getRazorpay(): Razorpay {
-    const keyId = this.configService.get<string>('razorpay.keyId');
-    const keySecret = this.configService.get<string>('razorpay.keySecret');
+  // Read Razorpay keys from admin settings (DB), so admin can set them dynamically.
+  private async getRazorpay(): Promise<Razorpay> {
+    const { keyId, keySecret } = await this.settingsService.getRazorpayKeys();
     if (!keyId || !keySecret) {
-      this.logger.error('Razorpay credentials are not configured (RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET).');
+      this.logger.error('Razorpay credentials are not configured (set them in admin Settings).');
       throw new BadRequestException('Payment gateway is not configured. Please contact support.');
     }
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
@@ -52,15 +54,16 @@ export class WalletService {
 
     let order;
     try {
-      order = await this.getRazorpay().orders.create({
-        amount: amount * 100, // paise
+      order = await (await this.getRazorpay()).orders.create({
+        amount: amount * 100, // paise (wallet amount is entered in rupees)
         currency: 'INR',
         receipt: `wallet_${Date.now()}`,
         notes: { userId, type: 'wallet_topup' },
       });
     } catch (e: any) {
-      this.logger.error(`Razorpay order creation failed: ${e?.error?.description ?? e?.message ?? e}`);
-      throw new BadRequestException('Could not start payment. Please try again later.');
+      const reason = e?.error?.description || e?.description || e?.message || 'unknown error';
+      this.logger.error(`Razorpay order creation failed: ${reason}`);
+      throw new BadRequestException(`Payment could not start: ${reason}`);
     }
 
     await this.txModel.create({
@@ -78,13 +81,13 @@ export class WalletService {
         orderId: order.id,
         amount: amount * 100,
         currency: 'INR',
-        keyId: this.configService.get('razorpay.keyId'),
+        keyId: (await this.settingsService.getRazorpayKeys()).keyId,
       },
     };
   }
 
   async verifyTopUp(userId: string, dto: VerifyTopUpDto) {
-    const keySecret = this.configService.get('razorpay.keySecret');
+    const keySecret = (await this.settingsService.getRazorpayKeys()).keySecret;
     const expected = crypto
       .createHmac('sha256', keySecret)
       .update(`${dto.razorpayOrderId}|${dto.razorpayPaymentId}`)

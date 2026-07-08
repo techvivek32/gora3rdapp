@@ -150,7 +150,9 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final authState = context.read<AuthBloc>().state;
     final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
     _razorpay!.open({
-      'key': 'rzp_test_RlUAkt1HzIvV4j',
+      // Use the key the backend returned (set by admin) so the checkout matches
+      // the order's account — never a hardcoded test key.
+      'key': order['keyId'] ?? '',
       'amount': order['amount'],
       'currency': order['currency'] ?? 'INR',
       'order_id': order['orderId'] ?? order['razorpayOrderId'],
