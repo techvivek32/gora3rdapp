@@ -54,9 +54,8 @@ export class SubscriptionsService {
     const plan = await this.planModel.findById(planId);
     if (!plan) throw new NotFoundException('Plan not found');
 
-    // Plan prices are stored in rupees; multiply by 100 for Razorpay (paise).
-    const priceInRupees = plan.discountedPrice || plan.price;
-    const amountInPaise = priceInRupees * 100;
+    // Plan prices are stored in paise; send directly to Razorpay.
+    const amountInPaise = plan.discountedPrice || plan.price;
     const orderId = generatePaymentOrderId();
 
     let razorpayOrder;
