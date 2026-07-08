@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../subscriptions/presentation/bloc/subscription_bloc.dart';
 
 /// Full-screen-style popup shown when a "new requirement" push arrives while the
 /// app is open (or when the user taps the notification).
@@ -48,6 +50,24 @@ class _RequirementAlert extends StatelessWidget {
 
   List<String> _stops() =>
       _str('stops').split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+
+  bool _hasActivePlan(BuildContext context) {
+    try {
+      final state = context.read<SubscriptionBloc>().state;
+      if (state is MySubscriptionLoaded && state.subscription != null) {
+        final subscription = state.subscription!;
+        final status = subscription['status']?.toString().toLowerCase() ?? '';
+        final expiryDate = subscription['expiryDate'];
+        if (status == 'active' && expiryDate != null) {
+          final expiry = DateTime.tryParse(expiryDate.toString());
+          if (expiry != null && expiry.isAfter(DateTime.now())) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,10 +122,10 @@ class _RequirementAlert extends StatelessWidget {
 
               // From → (stops) → To
               _routePoint(Colors.green, 'A', from.isEmpty ? '—' : from),
-              for (final stop in _stops()) ...[
+              for (final stop in _stops()) ...{
                 const SizedBox(height: 4),
                 _routePoint(AppColors.primary, '•', stop),
-              ],
+              },
               Padding(
                 padding: const EdgeInsets.only(left: 11, top: 2, bottom: 2),
                 child: Row(children: [
@@ -116,7 +136,7 @@ class _RequirementAlert extends StatelessWidget {
               ),
               _routePoint(Colors.red, 'B', to.isEmpty ? '—' : to),
 
-              if (note.isNotEmpty) ...[
+              if (note.isNotEmpty) ...{
                 const SizedBox(height: 12),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -126,43 +146,49 @@ class _RequirementAlert extends StatelessWidget {
                     Expanded(child: Text(note, style: const TextStyle(fontSize: 13, height: 1.4))),
                   ],
                 ),
-              ],
+              },
 
               const SizedBox(height: 8),
               Text('just now', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
               const SizedBox(height: 14),
 
-              // Actions — Call & WhatsApp (contact number only present for members).
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: mobile.isEmpty ? null : () => callNumber(mobile),
-                      icon: const Icon(Icons.call, size: 18, color: Colors.white),
-                      label: const Text('Call'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.green.withValues(alpha: 0.4),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+              // Actions — Call & WhatsApp (only enabled if user has active plan).
+              Builder(
+                builder: (ctx) {
+                  final hasActivePlan = _hasActivePlan(ctx);
+                  final canContact = mobile.isNotEmpty && hasActivePlan;
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: canContact ? () => callNumber(mobile) : null,
+                          icon: const Icon(Icons.call, size: 18, color: Colors.white),
+                          label: const Text('Call'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.green.withValues(alpha: 0.4),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: mobile.isEmpty ? null : () => openWhatsApp(mobile),
-                      icon: const Icon(Icons.chat, size: 18, color: Colors.white),
-                      label: const Text('WhatsApp'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF25D366),
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: const Color(0xFF25D366).withValues(alpha: 0.4),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: canContact ? () => openWhatsApp(mobile) : null,
+                          icon: const Icon(Icons.chat, size: 18, color: Colors.white),
+                          label: const Text('WhatsApp'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: const Color(0xFF25D366).withValues(alpha: 0.4),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 8),
               SizedBox(

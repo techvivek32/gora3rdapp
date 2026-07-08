@@ -56,6 +56,9 @@ Future<void> requestOverlayPermission() async {
 /// persist the payload and read it back when the overlay boots).
 const _kOverlayPayloadKey = 'gora_overlay_payload';
 
+/// Key for storing user subscription status in SharedPreferences.
+const _kSubscriptionKey = 'gora_user_subscription';
+
 /// Native channel registered on the overlay engine (see MainActivity). The
 /// overlay runs in its own engine with no plugins/Activity, so url_launcher
 /// can't launch the dialer/WhatsApp from here — we go through native instead.
@@ -116,6 +119,7 @@ class RequirementOverlay extends StatefulWidget {
 
 class _RequirementOverlayState extends State<RequirementOverlay> {
   Map<String, dynamic> _data = {};
+  bool _hasActivePlan = false;
 
   @override
   void initState() {
@@ -133,6 +137,22 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
       final raw = prefs.getString(_kOverlayPayloadKey);
       final parsed = _parse(raw);
       if (parsed.isNotEmpty && mounted) setState(() => _data = parsed);
+
+      // Load subscription status
+      final subJson = prefs.getString(_kSubscriptionKey);
+      if (subJson != null) {
+        try {
+          final subscription = Map<String, dynamic>.from(jsonDecode(subJson) as Map);
+          final status = subscription['status']?.toString().toLowerCase() ?? '';
+          final expiryDate = subscription['expiryDate'];
+          if (status == 'active' && expiryDate != null) {
+            final expiry = DateTime.tryParse(expiryDate.toString());
+            if (expiry != null && expiry.isAfter(DateTime.now())) {
+              if (mounted) setState(() => _hasActivePlan = true);
+            }
+          }
+        } catch (_) {}
+      }
     } catch (_) {}
   }
 
@@ -222,6 +242,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final to = _s('dropCity');
     final note = _s('notes');
     final hasMobile = _s('posterMobile').isNotEmpty;
+    final canContact = hasMobile && _hasActivePlan;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -332,13 +353,13 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                             const Divider(height: 18),
                             _routeRow(
                                 Colors.green, 'A', from.isEmpty ? '—' : from),
-                            for (final stop in _stops()) ...[
+                            for (final stop in _stops()) ...{
                               const SizedBox(height: 6),
                               _routeRow(_primary, '•', stop),
-                            ],
+                            },
                             const SizedBox(height: 6),
                             _routeRow(Colors.red, 'B', to.isEmpty ? '—' : to),
-                            if (note.isNotEmpty) ...[
+                            if (note.isNotEmpty) ...{
                               const SizedBox(height: 10),
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,13 +375,13 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                               fontSize: 12, height: 1.3))),
                                 ],
                               ),
-                            ],
+                            },
                             const SizedBox(height: 14),
                             Row(
                               children: [
                                 Expanded(
                                   child: ElevatedButton.icon(
-                                    onPressed: hasMobile ? _call : null,
+                                    onPressed: canContact ? _call : null,
                                     icon: const Icon(Icons.call,
                                         size: 18, color: Colors.white),
                                     label: const Text('Call'),
@@ -375,7 +396,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                 const SizedBox(width: 10),
                                 Expanded(
                                   child: ElevatedButton.icon(
-                                    onPressed: hasMobile ? _whatsapp : null,
+                                    onPressed: canContact ? _whatsapp : null,
                                     icon: const Icon(Icons.chat,
                                         size: 18, color: Colors.white),
                                     label: const Text('WhatsApp'),
