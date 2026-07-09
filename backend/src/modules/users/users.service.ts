@@ -63,8 +63,11 @@ export class UsersService {
   }
 
   async getReviews(ratedUserId: string) {
+    // Match by the string form of ratedUser so it works whether the field was stored
+    // as an ObjectId (normal) or as a plain string (legacy/seeded data) — otherwise a
+    // type mismatch silently returns zero reviews even when the rating average exists.
     const reviews = await this.ratingModel
-      .find({ ratedUser: ratedUserId })
+      .find({ $expr: { $eq: [{ $toString: '$ratedUser' }, ratedUserId] } })
       .populate('rater', 'fullName profileImage')
       .sort({ createdAt: -1 })
       .lean();

@@ -806,8 +806,10 @@ export class AdminService {
   }
 
   async getUserReviews(userId: string) {
+    // Match by string form so it works whether ratedUser was stored as an ObjectId
+    // or a plain string (legacy/seeded data).
     const reviews = await this.ratingModel
-      .find({ ratedUser: new Types.ObjectId(userId) })
+      .find({ $expr: { $eq: [{ $toString: '$ratedUser' }, userId] } })
       .populate('rater', 'fullName profileImage')
       .sort({ createdAt: -1 })
       .limit(100)

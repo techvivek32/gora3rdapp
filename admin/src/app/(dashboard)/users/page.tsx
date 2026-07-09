@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
-import { formatDate, getRelativeTime } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { Search, Download, Shield, Eye } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -69,13 +69,13 @@ function UsersPageInner() {
             {row.original.fullName?.[0]?.toUpperCase()}
           </div>
           <div>
-            <div className="font-medium text-sm flex items-center gap-1">
+            <div className="font-medium text-sm flex items-center gap-1 text-gray-900 dark:text-white">
               {row.original.fullName}
               {row.original.isVerified && (
                 <Shield className="w-3.5 h-3.5 text-emerald-500" />
               )}
             </div>
-            <div className="text-xs text-gray-500">{row.original.email}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">{row.original.email}</div>
           </div>
         </div>
       ),
@@ -83,17 +83,17 @@ function UsersPageInner() {
     {
       header: 'Mobile',
       accessorKey: 'mobile',
-      cell: ({ getValue }) => <span className="font-mono text-sm">{getValue() as string}</span>,
+      cell: ({ getValue }) => <span className="font-mono text-sm text-gray-900 dark:text-gray-100">{getValue() as string}</span>,
     },
     {
       header: 'Agency',
       accessorKey: 'agencyName',
-      cell: ({ getValue }) => <span className="text-sm text-gray-600">{(getValue() as string) || '-'}</span>,
+      cell: ({ getValue }) => <span className="text-sm text-gray-600 dark:text-gray-300">{(getValue() as string) || '-'}</span>,
     },
     {
       header: 'City',
       accessorKey: 'city',
-      cell: ({ getValue }) => <span className="text-sm">{(getValue() as string) || '-'}</span>,
+      cell: ({ getValue }) => <span className="text-sm text-gray-900 dark:text-gray-100">{(getValue() as string) || '-'}</span>,
     },
     {
       header: 'Membership',
@@ -104,7 +104,7 @@ function UsersPageInner() {
       header: 'Role',
       accessorKey: 'role',
       cell: ({ getValue }) => (
-        <span className="text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md capitalize">
+        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-2 py-1 rounded-md capitalize">
           {(getValue() as string).replace('_', ' ')}
         </span>
       ),
@@ -124,36 +124,10 @@ function UsersPageInner() {
       ),
     },
     {
-      header: 'Posts',
-      cell: ({ row }) => (
-        <div className="flex flex-col gap-0.5 text-xs">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-            <span className="text-blue-600 font-semibold">{row.original.requirementsPosted}</span>
-            <span className="text-gray-400">Req</span>
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-            <span className="text-green-600 font-semibold">{row.original.vehiclesPosted}</span>
-            <span className="text-gray-400">Cab</span>
-          </span>
-        </div>
-      ),
-    },
-    {
-      header: 'Last Active',
-      accessorKey: 'lastActive',
-      cell: ({ getValue }) => (
-        <span className="text-xs text-gray-500">
-          {getValue() ? getRelativeTime(getValue() as string) : 'Never'}
-        </span>
-      ),
-    },
-    {
       header: 'Joined',
       accessorKey: 'createdAt',
       cell: ({ getValue }) => (
-        <span className="text-xs text-gray-500">{formatDate(getValue() as string)}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(getValue() as string)}</span>
       ),
     },
     {
