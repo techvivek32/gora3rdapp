@@ -95,12 +95,14 @@ export class AuthService {
     };
   }
 
-  private async ensureUnique(email: string, mobile: string) {
-    const existingUser = await this.userModel.findOne({
-      $or: [{ email: email.toLowerCase() }, { mobile }],
-    });
+  private async ensureUnique(email: string | undefined, mobile: string) {
+    // Email is optional; only include it in the uniqueness check when provided.
+    const or: Record<string, any>[] = [{ mobile }];
+    if (email) or.push({ email: email.toLowerCase() });
+
+    const existingUser = await this.userModel.findOne({ $or: or });
     if (existingUser) {
-      if (existingUser.email === email.toLowerCase()) {
+      if (email && existingUser.email === email.toLowerCase()) {
         throw new ConflictException('Email already registered');
       }
       throw new ConflictException('Mobile number already registered');
@@ -133,7 +135,9 @@ export class AuthService {
     await this.verifyOtp(dto.mobile, dto.otp);
     await this.ensureUnique(dto.email, dto.mobile);
 
-    const hashedPassword = await bcrypt.hash(dto.password, 12);
+    // Email and password are optional (mobile users sign in with an OTP). Only set
+    // them when provided so the sparse unique email index isn't hit with a null.
+    const hashedPassword = dto.password ? await bcrypt.hash(dto.password, 12) : undefined;
 
     // Resolve the referrer (if a valid code was entered).
     let referredBy = null;
@@ -145,9 +149,9 @@ export class AuthService {
 
     const user = await this.userModel.create({
       fullName: dto.fullName,
-      email: dto.email.toLowerCase(),
+      ...(dto.email ? { email: dto.email.toLowerCase() } : {}),
       mobile: dto.mobile,
-      password: hashedPassword,
+      ...(hashedPassword ? { password: hashedPassword } : {}),
       agencyName: dto.agencyName,
       city: dto.city,
       state: dto.state,

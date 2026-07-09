@@ -30,13 +30,10 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   final _mobileCtrl = TextEditingController();
-  final _passwordCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
   final _referralCtrl = TextEditingController();
   String _selectedRole = 'travel_agency';
-  bool _obscure = true;
 
   bool _submitting = false;
   String _status = '';
@@ -69,9 +66,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _emailCtrl.dispose();
     _mobileCtrl.dispose();
-    _passwordCtrl.dispose();
     _agencyCtrl.dispose();
     _referralCtrl.dispose();
     for (final d in _docs.values) {
@@ -142,7 +137,6 @@ class _RegisterPageState extends State<RegisterPage> {
     });
     try {
       await _apiClient.dio.post('/auth/register/send-otp', data: {
-        'email': _emailCtrl.text.trim(),
         'mobile': _mobileCtrl.text.trim(),
       });
     } catch (e) {
@@ -175,9 +169,7 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_registered) {
       final result = await _authRepo.register(
         fullName: _nameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
         mobile: _mobileCtrl.text.trim(),
-        password: _passwordCtrl.text,
         agencyName: _agencyCtrl.text.trim().isEmpty ? null : _agencyCtrl.text.trim(),
         role: _selectedRole,
         otp: otp,
@@ -271,7 +263,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 onPressed: () async {
                   try {
                     await _apiClient.dio.post('/auth/register/send-otp', data: {
-                      'email': _emailCtrl.text.trim(),
                       'mobile': _mobileCtrl.text.trim(),
                     });
                     if (ctx.mounted) {
@@ -363,31 +354,6 @@ class _RegisterPageState extends State<RegisterPage> {
                     if (!RegExp(r'^[6-9]\d{9}$').hasMatch(v)) return 'Enter valid 10-digit mobile';
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined)),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    if (!v.contains('@')) return 'Enter valid email';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordCtrl,
-                  obscureText: _obscure,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscure = !_obscure),
-                    ),
-                  ),
-                  validator: (v) => v != null && v.length >= 8 ? null : 'Minimum 8 characters',
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(

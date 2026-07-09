@@ -9,7 +9,9 @@ export class User {
   @Prop({ required: true, trim: true })
   fullName: string;
 
-  @Prop({ required: true, unique: true, trim: true, lowercase: true })
+  // Email is optional (registration only needs a mobile number). Sparse + unique so
+  // accounts without an email don't collide on the unique index.
+  @Prop({ unique: true, sparse: true, trim: true, lowercase: true })
   email: string;
 
   @Prop({ required: true, unique: true, trim: true })
@@ -150,7 +152,7 @@ export class User {
 export const UserSchema = SchemaFactory.createForClass(User);
 
 // Indexes for performance
-UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ email: 1 }, { unique: true, sparse: true });
 UserSchema.index({ mobile: 1 }, { unique: true });
 UserSchema.index({ city: 1, membershipType: 1 });
 UserSchema.index({ businessCities: 1 });

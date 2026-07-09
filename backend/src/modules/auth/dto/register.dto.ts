@@ -14,14 +14,16 @@ export class RegisterDto {
   @Matches(/^\+?[1-9]\d{9,14}$/, { message: 'Invalid mobile number' })
   mobile: string;
 
-  @ApiProperty({ example: 'rahul@example.com' })
+  @ApiPropertyOptional({ example: 'rahul@example.com' })
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
-  @ApiProperty({ example: 'SecurePass@123', minLength: 8 })
+  @ApiPropertyOptional({ example: 'SecurePass@123', minLength: 8 })
+  @IsOptional()
   @IsString()
   @MinLength(8)
-  password: string;
+  password?: string;
 
   @ApiPropertyOptional({ example: 'Sharma Travels' })
   @IsOptional()

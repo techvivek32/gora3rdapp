@@ -19,8 +19,8 @@ abstract class AuthRepository {
   Future<Either<Failure, Map<String, dynamic>>> register({
     required String fullName,
     required String mobile,
-    required String email,
-    required String password,
+    String? email,
+    String? password,
     String? agencyName,
     String? city,
     String? state,
