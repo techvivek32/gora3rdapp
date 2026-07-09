@@ -104,6 +104,7 @@ export const adminApi = {
 
   // ─── Cities ────────────────────────────────────────────────────────────────
   getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
+  getCityInsights: () => apiClient.get('/admin/city-insights'),
   createCity: (data: any) => apiClient.post('/admin/cities', data),
   updateCity: (id: string, data: any) => apiClient.put(`/admin/cities/${id}`, data),
   deleteCity: (id: string) => apiClient.delete(`/admin/cities/${id}`),

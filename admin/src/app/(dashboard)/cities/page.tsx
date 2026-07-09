@@ -1,127 +1,164 @@
 'use client';
 
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import toast from 'react-hot-toast';
+import { MapPin, ClipboardList, Car, Users, TrendingUp } from 'lucide-react';
 
-interface City {
-  _id: string;
-  name: string;
+interface CityRow {
+  key: string;
+  city: string;
   state: string;
-  slug: string;
-  isActive: boolean;
-  isFeatured: boolean;
-  requirementCount: number;
-  vehicleCount: number;
-  userCount: number;
+  requirements: number;
+  vehicles: number;
+  users: number;
+  total: number;
 }
+interface Totals { cities: number; requirements: number; vehicles: number; users: number; }
+
+type SortKey = 'total' | 'requirements' | 'vehicles' | 'users';
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'total', label: 'Most Active' },
+  { key: 'requirements', label: 'Requirements' },
+  { key: 'vehicles', label: 'Available Cabs' },
+  { key: 'users', label: 'Agencies' },
+];
 
 export default function CitiesPage() {
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState('');
-  const [state, setState] = useState('');
-  const queryClient = useQueryClient();
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('total');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['cities'],
-    queryFn: () => adminApi.getCities(),
+    queryKey: ['city-insights'],
+    queryFn: () => adminApi.getCityInsights(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => adminApi.createCity({ name: name.trim(), state: state.trim() }),
-    onSuccess: () => {
-      toast.success('City created');
-      setName(''); setState(''); setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['cities'] });
-    },
-    onError: () => toast.error('Failed to create city'),
-  });
+  const rows: CityRow[] = data?.data?.rows || [];
+  const totals: Totals = data?.data?.totals || { cities: 0, requirements: 0, vehicles: 0, users: 0 };
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => adminApi.deleteCity(id),
-    onSuccess: () => { toast.success('City deleted'); queryClient.invalidateQueries({ queryKey: ['cities'] }); },
-  });
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = q
+      ? rows.filter((r) => r.city.toLowerCase().includes(q) || r.state.toLowerCase().includes(q))
+      : rows;
+    return [...list].sort((a, b) => b[sortKey] - a[sortKey]);
+  }, [rows, search, sortKey]);
 
-  const cities: City[] = data?.data?.data || [];
+  // Largest value of the active metric — drives the relative bar widths.
+  const maxVal = Math.max(1, ...filtered.map((r) => r[sortKey]));
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Cities</h1>
-          <p className="text-gray-500 mt-1">Manage platform cities</p>
-        </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : '+ Add City'}
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">City Insights</h1>
+        <p className="text-gray-500 mt-1">Where the demand and supply is — cities ranked by requirements, available cabs and agencies.</p>
       </div>
 
-      {showForm && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="font-semibold text-lg mb-4">Add New City</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <Input placeholder="City Name" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="State" value={state} onChange={(e) => setState(e.target.value)} />
-          </div>
-          <Button
-            className="mt-4"
-            onClick={() => createMutation.mutate()}
-            isLoading={createMutation.isPending}
-            disabled={!name || !state}
-          >
-            Create City
-          </Button>
-        </div>
-      )}
+      {/* KPI summary */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard icon={<MapPin className="w-5 h-5" />} label="Active Cities" value={totals.cities} color="text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20" />
+        <StatCard icon={<ClipboardList className="w-5 h-5" />} label="Requirements" value={totals.requirements} color="text-orange-600 bg-orange-50 dark:bg-orange-900/20" />
+        <StatCard icon={<Car className="w-5 h-5" />} label="Available Cabs" value={totals.vehicles} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" />
+        <StatCard icon={<Users className="w-5 h-5" />} label="Agencies" value={totals.users} color="text-blue-600 bg-blue-50 dark:bg-blue-900/20" />
+      </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div key={i} className="h-32 bg-gray-100 rounded-xl animate-pulse" />
+      {/* Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <Input
+          placeholder="Search city or state…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <div className="flex flex-wrap gap-1.5">
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSortKey(s.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                sortKey === s.key
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}
+            >
+              {s.label}
+            </button>
           ))}
         </div>
+      </div>
+
+      {/* Ranked list */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-16 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <TrendingUp className="w-10 h-10 mx-auto mb-2 opacity-40" />
+          <p>No city activity yet.</p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cities.map((city) => (
-            <div key={city._id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-card-hover transition-shadow">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-semibold text-lg">{city.name}</h3>
-                  <p className="text-gray-500 text-sm">{city.state}</p>
-                </div>
-                <div className="flex gap-2">
-                  <Badge variant={city.isActive ? 'success' : 'secondary'}>
-                    {city.isActive ? 'Active' : 'Inactive'}
-                  </Badge>
-                  {city.isFeatured && <Badge variant="warning">Featured</Badge>}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          {/* Header row */}
+          <div className="hidden md:grid grid-cols-12 gap-2 px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
+            <div className="col-span-1">#</div>
+            <div className="col-span-4">City</div>
+            <div className="col-span-2 text-center">Requirements</div>
+            <div className="col-span-2 text-center">Available Cabs</div>
+            <div className="col-span-2 text-center">Agencies</div>
+            <div className="col-span-1 text-right">Total</div>
+          </div>
+
+          {filtered.map((r, i) => (
+            <div key={r.key} className="grid grid-cols-2 md:grid-cols-12 gap-2 items-center px-5 py-3 border-b border-gray-50 dark:border-gray-800/60 last:border-0 hover:bg-gray-50/60 dark:hover:bg-gray-800/40">
+              {/* Rank + name */}
+              <div className="md:col-span-1 order-1">
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
+                  i < 3 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+                }`}>{i + 1}</span>
+              </div>
+              <div className="md:col-span-4 order-2">
+                <p className="font-semibold text-gray-900 dark:text-white capitalize leading-tight">{r.city}</p>
+                {r.state && <p className="text-xs text-gray-400 capitalize">{r.state}</p>}
+                {/* Relative-activity bar (of the selected metric) */}
+                <div className="mt-1.5 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden max-w-[220px]">
+                  <div className="h-full bg-orange-400 rounded-full" style={{ width: `${Math.round((r[sortKey] / maxVal) * 100)}%` }} />
                 </div>
               </div>
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                {[
-                  { label: 'Users', value: city.userCount },
-                  { label: 'Requirements', value: city.requirementCount },
-                  { label: 'Vehicles', value: city.vehicleCount },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-gray-50 rounded-lg p-2">
-                    <p className="text-lg font-bold">{value}</p>
-                    <p className="text-xs text-gray-500">{label}</p>
-                  </div>
-                ))}
+              <Metric className="md:col-span-2" label="Requirements" value={r.requirements} active={sortKey === 'requirements'} />
+              <Metric className="md:col-span-2" label="Available Cabs" value={r.vehicles} active={sortKey === 'vehicles'} />
+              <Metric className="md:col-span-2" label="Agencies" value={r.users} active={sortKey === 'users'} />
+              <div className="md:col-span-1 order-6 text-right">
+                <span className="text-xs text-gray-400 md:hidden">Total </span>
+                <span className="font-bold text-gray-900 dark:text-white">{r.total}</span>
               </div>
-              <button
-                onClick={() => deleteMutation.mutate(city._id)}
-                className="mt-3 text-xs text-red-500 hover:underline"
-              >
-                Delete
-              </button>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${color}`}>{icon}</div>
+      <div>
+        <p className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{value.toLocaleString('en-IN')}</p>
+        <p className="text-xs text-gray-500 mt-1">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value, active, className }: { label: string; value: number; active?: boolean; className?: string }) {
+  return (
+    <div className={`${className} order-3 flex items-center md:justify-center gap-1.5`}>
+      <span className="text-xs text-gray-400 md:hidden">{label}:</span>
+      <span className={`font-semibold ${active ? 'text-orange-600' : 'text-gray-700 dark:text-gray-200'}`}>{value}</span>
     </div>
   );
 }

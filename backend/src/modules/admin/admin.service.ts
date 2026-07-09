@@ -496,6 +496,79 @@ export class AdminService {
     return { message: 'City updated', data: city };
   }
 
+  /**
+   * City-wise activity across the platform — where the demand (requirements),
+   * supply (available cabs) and members (agencies/drivers) actually are. Built
+   * live from the requirement / vehicle / user collections (not the manually
+   * managed cities list), grouped by a normalized city key so "Rajkot" and
+   * "rajkot " collapse together, then ranked by total activity.
+   */
+  async getCityInsights() {
+    // Group requirements by their clean pickup city (fallback to the raw city).
+    const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
+
+    const [reqAgg, vehAgg, userAgg] = await Promise.all([
+      this.requirementModel.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
+        { $group: {
+          _id: cityKey,
+          city: { $first: { $ifNull: ['$pickupCityName', '$pickupCity'] } },
+          state: { $first: '$pickupState' },
+          count: { $sum: 1 },
+        } },
+      ]),
+      this.vehicleModel.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
+        { $group: {
+          _id: { $toLower: { $trim: { input: '$currentCity' } } },
+          city: { $first: '$currentCity' },
+          state: { $first: '$currentState' },
+          count: { $sum: 1 },
+        } },
+      ]),
+      this.userModel.aggregate([
+        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } } },
+        { $group: {
+          _id: { $toLower: { $trim: { input: '$city' } } },
+          city: { $first: '$city' },
+          state: { $first: '$state' },
+          count: { $sum: 1 },
+        } },
+      ]),
+    ]);
+
+    const map = new Map<string, { key: string; city: string; state: string; requirements: number; vehicles: number; users: number }>();
+    const upsert = (k: string, city: string, state: string) => {
+      if (!k) return null;
+      if (!map.has(k)) map.set(k, { key: k, city: city || k, state: state || '', requirements: 0, vehicles: 0, users: 0 });
+      const e = map.get(k)!;
+      if (state && !e.state) e.state = state;
+      if (city && (!e.city || e.city === k)) e.city = city;
+      return e;
+    };
+
+    for (const r of reqAgg as any[]) { const e = upsert(r._id, r.city, r.state); if (e) e.requirements = r.count; }
+    for (const v of vehAgg as any[]) { const e = upsert(v._id, v.city, v.state); if (e) e.vehicles = v.count; }
+    for (const u of userAgg as any[]) { const e = upsert(u._id, u.city, u.state); if (e) e.users = u.count; }
+
+    const rows = [...map.values()]
+      .map((e) => ({ ...e, total: e.requirements + e.vehicles + e.users }))
+      .filter((e) => e.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        cities: acc.cities + 1,
+        requirements: acc.requirements + r.requirements,
+        vehicles: acc.vehicles + r.vehicles,
+        users: acc.users + r.users,
+      }),
+      { cities: 0, requirements: 0, vehicles: 0, users: 0 },
+    );
+
+    return { message: 'City insights retrieved', data: { rows, totals } };
+  }
+
   async deleteCity(id: string) {
     await this.cityModel.findByIdAndDelete(id);
     return { message: 'City deleted' };

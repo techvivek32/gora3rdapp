@@ -253,6 +253,12 @@ export class AdminController {
     return this.adminService.getCities(query);
   }
 
+  @Get('city-insights')
+  @ApiOperation({ summary: 'City-wise activity (requirements / cabs / users)' })
+  getCityInsights() {
+    return this.adminService.getCityInsights();
+  }
+
   @Put('cities/:id')
   @ApiOperation({ summary: 'Update city' })
   updateCity(@Param('id') id: string, @Body() data: any) {

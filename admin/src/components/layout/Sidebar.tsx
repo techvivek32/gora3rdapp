@@ -63,10 +63,9 @@ export default function Sidebar() {
           <Car className="w-5 h-5 text-white" />
         </div>
         <div>
-          <span className="font-bold text-gray-900 dark:text-white">Gora Cabs</span>
+          <span className="font-bold text-gray-900 dark:text-white">Gora Texi</span>
           <div className="flex items-center gap-1">
-            <Shield className="w-3 h-3 text-orange-500" />
-            <span className="text-xs text-gray-500">Admin Panel</span>
+            <span className="text-xs text-gray-500">Partner</span>
           </div>
         </div>
       </div>
