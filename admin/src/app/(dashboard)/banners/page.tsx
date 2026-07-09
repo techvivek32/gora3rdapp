@@ -137,7 +137,16 @@ export default function BannersPage() {
 
           {/* Image upload + URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Banner Image</label>
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <label className="block text-sm font-medium text-gray-700">Banner Image</label>
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2.5 py-1">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" /></svg>
+                Recommended: 1080 × 528 px · 2.05:1 (landscape)
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mb-2">
+              This is the exact ratio the app shows banners at (home & requirement list). Any image is auto-cropped to fit — upload at 1080×528 so nothing important gets cut off.
+            </p>
 
             {/* Hidden file input */}
             <input
@@ -148,12 +157,12 @@ export default function BannersPage() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
             />
 
-            {/* Preview / upload area */}
+            {/* Preview / upload area — sized like the app (minimal, phone-width) */}
             <div
               onClick={() => !uploading && fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFileUpload(f); }}
-              className={`relative rounded-xl overflow-hidden h-44 cursor-pointer border-2 border-dashed transition-colors ${uploading ? 'border-brand-400 opacity-70' : 'border-gray-300 hover:border-brand-500'}`}
+              className={`relative rounded-2xl overflow-hidden aspect-[358/175] w-full max-w-sm mx-auto cursor-pointer border-2 border-dashed transition-colors ${uploading ? 'border-brand-400 opacity-70' : 'border-gray-300 hover:border-brand-500'}`}
             >
               {form.imageUrl && !imgError ? (
                 <>
@@ -163,6 +172,13 @@ export default function BannersPage() {
                     className="w-full h-full object-cover"
                     onError={() => setImgError(true)}
                   />
+                  {/* Mobile-style title/subtitle gradient — matches the app */}
+                  {(form.title || form.subtitle) && (
+                    <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/65 to-transparent pointer-events-none">
+                      {form.title && <p className="text-white font-bold text-sm leading-tight line-clamp-1">{form.title}</p>}
+                      {form.subtitle && <p className="text-white/80 text-[11px] leading-tight line-clamp-1">{form.subtitle}</p>}
+                    </div>
+                  )}
                   {/* Overlay on hover */}
                   <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
                     <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
@@ -180,7 +196,7 @@ export default function BannersPage() {
                     <>
                       <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                       <span className="text-gray-600 text-sm font-medium">Click or drag to upload image</span>
-                      <span className="text-gray-400 text-xs">PNG, JPG, WebP — auto resized to 1200×400</span>
+                      <span className="text-gray-400 text-xs">PNG, JPG, WebP — best at 1080 × 528 px (2.05:1)</span>
                     </>
                   )}
                 </div>
@@ -202,6 +218,9 @@ export default function BannersPage() {
             />
             {form.imageUrl && imgError && (
               <p className="text-red-500 text-xs mt-1">Could not load image from this URL</p>
+            )}
+            {form.imageUrl && !imgError && (
+              <p className="text-[11px] text-gray-400 text-center mt-2">This is how it appears in the app · 2.05:1</p>
             )}
           </div>
 
@@ -291,16 +310,9 @@ export default function BannersPage() {
         <div className="space-y-4">
           {banners.map((banner) => (
             <div key={banner._id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
-              {/* Thumbnail */}
-              <div className="w-32 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-orange-400 to-orange-600">
-                {banner.imageUrl && (
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                  />
-                )}
+              {/* Thumbnail — same ratio & style the app shows it at */}
+              <div className="w-44 flex-shrink-0">
+                <MobileBannerPreview imageUrl={banner.imageUrl} title={banner.title} subtitle={banner.subtitle} />
               </div>
 
               <div className="flex-1 min-w-0">
@@ -341,6 +353,30 @@ export default function BannersPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Renders a banner exactly the way the mobile app does — 2.05:1 box (358×175pt),
+ *  16px rounded corners, image cover-fit, and a bottom dark gradient with the
+ *  title/subtitle — so the admin sees the real in-app appearance. */
+function MobileBannerPreview({ imageUrl, title, subtitle }: { imageUrl?: string; title?: string; subtitle?: string }) {
+  return (
+    <div className="relative w-full aspect-[358/175] rounded-2xl overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 shadow-sm">
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt={title || 'Banner'}
+          className="absolute inset-0 w-full h-full object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      )}
+      {(title || subtitle) && (
+        <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/65 to-transparent">
+          {title && <p className="text-white font-bold text-sm leading-tight line-clamp-1">{title}</p>}
+          {subtitle && <p className="text-white/80 text-[11px] leading-tight line-clamp-1">{subtitle}</p>}
         </div>
       )}
     </div>

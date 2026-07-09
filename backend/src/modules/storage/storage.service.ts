@@ -128,7 +128,11 @@ export class StorageService {
   }
 
   async uploadBannerImage(file: Express.Multer.File): Promise<string> {
-    return this.uploadFile(file, 'banners', { resize: { width: 1200, height: 400 }, quality: 90 });
+    // 1080×528 keeps the exact aspect ratio the mobile app renders banners at
+    // (the home + requirement-feed banner box is 358×175 pt ≈ 2.05:1). Matching it
+    // here means the app shows the image with no extra cropping. 3× the display box
+    // for crisp rendering on high-DPI screens.
+    return this.uploadFile(file, 'banners', { resize: { width: 1080, height: 528 }, quality: 90 });
   }
 
   async deleteFile(url: string): Promise<void> {
