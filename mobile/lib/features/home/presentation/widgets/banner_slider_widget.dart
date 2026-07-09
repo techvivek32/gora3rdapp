@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/banner_popup.dart';
 
 class BannerSliderWidget extends StatefulWidget {
   final List<Map<String, dynamic>> banners;
@@ -114,7 +115,9 @@ class _BannerItem extends StatelessWidget {
     final title = banner['title'] as String?;
     final subtitle = banner['subtitle'] as String?;
 
-    return Padding(
+    return GestureDetector(
+      onTap: () => showBannerPopup(context, banner),
+      child: Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16.r),
@@ -170,6 +173,7 @@ class _BannerItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

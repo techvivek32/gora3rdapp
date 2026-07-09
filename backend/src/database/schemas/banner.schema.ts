@@ -21,6 +21,13 @@ export class Banner {
   @Prop()
   actionType: string;
 
+  // Contact numbers shown on the banner (tap to call / WhatsApp).
+  @Prop()
+  phone: string;
+
+  @Prop()
+  whatsapp: string;
+
   @Prop({ default: true })
   isActive: boolean;
 

@@ -11,14 +11,15 @@ interface Banner {
   title: string;
   subtitle?: string;
   imageUrl?: string;
-  actionUrl?: string;
+  phone?: string;
+  whatsapp?: string;
   isActive: boolean;
   sortOrder: number;
   clickCount: number;
   viewCount: number;
 }
 
-const EMPTY_FORM = { title: '', subtitle: '', imageUrl: '', actionUrl: '', sortOrder: 0, isActive: true };
+const EMPTY_FORM = { title: '', subtitle: '', imageUrl: '', phone: '', whatsapp: '', sameWhatsapp: true, isActive: true };
 
 export default function BannersPage() {
   const [showForm, setShowForm] = useState(false);
@@ -37,8 +38,18 @@ export default function BannersPage() {
   // Fix: interceptor extracts data?.data, so response.data = bannersArray
   const banners: Banner[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
 
+  // Payload sent to the API — WhatsApp mirrors the phone when "same" is ticked.
+  const buildPayload = () => ({
+    title: form.title.trim(),
+    subtitle: form.subtitle.trim(),
+    imageUrl: form.imageUrl.trim(),
+    phone: form.phone.trim(),
+    whatsapp: (form.sameWhatsapp ? form.phone : form.whatsapp).trim(),
+    isActive: form.isActive,
+  });
+
   const createMutation = useMutation({
-    mutationFn: () => adminApi.createBanner({ ...form, sortOrder: Number(form.sortOrder) }),
+    mutationFn: () => adminApi.createBanner(buildPayload()),
     onSuccess: () => {
       toast.success('Banner created');
       setForm(EMPTY_FORM);
@@ -49,7 +60,7 @@ export default function BannersPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Partial<typeof EMPTY_FORM>) => adminApi.updateBanner(editingId!, data),
+    mutationFn: () => adminApi.updateBanner(editingId!, buildPayload()),
     onSuccess: () => {
       toast.success('Banner updated');
       setEditingId(null);
@@ -84,7 +95,19 @@ export default function BannersPage() {
 
   const openEdit = (b: Banner) => {
     setEditingId(b._id);
-    setForm({ title: b.title, subtitle: b.subtitle ?? '', imageUrl: b.imageUrl ?? '', actionUrl: b.actionUrl ?? '', sortOrder: b.sortOrder, isActive: b.isActive });
+    const phone = b.phone ?? '';
+    const whatsapp = b.whatsapp ?? '';
+    // "Same" when there's no separate WhatsApp number, or it matches the phone.
+    const sameWhatsapp = !whatsapp || whatsapp === phone;
+    setForm({
+      title: b.title,
+      subtitle: b.subtitle ?? '',
+      imageUrl: b.imageUrl ?? '',
+      phone,
+      whatsapp,
+      sameWhatsapp,
+      isActive: b.isActive,
+    });
     setImgError(false);
     setShowForm(true);
   };
@@ -109,7 +132,7 @@ export default function BannersPage() {
 
   const handleSubmit = () => {
     if (!form.imageUrl.trim()) return toast.error('A banner image is required');
-    if (editingId) updateMutation.mutate(form);
+    if (editingId) updateMutation.mutate();
     else createMutation.mutate();
   };
 
@@ -246,25 +269,34 @@ export default function BannersPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Action URL</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
               <input
-                type="text"
-                placeholder="e.g. /requirements or https://..."
-                value={form.actionUrl}
-                onChange={(e) => setForm({ ...form, actionUrl: e.target.value })}
+                type="tel"
+                placeholder="e.g. 9876543210"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
               <input
-                type="number"
-                min={0}
-                value={form.sortOrder}
-                onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                type="tel"
+                placeholder="e.g. 9876543210"
+                value={form.sameWhatsapp ? form.phone : form.whatsapp}
+                disabled={form.sameWhatsapp}
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400"
               />
-              <p className="text-xs text-gray-400 mt-1">Lower = shown first</p>
+              <label className="flex items-center gap-2 cursor-pointer mt-2">
+                <input
+                  type="checkbox"
+                  checked={form.sameWhatsapp}
+                  onChange={(e) => setForm({ ...form, sameWhatsapp: e.target.checked })}
+                  className="w-4 h-4 text-brand-600 rounded"
+                />
+                <span className="text-xs text-gray-600">WhatsApp same as phone</span>
+              </label>
             </div>
           </div>
 
@@ -327,7 +359,8 @@ export default function BannersPage() {
                 <div className="flex gap-4 mt-1.5 text-xs text-gray-400">
                   <span>{banner.viewCount} views</span>
                   <span>{banner.clickCount} clicks</span>
-                  {banner.actionUrl && <span className="truncate max-w-[160px]">→ {banner.actionUrl}</span>}
+                  {banner.phone && <span>📞 {banner.phone}</span>}
+                  {banner.whatsapp && banner.whatsapp !== banner.phone && <span>💬 {banner.whatsapp}</span>}
                 </div>
               </div>
 

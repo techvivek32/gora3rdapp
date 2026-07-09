@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/banner_popup.dart';
 
 class BannerCardWidget extends StatelessWidget {
   final Map<String, dynamic> banner;
@@ -9,11 +10,12 @@ class BannerCardWidget extends StatelessWidget {
 
   const BannerCardWidget({super.key, required this.banner, required this.apiClient});
 
-  void _onTap() {
+  void _onTap(BuildContext context) {
     final id = banner['_id'] as String?;
     if (id != null) {
       apiClient.post('/banners/$id/click').ignore();
     }
+    showBannerPopup(context, banner);
   }
 
   @override
@@ -23,7 +25,7 @@ class BannerCardWidget extends StatelessWidget {
     final imageUrl = banner['imageUrl'] as String?;
 
     return GestureDetector(
-      onTap: _onTap,
+      onTap: () => _onTap(context),
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 16.w),
         height: 175.h,
