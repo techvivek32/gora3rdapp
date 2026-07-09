@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
@@ -32,14 +33,18 @@ interface User {
   vehiclesPosted: number;
 }
 
-export default function UsersPage() {
+function UsersPageInner() {
+  const params = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
-  const [membershipFilter, setMembershipFilter] = useState('');
+  // Filters seeded from the URL so dashboard cards can deep-link into a filtered view.
+  const [roleFilter, setRoleFilter] = useState(params.get('role') || '');
+  const [membershipFilter, setMembershipFilter] = useState(params.get('membership') || '');
+  const [verifiedFilter, setVerifiedFilter] = useState(params.get('verified') === 'true' ? 'true' : '');
+  const [activeFilter, setActiveFilter] = useState(params.get('active') === 'true' ? 'true' : '');
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-users', page, search, roleFilter, membershipFilter],
+    queryKey: ['admin-users', page, search, roleFilter, membershipFilter, verifiedFilter, activeFilter],
     queryFn: () =>
       adminApi.getUsers({
         page,
@@ -47,6 +52,8 @@ export default function UsersPage() {
         search,
         role: roleFilter || undefined,
         membershipType: membershipFilter || undefined,
+        isVerified: verifiedFilter === 'true' ? 'true' : undefined,
+        active: activeFilter === 'true' ? 'true' : undefined,
       }),
   });
   const data = rawData as any;
@@ -204,6 +211,14 @@ export default function UsersPage() {
           <option value="premium">Premium</option>
           <option value="golden">Golden</option>
         </Select>
+        <Select value={verifiedFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setVerifiedFilter(e.target.value); setPage(1); }}>
+          <option value="">All Verification</option>
+          <option value="true">Verified Only</option>
+        </Select>
+        <Select value={activeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setActiveFilter(e.target.value); setPage(1); }}>
+          <option value="">All Activity</option>
+          <option value="true">Active (7 days)</option>
+        </Select>
       </div>
 
       {/* Table */}
@@ -220,5 +235,14 @@ export default function UsersPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function UsersPage() {
+  // useSearchParams (inside UsersPageInner) must sit under a Suspense boundary.
+  return (
+    <Suspense fallback={null}>
+      <UsersPageInner />
+    </Suspense>
   );
 }

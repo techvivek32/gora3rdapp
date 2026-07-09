@@ -3,7 +3,6 @@ import { StatsCards } from '@/components/dashboard/StatsCards';
 import { RevenueChart } from '@/components/dashboard/RevenueChart';
 import { UserGrowthChart } from '@/components/dashboard/UserGrowthChart';
 import { TopCitiesCard } from '@/components/dashboard/TopCitiesCard';
-import { RecentRequirements } from '@/components/dashboard/RecentRequirements';
 import { MembershipBreakdown } from '@/components/dashboard/MembershipBreakdown';
 import { Skeleton } from '@/components/ui/Skeleton';
 
@@ -30,20 +29,13 @@ export default function DashboardPage() {
         </Suspense>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Suspense fallback={<ChartSkeleton />}>
-            <RecentRequirements />
-          </Suspense>
-        </div>
-        <div className="space-y-6">
-          <Suspense fallback={<ChartSkeleton />}>
-            <MembershipBreakdown />
-          </Suspense>
-          <Suspense fallback={<ChartSkeleton />}>
-            <TopCitiesCard />
-          </Suspense>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Suspense fallback={<ChartSkeleton />}>
+          <TopCitiesCard />
+        </Suspense>
+        <Suspense fallback={<ChartSkeleton />}>
+          <MembershipBreakdown />
+        </Suspense>
       </div>
     </div>
   );

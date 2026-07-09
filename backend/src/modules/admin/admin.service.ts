@@ -104,6 +104,12 @@ export class AdminService {
     if (query.isVerified !== undefined) filter.isVerified = query.isVerified === 'true';
     if (query.isBlocked !== undefined) filter.isBlocked = query.isBlocked === 'true';
     if (query.city) filter.city = new RegExp(query.city, 'i');
+    // "Active" = same definition as the dashboard card: not blocked and seen in the last 7 days.
+    if (query.active === 'true') {
+      filter.isActive = true;
+      filter.isBlocked = false;
+      filter.lastActive = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    }
 
     const [users, total] = await Promise.all([
       this.userModel.find(filter).select('-password -refreshToken -fcmTokens').sort(sort).skip(skip).limit(limit).lean(),

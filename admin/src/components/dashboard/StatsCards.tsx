@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import { adminApi } from '@/lib/api';
 import { Users, Car, FileText, TrendingUp, Crown, Shield, Star, IndianRupee } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ interface StatCard {
   icon: React.ReactNode;
   color: string;
   bgColor: string;
+  href?: string;
 }
 
 export function StatsCards() {
@@ -30,6 +32,7 @@ export function StatsCards() {
       icon: <Users className="w-5 h-5" />,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+      href: '/users',
     },
     {
       title: 'Active Users',
@@ -38,6 +41,7 @@ export function StatsCards() {
       icon: <TrendingUp className="w-5 h-5" />,
       color: 'text-emerald-600',
       bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
+      href: '/users?active=true',
     },
     {
       title: 'Verified Users',
@@ -45,6 +49,7 @@ export function StatsCards() {
       icon: <Shield className="w-5 h-5" />,
       color: 'text-indigo-600',
       bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+      href: '/users?verified=true',
     },
     {
       title: 'Premium Members',
@@ -52,6 +57,7 @@ export function StatsCards() {
       icon: <Star className="w-5 h-5" />,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+      href: '/users?membership=premium',
     },
     {
       title: 'Golden Members',
@@ -59,6 +65,7 @@ export function StatsCards() {
       icon: <Crown className="w-5 h-5" />,
       color: 'text-amber-600',
       bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+      href: '/users?membership=golden',
     },
     {
       title: 'Requirements',
@@ -67,6 +74,7 @@ export function StatsCards() {
       icon: <FileText className="w-5 h-5" />,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+      href: '/requirements',
     },
     {
       title: 'Active Vehicles',
@@ -74,6 +82,7 @@ export function StatsCards() {
       icon: <Car className="w-5 h-5" />,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+      href: '/vehicles',
     },
     {
       title: 'Total Revenue',
@@ -82,13 +91,14 @@ export function StatsCards() {
       icon: <IndianRupee className="w-5 h-5" />,
       color: 'text-rose-600',
       bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+      href: '/payments',
     },
   ];
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {cards.map((card) => (
-        <div key={card.title} className="stat-card">
+      {cards.map((card) => {
+        const inner = (
           <div className="flex items-start justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">{card.title}</p>
@@ -101,8 +111,19 @@ export function StatsCards() {
               <span className={card.color}>{card.icon}</span>
             </div>
           </div>
-        </div>
-      ))}
+        );
+        return card.href ? (
+          <Link
+            key={card.title}
+            href={card.href}
+            className="stat-card block transition-shadow hover:shadow-card-hover hover:border-orange-300 dark:hover:border-orange-500/40 cursor-pointer"
+          >
+            {inner}
+          </Link>
+        ) : (
+          <div key={card.title} className="stat-card">{inner}</div>
+        );
+      })}
     </div>
   );
 }
