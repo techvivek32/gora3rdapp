@@ -26,10 +26,16 @@ export class NotificationsService {
       requirement.dropCity,
     ].filter(Boolean);
 
-    // Find users with matching business cities who have notifications enabled
+    // City targeting: a user who selected business cities is notified only for those
+    // cities; a user who selected NO city (empty/absent businessCities) is treated as
+    // "all cities" and notified for every requirement.
     const candidates = await this.userModel
       .find({
-        businessCities: { $in: cities },
+        $or: [
+          { businessCities: { $in: cities } }, // selected → only matching cities
+          { businessCities: { $size: 0 } },    // selected nothing → all cities
+          { businessCities: { $exists: false } },
+        ],
         notificationsEnabled: true,
         isActive: true,
         isBlocked: false,
