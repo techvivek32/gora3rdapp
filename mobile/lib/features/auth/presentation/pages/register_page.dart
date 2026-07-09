@@ -16,7 +16,8 @@ class _DocField {
   final String key; // matches backend: aadhar, pan, drivingLicense, vehicleRc
   final String label;
   final TextEditingController numberCtrl = TextEditingController();
-  Uint8List? bytes;
+  Uint8List? bytes; // front side
+  Uint8List? backBytes; // back side
   _DocField(this.key, this.label);
 }
 
@@ -93,7 +94,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _profileBytes = bytes);
   }
 
-  Future<void> _pickDoc(_DocField doc) async {
+  Future<void> _pickDoc(_DocField doc, {required bool back}) async {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 1200,
@@ -101,7 +102,13 @@ class _RegisterPageState extends State<RegisterPage> {
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
-    setState(() => doc.bytes = bytes);
+    setState(() {
+      if (back) {
+        doc.backBytes = bytes;
+      } else {
+        doc.bytes = bytes;
+      }
+    });
   }
 
   Future<String> _uploadImage(
@@ -205,11 +212,13 @@ class _RegisterPageState extends State<RegisterPage> {
         final d = _docs[key]!;
         final hasNumber = d.numberCtrl.text.trim().isNotEmpty;
         final hasImage = d.bytes != null;
-        if (!hasNumber && !hasImage) continue;
+        final hasBack = d.backBytes != null;
+        if (!hasNumber && !hasImage && !hasBack) continue;
         setState(() => _status = 'Uploading documents...');
         final entry = <String, dynamic>{};
         if (hasNumber) entry['number'] = d.numberCtrl.text.trim();
-        if (hasImage) entry['image'] = await _uploadImage(d.bytes!, key);
+        if (hasImage) entry['image'] = await _uploadImage(d.bytes!, '${key}_front');
+        if (hasBack) entry['backImage'] = await _uploadImage(d.backBytes!, '${key}_back');
         body[key] = entry;
       }
 
@@ -437,8 +446,69 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  // One full-width upload box for a document side (front or back).
+  Widget _docSideBox(_DocField doc, {required bool back}) {
+    final Uint8List? bytes = back ? doc.backBytes : doc.bytes;
+    final label = back ? 'Back Side' : 'Front Side';
+    final primary = Theme.of(context).primaryColor;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(back ? Icons.flip_to_back : Icons.flip_to_front, size: 14, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () => _pickDoc(doc, back: back),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: bytes != null ? Colors.grey.shade100 : primary.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: bytes != null ? Colors.grey.shade300 : primary.withValues(alpha: 0.35),
+                width: 1.2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: bytes != null
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.memory(bytes, fit: BoxFit.cover),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                          child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                        ),
+                      ),
+                    ],
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add_a_photo_outlined, color: primary, size: 28),
+                      const SizedBox(height: 8),
+                      Text('Tap to upload $label', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDocTile(_DocField doc) {
-    final hasData = doc.bytes != null || doc.numberCtrl.text.trim().isNotEmpty;
+    final hasData = doc.bytes != null || doc.backBytes != null || doc.numberCtrl.text.trim().isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -469,44 +539,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 prefixIcon: const Icon(Icons.badge_outlined),
               ),
             ),
-            const SizedBox(height: 10),
-            InkWell(
-              onTap: () => _pickDoc(doc),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: doc.bytes != null
-                    ? Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.memory(doc.bytes!, fit: BoxFit.cover),
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                              child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.cloud_upload_outlined, color: Colors.grey.shade500, size: 28),
-                          const SizedBox(height: 6),
-                          Text('Upload ${doc.label} photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                        ],
-                      ),
-              ),
-            ),
+            const SizedBox(height: 12),
+            _docSideBox(doc, back: false),
+            const SizedBox(height: 12),
+            _docSideBox(doc, back: true),
           ],
         ),
       ),

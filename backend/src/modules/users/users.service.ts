@@ -196,9 +196,11 @@ export class UsersService {
 
     const { agencyName, ...documents } = dto;
 
-    // Keep only the document entries that were actually provided.
+    // Keep only the document entries that were actually provided (front and/or back).
     const cleanedDocuments = Object.fromEntries(
-      Object.entries(documents).filter(([, value]) => value && (value.number || value.image)),
+      Object.entries(documents).filter(
+        ([, value]) => value && (value.number || value.image || value.backImage),
+      ),
     );
 
     const update: Record<string, any> = {

@@ -297,7 +297,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   const providedDocs = DOCS
     .map((d) => ({ ...d, doc: user.documents?.[d.key] }))
-    .filter((d) => d.doc && (d.doc.number || d.doc.image));
+    .filter((d) => d.doc && (d.doc.number || d.doc.image || d.doc.backImage));
 
   const cardCls = 'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700';
 
@@ -502,15 +502,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                           </span>
                         )}
                       </div>
-                      {doc.image ? (
-                        <a href={doc.image} target="_blank" rel="noreferrer" className="block group">
-                          <img src={doc.image} alt={label} className="w-full h-44 object-cover group-hover:opacity-90 transition" />
-                        </a>
-                      ) : (
-                        <div className="w-full h-44 flex items-center justify-center text-gray-300 text-xs bg-gray-50 dark:bg-gray-800">
-                          No image uploaded
-                        </div>
-                      )}
+                      <div className="p-2 space-y-2">
+                        <DocImage label="Front Side" src={doc.image} alt={`${label} front`} />
+                        <DocImage label="Back Side" src={doc.backImage} alt={`${label} back`} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -812,6 +807,25 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           onClose={() => setEditSubModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setEditSubModal(null); }}
         />
+      )}
+    </div>
+  );
+}
+
+// One side (front/back) of a KYC document, stacked with a label above the image.
+function DocImage({ label, src, alt }: { label: string; src?: string; alt: string }) {
+  return (
+    <div>
+      <p className="text-[11px] font-semibold text-gray-500 mb-1">{label}</p>
+      {src ? (
+        <a href={src} target="_blank" rel="noreferrer" className="block group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={alt} className="w-full h-44 object-cover rounded-lg bg-gray-100 group-hover:opacity-90 transition" />
+        </a>
+      ) : (
+        <div className="w-full h-44 flex items-center justify-center text-gray-300 text-xs bg-gray-50 dark:bg-gray-800 rounded-lg">
+          No image uploaded
+        </div>
       )}
     </div>
   );

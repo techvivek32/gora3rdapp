@@ -102,13 +102,14 @@ export class User {
     osVersion: string;
   };
 
-  // KYC documents: each entry holds the document id/number and an uploaded image URL.
+  // KYC documents: each entry holds the document id/number plus front (`image`)
+  // and back (`backImage`) side photo URLs.
   @Prop({ type: Object, default: {} })
   documents: {
-    aadhar?: { number?: string; image?: string };
-    pan?: { number?: string; image?: string };
-    drivingLicense?: { number?: string; image?: string };
-    vehicleRc?: { number?: string; image?: string };
+    aadhar?: { number?: string; image?: string; backImage?: string };
+    pan?: { number?: string; image?: string; backImage?: string };
+    drivingLicense?: { number?: string; image?: string; backImage?: string };
+    vehicleRc?: { number?: string; image?: string; backImage?: string };
   };
 
   @Prop({ type: String, enum: VerificationStatus, default: VerificationStatus.NONE })

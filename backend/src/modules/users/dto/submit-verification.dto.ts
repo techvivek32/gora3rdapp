@@ -6,9 +6,15 @@ export class DocumentItemDto {
   @IsString()
   number?: string;
 
+  // Front side of the document.
   @IsOptional()
   @IsString()
   image?: string;
+
+  // Back side of the document.
+  @IsOptional()
+  @IsString()
+  backImage?: string;
 }
 
 export class SubmitVerificationDto {

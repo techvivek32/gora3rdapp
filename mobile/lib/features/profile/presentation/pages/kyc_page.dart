@@ -11,8 +11,10 @@ class _KycDoc {
   final String key; // backend: aadhar, pan, drivingLicense, vehicleRc
   final String label;
   final TextEditingController numberCtrl = TextEditingController();
-  String? existingImage; // URL already on the server
-  Uint8List? newBytes; // freshly picked image
+  String? existingImage; // front URL already on the server
+  String? existingBackImage; // back URL already on the server
+  Uint8List? newBytes; // freshly picked front image
+  Uint8List? newBackBytes; // freshly picked back image
   _KycDoc(this.key, this.label);
 }
 
@@ -72,6 +74,7 @@ class _KycPageState extends State<KycPage> {
         if (entry != null) {
           _docs[key]!.numberCtrl.text = (entry['number'] ?? '').toString();
           _docs[key]!.existingImage = entry['image'] as String?;
+          _docs[key]!.existingBackImage = entry['backImage'] as String?;
         }
       }
       if (mounted) {
@@ -87,11 +90,17 @@ class _KycPageState extends State<KycPage> {
     }
   }
 
-  Future<void> _pickImage(_KycDoc doc) async {
+  Future<void> _pickImage(_KycDoc doc, {required bool back}) async {
     final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 80);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
-    setState(() => doc.newBytes = bytes);
+    setState(() {
+      if (back) {
+        doc.newBackBytes = bytes;
+      } else {
+        doc.newBytes = bytes;
+      }
+    });
   }
 
   Future<String> _uploadImage(Uint8List bytes, String name) async {
@@ -133,11 +142,13 @@ class _KycPageState extends State<KycPage> {
       for (final key in _visibleKeys) {
         final d = _docs[key]!;
         final hasNumber = d.numberCtrl.text.trim().isNotEmpty;
-        final image = d.newBytes != null ? await _uploadImage(d.newBytes!, key) : d.existingImage;
-        if (!hasNumber && image == null) continue;
+        final image = d.newBytes != null ? await _uploadImage(d.newBytes!, '${key}_front') : d.existingImage;
+        final backImage = d.newBackBytes != null ? await _uploadImage(d.newBackBytes!, '${key}_back') : d.existingBackImage;
+        if (!hasNumber && image == null && backImage == null) continue;
         final entry = <String, dynamic>{};
         if (hasNumber) entry['number'] = d.numberCtrl.text.trim();
         if (image != null) entry['image'] = image;
+        if (backImage != null) entry['backImage'] = backImage;
         body[key] = entry;
       }
 
@@ -256,7 +267,11 @@ class _KycPageState extends State<KycPage> {
   }
 
   Widget _buildDocTile(_KycDoc doc) {
-    final hasData = doc.newBytes != null || (doc.existingImage != null) || doc.numberCtrl.text.trim().isNotEmpty;
+    final hasData = doc.newBytes != null ||
+        doc.existingImage != null ||
+        doc.newBackBytes != null ||
+        doc.existingBackImage != null ||
+        doc.numberCtrl.text.trim().isNotEmpty;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -287,35 +302,69 @@ class _KycPageState extends State<KycPage> {
                 prefixIcon: const Icon(Icons.badge_outlined),
               ),
             ),
-            const SizedBox(height: 10),
-            InkWell(
-              onTap: _locked ? null : () => _pickImage(doc),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: doc.newBytes != null
-                    ? _imageWithEdit(Image.memory(doc.newBytes!, fit: BoxFit.cover), locked: _locked)
-                    : (doc.existingImage != null
-                        ? _imageWithEdit(Image.network(doc.existingImage!, fit: BoxFit.cover), locked: _locked)
-                        : Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.cloud_upload_outlined, color: Colors.grey.shade500, size: 28),
-                              const SizedBox(height: 6),
-                              Text('Upload ${doc.label} photo', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                            ],
-                          )),
-              ),
-            ),
+            const SizedBox(height: 12),
+            _sideBox(doc, back: false),
+            const SizedBox(height: 12),
+            _sideBox(doc, back: true),
           ],
         ),
       ),
+    );
+  }
+
+  // One full-width upload box for a document side (front or back).
+  Widget _sideBox(_KycDoc doc, {required bool back}) {
+    final Uint8List? newBytes = back ? doc.newBackBytes : doc.newBytes;
+    final String? existing = back ? doc.existingBackImage : doc.existingImage;
+    final label = back ? 'Back Side' : 'Front Side';
+    final hasImage = newBytes != null || existing != null;
+
+    Widget content;
+    if (newBytes != null) {
+      content = _imageWithEdit(Image.memory(newBytes, fit: BoxFit.cover), locked: _locked);
+    } else if (existing != null) {
+      content = _imageWithEdit(Image.network(existing, fit: BoxFit.cover), locked: _locked);
+    } else {
+      content = Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.add_a_photo_outlined, color: AppColors.primary, size: 28),
+          const SizedBox(height: 8),
+          Text('Tap to upload $label', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(back ? Icons.flip_to_back : Icons.flip_to_front, size: 14, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: _locked ? null : () => _pickImage(doc, back: back),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: hasImage ? Colors.grey.shade100 : AppColors.primary.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasImage ? Colors.grey.shade300 : AppColors.primary.withValues(alpha: 0.35),
+                width: 1.2,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: content,
+          ),
+        ),
+      ],
     );
   }
 

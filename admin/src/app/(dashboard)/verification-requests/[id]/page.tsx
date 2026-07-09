@@ -163,16 +163,10 @@ export default function VerificationRequestDetailPage({ params }: { params: Prom
                   <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800">
                     <span className="font-medium text-sm">{DOC_LABELS[key] || key}</span>
                   </div>
-                  {doc.image ? (
-                    <a href={doc.image} target="_blank" rel="noopener noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={doc.image} alt={DOC_LABELS[key]} className="w-full h-44 object-cover bg-gray-100" />
-                    </a>
-                  ) : (
-                    <div className="w-full h-44 flex items-center justify-center bg-gray-100 text-gray-400 text-sm">
-                      No image
-                    </div>
-                  )}
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <DocSide label="Front Side" src={doc.image} alt={`${DOC_LABELS[key]} front`} />
+                    <DocSide label="Back Side" src={doc.backImage} alt={`${DOC_LABELS[key]} back`} />
+                  </div>
                   <div className="px-4 py-3">
                     <p className="text-xs text-gray-400">Document Number</p>
                     <p className="font-mono text-sm">{doc.number || '—'}</p>
@@ -183,6 +177,25 @@ export default function VerificationRequestDetailPage({ params }: { params: Prom
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// One side (front/back) of a document image, with a tap-to-open link.
+function DocSide({ label, src, alt }: { label: string; src?: string; alt: string }) {
+  return (
+    <div className="p-2">
+      <p className="text-[11px] font-semibold text-gray-500 mb-1">{label}</p>
+      {src ? (
+        <a href={src} target="_blank" rel="noopener noreferrer">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={alt} className="w-full h-44 object-cover rounded-lg bg-gray-100" />
+        </a>
+      ) : (
+        <div className="w-full h-44 flex items-center justify-center bg-gray-100 dark:bg-gray-800 text-gray-400 text-xs rounded-lg">
+          No image
+        </div>
+      )}
     </div>
   );
 }
