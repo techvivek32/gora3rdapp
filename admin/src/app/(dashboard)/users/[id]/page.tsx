@@ -87,12 +87,13 @@ const DOCS = [
 
 const TABS = [
   { id: 'profile', label: 'User Profile', icon: User },
-  { id: 'requests', label: 'Request List', icon: ClipboardList },
+  { id: 'subscription', label: 'Subscription', icon: CheckSquare },
   { id: 'payments', label: 'Payment History', icon: CreditCard },
   { id: 'withdrawals', label: 'Withdrawal History', icon: ArrowUpRight },
   { id: 'reviews', label: 'Review History', icon: Star },
   { id: 'documents', label: 'Documents', icon: FileCheck },
-  { id: 'subscription', label: 'Subscription', icon: CheckSquare },
+  { id: 'requests', label: 'Request List', icon: ClipboardList },
+
 ];
 
 function verificationBadge(status?: string) {

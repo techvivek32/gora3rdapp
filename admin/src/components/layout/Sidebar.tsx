@@ -58,12 +58,15 @@ export default function Sidebar() {
   return (
     <aside className="w-64 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200 dark:border-gray-700">
-        <div className="w-9 h-9 bg-orange-500 rounded-lg flex items-center justify-center">
-          <Car className="w-5 h-5 text-white" />
-        </div>
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/Gora_Taxi_Partner.png"
+          alt="Gora Taxi Partner"
+          className="h-10 w-10 flex-shrink-0 object-contain rounded-xl"
+        />
         <div>
-          <span className="font-bold text-gray-900 dark:text-white">Gora Texi</span>
+          <span className="font-bold text-gray-900 dark:text-white">Gora Taxi</span>
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-500">Partner</span>
           </div>
@@ -101,7 +104,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="px-3 py-1 border-t border-gray-200 dark:border-gray-700">
         <button
           onClick={() => signOut({ callbackUrl: '/login' })}
           className="sidebar-link w-full text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
