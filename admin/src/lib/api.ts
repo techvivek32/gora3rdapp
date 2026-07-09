@@ -18,11 +18,12 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (res) => res.data,
   (error) => {
-    // Safety net: if a call still hits an expired/invalid token (401/403 auth),
-    // the session can't serve this request → force a clean re-login.
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      import('next-auth/react').then(({ signOut }) => signOut({ callbackUrl: '/login' })).catch(() => {});
-    }
+    // Note: we intentionally do NOT force a sign-out on a 401 here. On a page reload
+    // a query can briefly race ahead of the session refresh and fire with a stale
+    // access token, producing a transient 401 — hard sign-out here used to log the
+    // admin out on every refresh. React Query retries the request once the refreshed
+    // token lands (SessionSync). Genuine session expiry (refresh token dead) is handled
+    // in providers.tsx, which signs out when the session reports RefreshAccessTokenError.
     const message = error.response?.data?.message || error.message || 'Something went wrong';
     return Promise.reject(new Error(message));
   },

@@ -282,10 +282,27 @@ export class AuthService {
     const isTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!isTokenValid) throw new UnauthorizedException('Invalid refresh token');
 
-    const tokens = await this.generateTokens(user);
-    await this.saveRefreshToken(userId, tokens.refreshToken);
+    // Issue only a fresh access token and KEEP the same refresh token (no rotation).
+    // Rotating here caused logouts: on a page reload NextAuth fires the refresh from
+    // both the server (getServerSession) and the client at once with the same token —
+    // rotation invalidates one of them, and server-side rotations can't be persisted
+    // back into the cookie. A stable refresh token (still valid its full 30d) avoids
+    // that race entirely, so the admin stays logged in across refreshes / tab reopens.
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: user._id.toString(),
+        email: user.email,
+        mobile: user.mobile,
+        role: user.role,
+        membershipType: user.membershipType,
+      },
+      {
+        secret: this.configService.get<string>('jwt.secret'),
+        expiresIn: this.configService.get<string>('jwt.expiresIn', '15m'),
+      },
+    );
 
-    return { message: 'Tokens refreshed', data: tokens };
+    return { message: 'Tokens refreshed', data: { accessToken, refreshToken } };
   }
 
   async logout(userId: string, fcmToken?: string) {

@@ -105,9 +105,12 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
     error: '/login',
   },
-  // Admin session times out after 1 day of inactivity (rolling window). Within that
-  // day the short-lived access token is auto-refreshed by the jwt callback above;
-  // once the day lapses the session expires and the user is sent back to login.
-  session: { strategy: 'jwt', maxAge: 24 * 60 * 60 },
+  // Admin session lasts 24h and rolls forward on activity: the session cookie is
+  // persisted (so closing/reopening the tab keeps you signed in) and is re-issued at
+  // most once per hour of use, pushing its 24h expiry out. Within that window the
+  // short-lived access token is auto-refreshed by the jwt callback above; only after
+  // 24h of no activity does the session lapse and the user return to login.
+  session: { strategy: 'jwt', maxAge: 24 * 60 * 60, updateAge: 60 * 60 },
+  jwt: { maxAge: 24 * 60 * 60 },
   secret: process.env.NEXTAUTH_SECRET,
 };
