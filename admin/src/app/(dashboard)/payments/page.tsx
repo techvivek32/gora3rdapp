@@ -84,8 +84,10 @@ export default function PaymentsPage() {
     queryFn: () => adminApi.getPayments({ page, limit: 20 }),
   });
 
+  // Revenue = successful Razorpay transactions only (plans + wallet top-ups);
+  // admin adjustments (method "admin") and other non-gateway entries don't count.
   const total = data?.data?.data?.reduce((sum: number, p: Payment) =>
-    p.status === 'paid' ? sum + p.amount : sum, 0) ?? 0;
+    p.status === 'success' && p.method === 'razorpay' ? sum + p.amount : sum, 0) ?? 0;
 
   return (
     <div className="space-y-6">

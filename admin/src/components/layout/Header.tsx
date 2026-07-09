@@ -1,16 +1,23 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { Bell, Search, Moon, Sun, Menu } from 'lucide-react';
-import { useState } from 'react';
+import { Bell, Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function Header() {
   const { data: session } = useSession();
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(true);
+
+  // Sync with the theme applied by the pre-paint init script (defaults to dark).
+  useEffect(() => {
+    setIsDark(document.documentElement.classList.contains('dark'));
+  }, []);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark');
+    const next = !document.documentElement.classList.contains('dark');
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+    setIsDark(next);
   };
 
   return (

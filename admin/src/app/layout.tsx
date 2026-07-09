@@ -11,9 +11,16 @@ export const metadata: Metadata = {
   icons: { icon: '/favicon.ico' },
 };
 
+// Applies the theme before paint (no flash). Dark is the default; only an explicit
+// "light" choice saved by the user opts out.
+const themeInit = `(function(){try{var t=localStorage.getItem('theme');if(t==='light'){document.documentElement.classList.remove('dark');}else{document.documentElement.classList.add('dark');}}catch(e){document.documentElement.classList.add('dark');}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
       <body className={inter.className}>
         <Providers>{children}</Providers>
       </body>

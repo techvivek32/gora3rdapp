@@ -44,46 +44,46 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Send Notification</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Send Notification</h1>
         <p className="text-gray-500 mt-1">Push notifications to targeted users</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5 max-w-2xl">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5 max-w-2xl">
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
             <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Notification title" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Message *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Message *</label>
             <textarea
               value={form.body}
               onChange={(e) => setForm({ ...form, body: e.target.value })}
               placeholder="Notification message body"
               rows={3}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
+              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image URL (Optional)</label>
               <Input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Action URL (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Action URL (Optional)</label>
               <Input value={form.actionUrl} onChange={(e) => setForm({ ...form, actionUrl: e.target.value })} placeholder="/requirements" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Target Membership</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target Membership</label>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, targetMemberships: [] }))}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
                   form.targetMemberships.length === 0
-                    ? 'bg-gray-800 text-white border-gray-800'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    ? 'bg-gray-800 text-white border-gray-800 dark:bg-gray-200 dark:text-gray-900 dark:border-gray-200'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
                 }`}
               >
                 All Users
@@ -103,7 +103,7 @@ export default function NotificationsPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Target Cities (Optional)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Cities (Optional)</label>
             <Input
               value={form.targetCities}
               onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
@@ -113,14 +113,14 @@ export default function NotificationsPage() {
           </div>
         </div>
 
-        <div className="bg-gray-50 rounded-lg p-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">Preview</p>
-          <div className="bg-white rounded-lg p-3 border border-gray-200 flex gap-3">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview</p>
+          <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-700 flex gap-3">
             <div className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center flex-shrink-0">
               <span className="text-brand-600 font-bold text-sm">G</span>
             </div>
             <div>
-              <p className="font-semibold text-sm">{form.title || 'Notification Title'}</p>
+              <p className="font-semibold text-sm text-gray-900 dark:text-white">{form.title || 'Notification Title'}</p>
               <p className="text-xs text-gray-500">{form.body || 'Notification message will appear here'}</p>
             </div>
           </div>

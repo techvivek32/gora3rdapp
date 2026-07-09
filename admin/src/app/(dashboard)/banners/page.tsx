@@ -142,7 +142,7 @@ export default function BannersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Banners</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Banners</h1>
           <p className="text-gray-500 mt-1">Manage promotional banners shown at the top of the app</p>
         </div>
         <button
@@ -155,13 +155,13 @@ export default function BannersPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-          <h2 className="font-semibold text-lg">{editingId ? 'Edit Banner' : 'New Banner'}</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
+          <h2 className="font-semibold text-lg text-gray-900 dark:text-white">{editingId ? 'Edit Banner' : 'New Banner'}</h2>
 
           {/* Image upload + URL */}
           <div>
             <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-              <label className="block text-sm font-medium text-gray-700">Banner Image</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Banner Image</label>
               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-brand-700 bg-brand-50 border border-brand-200 rounded-full px-2.5 py-1">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5z" /></svg>
                 Recommended: 1080 × 528 px · 2.05:1 (landscape)
@@ -218,7 +218,7 @@ export default function BannersPage() {
                   ) : (
                     <>
                       <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                      <span className="text-gray-600 text-sm font-medium">Click or drag to upload image</span>
+                      <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Click or drag to upload image</span>
                       <span className="text-gray-400 text-xs">PNG, JPG, WebP — best at 1080 × 528 px (2.05:1)</span>
                     </>
                   )}
@@ -228,16 +228,16 @@ export default function BannersPage() {
 
             {/* Or paste URL */}
             <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-px bg-gray-200" />
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
               <span className="text-xs text-gray-400 whitespace-nowrap">or paste URL</span>
-              <div className="flex-1 h-px bg-gray-200" />
+              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
             </div>
             <input
               type="url"
               placeholder="https://example.com/banner.jpg"
               value={form.imageUrl}
               onChange={(e) => { setForm({ ...form, imageUrl: e.target.value }); setImgError(false); }}
-              className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             />
             {form.imageUrl && imgError && (
               <p className="text-red-500 text-xs mt-1">Could not load image from this URL</p>
@@ -249,44 +249,44 @@ export default function BannersPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
               <input
                 type="text"
                 placeholder="e.g. Special Offer"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subtitle</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subtitle</label>
               <input
                 type="text"
                 placeholder="e.g. Book now and save 20%"
                 value={form.subtitle}
                 onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number</label>
               <input
                 type="tel"
                 placeholder="e.g. 9876543210"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Number</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">WhatsApp Number</label>
               <input
                 type="tel"
                 placeholder="e.g. 9876543210"
                 value={form.sameWhatsapp ? form.phone : form.whatsapp}
                 disabled={form.sameWhatsapp}
                 onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-gray-100 disabled:text-gray-400"
               />
               <label className="flex items-center gap-2 cursor-pointer mt-2">
                 <input
@@ -295,7 +295,7 @@ export default function BannersPage() {
                   onChange={(e) => setForm({ ...form, sameWhatsapp: e.target.checked })}
                   className="w-4 h-4 text-brand-600 rounded"
                 />
-                <span className="text-xs text-gray-600">WhatsApp same as phone</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400">WhatsApp same as phone</span>
               </label>
             </div>
           </div>
@@ -307,7 +307,7 @@ export default function BannersPage() {
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
               className="w-4 h-4 text-brand-600 rounded"
             />
-            <span className="text-sm font-medium text-gray-700">Active (visible in app)</span>
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active (visible in app)</span>
           </label>
 
           <button
@@ -333,7 +333,7 @@ export default function BannersPage() {
           ))}
         </div>
       ) : banners.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
           <div className="text-4xl mb-3">🖼️</div>
           <p className="text-gray-500 font-medium">No banners yet</p>
           <p className="text-gray-400 text-sm mt-1">Create your first banner to show it in the app</p>
@@ -341,7 +341,7 @@ export default function BannersPage() {
       ) : (
         <div className="space-y-4">
           {banners.map((banner) => (
-            <div key={banner._id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4">
+            <div key={banner._id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex items-center gap-4">
               {/* Thumbnail — same ratio & style the app shows it at */}
               <div className="w-44 flex-shrink-0">
                 <MobileBannerPreview imageUrl={banner.imageUrl} title={banner.title} subtitle={banner.subtitle} />
@@ -349,7 +349,7 @@ export default function BannersPage() {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold">{banner.title}</h3>
+                  <h3 className="font-semibold text-gray-900 dark:text-white">{banner.title}</h3>
                   <Badge variant={banner.isActive ? 'success' : 'secondary'}>
                     {banner.isActive ? 'Active' : 'Inactive'}
                   </Badge>
@@ -367,7 +367,7 @@ export default function BannersPage() {
               <div className="flex gap-2 flex-shrink-0">
                 <button
                   onClick={() => openEdit(banner)}
-                  className="px-3 py-1.5 text-xs font-semibold border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold border border-gray-300 dark:border-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   Edit
                 </button>

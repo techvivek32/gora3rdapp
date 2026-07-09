@@ -59,11 +59,8 @@ export class AdminService {
       this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false }),
       this.vehicleModel.countDocuments({ isDeleted: false }),
       this.vehicleModel.countDocuments({ status: 'available', isDeleted: false }),
-      this.paymentModel.aggregate([{ $match: { status: 'success' } }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      this.paymentModel.aggregate([
-        { $match: { status: 'success', createdAt: { $gte: monthStart } } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]),
+      this.razorpayRevenue(),
+      this.razorpayRevenue(monthStart),
       this.reportModel.countDocuments({ status: ReportStatus.PENDING }),
       this.notificationsService ? 0 : 0,
       this.userModel.countDocuments({ createdAt: { $gte: todayStart } }),
@@ -77,8 +74,8 @@ export class AdminService {
         requirements: { total: totalRequirements, active: activeRequirements, today: todayRequirements },
         vehicles: { total: totalVehicles, active: activeVehicles },
         revenue: {
-          total: totalRevenue[0]?.total || 0,
-          monthly: monthlyRevenue[0]?.total || 0,
+          total: totalRevenue,
+          monthly: monthlyRevenue,
         },
         reports: { pending: pendingReports },
         today: { registrations: todayRegistrations, requirements: todayRequirements },
@@ -668,11 +665,7 @@ export class AdminService {
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
-      this.paymentModel.aggregate([
-        { $match: { status: 'success', createdAt: { $gte: startDate } } },
-        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, revenue: { $sum: '$amount' }, count: { $sum: 1 } } },
-        { $sort: { _id: 1 } },
-      ]),
+      this.razorpayDailyRevenue(startDate),
       this.requirementModel.aggregate([
         { $match: { isDeleted: false } },
         { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
@@ -688,6 +681,54 @@ export class AdminService {
       message: 'Analytics data',
       data: { userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown },
     };
+  }
+
+  // ── Revenue: only real Razorpay money counts ────────────────────────────────
+  // A transaction is revenue only when it actually went through Razorpay (it has a
+  // razorpayPaymentId): plan purchases + wallet top-ups. Admin wallet adjustments and
+  // manual entries have no razorpayPaymentId, so they're excluded. Payment amounts are
+  // stored in paise (÷100 → rupees); wallet amounts are already in rupees.
+  private readonly _hasRazorpayId = { $exists: true, $nin: [null, ''] };
+
+  private async razorpayRevenue(since?: Date): Promise<number> {
+    const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId };
+    const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId };
+    if (since) {
+      pMatch.createdAt = { $gte: since };
+      wMatch.createdAt = { $gte: since };
+    }
+    const [p, w] = await Promise.all([
+      this.paymentModel.aggregate([{ $match: pMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      this.walletTxModel.aggregate([{ $match: wMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    ]);
+    const planRupees = (p[0]?.total || 0) / 100; // paise → rupees
+    const walletRupees = w[0]?.total || 0; // already rupees
+    return Math.round(planRupees + walletRupees);
+  }
+
+  private async razorpayDailyRevenue(since: Date) {
+    const dateKey = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+    const [planDaily, walletDaily] = await Promise.all([
+      this.paymentModel.aggregate([
+        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } } },
+        { $group: { _id: dateKey, paise: { $sum: '$amount' }, count: { $sum: 1 } } },
+      ]),
+      this.walletTxModel.aggregate([
+        { $match: { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } } },
+        { $group: { _id: dateKey, rupees: { $sum: '$amount' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+    const map = new Map<string, { revenue: number; count: number }>();
+    for (const d of planDaily as any[]) map.set(d._id, { revenue: (d.paise || 0) / 100, count: d.count || 0 });
+    for (const d of walletDaily as any[]) {
+      const e = map.get(d._id) || { revenue: 0, count: 0 };
+      e.revenue += d.rupees || 0;
+      e.count += d.count || 0;
+      map.set(d._id, e);
+    }
+    return [...map.entries()]
+      .map(([_id, v]) => ({ _id, revenue: Math.round(v.revenue), count: v.count }))
+      .sort((a, b) => a._id.localeCompare(b._id));
   }
 
   // Combined transaction history: subscription payments + wallet top-ups.
