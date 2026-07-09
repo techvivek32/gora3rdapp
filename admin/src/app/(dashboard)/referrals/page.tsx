@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
-import { Input } from '@/components/ui/Input';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Button } from '@/components/ui/Button';
-import { Search, Trophy, Plus, Minus, X } from 'lucide-react';
+import { Trophy, Plus, Minus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -30,13 +30,15 @@ const medalEmoji: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 export default function ReferralsPage() {
   const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
   const [amount, setAmount] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-referrals', search],
-    queryFn: () => adminApi.getReferralLeaderboard({ search }),
+    queryKey: ['admin-referrals', search, dateFrom, dateTo],
+    queryFn: () => adminApi.getReferralLeaderboard({ search, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
   const data = rawData as any;
   const rows: Row[] = data?.data || [];
@@ -143,6 +145,17 @@ export default function ReferralsPage() {
         </div>
       </div>
 
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search name, mobile, code…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={setDateFrom}
+        onDateTo={setDateTo}
+        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+      />
+
       {top3.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {top3.map((u) => (
@@ -167,16 +180,6 @@ export default function ReferralsPage() {
           ))}
         </div>
       )}
-
-      <div className="relative flex-1 min-w-[200px] max-w-xs">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, mobile, code..."
-          className="pl-9"
-        />
-      </div>
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <DataTable columns={columns} data={rows} isLoading={isLoading} />

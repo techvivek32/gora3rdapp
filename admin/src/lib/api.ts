@@ -99,7 +99,7 @@ export const adminApi = {
     apiClient.post(`/admin/wallets/${userId}/adjust`, data),
 
   // ─── Withdrawals ─────────────────────────────────────────────────────────────
-  getWithdrawals: (params?: { status?: string }) => apiClient.get('/admin/wallets/withdrawals', { params }),
+  getWithdrawals: (params?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }) => apiClient.get('/admin/wallets/withdrawals', { params }),
   approveWithdrawal: (id: string) => apiClient.post(`/admin/wallets/withdrawals/${id}/approve`),
   rejectWithdrawal: (id: string, reason: string) => apiClient.post(`/admin/wallets/withdrawals/${id}/reject`, { reason }),
 

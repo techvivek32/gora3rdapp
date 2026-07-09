@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -80,10 +81,13 @@ const columns: ColumnDef<Subscription>[] = [
 export default function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('active');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', page, status],
-    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status }),
+    queryKey: ['subscriptions', page, status, search, dateFrom, dateTo],
+    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
 
   return (
@@ -93,19 +97,25 @@ export default function SubscriptionsPage() {
         <p className="text-gray-500 mt-1">User membership subscriptions</p>
       </div>
 
-      <div className="flex gap-2">
-        {['active', 'expired'].map((s) => (
-          <button
-            key={s}
-            onClick={() => { setStatus(s); setPage(1); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              status === s ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
-        ))}
-      </div>
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search by user name / mobile…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        onDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+      >
+        <select
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="active">Active</option>
+          <option value="expired">Expired</option>
+        </select>
+      </FilterBar>
 
       <DataTable
         columns={columns}

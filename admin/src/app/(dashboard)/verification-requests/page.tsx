@@ -6,10 +6,9 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
-import { Search } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface VerificationRequest {
@@ -35,15 +34,19 @@ export default function VerificationRequestsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('pending');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['verification-requests', page, search, statusFilter],
+    queryKey: ['verification-requests', page, search, statusFilter, dateFrom, dateTo],
     queryFn: () =>
       adminApi.getVerificationRequests({
         page,
         limit: 20,
         search,
         status: statusFilter || 'pending',
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
       }),
   });
   const data = rawData as any;
@@ -128,16 +131,16 @@ export default function VerificationRequestsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <Input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search by name, email, mobile..."
-            className="pl-9"
-          />
-        </div>
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search by name, email, mobile…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        onDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onClear={() => { setSearch(''); setStatusFilter('pending'); setDateFrom(''); setDateTo(''); setPage(1); }}
+      >
         <Select
           value={statusFilter}
           onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -147,7 +150,7 @@ export default function VerificationRequestsPage() {
           <option value="rejected">Rejected</option>
           <option value="all">All</option>
         </Select>
-      </div>
+      </FilterBar>
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">

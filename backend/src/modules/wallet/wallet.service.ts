@@ -9,6 +9,7 @@ import { WalletTransaction, WalletTransactionDocument } from '../../database/sch
 import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/schemas/withdrawal-request.schema';
 import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto } from './dto/wallet.dto';
 import { SettingsService } from '../settings/settings.service';
+import { dateRangeFilter } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class WalletService {
@@ -241,9 +242,23 @@ export class WalletService {
   }
 
   /** Admin: list withdrawal requests (optionally filtered by status). */
-  async getWithdrawals(status?: string) {
-    const filter: any = {};
+  async getWithdrawals(query: any = {}) {
+    const status = typeof query === 'string' ? query : query?.status;
+    const filter: any = { ...dateRangeFilter(query) };
     if (status && ['pending', 'approved', 'rejected'].includes(status)) filter.status = status;
+
+    // Search by the requester's name / mobile, or the payout account details.
+    const search = (query?.search || '').trim();
+    if (search) {
+      const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      const matchedUsers = await this.userModel.find({ $or: [{ fullName: rx }, { mobile: rx }] }).select('_id').lean();
+      filter.$or = [
+        { userId: { $in: matchedUsers.map((u) => u._id) } },
+        { accountHolderName: rx },
+        { accountNumber: rx },
+      ];
+    }
+
     const requests = await this.withdrawalModel
       .find(filter)
       .populate('userId', 'fullName mobile email agencyName city walletBalance')

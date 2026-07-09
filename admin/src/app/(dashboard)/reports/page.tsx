@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { FilterBar } from '@/components/ui/FilterBar';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -41,12 +42,15 @@ const STATUS_COLORS: Record<string, 'default' | 'warning' | 'success' | 'destruc
 export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('pending');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selected, setSelected] = useState<Report | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reports', page, status],
-    queryFn: () => adminApi.getReports({ page, limit: 20, status }),
+    queryKey: ['reports', page, status, search, dateFrom, dateTo],
+    queryFn: () => adminApi.getReports({ page, limit: 20, status, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
 
   const resolveMutation = useMutation({
@@ -115,19 +119,27 @@ export default function ReportsPage() {
         <p className="text-gray-500 mt-1">User-submitted content reports</p>
       </div>
 
-      <div className="flex gap-2">
-        {['pending', 'under_review', 'resolved', 'dismissed'].map((s) => (
-          <button
-            key={s}
-            onClick={() => { setStatus(s); setPage(1); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              status === s ? 'bg-brand-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            {s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}
-          </button>
-        ))}
-      </div>
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search reason / description…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        onDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+      >
+        <select
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="pending">Pending</option>
+          <option value="under_review">Under Review</option>
+          <option value="resolved">Resolved</option>
+          <option value="dismissed">Dismissed</option>
+        </select>
+      </FilterBar>
 
       <DataTable
         columns={columns}

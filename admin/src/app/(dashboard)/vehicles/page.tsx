@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -37,11 +37,14 @@ export default function VehiclesPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['vehicles', page, search],
-    queryFn: () => adminApi.getVehicles({ page, limit: 20, search }),
+    queryKey: ['vehicles', page, search, status, dateFrom, dateTo],
+    queryFn: () => adminApi.getVehicles({ page, limit: 20, search, status: status || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -114,12 +117,29 @@ export default function VehiclesPage() {
         <p className="text-gray-500 mt-1">All posted available cabs and vehicles</p>
       </div>
 
-      <Input
-        placeholder="Search by city or listing ID..."
-        value={search}
-        onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-        className="max-w-sm"
-      />
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search by city, listing ID, driver…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        onDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+      >
+        <select
+          value={status}
+          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="">All Status</option>
+          <option value="available">Available</option>
+          <option value="booked">Booked</option>
+          <option value="on_hold">Hold</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="expired">Expired</option>
+        </select>
+      </FilterBar>
 
       <DataTable
         columns={columns}

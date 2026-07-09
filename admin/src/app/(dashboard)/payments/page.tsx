@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
+import { FilterBar } from '@/components/ui/FilterBar';
+import { Select } from '@/components/ui/Select';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface Payment {
@@ -78,10 +80,21 @@ const columns: ColumnDef<Payment>[] = [
 
 export default function PaymentsPage() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const reset = () => setPage(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['payments', page],
-    queryFn: () => adminApi.getPayments({ page, limit: 20 }),
+    queryKey: ['payments', page, search, status, dateFrom, dateTo],
+    queryFn: () => adminApi.getPayments({
+      page, limit: 20,
+      search: search || undefined,
+      status: status || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    }),
   });
 
   // Revenue = successful Razorpay transactions only (plans + wallet top-ups);
@@ -101,6 +114,25 @@ export default function PaymentsPage() {
           <p className="text-2xl font-bold text-green-600">₹{(total / 100).toLocaleString('en-IN')}</p>
         </div>
       </div>
+
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); reset(); }}
+        searchPlaceholder="Search order ID / payment ID…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); reset(); }}
+        onDateTo={(v) => { setDateTo(v); reset(); }}
+        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); reset(); }}
+      >
+        <Select value={status} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatus(e.target.value); reset(); }}>
+          <option value="">All Status</option>
+          <option value="success">Success</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
+          <option value="refunded">Refunded</option>
+        </Select>
+      </FilterBar>
 
       <DataTable
         columns={columns}

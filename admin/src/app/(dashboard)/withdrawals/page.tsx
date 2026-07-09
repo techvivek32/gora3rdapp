@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Banknote, Check, X, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -30,8 +31,6 @@ interface Withdrawal {
   processedAt?: string;
 }
 
-const STATUSES = ['pending', 'approved', 'rejected'] as const;
-
 function statusBadge(status: string) {
   const map: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
@@ -44,10 +43,18 @@ function statusBadge(status: string) {
 export default function WithdrawalsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ['withdrawals', filter],
-    queryFn: () => adminApi.getWithdrawals(filter === 'all' ? {} : { status: filter }),
+    queryKey: ['withdrawals', filter, search, dateFrom, dateTo],
+    queryFn: () => adminApi.getWithdrawals({
+      status: filter === 'all' ? undefined : filter,
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    }),
     refetchInterval: 30000,
   });
   const requests: Withdrawal[] = (raw as any)?.data || [];
@@ -85,20 +92,28 @@ export default function WithdrawalsPage() {
         </div>
       </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2">
-        {(['pending', ...STATUSES.slice(1), 'all'] as const).map((s) => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${
-              filter === s ? 'bg-orange-500 text-white' : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Filters */}
+      <FilterBar
+        search={search}
+        onSearch={setSearch}
+        searchPlaceholder="Search name / mobile / account…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={setDateFrom}
+        onDateTo={setDateTo}
+        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+      >
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as typeof filter)}
+          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm capitalize"
+        >
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+          <option value="all">All</option>
+        </select>
+      </FilterBar>
 
       {isLoading ? (
         <p className="text-sm text-gray-400 p-6 text-center">Loading…</p>

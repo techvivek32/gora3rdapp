@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
+import { FilterBar } from '@/components/ui/FilterBar';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -55,11 +55,13 @@ export default function RequirementsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['requirements', page, search, status],
-    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status }),
+    queryKey: ['requirements', page, search, status, dateFrom, dateTo],
+    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -134,24 +136,27 @@ export default function RequirementsPage() {
         <p className="text-gray-500 mt-1">All posted vehicle requirements</p>
       </div>
 
-      <div className="flex gap-3">
-        <Input
-          placeholder="Search by city or booking ID..."
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="max-w-sm"
-        />
+      <FilterBar
+        search={search}
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+        searchPlaceholder="Search by city or booking ID…"
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
+        onDateTo={(v) => { setDateTo(v); setPage(1); }}
+        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+      >
         <select
           value={status}
           onChange={(e) => { setStatus(e.target.value); setPage(1); }}
-          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm"
+          className="border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm"
         >
           <option value="">All Status</option>
           {REQ_STATUSES.map((s) => (
             <option key={s} value={s}>{statusLabel(s)}</option>
           ))}
         </select>
-      </div>
+      </FilterBar>
 
       <DataTable
         columns={columns}

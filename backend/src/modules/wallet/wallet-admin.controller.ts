@@ -36,8 +36,8 @@ export class WalletAdminController {
 
   @Get('withdrawals')
   @ApiOperation({ summary: 'List withdrawal requests' })
-  getWithdrawals(@Query('status') status?: string) {
-    return this.walletService.getWithdrawals(status);
+  getWithdrawals(@Query() query: any) {
+    return this.walletService.getWithdrawals(query);
   }
 
   @Post('withdrawals/:id/approve')

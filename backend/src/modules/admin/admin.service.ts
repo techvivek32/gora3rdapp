@@ -16,7 +16,7 @@ import { AuditLog, AuditLogDocument } from '../../database/schemas/audit-log.sch
 import { NotificationsService } from '../notifications/notifications.service';
 import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
-import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+import { getPaginationParams, buildPaginatedResult, dateRangeFilter } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class AdminService {
@@ -135,6 +135,7 @@ export class AdminService {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ fullName: rx }, { mobile: rx }, { agencyName: rx }, { referralCode: rx }];
     }
+    Object.assign(filter, dateRangeFilter(query));
 
     const users = await this.userModel
       .find(filter)
@@ -200,6 +201,7 @@ export class AdminService {
       ];
     }
     if (query.role) filter.role = query.role;
+    Object.assign(filter, dateRangeFilter(query, 'verificationSubmittedAt'));
 
     const [users, total] = await Promise.all([
       this.userModel
@@ -379,9 +381,13 @@ export class AdminService {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };
 
-    if (query.search) filter.bookingId = new RegExp(query.search, 'i');
+    if (query.search) {
+      const rx = new RegExp(query.search, 'i');
+      filter.$or = [{ bookingId: rx }, { pickupCity: rx }, { dropCity: rx }, { pickupCityName: rx }, { dropCityName: rx }];
+    }
     if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');
     if (query.status) filter.status = query.status;
+    Object.assign(filter, dateRangeFilter(query));
 
     const [requirements, total] = await Promise.all([
       this.requirementModel
@@ -398,6 +404,17 @@ export class AdminService {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
+    Object.assign(filter, dateRangeFilter(query));
+
+    // Search by the subscriber's name / mobile (resolve matching users first).
+    if (query.search) {
+      const rx = new RegExp(query.search, 'i');
+      const matchedUsers = await this.userModel
+        .find({ $or: [{ fullName: rx }, { mobile: rx }, { agencyName: rx }] })
+        .select('_id')
+        .lean();
+      filter.userId = { $in: matchedUsers.map((u) => u._id) };
+    }
 
     const [subscriptions, total] = await Promise.all([
       this.subscriptionModel
@@ -425,6 +442,7 @@ export class AdminService {
       ];
     }
     if (query.status) filter.status = query.status;
+    Object.assign(filter, dateRangeFilter(query));
 
     const [vehicles, total] = await Promise.all([
       this.vehicleModel
@@ -606,6 +624,11 @@ export class AdminService {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
+    if (query.search) {
+      const rx = new RegExp(query.search, 'i');
+      filter.$or = [{ reason: rx }, { description: rx }, { targetType: rx }];
+    }
+    Object.assign(filter, dateRangeFilter(query));
 
     const [reports, total] = await Promise.all([
       this.reportModel
@@ -912,7 +935,8 @@ export class AdminService {
     const search = (query.search || '').trim();
     const rx = search ? new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
 
-    const paymentFilter: any = {};
+    const dateFilter = dateRangeFilter(query);
+    const paymentFilter: any = { ...dateFilter };
     if (query.status) paymentFilter.status = query.status;
     if (rx) paymentFilter.$or = [{ orderId: rx }, { razorpayPaymentId: rx }];
 
@@ -927,7 +951,7 @@ export class AdminService {
     // Wallet top-ups (money the user added). Only include when the status filter
     // isn't set to something a wallet credit can't be.
     const includeWallet = !query.status || ['success', 'paid'].includes(query.status);
-    const walletFilter: any = { type: 'credit', status: 'success' };
+    const walletFilter: any = { type: 'credit', status: 'success', ...dateFilter };
     if (rx) walletFilter.razorpayOrderId = rx;
     const walletTxns = includeWallet
       ? await this.walletTxModel
