@@ -543,7 +543,7 @@ class VehicleCard extends StatelessWidget {
                                       mainAxisAlignment: MainAxisAlignment.center,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(_formatDateFull(vehicle['availableDate']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                                        Text(_formatDateFull(vehicle['availableDate']), style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold, color: Colors.white)),
                                         SizedBox(height: 2.h),
                                         Text(_formatTime12(vehicle['availableTime'] as String?), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.white)),
                                       ],

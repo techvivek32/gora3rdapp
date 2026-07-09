@@ -287,7 +287,7 @@ class RequirementCardWidget extends StatelessWidget {
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       Text(_formatDate(requirement['travelDate']), style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold, color: Colors.white)),
-                                      Text(requirement['travelTime'] as String? ?? '', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600, color: Colors.white)),
+                                      Text(_formatTime12(requirement['travelTime']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: Colors.white)),
                                     ],
                                   ),
                                 ),
@@ -393,12 +393,22 @@ class RequirementCardWidget extends StatelessWidget {
                                       }),
                                     ),
                                   ),
-                                  if (badgeText != null)
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                      decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
-                                      child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      if (_timeAgo(requirement['createdAt']).isNotEmpty)
+                                        Padding(
+                                          padding: EdgeInsets.only(bottom: 3.h),
+                                          child: Text(_timeAgo(requirement['createdAt']),
+                                              style: TextStyle(fontSize: 9.sp, color: Colors.grey[600])),
+                                        ),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                        decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
+                                        child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                               SizedBox(height: 12.h),
@@ -654,6 +664,35 @@ class RequirementCardWidget extends StatelessWidget {
         return 'CNG';
       default:
         return 'Any Fuel';
+    }
+  }
+
+  // "14:44" → "02:44 pm"
+  String _formatTime12(dynamic t) {
+    final s = (t as String?) ?? '';
+    if (s.isEmpty) return '';
+    final parts = s.split(':');
+    if (parts.length < 2) return s;
+    int h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final period = h >= 12 ? 'pm' : 'am';
+    int h12 = h % 12;
+    if (h12 == 0) h12 = 12;
+    return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+  }
+
+  // How long ago the requirement was posted, e.g. "3 hours ago".
+  String _timeAgo(dynamic createdAt) {
+    if (createdAt == null) return '';
+    try {
+      final d = DateTime.parse(createdAt.toString());
+      final diff = DateTime.now().difference(d);
+      if (diff.inMinutes < 1) return 'just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes} minute${diff.inMinutes == 1 ? '' : 's'} ago';
+      if (diff.inHours < 24) return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    } catch (_) {
+      return '';
     }
   }
 
