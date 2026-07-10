@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/utils/membership.dart';
 
 /// Native channel (registered in MainActivity) that opens the "Display over
 /// other apps" settings robustly across OEMs — the plugin's default intent opens
@@ -55,9 +56,6 @@ Future<void> requestOverlayPermission() async {
 /// message-channel broadcast can race the overlay engine startup, so we also
 /// persist the payload and read it back when the overlay boots).
 const _kOverlayPayloadKey = 'gora_overlay_payload';
-
-/// Key for storing user subscription status in SharedPreferences.
-const _kSubscriptionKey = 'gora_user_subscription';
 
 /// Native channel registered on the overlay engine (see MainActivity). The
 /// overlay runs in its own engine with no plugins/Activity, so url_launcher
@@ -119,7 +117,7 @@ class RequirementOverlay extends StatefulWidget {
 
 class _RequirementOverlayState extends State<RequirementOverlay> {
   Map<String, dynamic> _data = {};
-  bool _hasActivePlan = false;
+  bool _userCanContact = false;
 
   @override
   void initState() {
@@ -138,21 +136,11 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
       final parsed = _parse(raw);
       if (parsed.isNotEmpty && mounted) setState(() => _data = parsed);
 
-      // Load subscription status
-      final subJson = prefs.getString(_kSubscriptionKey);
-      if (subJson != null) {
-        try {
-          final subscription = Map<String, dynamic>.from(jsonDecode(subJson) as Map);
-          final status = subscription['status']?.toString().toLowerCase() ?? '';
-          final expiryDate = subscription['expiryDate'];
-          if (status == 'active' && expiryDate != null) {
-            final expiry = DateTime.tryParse(expiryDate.toString());
-            if (expiry != null && expiry.isAfter(DateTime.now())) {
-              if (mounted) setState(() => _hasActivePlan = true);
-            }
-          }
-        } catch (_) {}
-      }
+      // Whether this user may contact posters. The overlay runs in its own engine
+      // with no access to the app's blocs, so the main app mirrors the answer here
+      // on every auth change (see saveOverlayContactFlag).
+      final canContact = prefs.getBool(kOverlayCanContactKey) ?? false;
+      if (mounted) setState(() => _userCanContact = canContact);
     } catch (_) {}
   }
 
@@ -242,7 +230,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final to = _s('dropCity');
     final note = _s('notes');
     final hasMobile = _s('posterMobile').isNotEmpty;
-    final canContact = hasMobile && _hasActivePlan;
+    final canContact = hasMobile && _userCanContact;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,

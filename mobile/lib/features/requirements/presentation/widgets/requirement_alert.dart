@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
-import '../../../subscriptions/presentation/bloc/subscription_bloc.dart';
+import '../../../../core/utils/membership.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Full-screen-style popup shown when a "new requirement" push arrives while the
 /// app is open (or when the user taps the notification).
@@ -51,20 +52,11 @@ class _RequirementAlert extends StatelessWidget {
   List<String> _stops() =>
       _str('stops').split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
-  bool _hasActivePlan(BuildContext context) {
+  /// Same membership check the requirement card uses.
+  bool _userCanContact(BuildContext context) {
     try {
-      final state = context.read<SubscriptionBloc>().state;
-      if (state is MySubscriptionLoaded && state.subscription != null) {
-        final subscription = state.subscription!;
-        final status = subscription['status']?.toString().toLowerCase() ?? '';
-        final expiryDate = subscription['expiryDate'];
-        if (status == 'active' && expiryDate != null) {
-          final expiry = DateTime.tryParse(expiryDate.toString());
-          if (expiry != null && expiry.isAfter(DateTime.now())) {
-            return true;
-          }
-        }
-      }
+      final state = context.read<AuthBloc>().state;
+      if (state is AuthAuthenticated) return canContactPosters(state.user);
     } catch (_) {}
     return false;
   }
@@ -155,8 +147,7 @@ class _RequirementAlert extends StatelessWidget {
               // Actions — Call & WhatsApp (only enabled if user has active plan).
               Builder(
                 builder: (ctx) {
-                  final hasActivePlan = _hasActivePlan(ctx);
-                  final canContact = mobile.isNotEmpty && hasActivePlan;
+                  final canContact = mobile.isNotEmpty && _userCanContact(ctx);
                   return Row(
                     children: [
                       Expanded(

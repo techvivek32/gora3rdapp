@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
 import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
+import 'core/utils/membership.dart';
 import 'core/utils/ring_player.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
@@ -88,6 +91,7 @@ class GoraCabsApp extends StatefulWidget {
 class _GoraCabsAppState extends State<GoraCabsApp> {
   late final AuthBloc _authBloc;
   late final GoRouter _router;
+  StreamSubscription<AuthState>? _authSub;
 
   @override
   void initState() {
@@ -100,11 +104,27 @@ class _GoraCabsAppState extends State<GoraCabsApp> {
     ApiClient.onSessionExpired = () {
       if (mounted) _authBloc.add(AuthLogoutEvent());
     };
+
+    // The floating overlay runs in a separate Flutter engine and can't reach the
+    // blocs, so mirror "may this user contact posters?" into SharedPreferences
+    // whenever the auth state changes. Without this the overlay's Call/WhatsApp
+    // buttons stay disabled for everyone.
+    void syncOverlayFlag(AuthState state) {
+      if (state is AuthAuthenticated) {
+        saveOverlayContactFlag(Map<String, dynamic>.from(state.user as Map));
+      } else if (state is AuthUnauthenticated) {
+        clearOverlayContactFlag();
+      }
+    }
+
+    syncOverlayFlag(_authBloc.state); // in case auth already resolved
+    _authSub = _authBloc.stream.listen(syncOverlayFlag);
   }
 
   @override
   void dispose() {
     ApiClient.onSessionExpired = null;
+    _authSub?.cancel();
     _authBloc.close();
     super.dispose();
   }

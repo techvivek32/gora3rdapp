@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/utils/membership.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
 
@@ -33,7 +34,7 @@ class RequirementCardWidget extends StatelessWidget {
         String? currentMembership;
         if (authState is AuthAuthenticated) {
           final user = authState.user;
-          isCurrentUserPremium = (user['isPremium'] == true) || (user['isGolden'] == true) || (['active', 'verified', 'premium', 'golden'].contains(user['membershipType']));
+          isCurrentUserPremium = canContactPosters(user);
           currentUserId = user['_id'] as String?;
           currentUserName = user['fullName'] as String?;
           currentMembership = user['membershipType'] as String?;

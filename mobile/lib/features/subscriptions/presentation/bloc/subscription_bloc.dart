@@ -1,7 +1,5 @@
-import 'dart:convert';
 import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/network/api_client.dart';
 
 part 'subscription_event.dart';
@@ -55,15 +53,6 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
     try {
       final res = await apiClient.get('/subscriptions/my');
       final subscription = res.data['data'] as Map<String, dynamic>?;
-      
-      // Save subscription to SharedPreferences for overlay access
-      if (subscription != null) {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('gora_user_subscription', jsonEncode(subscription));
-        } catch (_) {}
-      }
-      
       emit(MySubscriptionLoaded(subscription: subscription));
     } catch (e) {
       emit(SubscriptionError(message: e.toString()));
