@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/schemas/withdrawal-request.schema';
-import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto } from './dto/wallet.dto';
+import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto, TransferFundsDto } from './dto/wallet.dto';
 import { SettingsService } from '../settings/settings.service';
 import { dateRangeFilter } from '../../common/utils/pagination.util';
 
@@ -37,8 +37,10 @@ export class WalletService {
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select('walletBalance').lean(),
       // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
+      // Transfers carry the other party so the app can show their name/number.
       this.txModel
         .find({ userId: new Types.ObjectId(userId), status: 'success' })
+        .populate('counterpartyId', 'fullName agencyName mobile')
         .sort({ createdAt: -1 })
         .limit(20)
         .lean(),
@@ -238,6 +240,80 @@ export class WalletService {
     return {
       message: 'Withdrawal request submitted. It will be processed after review.',
       data: { balance: updated?.walletBalance ?? 0, request },
+    };
+  }
+
+  // ─── Wallet-to-wallet transfer ─────────────────────────────────────────────
+
+  /** Send money from the current user's wallet to another user, found by mobile.
+   *  Fails (without moving anything) when the sender's balance is short. */
+  async transferFunds(userId: string, dto: TransferFundsDto) {
+    const amount = Math.round(dto.amount);
+    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+
+    // Resolve the recipient by the last 10 digits, same as the user lookup does.
+    const digits = (dto.mobile || '').replace(/\D/g, '');
+    if (digits.length < 10) throw new BadRequestException('Enter a valid mobile number');
+    const recipient = await this.userModel
+      .findOne({ mobile: new RegExp(`${digits.slice(-10)}$`), isActive: true, isBlocked: false })
+      .select('_id fullName agencyName mobile');
+    if (!recipient) throw new NotFoundException('No user found with this number');
+    if (recipient._id.toString() === userId) {
+      throw new BadRequestException('You cannot transfer money to yourself');
+    }
+
+    const sender = await this.userModel.findById(userId).select('walletBalance fullName');
+    if (!sender) throw new NotFoundException('User not found');
+    const balance = sender.walletBalance ?? 0;
+    if (amount > balance) {
+      throw new BadRequestException(`Insufficient balance. You have ₹${balance}.`);
+    }
+
+    // Debit conditionally so two concurrent transfers can't overdraw the wallet.
+    const debited = await this.userModel
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(userId), walletBalance: { $gte: amount } },
+        { $inc: { walletBalance: -amount } },
+        { new: true },
+      )
+      .select('walletBalance');
+    if (!debited) throw new BadRequestException('Insufficient balance');
+
+    try {
+      await this.userModel.findByIdAndUpdate(recipient._id, { $inc: { walletBalance: amount } });
+    } catch (e) {
+      // Put the money back — never leave it debited without a matching credit.
+      await this.userModel.findByIdAndUpdate(userId, { $inc: { walletBalance: amount } });
+      this.logger.error(`Wallet transfer credit failed: ${e?.message ?? e}`);
+      throw new BadRequestException('Transfer failed. Please try again.');
+    }
+
+    const toName = (recipient.agencyName || '').trim() || recipient.fullName;
+    const note = dto.note?.trim();
+    await this.txModel.create([
+      {
+        userId: new Types.ObjectId(userId),
+        counterpartyId: recipient._id,
+        amount,
+        type: 'debit',
+        status: 'success',
+        source: 'transfer',
+        note: note || '', // the counterparty is stored separately, so keep the user's note as-is
+      },
+      {
+        userId: recipient._id,
+        counterpartyId: new Types.ObjectId(userId),
+        amount,
+        type: 'credit',
+        status: 'success',
+        source: 'transfer',
+        note: note || '',
+      },
+    ]);
+
+    return {
+      message: `₹${amount} sent to ${toName}.`,
+      data: { balance: debited.walletBalance ?? 0, to: { name: toName, mobile: recipient.mobile } },
     };
   }
 

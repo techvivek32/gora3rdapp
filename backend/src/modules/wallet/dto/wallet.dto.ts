@@ -1,11 +1,30 @@
-import { IsIn, IsNotEmpty, IsNumber, IsString, MaxLength, Min } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTopUpDto {
   @ApiProperty({ example: 500 })
   @IsNumber()
   @Min(1)
   amount: number;
+}
+
+/** Wallet-to-wallet transfer to another user, found by their mobile number. */
+export class TransferFundsDto {
+  @ApiProperty({ example: '9876543210', description: "Recipient's mobile number" })
+  @IsString()
+  @IsNotEmpty()
+  mobile: string;
+
+  @ApiProperty({ example: 500 })
+  @IsNumber()
+  @Min(1)
+  amount: number;
+
+  @ApiPropertyOptional({ example: 'For the Jaipur trip' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  note?: string;
 }
 
 export class VerifyTopUpDto {

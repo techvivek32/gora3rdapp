@@ -246,6 +246,218 @@ class _WalletPageState extends State<WalletPage> {
     ifscCtrl.dispose();
   }
 
+  /// Send money to another user: look them up by mobile, then transfer.
+  Future<void> _showTransferSheet() async {
+    final phoneCtrl = TextEditingController();
+    final amountCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    Map<String, dynamic>? recipient; // resolved user, null until found
+    bool searching = false;
+    bool submitting = false;
+
+    InputDecoration dec(String label, IconData icon) => InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, size: 20),
+          isDense: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        );
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<void> search() async {
+            final phone = phoneCtrl.text.trim();
+            if (phone.length < 10) return _snack('Enter a valid 10-digit mobile number');
+            setSheet(() {
+              searching = true;
+              recipient = null;
+            });
+            try {
+              final res = await _api.get('/users/lookup', params: {'mobile': phone});
+              final user = Map<String, dynamic>.from(res.data['data'] as Map);
+              setSheet(() {
+                recipient = user;
+                searching = false;
+              });
+            } catch (e) {
+              setSheet(() => searching = false);
+              _snack(ErrorMapper.message(e));
+            }
+          }
+
+          Future<void> submit() async {
+            if (recipient == null) return _snack('Search and select a user first');
+            final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
+            if (amt < 1) return _snack('Enter a valid amount');
+            // Server re-checks this, but fail fast so we never even attempt it.
+            if (amt > _balance) {
+              return _snack('Insufficient balance. You have ₹${_balance.toStringAsFixed(0)}');
+            }
+            setSheet(() => submitting = true);
+            try {
+              await _api.post('/wallet/transfer', data: {
+                'mobile': phoneCtrl.text.trim(),
+                'amount': amt,
+                if (noteCtrl.text.trim().isNotEmpty) 'note': noteCtrl.text.trim(),
+              });
+              if (ctx.mounted) Navigator.pop(ctx);
+              _snack('₹$amt sent successfully.', error: false);
+              await _load();
+            } catch (e) {
+              setSheet(() => submitting = false);
+              _snack(ErrorMapper.message(e));
+            }
+          }
+
+          final name = ((recipient?['agencyName'] as String?)?.trim().isNotEmpty == true)
+              ? recipient!['agencyName'] as String
+              : (recipient?['fullName'] as String? ?? '');
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(4)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Transfer Money', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text('Available balance: ₹${_balance.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: 16),
+
+                  // 1. Find the recipient by phone number.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: phoneCtrl,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          onChanged: (_) {
+                            if (recipient != null) setSheet(() => recipient = null);
+                          },
+                          decoration: dec('Recipient mobile number', Icons.phone_outlined)
+                              .copyWith(counterText: ''),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: searching ? null : search,
+                          style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16)),
+                          child: searching
+                              ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.search, size: 20),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // 2. Show who we found before any money moves.
+                  if (recipient != null) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                            backgroundImage: (recipient!['profileImage'] as String?)?.isNotEmpty == true
+                                ? NetworkImage(recipient!['profileImage'] as String)
+                                : null,
+                            child: (recipient!['profileImage'] as String?)?.isNotEmpty == true
+                                ? null
+                                : Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Flexible(child: Text(name, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold))),
+                                  if (recipient!['isVerified'] == true) ...[
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.verified, size: 14, color: Color(0xFF2196F3)),
+                                  ],
+                                ]),
+                                Text('${recipient!['mobile'] ?? ''}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: amountCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      decoration: dec('Amount (₹)', Icons.currency_rupee),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLength: 120,
+                      decoration: dec('Note (optional)', Icons.notes).copyWith(counterText: ''),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: submitting ? null : submit,
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+                        child: submitting
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text('Send Money', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('Money moves instantly to the recipient. Transfers cannot be reversed.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    // showModalBottomSheet's future completes as soon as the sheet is popped, while
+    // its TextFields are still mounted through the close animation. Disposing the
+    // controllers now would tear them out from under live widgets.
+    Future.delayed(const Duration(milliseconds: 400), () {
+      phoneCtrl.dispose();
+      amountCtrl.dispose();
+      noteCtrl.dispose();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -302,6 +514,20 @@ class _WalletPageState extends State<WalletPage> {
                       onPressed: (_processing || _balance <= 0) ? null : _showWithdrawSheet,
                       icon: const Icon(Icons.account_balance_outlined, size: 20),
                       label: const Text('Withdraw', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: (_processing || _balance <= 0) ? null : _showTransferSheet,
+                      icon: const Icon(Icons.send_rounded, size: 20),
+                      label: const Text('Transfer', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -376,6 +602,17 @@ class _WalletPageState extends State<WalletPage> {
     final status = (tx['status'] ?? '').toString();
     final isCredit = type == 'credit';
     final ok = status == 'success';
+    final note = (tx['note'] ?? '').toString().trim();
+
+    // Transfers read "Transfer → 9876543210" on one line, with the note beneath it.
+    final isTransfer = (tx['source'] ?? '').toString() == 'transfer';
+    final other = tx['counterpartyId'] is Map ? Map<String, dynamic>.from(tx['counterpartyId'] as Map) : null;
+    final otherMobile = (other?['mobile'] ?? '').toString();
+
+    final title = isTransfer
+        ? (otherMobile.isNotEmpty ? 'Transfer → $otherMobile' : 'Transfer')
+        : (note.isNotEmpty ? note : (isCredit ? 'Added to wallet' : 'Debited'));
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -385,6 +622,7 @@ class _WalletPageState extends State<WalletPage> {
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(isCredit ? Icons.south_west : Icons.north_east,
               color: isCredit ? AppColors.success : AppColors.error, size: 20),
@@ -393,12 +631,14 @@ class _WalletPageState extends State<WalletPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text((tx['note'] ?? (isCredit ? 'Added to wallet' : 'Debited')).toString(),
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                if (isTransfer && note.isNotEmpty)
+                  Text(note, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                 Text(status, style: TextStyle(fontSize: 11, color: ok ? AppColors.success : AppColors.textHint)),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Text('${isCredit ? '+' : '-'}₹${amount.toStringAsFixed(0)}',
               style: TextStyle(fontWeight: FontWeight.w700, color: isCredit ? AppColors.success : AppColors.error)),
         ],
