@@ -563,39 +563,42 @@ class RequirementCardWidget extends StatelessWidget {
   }
 
   Widget _buildStampBadge({required String text, required Color color}) {
-    return Container(
+    // No background fill — the stamp reads as ink pressed straight onto the card.
+    return SizedBox(
       width: 150.w,
       height: 150.w,
-      // Highlight the stamp so it pops against the dimmed card behind it.
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withOpacity(0.85),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.35), blurRadius: 12, spreadRadius: 1)],
-      ),
       child: CustomPaint(
-        painter: _StampRingPainter(color: color),
+        painter: _StampRingPainter(color: color, topText: text, bottomText: 'GORA TAXI PARTNER'),
+        // Keep the whole centre block inside the inner circle, whatever the status
+        // word's length ("CANCELLED" is much wider than "BOOKED").
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.star, color: color, size: 12.sp),
-                SizedBox(width: 3.w),
-                Icon(Icons.star, color: color, size: 12.sp),
-                SizedBox(width: 3.w),
-                Icon(Icons.star, color: color, size: 12.sp),
-              ]),
-              SizedBox(height: 4.h),
-              Text(text, style: TextStyle(color: color, fontSize: 19.sp, fontWeight: FontWeight.w900, letterSpacing: 2)),
-              SizedBox(height: 4.h),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.star, color: color, size: 12.sp),
-                SizedBox(width: 3.w),
-                Icon(Icons.star, color: color, size: 12.sp),
-                SizedBox(width: 3.w),
-                Icon(Icons.star, color: color, size: 12.sp),
-              ]),
-            ],
+          child: SizedBox(
+            width: 94.w,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.star, color: color, size: 12.sp),
+                    SizedBox(width: 3.w),
+                    Icon(Icons.star, color: color, size: 12.sp),
+                    SizedBox(width: 3.w),
+                    Icon(Icons.star, color: color, size: 12.sp),
+                  ]),
+                  SizedBox(height: 4.h),
+                  Text(text, style: TextStyle(color: color, fontSize: 19.sp, fontWeight: FontWeight.w900, letterSpacing: 2)),
+                  SizedBox(height: 4.h),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.star, color: color, size: 12.sp),
+                    SizedBox(width: 3.w),
+                    Icon(Icons.star, color: color, size: 12.sp),
+                    SizedBox(width: 3.w),
+                    Icon(Icons.star, color: color, size: 12.sp),
+                  ]),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -761,48 +764,85 @@ class _WatermarkPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
+/// Two concentric circles with curved text running around the ring between them:
+/// [topText] arcs over the top, [bottomText] arcs along the bottom (both upright).
 class _StampRingPainter extends CustomPainter {
   final Color color;
-  _StampRingPainter({required this.color});
+  final String topText;
+  final String bottomText;
+  _StampRingPainter({required this.color, required this.topText, required this.bottomText});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
+    final center = Offset(size.width / 2, size.height / 2);
     final rOuter = size.width / 2 - 2;
-    final rValley = rOuter - 7;
-    final rInner = rOuter - 14;
+    final rInner = rOuter - 22; // wide enough ring to seat the text
+    final rText = (rOuter + rInner) / 2;
 
-    final paint = Paint()
+    final outerPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 4;
+    final innerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
 
-    const teeth = 26;
-    final path = Path();
-    for (int i = 0; i < teeth; i++) {
-      final a1 = (i / teeth) * 2 * pi - pi / 2;
-      final a2 = ((i + 0.5) / teeth) * 2 * pi - pi / 2;
-      final a3 = ((i + 1.0) / teeth) * 2 * pi - pi / 2;
-      final p1x = cx + rOuter * cos(a1);
-      final p1y = cy + rOuter * sin(a1);
-      final p2x = cx + rValley * cos(a2);
-      final p2y = cy + rValley * sin(a2);
-      final p3x = cx + rOuter * cos(a3);
-      final p3y = cy + rOuter * sin(a3);
-      if (i == 0) {
-        path.moveTo(p1x, p1y);
-      } else {
-        path.lineTo(p1x, p1y);
-      }
-      path.lineTo(p2x, p2y);
-      path.lineTo(p3x, p3y);
+    // Round outer edge (was a saw-tooth path) + the inner circle.
+    canvas.drawCircle(center, rOuter, outerPaint);
+    canvas.drawCircle(center, rInner, innerPaint);
+
+    final style = TextStyle(
+      color: color,
+      fontSize: 9,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1.2,
+      height: 1.0,
+    );
+    _drawArcText(canvas, center, topText, rText, style, top: true);
+    _drawArcText(canvas, center, bottomText, rText, style, top: false);
+  }
+
+  /// Lays each glyph out individually and rotates it to sit tangent to the circle.
+  /// On the bottom arc the glyphs are flipped so the text still reads left-to-right.
+  void _drawArcText(Canvas canvas, Offset center, String text, double radius, TextStyle style, {required bool top}) {
+    if (text.isEmpty || radius <= 0) return;
+
+    final painters = <TextPainter>[];
+    double totalWidth = 0;
+    for (final ch in text.split('')) {
+      final tp = TextPainter(text: TextSpan(text: ch, style: style), textDirection: TextDirection.ltr)..layout();
+      painters.add(tp);
+      totalWidth += tp.width;
     }
-    path.close();
-    canvas.drawPath(path, paint);
-    canvas.drawCircle(Offset(cx, cy), rInner - 2, paint);
+
+    final span = totalWidth / radius; // arc the whole string occupies, in radians
+    final centerAngle = top ? -pi / 2 : pi / 2;
+    double consumed = 0;
+
+    for (final tp in painters) {
+      final charSpan = tp.width / radius;
+      final offset = consumed + charSpan / 2 - span / 2;
+      // Going left→right means increasing angle on top, decreasing on the bottom.
+      final theta = top ? centerAngle + offset : centerAngle - offset;
+
+      canvas.save();
+      canvas.translate(center.dx, center.dy);
+      if (top) {
+        canvas.rotate(theta + pi / 2); // glyph "up" points away from the centre
+        canvas.translate(0, -radius);
+      } else {
+        canvas.rotate(theta - pi / 2); // glyph "up" points toward the centre
+        canvas.translate(0, radius);
+      }
+      tp.paint(canvas, Offset(-tp.width / 2, -tp.height / 2));
+      canvas.restore();
+
+      consumed += charSpan;
+    }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _StampRingPainter old) =>
+      old.color != color || old.topText != topText || old.bottomText != bottomText;
 }
