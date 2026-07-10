@@ -429,7 +429,8 @@ class RequirementCardWidget extends StatelessWidget {
                                   }),
                                   _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
                                     if (mobile != null && mobile.isNotEmpty) {
-                                      openWhatsApp(mobile);
+                                      // Pre-fill the chat with the full requirement details.
+                                      openWhatsApp(mobile, message: _buildWhatsAppMessage());
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
                                     }
@@ -606,6 +607,116 @@ class RequirementCardWidget extends StatelessWidget {
   }
 
   String _formatVehicleType(String? type) => type == null ? '' : vehicleTypeLabel(type);
+
+  String _tripLabel(dynamic t) {
+    switch ((t ?? '').toString()) {
+      case 'one_way':
+        return 'One Way Trip';
+      case 'round_trip':
+        return 'Round Trip';
+      default:
+        return '${(t ?? '').toString().replaceAll('_', ' ').split(' ').where((w) => w.isNotEmpty).map((w) => '${w[0].toUpperCase()}${w.substring(1)}').join(' ')} Trip';
+    }
+  }
+
+  /// "2026-07-16" → "16-07-26"
+  String _shortDate(dynamic date) {
+    if (date == null) return '';
+    final raw = date.toString();
+    final datePart = raw.contains('T') ? raw.split('T').first : raw;
+    final p = datePart.split('-');
+    if (p.length == 3 && p[0].length == 4) return '${p[2]}-${p[1]}-${p[0].substring(2)}';
+    return datePart;
+  }
+
+  /// "154 KMs / 3 Hrs" — sums the pickup→stops→drop legs, falling back to the
+  /// stored estimatedDistance when coordinates are missing.
+  String? _routeSummary(dynamic from, List stops, dynamic to) {
+    final points = <dynamic>[from, ...stops, to];
+    double sum = 0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final leg = _haversineKm(points[i], points[i + 1]);
+      if (leg == null) {
+        sum = 0;
+        break;
+      }
+      sum += leg;
+    }
+    if (sum <= 0) {
+      final est = requirement['estimatedDistance'];
+      if (est is! num || est <= 0) return null;
+      sum = est.toDouble();
+    }
+    final hrs = (sum / 50).round(); // same ~50 km/h estimate the card's leg labels use
+    return '${sum.toStringAsFixed(0)} KMs / $hrs Hrs';
+  }
+
+  /// The whole requirement, formatted for sharing over WhatsApp.
+  String _buildWhatsAppMessage() {
+    final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
+    final rawStops = requirement['stops'];
+    final stops = rawStops is List
+        ? rawStops.whereType<Map>().where((m) => (m['address'] ?? '').toString().trim().isNotEmpty).toList()
+        : const <Map>[];
+
+    final b = StringBuffer();
+    b.writeln('📢 *Requirement*');
+    b.writeln('*Gora Taxi Partner App*');
+    b.writeln();
+
+    final id = requirement['requirementId'] ?? requirement['bookingId'];
+    if (id != null) b.writeln('🆔 *ID:* $id');
+    b.writeln('🚖 *Trip:* ${_tripLabel(requirement['tripType'])}');
+    b.writeln('🚗 *Vehicle:* ${_formatVehicleType(requirement['vehicleType'] as String?)}');
+    b.writeln('⛽ *Fuel:* ${_formatFuel(requirement['fuelType'])}');
+    b.writeln();
+
+    b.writeln('*📍Location point*');
+    b.writeln(' *From:* ${requirement['pickupCity'] ?? ''}');
+    for (var i = 0; i < stops.length; i++) {
+      b.writeln(' *Stop ${i + 1}:* ${stops[i]['address']}');
+    }
+    b.writeln(' *To:* ${requirement['dropCity'] ?? ''}');
+    b.writeln();
+
+    b.writeln('📅 *Date:* ${_shortDate(requirement['travelDate'])}');
+    b.writeln('🕒 *Time:* ${_formatTime12(requirement['travelTime'])}');
+    if (requirement['tripType'] == 'round_trip' && requirement['returnDate'] != null) {
+      b.writeln('🔁 *Return:* ${_shortDate(requirement['returnDate'])} ${_formatTime12(requirement['returnTime'])}');
+    }
+    final route = _routeSummary(requirement['pickupCoordinates'], stops, requirement['dropCoordinates']);
+    if (route != null) b.writeln('⌛ *Distance:* $route');
+    b.writeln();
+
+    final num total = (requirement['totalAmount'] as num?) ?? 0;
+    if (total > 0) {
+      b.writeln('💰 *Fare:* ₹${total.round()}');
+      b.writeln();
+    }
+
+    final notes = (requirement['notes'] as String?)?.trim() ?? '';
+    if (notes.isNotEmpty) {
+      b.writeln('📝 *Other Information:*');
+      b.writeln(notes);
+      b.writeln();
+    }
+
+    if (postedBy != null) {
+      b.writeln('📞 *Posted By*');
+      final agency = (postedBy['agencyName'] as String?)?.trim() ?? '';
+      final name = (postedBy['fullName'] as String?)?.trim() ?? '';
+      final phone = (postedBy['mobile'] as String?)?.trim() ?? '';
+      if (agency.isNotEmpty) b.writeln('🏢 $agency');
+      if (name.isNotEmpty) b.writeln('👤 *$name*');
+      if (phone.isNotEmpty) b.writeln('📱 *$phone*');
+      if (postedBy['isVerified'] == true) b.writeln('✅ Verified Gora Taxi PARTNER Member');
+      b.writeln();
+    }
+
+    b.writeln('You can also book your taxi from Gora Taxi Partner App and register your vehicle from the below link');
+    b.write('https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner');
+    return b.toString();
+  }
 
   double? _coordLat(dynamic m) => m is Map ? (m['lat'] as num?)?.toDouble() : null;
   double? _coordLng(dynamic m) => m is Map ? (m['lng'] as num?)?.toDouble() : null;
