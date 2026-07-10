@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -245,57 +246,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
   /// Asks the user for the OTP. Returns the entered code, or null if cancelled.
   Future<String?> _showOtpDialog() {
-    final otpCtrl = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Verify Mobile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Enter the 6-digit OTP sent to ${_mobileCtrl.text.trim()}',
-                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              autofocus: true,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(counterText: '', hintText: '••••••'),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () async {
-                  try {
-                    await _apiClient.dio.post('/auth/register/send-otp', data: {
-                      'mobile': _mobileCtrl.text.trim(),
-                    });
-                    if (ctx.mounted) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(
-                        const SnackBar(content: Text('OTP resent')),
-                      );
-                    }
-                  } catch (_) {}
-                },
-                child: const Text('Resend OTP'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (otpCtrl.text.trim().length >= 4) Navigator.pop(ctx, otpCtrl.text.trim());
-            },
-            child: const Text('Verify'),
-          ),
-        ],
-      ),
+    final mobile = _mobileCtrl.text.trim();
+    return showOtpVerifyDialog(
+      context,
+      mobile: mobile,
+      onResend: () => _apiClient.dio.post('/auth/register/send-otp', data: {'mobile': mobile}),
     );
   }
 

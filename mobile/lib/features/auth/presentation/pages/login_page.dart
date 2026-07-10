@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo.dart';
+import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -80,51 +81,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<String?> _showOtpDialog(String mobile) {
-    final otpCtrl = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Verify Mobile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Enter the 6-digit OTP sent to $mobile',
-                textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
-            const SizedBox(height: 16),
-            TextField(
-              controller: otpCtrl,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              autofocus: true,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(counterText: '', hintText: '••••••'),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () async {
-                  await _authRepo.sendLoginOtp(mobile);
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('OTP resent')));
-                  }
-                },
-                child: const Text('Resend OTP'),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () {
-              if (otpCtrl.text.trim().length >= 4) Navigator.pop(ctx, otpCtrl.text.trim());
-            },
-            child: const Text('Verify'),
-          ),
-        ],
-      ),
+    return showOtpVerifyDialog(
+      context,
+      mobile: mobile,
+      // Throw on failure so the dialog reports it instead of pretending it resent.
+      onResend: () async {
+        final result = await _authRepo.sendLoginOtp(mobile);
+        result.fold((f) => throw Exception(f.message), (_) {});
+      },
     );
   }
 
