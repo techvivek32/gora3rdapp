@@ -135,6 +135,12 @@ export class StorageService {
     return this.uploadFile(file, 'banners', { resize: { width: 1080, height: 528 }, quality: 90 });
   }
 
+  async uploadNotificationImage(file: Express.Multer.File): Promise<string> {
+    // 1024×512 (2:1) is the aspect ratio Android's "big picture" notification style
+    // and the iOS attachment preview both render at, so it lands uncropped.
+    return this.uploadFile(file, 'notifications', { resize: { width: 1024, height: 512 }, quality: 85 });
+  }
+
   async deleteFile(url: string): Promise<void> {
     if (this.useLocal) {
       this.deleteLocally(url);

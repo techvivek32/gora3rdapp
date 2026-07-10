@@ -122,6 +122,13 @@ export const adminApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  uploadNotificationImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/notification', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
 
   // ─── Account Deletion Requests ─────────────────────────────────────────────
   getDeletionRequests: (params?: any) => apiClient.get('/admin/deletion-requests', { params }),

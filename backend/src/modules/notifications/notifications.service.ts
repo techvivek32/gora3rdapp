@@ -62,8 +62,6 @@ export class NotificationsService {
       .select('mobile fullName agencyName')
       .lean();
 
-    const userIds = targetUsers.map((u) => u._id);
-
     const titleCase = (s: any) =>
       `${s ?? ''}`.replace(/_/g, ' ').split(' ').filter(Boolean)
         .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
@@ -91,23 +89,9 @@ export class NotificationsService {
     const title = `Gora Taxi booking ${titleCase(requirement.tripType)} trip`;
     const body = `${requirement.pickupCity} → ${requirement.dropCity}\nCar type - ${titleCase(requirement.vehicleType)}\nDate time - ${fmtDate(requirement.travelDate)} | ${fmtTime(requirement.travelTime)}`;
 
-    // Create notification records
-    const notifications = userIds.map((userId) => ({
-      userId,
-      title,
-      body,
-      type: NotificationType.NEW_REQUIREMENT,
-      data: {
-        requirementId: requirement._id.toString(),
-        bookingId: requirement.bookingId,
-        pickupCity: requirement.pickupCity,
-        dropCity: requirement.dropCity,
-        vehicleType: requirement.vehicleType,
-        type: NotificationType.NEW_REQUIREMENT,
-      },
-    }));
-
-    await this.notificationModel.insertMany(notifications);
+    // No in-app notification rows for new requirements: they're delivered as a push
+    // + overlay/alert card, and the requirement feed is the place to browse them.
+    // Writing one row per targeted user per requirement only flooded that list.
 
     // Contact (Call/WhatsApp) is a premium feature: only premium members get the
     // poster's mobile in the overlay payload; others get an empty number so the
@@ -203,44 +187,112 @@ export class NotificationsService {
   }
 
   async sendGlobalNotification(title: string, body: string, data?: Record<string, string>) {
-    const users = await this.userModel
-      .find({ isActive: true, notificationsEnabled: true, fcmTokens: { $exists: true, $ne: [] } })
-      .select('fcmTokens _id')
-      .lean();
+    return this.sendAdminNotification({ title, body, data });
+  }
 
-    const allTokens = users.flatMap((u) => u.fcmTokens).filter(Boolean);
-    const userIds = users.map((u) => u._id);
+  /**
+   * Admin broadcast: saves an in-app notification row per matched user and pushes
+   * it over FCM. Every target list is "empty = no restriction", so leaving all of
+   * them blank reaches every active, notifiable user.
+   */
+  async sendAdminNotification(input: {
+    title: string;
+    body: string;
+    imageUrl?: string;
+    actionUrl?: string;
+    type?: string;
+    targetRoles?: string[];
+    targetCities?: string[];
+    targetMemberships?: string[];
+    data?: Record<string, string>;
+  }) {
+    const { title, body, imageUrl, actionUrl } = input;
+    const roles = (input.targetRoles ?? []).filter(Boolean);
+    const cities = (input.targetCities ?? []).filter(Boolean);
+    const memberships = (input.targetMemberships ?? []).filter(Boolean);
+    const type = Object.values(NotificationType).includes(input.type as NotificationType)
+      ? (input.type as NotificationType)
+      : NotificationType.SYSTEM;
+
+    const filter: any = { isActive: true, isBlocked: false, notificationsEnabled: true };
+    if (roles.length) filter.role = { $in: roles };
+    if (memberships.length) filter.membershipType = { $in: memberships };
+    // A user who picked no business city counts as "all cities", same as requirement alerts.
+    if (cities.length) {
+      filter.$or = [
+        { businessCities: { $in: cities } },
+        { businessCities: { $size: 0 } },
+        { businessCities: { $exists: false } },
+      ];
+    }
+
+    const users = await this.userModel.find(filter).select('fcmTokens _id').lean();
+    if (users.length === 0) return { message: 'No users matched this audience' };
+
+    // Everything in an FCM data payload must be a string.
+    const payload: Record<string, string> = {
+      ...(input.data ?? {}),
+      type,
+      ...(actionUrl ? { actionUrl } : {}),
+      ...(imageUrl ? { imageUrl } : {}),
+    };
 
     await this.notificationModel.insertMany(
-      userIds.map((userId) => ({
-        userId,
+      users.map((u) => ({
+        userId: u._id,
         title,
         body,
-        type: NotificationType.SYSTEM,
-        isGlobal: true,
-        data,
+        type,
+        isGlobal: !roles.length && !cities.length && !memberships.length,
+        targetRoles: roles,
+        targetCities: cities,
+        targetMemberships: memberships,
+        imageUrl,
+        actionUrl,
+        isSent: true,
+        sentAt: new Date(),
+        data: payload,
       })),
     );
 
+    // Users without a device token still get the in-app row above; only push below.
+    const allTokens = users.flatMap((u) => u.fcmTokens ?? []).filter(Boolean);
     const batchSize = 500;
     for (let i = 0; i < allTokens.length; i += batchSize) {
-      await this.firebaseService.sendPushNotification(allTokens.slice(i, i + batchSize), {
-        title,
-        body,
-        data,
-      });
+      try {
+        await this.firebaseService.sendPushNotification(allTokens.slice(i, i + batchSize), {
+          title,
+          body,
+          data: payload,
+          imageUrl,
+        });
+      } catch (error) {
+        this.logger.error('Admin push batch failed:', error.message);
+      }
     }
 
-    return { message: `Global notification sent to ${users.length} users` };
+    return { message: `Notification sent to ${users.length} users` };
+  }
+
+  /**
+   * New-requirement alerts are no longer stored, but rows written before that
+   * change still exist — keep them out of the list and the unread badge.
+   */
+  private visibleFor(userId: string) {
+    return {
+      userId: new Types.ObjectId(userId),
+      type: { $ne: NotificationType.NEW_REQUIREMENT },
+    };
   }
 
   async getUserNotifications(userId: string, page = 1, limit = 20) {
     const { skip, sort } = getPaginationParams({ page, limit, sortBy: 'createdAt', sortOrder: 'desc' });
+    const base = this.visibleFor(userId);
 
     const [notifications, total, unreadCount] = await Promise.all([
-      this.notificationModel.find({ userId: new Types.ObjectId(userId) }).sort(sort).skip(skip).limit(limit).lean(),
-      this.notificationModel.countDocuments({ userId: new Types.ObjectId(userId) }),
-      this.notificationModel.countDocuments({ userId: new Types.ObjectId(userId), isRead: false }),
+      this.notificationModel.find(base).sort(sort).skip(skip).limit(limit).lean(),
+      this.notificationModel.countDocuments(base),
+      this.notificationModel.countDocuments({ ...base, isRead: false }),
     ]);
 
     return buildPaginatedResult({ notifications, unreadCount } as any, total, page, limit);
@@ -256,7 +308,7 @@ export class NotificationsService {
 
   async getUnreadCount(userId: string) {
     const count = await this.notificationModel.countDocuments({
-      userId: new Types.ObjectId(userId),
+      ...this.visibleFor(userId),
       isRead: false,
     });
     return { data: { count } };

@@ -753,8 +753,17 @@ export class AdminService {
     return { message: 'Report resolved', data: report };
   }
 
-  async sendAdminNotification(data: { title: string; body: string; targetType: string; targetCities?: string[]; targetMemberships?: string[] }) {
-    return this.notificationsService.sendGlobalNotification(data.title, data.body);
+  async sendAdminNotification(data: {
+    title: string;
+    body: string;
+    imageUrl?: string;
+    actionUrl?: string;
+    type?: string;
+    targetRoles?: string[];
+    targetCities?: string[];
+    targetMemberships?: string[];
+  }) {
+    return this.notificationsService.sendAdminNotification(data);
   }
 
   async getAnalytics(period: string) {

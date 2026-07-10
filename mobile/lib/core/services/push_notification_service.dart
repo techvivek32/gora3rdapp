@@ -7,6 +7,7 @@ import '../di/injection.dart';
 import '../network/api_client.dart';
 import '../router/app_router.dart';
 import '../utils/contact_launcher.dart';
+import '../utils/action_url.dart';
 import '../utils/ring_player.dart';
 import '../../features/requirements/presentation/widgets/requirement_alert.dart';
 
@@ -162,8 +163,14 @@ class PushNotificationService {
     // Show the rich popup card if this was a requirement, else open the feed.
     if ((data['requirementId'] ?? '').toString().isNotEmpty) {
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
+      return;
+    }
+    // Admin broadcast: follow its action URL, otherwise land on the inbox.
+    final actionUrl = (data['actionUrl'] ?? '').toString().trim();
+    if (actionUrl.isNotEmpty) {
+      openActionUrl(ctx, actionUrl);
     } else {
-      ctx.push('/requirements');
+      ctx.push('/notifications');
     }
   }
 }

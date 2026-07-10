@@ -61,6 +61,10 @@ export class Notification {
   @Prop({ type: [String], default: [] })
   targetMemberships: string[];
 
+  /** Audience roles ('driver' | 'travel_agency'). Empty = every role. */
+  @Prop({ type: [String], default: [] })
+  targetRoles: string[];
+
   @Prop()
   imageUrl: string;
 

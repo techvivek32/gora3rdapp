@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/action_url.dart';
 import '../bloc/notification_bloc.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -27,6 +28,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     'new_vehicle': Icons.directions_car_outlined,
     'new_message': Icons.chat_bubble_outline,
     'subscription_activated': Icons.workspace_premium,
+    'promotional': Icons.campaign_outlined,
     'system': Icons.notifications_outlined,
   };
 
@@ -38,6 +40,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     'new_vehicle': AppColors.primary,
     'new_message': AppColors.info,
     'subscription_activated': AppColors.memberGolden,
+    'promotional': AppColors.memberGolden,
     'system': AppColors.textSecondary,
   };
 
@@ -48,7 +51,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
     }
     final type = n['type'] as String? ?? '';
     final data = n['data'] as Map<String, dynamic>? ?? {};
-    if (type == 'requirement_posted' || type == 'requirement_accepted' || type == 'new_requirement') {
+
+    // An admin-set action URL wins: http(s) opens the browser, anything else is
+    // treated as an in-app route ("/subscription").
+    final actionUrl = (n['actionUrl'] ?? data['actionUrl'] ?? '').toString().trim();
+    if (actionUrl.isNotEmpty) {
+      openActionUrl(context, actionUrl);
+      return;
+    }
+
+    if (type == 'requirement_posted' || type == 'requirement_accepted') {
       final requirementId = data['requirementId'] as String?;
       if (requirementId != null) context.push('/requirements/$requirementId');
     } else if (type == 'vehicle_posted' || type == 'new_vehicle') {
@@ -202,6 +214,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins', height: 1.4),
                                 ),
+                                if ((n['imageUrl'] ?? '').toString().isNotEmpty) ...[
+                                  SizedBox(height: 8.h),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    child: AspectRatio(
+                                      aspectRatio: 2, // matches the 1024×512 upload
+                                      child: Image.network(
+                                        n['imageUrl'].toString(),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),

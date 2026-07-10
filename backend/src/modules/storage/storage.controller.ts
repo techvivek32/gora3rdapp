@@ -38,4 +38,12 @@ export class StorageController {
     const url = await this.storageService.uploadBannerImage(file);
     return { url };
   }
+
+  @Post('upload/notification')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload notification image (1024×512, WebP)' })
+  async uploadNotification(@UploadedFile() file: Express.Multer.File) {
+    const url = await this.storageService.uploadNotificationImage(file);
+    return { url };
+  }
 }
