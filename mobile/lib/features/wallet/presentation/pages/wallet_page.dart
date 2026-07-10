@@ -129,12 +129,52 @@ class _WalletPageState extends State<WalletPage> {
     _snack('Payment failed: ${response.message ?? ''}');
   }
 
+  /// Selectable pill used to pick the payout method (bank vs UPI).
+  Widget _methodChip({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+            width: selected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: selected ? AppColors.primary : AppColors.textSecondary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _showWithdrawSheet() async {
     final amountCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final bankCtrl = TextEditingController();
     final accCtrl = TextEditingController();
     final ifscCtrl = TextEditingController();
+    final upiCtrl = TextEditingController();
+    String method = 'bank'; // 'bank' | 'upi'
     bool submitting = false;
 
     InputDecoration dec(String label, IconData icon) => InputDecoration(
@@ -151,24 +191,37 @@ class _WalletPageState extends State<WalletPage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
+          final isBank = method == 'bank';
+
           Future<void> submit() async {
             final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
             if (amt < 1) return _snack('Enter a valid amount');
             if (amt > _balance) return _snack('You can withdraw at most ₹${_balance.toStringAsFixed(0)}');
-            if (nameCtrl.text.trim().isEmpty ||
-                bankCtrl.text.trim().isEmpty ||
-                accCtrl.text.trim().isEmpty ||
-                ifscCtrl.text.trim().isEmpty) {
-              return _snack('Please fill all bank details');
+            if (nameCtrl.text.trim().isEmpty) return _snack('Enter the account holder name');
+
+            if (isBank) {
+              if (bankCtrl.text.trim().isEmpty || accCtrl.text.trim().isEmpty || ifscCtrl.text.trim().isEmpty) {
+                return _snack('Please fill all bank details');
+              }
+            } else {
+              final upi = upiCtrl.text.trim();
+              if (!RegExp(r'^[\w.\-]{2,}@[a-zA-Z]{2,}$').hasMatch(upi)) {
+                return _snack('Enter a valid UPI ID (e.g. name@bank)');
+              }
             }
+
             setSheet(() => submitting = true);
             try {
               await _api.post('/wallet/withdraw', data: {
                 'amount': amt,
+                'method': method,
                 'accountHolderName': nameCtrl.text.trim(),
-                'bankName': bankCtrl.text.trim(),
-                'accountNumber': accCtrl.text.trim(),
-                'ifsc': ifscCtrl.text.trim().toUpperCase(),
+                if (isBank) ...{
+                  'bankName': bankCtrl.text.trim(),
+                  'accountNumber': accCtrl.text.trim(),
+                  'ifsc': ifscCtrl.text.trim().toUpperCase(),
+                } else
+                  'upiId': upiCtrl.text.trim(),
               });
               if (ctx.mounted) Navigator.pop(ctx);
               _snack('Withdrawal request submitted for review.', error: false);
@@ -199,6 +252,31 @@ class _WalletPageState extends State<WalletPage> {
                   Text('Available balance: ₹${_balance.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
+
+                  // Payout method: bank transfer or UPI.
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _methodChip(
+                          label: 'Bank Account',
+                          icon: Icons.account_balance_outlined,
+                          selected: isBank,
+                          onTap: () => setSheet(() => method = 'bank'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _methodChip(
+                          label: 'UPI ID',
+                          icon: Icons.qr_code_2,
+                          selected: !isBank,
+                          onTap: () => setSheet(() => method = 'upi'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
                   TextField(
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
@@ -206,18 +284,31 @@ class _WalletPageState extends State<WalletPage> {
                     decoration: dec('Amount (₹)', Icons.currency_rupee),
                   ),
                   const SizedBox(height: 12),
-                  TextField(controller: nameCtrl, textCapitalization: TextCapitalization.words, decoration: dec('Account Holder Name', Icons.person_outline)),
-                  const SizedBox(height: 12),
-                  TextField(controller: bankCtrl, textCapitalization: TextCapitalization.words, decoration: dec('Bank Name', Icons.account_balance_outlined)),
-                  const SizedBox(height: 12),
-                  TextField(controller: accCtrl, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: dec('Account Number', Icons.numbers)),
-                  const SizedBox(height: 12),
                   TextField(
-                    controller: ifscCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]'))],
-                    decoration: dec('IFSC Code', Icons.qr_code),
+                    controller: nameCtrl,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: dec(isBank ? 'Account Holder Name' : 'Name', Icons.person_outline),
                   ),
+                  const SizedBox(height: 12),
+
+                  if (isBank) ...[
+                    TextField(controller: bankCtrl, textCapitalization: TextCapitalization.words, decoration: dec('Bank Name', Icons.account_balance_outlined)),
+                    const SizedBox(height: 12),
+                    TextField(controller: accCtrl, keyboardType: TextInputType.number, inputFormatters: [FilteringTextInputFormatter.digitsOnly], decoration: dec('Account Number', Icons.numbers)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: ifscCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]'))],
+                      decoration: dec('IFSC Code', Icons.qr_code),
+                    ),
+                  ] else
+                    TextField(
+                      controller: upiCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: dec('UPI ID (e.g. name@bank)', Icons.alternate_email),
+                    ),
+
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -239,11 +330,16 @@ class _WalletPageState extends State<WalletPage> {
         },
       ),
     );
-    amountCtrl.dispose();
-    nameCtrl.dispose();
-    bankCtrl.dispose();
-    accCtrl.dispose();
-    ifscCtrl.dispose();
+    // Delay so the sheet's TextFields (still mounted through the close animation)
+    // don't reference disposed controllers.
+    Future.delayed(const Duration(milliseconds: 400), () {
+      amountCtrl.dispose();
+      nameCtrl.dispose();
+      bankCtrl.dispose();
+      accCtrl.dispose();
+      ifscCtrl.dispose();
+      upiCtrl.dispose();
+    });
   }
 
   /// Send money to another user: look them up by mobile, then transfer.

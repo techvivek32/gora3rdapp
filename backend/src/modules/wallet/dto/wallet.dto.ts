@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, MaxLength, Min, ValidateIf } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateTopUpDto {
@@ -50,29 +50,47 @@ export class RequestWithdrawalDto {
   @Min(1)
   amount: number;
 
+  @ApiPropertyOptional({ enum: ['bank', 'upi'], default: 'bank' })
+  @IsOptional()
+  @IsIn(['bank', 'upi'])
+  method?: 'bank' | 'upi';
+
   @ApiProperty({ example: 'Ramesh Kumar' })
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
   accountHolderName: string;
 
-  @ApiProperty({ example: 'State Bank of India' })
+  // ── Bank payout (required when method is 'bank') ───────────────────────────
+  @ApiPropertyOptional({ example: 'State Bank of India' })
+  @ValidateIf((o) => (o.method ?? 'bank') === 'bank')
   @IsString()
   @IsNotEmpty()
   @MaxLength(80)
-  bankName: string;
+  bankName?: string;
 
-  @ApiProperty({ example: '123456789012' })
+  @ApiPropertyOptional({ example: '123456789012' })
+  @ValidateIf((o) => (o.method ?? 'bank') === 'bank')
   @IsString()
   @IsNotEmpty()
   @MaxLength(30)
-  accountNumber: string;
+  accountNumber?: string;
 
-  @ApiProperty({ example: 'SBIN0001234' })
+  @ApiPropertyOptional({ example: 'SBIN0001234' })
+  @ValidateIf((o) => (o.method ?? 'bank') === 'bank')
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
-  ifsc: string;
+  ifsc?: string;
+
+  // ── UPI payout (required when method is 'upi') ─────────────────────────────
+  @ApiPropertyOptional({ example: 'ramesh@okaxis' })
+  @ValidateIf((o) => o.method === 'upi')
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^[\w.\-]{2,}@[a-zA-Z]{2,}$/, { message: 'Enter a valid UPI ID (e.g. name@bank)' })
+  @MaxLength(60)
+  upiId?: string;
 }
 
 export class RejectWithdrawalDto {

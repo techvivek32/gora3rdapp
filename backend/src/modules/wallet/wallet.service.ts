@@ -227,13 +227,16 @@ export class WalletService {
       .findByIdAndUpdate(userId, { $inc: { walletBalance: -amount } }, { new: true })
       .select('walletBalance');
 
+    // Store only the fields that belong to the chosen payout method.
+    const method = dto.method ?? 'bank';
     const request = await this.withdrawalModel.create({
       userId: new Types.ObjectId(userId),
       amount,
+      method,
       accountHolderName: dto.accountHolderName,
-      bankName: dto.bankName,
-      accountNumber: dto.accountNumber,
-      ifsc: dto.ifsc,
+      ...(method === 'bank'
+        ? { bankName: dto.bankName, accountNumber: dto.accountNumber, ifsc: dto.ifsc }
+        : { upiId: dto.upiId }),
       status: 'pending',
     });
 
@@ -332,6 +335,7 @@ export class WalletService {
         { userId: { $in: matchedUsers.map((u) => u._id) } },
         { accountHolderName: rx },
         { accountNumber: rx },
+        { upiId: rx },
       ];
     }
 

@@ -21,10 +21,12 @@ interface Withdrawal {
   _id: string;
   userId: WithdrawalUser | null;
   amount: number;
+  method?: 'bank' | 'upi';
   accountHolderName: string;
-  bankName: string;
-  accountNumber: string;
-  ifsc: string;
+  bankName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  upiId?: string;
   status: 'pending' | 'approved' | 'rejected';
   rejectionReason?: string;
   createdAt: string;
@@ -134,12 +136,30 @@ export default function WithdrawalsPage() {
                 )}
               </div>
 
-              {/* Bank details */}
+              {/* Payout details — bank transfer or UPI (older records default to bank) */}
               <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3 text-sm space-y-1">
-                <Detail label="Account Holder" value={w.accountHolderName} />
-                <Detail label="Bank" value={w.bankName} />
-                <Detail label="Account No." value={w.accountNumber} mono />
-                <Detail label="IFSC" value={w.ifsc} mono />
+                <div className="flex items-center gap-2 pb-1">
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    w.method === 'upi'
+                      ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+                  }`}>
+                    {w.method === 'upi' ? 'UPI' : 'Bank Transfer'}
+                  </span>
+                </div>
+                {w.method === 'upi' ? (
+                  <>
+                    <Detail label="Name" value={w.accountHolderName} />
+                    <Detail label="UPI ID" value={w.upiId ?? '—'} mono />
+                  </>
+                ) : (
+                  <>
+                    <Detail label="Account Holder" value={w.accountHolderName} />
+                    <Detail label="Bank" value={w.bankName ?? '—'} />
+                    <Detail label="Account No." value={w.accountNumber ?? '—'} mono />
+                    <Detail label="IFSC" value={w.ifsc ?? '—'} mono />
+                  </>
+                )}
               </div>
 
               <div className="text-xs text-gray-400">
