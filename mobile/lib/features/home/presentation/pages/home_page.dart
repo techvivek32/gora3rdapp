@@ -167,11 +167,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  // Brand title: "Partner" is stretched horizontally (width only, same font
-  // size) so it lines up exactly under "Gora Taxi".
+  // Brand title: "Partner" is stretched horizontally so it lines up exactly under
+  // "Gora Taxi". `height: 1.0` strips the font's default leading, tucking the two
+  // lines together; the larger Partner font makes it taller (scaleX squeezes it
+  // back to the same width).
   Widget _buildBrandTitle() {
-    final goraStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary);
-    final partnerStyle = TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary);
+    final goraStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.0);
+    final partnerStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.0);
     final gw = _textWidth('Gora Taxi', goraStyle);
     final pw = _textWidth('Partner', partnerStyle);
     final sx = pw > 0 ? gw / pw : 1.0;
@@ -305,7 +307,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
                 // Scrolling caution line
                 Container(
-                  color: const Color.fromARGB(255, 88, 88, 88),
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: MarqueeText(
                     text:
@@ -322,7 +323,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
                 // Scrolling account-verification reminder
                 Container(
-                  color: const Color.fromARGB(255, 88, 88, 88),
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: MarqueeText(
                     text:
