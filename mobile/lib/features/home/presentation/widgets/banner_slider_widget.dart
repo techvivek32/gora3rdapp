@@ -136,41 +136,43 @@ class _BannerItem extends StatelessWidget {
             else
               _gradientBg(),
 
-            // Dark gradient overlay for text readability
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: EdgeInsets.fromLTRB(14.w, 24.h, 14.w, 14.h),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
+            // Dark gradient only when there's text to keep readable — an image-only
+            // banner shows the artwork with no fade over it.
+            if ((title != null && title.isNotEmpty) || (subtitle != null && subtitle.isNotEmpty))
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.fromLTRB(14.w, 24.h, 14.w, 14.h),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [Colors.black.withValues(alpha: 0.65), Colors.transparent],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (title != null && title.isNotEmpty)
+                        Text(title,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14.sp,
+                                fontFamily: 'Poppins')),
+                      if (subtitle != null && subtitle.isNotEmpty)
+                        Text(subtitle,
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11.sp,
+                                fontFamily: 'Poppins')),
+                    ],
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (title != null && title.isNotEmpty)
-                      Text(title,
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14.sp,
-                              fontFamily: 'Poppins')),
-                    if (subtitle != null && subtitle.isNotEmpty)
-                      Text(subtitle,
-                          style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11.sp,
-                              fontFamily: 'Poppins')),
-                  ],
-                ),
               ),
-            ),
           ],
         ),
       ),

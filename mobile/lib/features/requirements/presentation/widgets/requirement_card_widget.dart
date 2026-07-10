@@ -420,24 +420,24 @@ class RequirementCardWidget extends StatelessWidget {
                             if (canContact)
                               Row(
                                 children: [
-                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 22), 'Phone', () {
+                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 28), 'Phone', () {
                                     if (mobile != null && mobile.isNotEmpty) {
                                       callNumber(mobile);
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
                                     }
                                   }),
-                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 22), 'Whatsapp', () {
+                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
                                     if (mobile != null && mobile.isNotEmpty) {
                                       openWhatsApp(mobile);
                                     } else {
                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
                                     }
                                   }),
-                                  _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 22), 'Advice',
+                                  _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
                                       () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
                                   _ratingAction(rating),
-                                  _action(Icon(Icons.report, color: Colors.red.shade400, size: 22), 'Report',
+                                  _action(Icon(Icons.report, color: Colors.red.shade400, size: 28), 'Report',
                                       postedBy?['_id'] == null
                                           ? null
                                           : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
@@ -514,8 +514,8 @@ class RequirementCardWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             icon,
-            SizedBox(height: 4.h),
-            Text(label, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+            SizedBox(height: 5.h),
+            Text(label, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ],
         ),
       ),
@@ -528,12 +528,12 @@ class RequirementCardWidget extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.star, size: 16.sp, color: Colors.amber),
+            Icon(Icons.star, size: 22.sp, color: Colors.amber),
             SizedBox(width: 2.w),
-            Text(rating > 0 ? rating.toStringAsFixed(1) : '—', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+            Text(rating > 0 ? rating.toStringAsFixed(1) : '—', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.bold, color: Colors.black)),
           ]),
-          SizedBox(height: 4.h),
-          Text('Rating', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary)),
+          SizedBox(height: 5.h),
+          Text('Rating', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
         ],
       ),
     );

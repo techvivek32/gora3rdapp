@@ -50,19 +50,21 @@ class BannerCardWidget extends StatelessWidget {
               else
                 _gradientBg(),
 
-              // Dark overlay for readability
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      Colors.black.withOpacity(0.6),
-                      Colors.black.withOpacity(0.1),
-                    ],
+              // Dark overlay only when there's text to keep readable — an image-only
+              // banner shows the artwork with no fade over it.
+              if (title.isNotEmpty || subtitle.isNotEmpty)
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.6),
+                        Colors.black.withValues(alpha: 0.1),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
               // Content
               Padding(
