@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
+import '../../../../core/utils/ring_player.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 /// Full-screen-style popup shown when a "new requirement" push arrives while the
@@ -13,7 +14,8 @@ Future<void> showRequirementAlert(BuildContext context, Map<String, dynamic> dat
     barrierDismissible: true,
     barrierColor: Colors.black54,
     builder: (_) => _RequirementAlert(data: data),
-  );
+    // Cut the ring short once the user has seen (and dismissed) the alert.
+  ).whenComplete(stopRequirementRing);
 }
 
 class _RequirementAlert extends StatelessWidget {

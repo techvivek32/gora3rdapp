@@ -34,8 +34,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // and the "Display over other apps" permission was granted.
     final data = message.data;
     if ((data['requirementId'] ?? '').toString().isNotEmpty) {
-      await playRequirementRing();
+      // Overlay first so it appears immediately, then hold this isolate open for
+      // the ring — it is killed as soon as this handler returns.
       await showRequirementOverlay(Map<String, dynamic>.from(data));
+      await playRequirementRing(awaitEnd: true);
     }
   } catch (e) {
     debugPrint('Firebase background handler error: $e');
