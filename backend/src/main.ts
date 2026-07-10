@@ -75,8 +75,13 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new LoggingInterceptor(), new ResponseInterceptor());
 
-  // Swagger API Documentation
-  if (configService.get('NODE_ENV') !== 'production') {
+  // Swagger API Documentation.
+  // Gate on process.env directly (same source the logger above uses). Reading it via
+  // ConfigService returned undefined when NODE_ENV isn't registered in the config
+  // schema, so this block ran in production — and SwaggerModule.createDocument()
+  // scans every controller/DTO, burning ~20s of CPU on every boot.
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (!isProduction) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('Gora Cabs API')
       .setDescription('Taxi Requirement & Available Cab Network Platform')
@@ -110,7 +115,7 @@ async function bootstrap() {
   const host = process.env.BIND_HOST || '127.0.0.1';
   await app.listen(port, host);
   console.log(`🚀 Gora Cabs API running on: http://localhost:${port}/${apiPrefix}`);
-  console.log(`📄 Swagger docs: http://localhost:${port}/api/docs`);
+  if (!isProduction) console.log(`📄 Swagger docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap().catch(console.error);

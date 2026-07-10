@@ -9,12 +9,13 @@ export class User {
   @Prop({ required: true, trim: true })
   fullName: string;
 
-  // Email is optional (registration only needs a mobile number). Sparse + unique so
-  // accounts without an email don't collide on the unique index.
-  @Prop({ unique: true, sparse: true, trim: true, lowercase: true })
+  // Email is optional (registration only needs a mobile number). The unique+sparse
+  // index is declared once at the bottom via UserSchema.index() — don't also set
+  // `unique` here or Mongoose warns about a duplicate index definition.
+  @Prop({ trim: true, lowercase: true })
   email: string;
 
-  @Prop({ required: true, unique: true, trim: true })
+  @Prop({ required: true, trim: true })
   mobile: string;
 
   @Prop({ select: false })
