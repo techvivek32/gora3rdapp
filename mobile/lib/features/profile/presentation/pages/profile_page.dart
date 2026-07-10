@@ -8,6 +8,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -660,7 +661,17 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
                         SizedBox(height: 14.h),
                         _field(_agencyCtrl, 'Agency Name', Icons.business_outlined),
                         SizedBox(height: 14.h),
-                        _field(_cityCtrl, 'City', Icons.location_city_outlined),
+                        // Google Places-backed suggestions, same source as "My Cities".
+                        PlacesCityField(
+                          label: 'City',
+                          icon: Icons.location_city_outlined,
+                          initialText: _cityCtrl.text,
+                          onChanged: (city, state) {
+                            _cityCtrl.text = city;
+                            // Picking a suggestion also fills the state for the user.
+                            if (state != null && state.isNotEmpty) _stateCtrl.text = state;
+                          },
+                        ),
                         SizedBox(height: 14.h),
                         _field(_stateCtrl, 'State', Icons.map_outlined),
                         SizedBox(height: 24.h),

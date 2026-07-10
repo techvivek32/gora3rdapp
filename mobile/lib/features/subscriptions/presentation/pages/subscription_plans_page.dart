@@ -201,7 +201,6 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
         actions: [
           Padding(
             padding: EdgeInsets.only(right: 12.w),
-            child: Icon(Icons.emoji_events, color: Colors.white, size: 24.sp),
           ),
         ],
       ),
