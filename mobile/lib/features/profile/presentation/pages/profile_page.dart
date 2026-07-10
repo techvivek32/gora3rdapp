@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -171,37 +172,101 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  /// Asks for a reason, then submits a deletion *request* for an admin to review.
+  /// The account stays usable until an admin approves it.
   Future<void> _confirmDeleteAccount(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
+    // The dialog owns its own controller (see _DeleteAccountDialog) — disposing it
+    // here would tear it down while the closing dialog's TextFormField is still
+    // mounted, tripping the `_dependents.isEmpty` assertion.
+    final reason = await showDialog<String>(
       context: context,
-      builder: (dialogCtx) => AlertDialog(
-        title: const Text('Delete Account', style: TextStyle(fontFamily: 'Poppins')),
-        content: const Text(
-          'This will permanently delete your account and you will be signed out. '
-          'This action cannot be undone. Are you sure?',
-          style: TextStyle(fontFamily: 'Poppins'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogCtx).pop(false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.of(dialogCtx).pop(true),
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
+      builder: (_) => const _DeleteAccountDialog(),
     );
-    if (confirmed != true || !context.mounted) return;
+
+    if (reason == null || reason.isEmpty || !context.mounted) return;
 
     try {
-      await getIt<ApiClient>().delete('/users/account');
+      await getIt<ApiClient>().post('/users/account/delete-request', data: {'reason': reason});
       if (!context.mounted) return;
-      context.read<AuthBloc>().add(AuthLogoutEvent());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your deletion request has been submitted for review.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete account. Please try again.'), backgroundColor: AppColors.error),
+        SnackBar(content: Text(ErrorMapper.message(e)), backgroundColor: AppColors.error),
       );
     }
+  }
+}
+
+/// Delete-account dialog. Owns its TextEditingController so the controller lives
+/// exactly as long as the dialog's widget tree (pops with the typed reason, or null).
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _reasonCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Delete Account', style: TextStyle(fontFamily: 'Poppins')),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Tell us why you want to delete your account. Our team will review your '
+              'request, and your account will be removed once it is approved.',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _reasonCtrl,
+              maxLines: 3,
+              maxLength: 500,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Reason for deletion',
+                hintText: 'e.g. I no longer use the app',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) => (v == null || v.trim().length < 3)
+                  ? 'Please tell us why you want to delete your account'
+                  : null,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              Navigator.of(context).pop(_reasonCtrl.text.trim());
+            }
+          },
+          child: const Text('Submit Request', style: TextStyle(color: AppColors.error)),
+        ),
+      ],
+    );
   }
 }
 

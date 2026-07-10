@@ -314,6 +314,29 @@ export class AdminController {
     return this.adminService.resolveReport(id, adminId, action, notes);
   }
 
+  // ─── Account deletion requests ─────────────────────────────────────────────
+  @Get('deletion-requests')
+  @ApiOperation({ summary: 'List account deletion requests' })
+  getDeletionRequests(@Query() query: any) {
+    return this.adminService.getDeletionRequests(query);
+  }
+
+  @Post('deletion-requests/:id/approve')
+  @ApiOperation({ summary: 'Approve a deletion request (removes the user)' })
+  approveDeletionRequest(@Param('id') id: string, @CurrentUser('sub') adminId: string) {
+    return this.adminService.approveDeletionRequest(id, adminId);
+  }
+
+  @Post('deletion-requests/:id/reject')
+  @ApiOperation({ summary: 'Reject a deletion request' })
+  rejectDeletionRequest(
+    @Param('id') id: string,
+    @CurrentUser('sub') adminId: string,
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.rejectDeletionRequest(id, adminId, reason);
+  }
+
   // ─── Notifications ─────────────────────────────────────────────────────────
   @Post('notifications/send')
   @ApiOperation({ summary: 'Send admin notification' })

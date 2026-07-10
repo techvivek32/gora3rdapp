@@ -8,6 +8,7 @@ import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { RateUserDto } from './dto/rate-user.dto';
+import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -30,10 +31,19 @@ export class UsersController {
     return this.usersService.updateProfile(userId, dto);
   }
 
-  @Delete('account')
-  @ApiOperation({ summary: 'Delete (deactivate) the current user account' })
-  deleteAccount(@CurrentUser('sub') userId: string) {
-    return this.usersService.deleteAccount(userId);
+  @Post('account/delete-request')
+  @ApiOperation({ summary: 'Request account deletion (reviewed by an admin)' })
+  requestAccountDeletion(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: RequestAccountDeletionDto,
+  ) {
+    return this.usersService.requestAccountDeletion(userId, dto.reason);
+  }
+
+  @Get('account/delete-request')
+  @ApiOperation({ summary: 'Status of the current user’s deletion request' })
+  getDeletionRequestStatus(@CurrentUser('sub') userId: string) {
+    return this.usersService.getDeletionRequestStatus(userId);
   }
 
   @Post('verification')

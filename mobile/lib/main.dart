@@ -7,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
+import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
 import 'core/utils/ring_player.dart';
 import 'core/services/push_notification_service.dart';
@@ -93,10 +94,17 @@ class _GoraCabsAppState extends State<GoraCabsApp> {
     super.initState();
     _authBloc = getIt<AuthBloc>()..add(AuthCheckStatusEvent());
     _router = AppRouter.createRouter(_authBloc);
+
+    // The session can no longer be renewed (account deleted by an admin, blocked or
+    // deactivated) → sign out. The router redirects to login on AuthUnauthenticated.
+    ApiClient.onSessionExpired = () {
+      if (mounted) _authBloc.add(AuthLogoutEvent());
+    };
   }
 
   @override
   void dispose() {
+    ApiClient.onSessionExpired = null;
     _authBloc.close();
     super.dispose();
   }

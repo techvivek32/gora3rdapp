@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
@@ -13,6 +13,10 @@ import { Report, ReportDocument, ReportStatus } from '../../database/schemas/rep
 import { Banner, BannerDocument } from '../../database/schemas/banner.schema';
 import { City, CityDocument } from '../../database/schemas/city.schema';
 import { AuditLog, AuditLogDocument } from '../../database/schemas/audit-log.schema';
+import {
+  AccountDeletionRequest,
+  AccountDeletionRequestDocument,
+} from '../../database/schemas/account-deletion-request.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
@@ -34,8 +38,88 @@ export class AdminService {
     @InjectModel(Banner.name) private bannerModel: Model<BannerDocument>,
     @InjectModel(City.name) private cityModel: Model<CityDocument>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLogDocument>,
+    @InjectModel(AccountDeletionRequest.name)
+    private deletionRequestModel: Model<AccountDeletionRequestDocument>,
     private notificationsService: NotificationsService,
   ) {}
+
+  // ── Account deletion requests ───────────────────────────────────────────────
+
+  async getDeletionRequests(query: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = { ...dateRangeFilter(query) };
+    if (query.status) filter.status = query.status;
+    if (query.search) {
+      const rx = new RegExp(String(query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ fullName: rx }, { mobile: rx }, { email: rx }, { reason: rx }];
+    }
+
+    const [requests, total] = await Promise.all([
+      this.deletionRequestModel
+        .find(filter)
+        .populate('userId', 'fullName mobile email membershipType profileImage')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      this.deletionRequestModel.countDocuments(filter),
+    ]);
+
+    return { message: 'Deletion requests retrieved', data: buildPaginatedResult(requests, total, page, limit) };
+  }
+
+  /** Approving permanently removes the user and hides everything they posted. */
+  async approveDeletionRequest(id: string, adminId: string) {
+    const request = await this.deletionRequestModel.findById(id);
+    if (!request) throw new NotFoundException('Deletion request not found');
+    if (request.status !== 'pending') {
+      throw new BadRequestException(`This request is already ${request.status}.`);
+    }
+
+    const userId = request.userId;
+    // Hide their content first, then remove the account itself.
+    await Promise.all([
+      this.requirementModel.updateMany({ postedBy: userId }, { isDeleted: true, deletedAt: new Date() }),
+      this.vehicleModel.updateMany({ postedBy: userId }, { isDeleted: true, deletedAt: new Date() }),
+      this.ratingModel.deleteMany({ $or: [{ rater: userId }, { ratedUser: userId }] }),
+    ]);
+    await this.userModel.findByIdAndDelete(userId);
+
+    request.status = 'approved';
+    request.processedBy = new Types.ObjectId(adminId);
+    request.processedAt = new Date();
+    await request.save();
+
+    await this.auditLogModel.create({
+      userId: new Types.ObjectId(adminId),
+      action: 'DELETE_ACCOUNT_APPROVED',
+      resource: 'user',
+      resourceId: userId.toString(),
+    });
+    return { message: 'Account deleted', data: request };
+  }
+
+  async rejectDeletionRequest(id: string, adminId: string, reason?: string) {
+    const request = await this.deletionRequestModel.findById(id);
+    if (!request) throw new NotFoundException('Deletion request not found');
+    if (request.status !== 'pending') {
+      throw new BadRequestException(`This request is already ${request.status}.`);
+    }
+
+    request.status = 'rejected';
+    request.rejectionReason = reason?.trim();
+    request.processedBy = new Types.ObjectId(adminId);
+    request.processedAt = new Date();
+    await request.save();
+
+    await this.auditLogModel.create({
+      userId: new Types.ObjectId(adminId),
+      action: 'DELETE_ACCOUNT_REJECTED',
+      resource: 'user',
+      resourceId: request.userId.toString(),
+    });
+    return { message: 'Deletion request rejected', data: request };
+  }
 
   async getDashboardStats() {
     const now = new Date();

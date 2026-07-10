@@ -6,6 +6,11 @@ import '../config/env.dart';
 class ApiClient {
   static const _baseUrl = Env.apiBaseUrl;
 
+  /// Called once when the session can no longer be renewed — i.e. the refresh
+  /// token was rejected because the account was deleted, blocked or deactivated.
+  /// main.dart wires this up to sign the user out and send them to the login page.
+  static void Function()? onSessionExpired;
+
   late final Dio _dio;
   final FlutterSecureStorage _storage;
 
@@ -45,7 +50,19 @@ class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _storage;
   final Dio _dio;
 
+  /// Guards against a burst of 401s (several in-flight requests) each firing a logout.
+  static bool _signingOut = false;
+
   _AuthInterceptor(this._storage, this._dio);
+
+  Future<void> _forceSignOut() async {
+    if (_signingOut) return;
+    _signingOut = true;
+    await _storage.deleteAll();
+    ApiClient.onSessionExpired?.call();
+    // Allow a future session to expire again after this one is handled.
+    Future.delayed(const Duration(seconds: 3), () => _signingOut = false);
+  }
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -92,8 +109,9 @@ class _AuthInterceptor extends Interceptor {
             return handler.next(err);
           }
         } catch (_) {
-          // Refresh request itself failed — clear tokens and force re-login.
-          await _storage.deleteAll();
+          // Refresh was rejected — the account is gone, blocked or deactivated.
+          // (A failed *login* has no refresh token stored, so it never lands here.)
+          await _forceSignOut();
         }
       }
     }

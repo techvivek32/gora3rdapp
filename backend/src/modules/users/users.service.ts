@@ -4,6 +4,10 @@ import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { Rating, RatingDocument } from '../../database/schemas/rating.schema';
+import {
+  AccountDeletionRequest,
+  AccountDeletionRequestDocument,
+} from '../../database/schemas/account-deletion-request.schema';
 import { ConflictException } from '@nestjs/common';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { RateUserDto } from './dto/rate-user.dto';
@@ -22,6 +26,8 @@ export class UsersService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
     @InjectModel(Rating.name) private ratingModel: Model<RatingDocument>,
+    @InjectModel(AccountDeletionRequest.name)
+    private deletionRequestModel: Model<AccountDeletionRequestDocument>,
   ) {}
 
   // One-time rating of another user. Recomputes the rated user's average.
@@ -264,16 +270,39 @@ export class UsersService {
     return { message: `Notifications ${enabled ? 'enabled' : 'disabled'}` };
   }
 
-  /** Self-service account deletion — deactivates the account so it can no longer
-   *  log in (login rejects inactive accounts). */
-  async deleteAccount(userId: string) {
-    const user = await this.userModel.findById(userId).select('_id');
+  /** Self-service account deletion is now a *request*: the user gives a reason and an
+   *  admin reviews it. The account stays usable until an admin approves, at which
+   *  point it's removed from the database. */
+  async requestAccountDeletion(userId: string, reason: string) {
+    const user = await this.userModel.findById(userId).select('fullName mobile email');
     if (!user) throw new NotFoundException('User not found');
-    await this.userModel.findByIdAndUpdate(userId, {
-      isActive: false,
-      fcmTokens: [],
+
+    const existing = await this.deletionRequestModel.findOne({ userId, status: 'pending' }).lean();
+    if (existing) {
+      throw new ConflictException('You already have a deletion request awaiting review.');
+    }
+
+    // Snapshot the identity so the request stays readable after the user is deleted.
+    await this.deletionRequestModel.create({
+      userId: new Types.ObjectId(userId),
+      reason: reason.trim(),
+      status: 'pending',
+      fullName: user.fullName,
+      mobile: user.mobile,
+      email: user.email,
     });
-    return { message: 'Your account has been deleted.' };
+
+    return { message: 'Your deletion request has been submitted for review.' };
+  }
+
+  /** Whether the current user already has a pending deletion request. */
+  async getDeletionRequestStatus(userId: string) {
+    const req = await this.deletionRequestModel
+      .findOne({ userId })
+      .sort({ createdAt: -1 })
+      .select('status reason rejectionReason createdAt')
+      .lean();
+    return { message: 'Deletion request status', data: req ?? null };
   }
 
   async updateFcmToken(userId: string, fcmToken: string, action: 'add' | 'remove' = 'add') {

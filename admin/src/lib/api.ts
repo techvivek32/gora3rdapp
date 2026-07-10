@@ -123,6 +123,12 @@ export const adminApi = {
     });
   },
 
+  // ─── Account Deletion Requests ─────────────────────────────────────────────
+  getDeletionRequests: (params?: any) => apiClient.get('/admin/deletion-requests', { params }),
+  approveDeletionRequest: (id: string) => apiClient.post(`/admin/deletion-requests/${id}/approve`),
+  rejectDeletionRequest: (id: string, reason?: string) =>
+    apiClient.post(`/admin/deletion-requests/${id}/reject`, { reason }),
+
   // ─── Reports ───────────────────────────────────────────────────────────────
   getReports: (params?: any) => apiClient.get('/admin/reports', { params }),
   resolveReport: (id: string, data: any) => apiClient.post(`/admin/reports/${id}/resolve`, data),

@@ -4,9 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, Users, Car, MapPin, Bell, CreditCard,
-  BarChart3, Flag, Image, Settings, ChevronDown, LogOut, Shield,
-  FileText, Megaphone, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign
+  LayoutDashboard, Users, Car, Bell, CreditCard,
+  BarChart3, Flag, Image, Settings, LogOut,
+  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 
@@ -25,6 +25,7 @@ const navigation = [
       { href: '/support-chats', label: 'Support Chats', icon: MessageSquare },
       { href: '/referrals', label: 'Invite Leaderboard', icon: Trophy },
       { href: '/verification-requests', label: 'Verification Requests', icon: BadgeCheck },
+      { href: '/deletion-requests', label: 'Deletion Requests', icon: UserX },
       { href: '/requirements', label: 'Requirements', icon: FileText },
       { href: '/vehicles', label: 'Available Vehicles', icon: Car },
       { href: '/reports', label: 'Reports', icon: Flag },

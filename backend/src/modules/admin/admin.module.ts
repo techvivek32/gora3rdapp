@@ -16,6 +16,7 @@ import { City, CitySchema } from '../../database/schemas/city.schema';
 import { SubscriptionPlan, SubscriptionPlanSchema } from '../../database/schemas/subscription.schema';
 import { AuditLog, AuditLogSchema } from '../../database/schemas/audit-log.schema';
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
+import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: City.name, schema: CitySchema },
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: Notification.name, schema: NotificationSchema },
+      { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
     ]),
     NotificationsModule,
   ],
