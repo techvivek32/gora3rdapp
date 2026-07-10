@@ -12,6 +12,21 @@ class SupportChatPage extends StatefulWidget {
   State<SupportChatPage> createState() => _SupportChatPageState();
 }
 
+/// Tap-to-send shortcuts for the most common support topics.
+const _quickReplies = <_QuickReply>[
+  _QuickReply(Icons.payments_outlined, 'Payment', 'I need help with a payment issue.'),
+  _QuickReply(Icons.workspace_premium_outlined, 'Plan', 'I have a question about my membership plan.'),
+  _QuickReply(Icons.description_outlined, 'Requirement', 'I need help with a requirement I posted.'),
+  _QuickReply(Icons.person_remove_outlined, 'Delete account', 'I want to delete my account.'),
+];
+
+class _QuickReply {
+  final IconData icon;
+  final String label;
+  final String message;
+  const _QuickReply(this.icon, this.label, this.message);
+}
+
 class _SupportChatPageState extends State<SupportChatPage> {
   final _api = getIt<ApiClient>();
   final _ctrl = TextEditingController();
@@ -64,11 +79,14 @@ class _SupportChatPageState extends State<SupportChatPage> {
     });
   }
 
-  Future<void> _send() async {
-    final text = _ctrl.text.trim();
+  /// Sends [message] when given (quick-reply chips), otherwise whatever is typed.
+  Future<void> _send({String? message}) async {
+    final text = (message ?? _ctrl.text).trim();
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
-    _ctrl.clear();
+    // Only wipe the field when the text came from it — a quick reply shouldn't
+    // discard a draft the user was already typing.
+    if (message == null) _ctrl.clear();
     // Optimistic append.
     setState(() {
       _messages.add({'sender': 'user', 'text': text, 'createdAt': DateTime.now().toIso8601String(), '_optimistic': true});
@@ -111,7 +129,63 @@ class _SupportChatPageState extends State<SupportChatPage> {
                         itemBuilder: (_, i) => _bubble(_messages[i]),
                       ),
           ),
+          // Shown once, above the input, until the conversation starts.
+          if (!_loading && _messages.isEmpty) _quickRepliesBar(),
           _inputBar(),
+        ],
+      ),
+    );
+  }
+
+  /// Horizontal strip of one-tap topics. Tapping a chip sends its message straight away.
+  Widget _quickRepliesBar() {
+    return Container(
+      width: double.infinity,
+      color: Colors.white,
+      padding: EdgeInsets.only(top: 10.h, bottom: 10.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: 14.w, bottom: 8.h),
+            child: Text(
+              'What do you need help with?',
+              style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: 14.w),
+            child: Row(
+              children: [
+                for (final q in _quickReplies) ...[
+                  GestureDetector(
+                    onTap: _sending ? null : () => _send(message: q.message),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(20.r),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(q.icon, size: 14.sp, color: AppColors.primary),
+                          SizedBox(width: 6.w),
+                          Text(
+                            q.label,
+                            style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
