@@ -44,16 +44,12 @@ export default function WithdrawalsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ['withdrawals', filter, search, dateFrom, dateTo],
+    queryKey: ['withdrawals', filter, search],
     queryFn: () => adminApi.getWithdrawals({
       status: filter === 'all' ? undefined : filter,
       search: search || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
     }),
     refetchInterval: 30000,
   });
@@ -97,11 +93,7 @@ export default function WithdrawalsPage() {
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Search name / mobile / account…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={setDateFrom}
-        onDateTo={setDateTo}
-        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+        onClear={() => { setSearch(''); }}
       >
         <select
           value={filter}

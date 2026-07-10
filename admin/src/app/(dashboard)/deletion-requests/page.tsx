@@ -36,19 +36,15 @@ export default function DeletionRequestsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('pending');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [rejectTarget, setRejectTarget] = useState<DeletionRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['deletion-requests', page, status, search, dateFrom, dateTo],
+    queryKey: ['deletion-requests', page, status, search],
     queryFn: () => adminApi.getDeletionRequests({
       page, limit: 20,
       status: status || undefined,
       search: search || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
     }),
   });
 
@@ -155,11 +151,7 @@ export default function DeletionRequestsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search name, mobile, reason…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setPage(1); }}
       >
         <select
           value={status}

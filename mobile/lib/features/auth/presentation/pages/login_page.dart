@@ -185,10 +185,10 @@ class _LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("Don't have an account? ", style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary)),
+                    Text("New Account ", style: TextStyle(fontSize: 14.sp, color: AppColors.textSecondary)),
                     GestureDetector(
                       onTap: () => context.go('/auth/register'),
-                      child: Text('Register', style: TextStyle(fontSize: 14.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                      child: Text('Register', style: TextStyle(fontSize: 16.sp, color: AppColors.primary, fontWeight: FontWeight.w600)),
                     ),
                   ],
                 ),

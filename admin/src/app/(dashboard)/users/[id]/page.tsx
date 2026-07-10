@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Phone, Mail, Building2, MapPin, ShieldCheck,
-  FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2,
+  FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2, Power, PowerOff,
   Calendar, User, CreditCard, ArrowUpRight, FileCheck, CheckSquare,
   Eye, Pencil, Trash2, X,
 } from 'lucide-react';
@@ -291,6 +291,17 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     onSuccess: (_, block) => { toast.success(block ? 'User blocked' : 'User unblocked'); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
   });
 
+  // Activate / deactivate the account. An inactive user can't log in.
+  const activeMutation = useMutation({
+    mutationFn: (isActive: boolean) => adminApi.updateUser(id, { isActive }),
+    onSuccess: (_, isActive) => {
+      toast.success(isActive ? 'User activated' : 'User deactivated');
+      queryClient.invalidateQueries({ queryKey: ['user', id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Could not update account status'),
+  });
+
   if (isLoading) return <div className="h-96 bg-gray-100 dark:bg-gray-800 rounded-xl animate-pulse" />;
 
   const user = (data as any)?.data;
@@ -312,14 +323,24 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         >
           <ArrowLeft className="w-4 h-4" /> Back to Users
         </button>
-        <Button
-          variant={user.isBlocked ? 'default' : 'destructive'}
-          onClick={() => blockMutation.mutate(!user.isBlocked)}
-          isLoading={blockMutation.isPending}
-        >
-          {user.isBlocked ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Ban className="w-4 h-4 mr-2" />}
-          {user.isBlocked ? 'Unblock' : 'Block'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={user.isActive ? 'outline' : 'default'}
+            onClick={() => activeMutation.mutate(!user.isActive)}
+            isLoading={activeMutation.isPending}
+          >
+            {user.isActive ? <PowerOff className="w-4 h-4 mr-2" /> : <Power className="w-4 h-4 mr-2" />}
+            {user.isActive ? 'Inactivate' : 'Activate'}
+          </Button>
+          <Button
+            variant={user.isBlocked ? 'default' : 'destructive'}
+            onClick={() => blockMutation.mutate(!user.isBlocked)}
+            isLoading={blockMutation.isPending}
+          >
+            {user.isBlocked ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Ban className="w-4 h-4 mr-2" />}
+            {user.isBlocked ? 'Unblock' : 'Block'}
+          </Button>
+        </div>
       </div>
 
       {/* Top Profile Section */}

@@ -82,12 +82,10 @@ export default function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', page, status, search, dateFrom, dateTo],
-    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+    queryKey: ['subscriptions', page, status, search],
+    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status, search: search || undefined }),
   });
 
   return (
@@ -101,11 +99,7 @@ export default function SubscriptionsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search by user name / mobile…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setPage(1); }}
       >
         <select
           value={status}

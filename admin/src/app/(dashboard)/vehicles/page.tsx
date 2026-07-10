@@ -38,13 +38,11 @@ export default function VehiclesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['vehicles', page, search, status, dateFrom, dateTo],
-    queryFn: () => adminApi.getVehicles({ page, limit: 20, search, status: status || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+    queryKey: ['vehicles', page, search, status],
+    queryFn: () => adminApi.getVehicles({ page, limit: 20, search, status: status || undefined }),
   });
 
   const deleteMutation = useMutation({
@@ -121,11 +119,7 @@ export default function VehiclesPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search by city, listing ID, driver…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setStatus(''); setPage(1); }}
       >
         <select
           value={status}

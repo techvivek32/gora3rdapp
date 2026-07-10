@@ -43,14 +43,12 @@ export default function ReportsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('pending');
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [selected, setSelected] = useState<Report | null>(null);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['reports', page, status, search, dateFrom, dateTo],
-    queryFn: () => adminApi.getReports({ page, limit: 20, status, search: search || undefined, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+    queryKey: ['reports', page, status, search],
+    queryFn: () => adminApi.getReports({ page, limit: 20, status, search: search || undefined }),
   });
 
   const resolveMutation = useMutation({
@@ -123,11 +121,7 @@ export default function ReportsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search reason / description…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setPage(1); }}
       >
         <select
           value={status}

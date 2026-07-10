@@ -55,13 +55,11 @@ export default function RequirementsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['requirements', page, search, status, dateFrom, dateTo],
-    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+    queryKey: ['requirements', page, search, status],
+    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status }),
   });
 
   const deleteMutation = useMutation({
@@ -140,11 +138,7 @@ export default function RequirementsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search by city or booking ID…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setStatus(''); setPage(1); }}
       >
         <select
           value={status}

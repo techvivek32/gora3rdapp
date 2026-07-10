@@ -82,18 +82,14 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const reset = () => setPage(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['payments', page, search, status, dateFrom, dateTo],
+    queryKey: ['payments', page, search, status],
     queryFn: () => adminApi.getPayments({
       page, limit: 20,
       search: search || undefined,
       status: status || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
     }),
   });
 
@@ -119,11 +115,7 @@ export default function PaymentsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); reset(); }}
         searchPlaceholder="Search order ID / payment ID…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); reset(); }}
-        onDateTo={(v) => { setDateTo(v); reset(); }}
-        onClear={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); reset(); }}
+        onClear={() => { setSearch(''); setStatus(''); reset(); }}
       >
         <Select value={status} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatus(e.target.value); reset(); }}>
           <option value="">All Status</option>

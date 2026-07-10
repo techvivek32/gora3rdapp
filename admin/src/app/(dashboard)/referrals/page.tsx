@@ -30,15 +30,13 @@ const medalEmoji: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
 export default function ReferralsPage() {
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
   const [amount, setAmount] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-referrals', search, dateFrom, dateTo],
-    queryFn: () => adminApi.getReferralLeaderboard({ search, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
+    queryKey: ['admin-referrals', search],
+    queryFn: () => adminApi.getReferralLeaderboard({ search }),
   });
   const data = rawData as any;
   const rows: Row[] = data?.data || [];
@@ -149,11 +147,7 @@ export default function ReferralsPage() {
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Search name, mobile, code…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={setDateFrom}
-        onDateTo={setDateTo}
-        onClear={() => { setSearch(''); setDateFrom(''); setDateTo(''); }}
+        onClear={() => { setSearch(''); }}
       />
 
       {top3.length > 0 && (

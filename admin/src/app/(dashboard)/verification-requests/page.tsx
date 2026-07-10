@@ -34,19 +34,15 @@ export default function VerificationRequestsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('pending');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['verification-requests', page, search, statusFilter, dateFrom, dateTo],
+    queryKey: ['verification-requests', page, search, statusFilter],
     queryFn: () =>
       adminApi.getVerificationRequests({
         page,
         limit: 20,
         search,
         status: statusFilter || 'pending',
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
       }),
   });
   const data = rawData as any;
@@ -135,11 +131,7 @@ export default function VerificationRequestsPage() {
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
         searchPlaceholder="Search by name, email, mobile…"
-        dateFrom={dateFrom}
-        dateTo={dateTo}
-        onDateFrom={(v) => { setDateFrom(v); setPage(1); }}
-        onDateTo={(v) => { setDateTo(v); setPage(1); }}
-        onClear={() => { setSearch(''); setStatusFilter('pending'); setDateFrom(''); setDateTo(''); setPage(1); }}
+        onClear={() => { setSearch(''); setStatusFilter('pending'); setPage(1); }}
       >
         <Select
           value={statusFilter}
