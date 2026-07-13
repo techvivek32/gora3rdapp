@@ -766,6 +766,10 @@ export class AdminService {
     return this.notificationsService.sendAdminNotification(data);
   }
 
+  async getSentNotifications(page = 1, limit = 20) {
+    return this.notificationsService.getSentNotifications(page, limit);
+  }
+
   async getAnalytics(period: string) {
     const days = period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

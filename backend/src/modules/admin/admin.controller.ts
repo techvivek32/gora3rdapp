@@ -344,6 +344,12 @@ export class AdminController {
     return this.adminService.sendAdminNotification(data);
   }
 
+  @Get('notifications')
+  @ApiOperation({ summary: 'Sent notification history with read/click stats' })
+  getSentNotifications(@Query() query: any) {
+    return this.adminService.getSentNotifications(query.page, query.limit);
+  }
+
   @Post('users/:id/referral-count')
   @ApiOperation({ summary: 'Update user referral count (add/deduct)' })
   updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number) {

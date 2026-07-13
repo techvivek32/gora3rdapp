@@ -211,10 +211,16 @@ export class NotificationsService {
     const users = await this.userModel.find(filter).select('fcmTokens _id notificationsEnabled').lean();
     if (users.length === 0) return { message: 'No users matched this audience' };
 
+    // One id shared by every row of this send, so the admin panel can group them
+    // back together and report sent/read/clicked counts.
+    const campaignId = new Types.ObjectId().toString();
+    const sentAt = new Date();
+
     // Everything in an FCM data payload must be a string.
     const payload: Record<string, string> = {
       ...(input.data ?? {}),
       type,
+      campaignId,
       ...(actionUrl ? { actionUrl } : {}),
       ...(imageUrl ? { imageUrl } : {}),
     };
@@ -225,6 +231,7 @@ export class NotificationsService {
         title,
         body,
         type,
+        campaignId,
         isGlobal: !roles.length && !cities.length && !memberships.length,
         targetRoles: roles,
         targetCities: cities,
@@ -232,7 +239,7 @@ export class NotificationsService {
         imageUrl,
         actionUrl,
         isSent: true,
-        sentAt: new Date(),
+        sentAt,
         data: payload,
       })),
     );
@@ -297,6 +304,71 @@ export class NotificationsService {
 
     await this.notificationModel.updateMany(filter, { isRead: true, readAt: new Date() });
     return { message: 'Notifications marked as read' };
+  }
+
+  /** The user followed this notification's action URL. Only the first tap counts. */
+  async markClicked(userId: string, notificationId: string) {
+    await this.notificationModel.updateOne(
+      { _id: new Types.ObjectId(notificationId), userId: new Types.ObjectId(userId), isClicked: { $ne: true } },
+      { isClicked: true, clickedAt: new Date(), isRead: true, readAt: new Date() },
+    );
+    return { message: 'Click recorded' };
+  }
+
+  /**
+   * Admin history: one row per broadcast, with how many users it reached, how many
+   * opened it, and how many followed its action URL.
+   */
+  async getSentNotifications(page = 1, limit = 20) {
+    const skip = (Math.max(1, +page) - 1) * Math.max(1, +limit);
+    const perLimit = Math.max(1, +limit);
+
+    const match = { campaignId: { $exists: true, $ne: null } };
+    const group = [
+      {
+        $group: {
+          _id: '$campaignId',
+          title: { $first: '$title' },
+          body: { $first: '$body' },
+          type: { $first: '$type' },
+          imageUrl: { $first: '$imageUrl' },
+          actionUrl: { $first: '$actionUrl' },
+          targetRoles: { $first: '$targetRoles' },
+          targetCities: { $first: '$targetCities' },
+          targetMemberships: { $first: '$targetMemberships' },
+          sentAt: { $first: '$sentAt' },
+          createdAt: { $first: '$createdAt' },
+          recipients: { $sum: 1 },
+          readCount: { $sum: { $cond: ['$isRead', 1, 0] } },
+          clickCount: { $sum: { $cond: ['$isClicked', 1, 0] } },
+        },
+      },
+    ];
+
+    const [rows, totals] = await Promise.all([
+      this.notificationModel.aggregate([
+        { $match: match },
+        ...group,
+        { $sort: { sentAt: -1, createdAt: -1 } },
+        { $skip: skip },
+        { $limit: perLimit },
+        { $project: { _id: 0, campaignId: '$_id', title: 1, body: 1, type: 1, imageUrl: 1, actionUrl: 1, targetRoles: 1, targetCities: 1, targetMemberships: 1, sentAt: 1, createdAt: 1, recipients: 1, readCount: 1, clickCount: 1 } },
+      ]),
+      this.notificationModel.aggregate([
+        { $match: match },
+        ...group,
+        { $count: 'total' },
+      ]),
+    ]);
+
+    const total = totals[0]?.total ?? 0;
+    return {
+      message: 'Sent notifications',
+      data: {
+        notifications: rows,
+        pagination: { page: +page, limit: perLimit, total, totalPages: Math.ceil(total / perLimit) },
+      },
+    };
   }
 
   async getUnreadCount(userId: string) {

@@ -157,6 +157,7 @@ export const adminApi = {
   // ─── Notifications ─────────────────────────────────────────────────────────
   sendNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
   sendAdminNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
+  getSentNotifications: (params?: any) => apiClient.get('/admin/notifications', { params }),
 
   // ─── Subscriptions ─────────────────────────────────────────────────────────
   getSubscriptionPlans: () => apiClient.get('/subscriptions/plans'),

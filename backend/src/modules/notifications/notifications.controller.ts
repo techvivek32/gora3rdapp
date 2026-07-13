@@ -40,4 +40,11 @@ export class NotificationsController {
   markOneRead(@Param('id') id: string, @CurrentUser('sub') userId: string) {
     return this.notificationsService.markAsRead(userId, id);
   }
+
+  @Post(':id/click')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record that the user followed the action URL' })
+  markClicked(@Param('id') id: string, @CurrentUser('sub') userId: string) {
+    return this.notificationsService.markClicked(userId, id);
+  }
 }

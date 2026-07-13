@@ -1,12 +1,36 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { CityMultiSelect } from '@/components/ui/CityMultiSelect';
 import toast from 'react-hot-toast';
+
+interface SentNotification {
+  campaignId: string;
+  title: string;
+  body: string;
+  imageUrl?: string;
+  actionUrl?: string;
+  targetRoles?: string[];
+  targetCities?: string[];
+  targetMemberships?: string[];
+  sentAt?: string;
+  createdAt?: string;
+  recipients: number;
+  readCount: number;
+  clickCount: number;
+}
+
+const pct = (n: number, total: number) => (total ? Math.round((n / total) * 100) : 0);
+
+const audienceLabel = (n: SentNotification) => {
+  const roles = n.targetRoles ?? [];
+  if (!roles.length) return 'Both';
+  return roles.map((r) => (r === 'travel_agency' ? 'Agent' : 'Driver')).join(', ');
+};
 
 const MEMBERSHIP_TYPES = ['new', 'active', 'premium', 'golden'];
 
@@ -34,9 +58,18 @@ export default function NotificationsPage() {
   const [form, setForm] = useState(EMPTY);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   // Guard against a stale non-array value surviving a hot reload.
   const cities: string[] = Array.isArray(form.targetCities) ? form.targetCities : [];
+
+  const { data: history, isLoading: historyLoading } = useQuery({
+    queryKey: ['sent-notifications'],
+    queryFn: async () => {
+      const res: any = await adminApi.getSentNotifications({ limit: 50 });
+      return (res?.data?.notifications ?? res?.notifications ?? []) as SentNotification[];
+    },
+  });
 
   const sendMutation = useMutation({
     mutationFn: () => {
@@ -50,9 +83,21 @@ export default function NotificationsPage() {
     onSuccess: (res: any) => {
       toast.success(res?.data?.message ?? res?.message ?? 'Notification sent');
       setForm(EMPTY);
+      queryClient.invalidateQueries({ queryKey: ['sent-notifications'] });
     },
     onError: () => toast.error('Failed to send notification'),
   });
+
+  const sent = history ?? [];
+  const totals = sent.reduce(
+    (a, n) => ({
+      campaigns: a.campaigns + 1,
+      recipients: a.recipients + n.recipients,
+      reads: a.reads + n.readCount,
+      clicks: a.clicks + n.clickCount,
+    }),
+    { campaigns: 0, recipients: 0, reads: 0, clicks: 0 },
+  );
 
   const handleFileUpload = async (file: File) => {
     setUploading(true);
@@ -244,6 +289,102 @@ export default function NotificationsPage() {
           Send Notification
         </Button>
       </div>
+
+      {/* ── History ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatTile label="Notifications Sent" value={totals.campaigns} />
+        <StatTile label="Total Delivered" value={totals.recipients} hint="one per user" />
+        <StatTile label="Seen" value={totals.reads} hint={`${pct(totals.reads, totals.recipients)}% of delivered`} />
+        <StatTile label="Clicked" value={totals.clicks} hint={`${pct(totals.clicks, totals.recipients)}% of delivered`} />
+      </div>
+
+      <div className="w-full bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="p-6 pb-3">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Sent Notifications</h2>
+          <p className="text-sm text-gray-500">Every broadcast, with how many users received, opened and clicked it</p>
+        </div>
+
+        {historyLoading ? (
+          <p className="px-6 pb-6 text-sm text-gray-500">Loading…</p>
+        ) : sent.length === 0 ? (
+          <p className="px-6 pb-6 text-sm text-gray-500">No notifications sent yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-y border-gray-200 dark:border-gray-700">
+                  <th className="px-6 py-3 font-medium">Notification</th>
+                  <th className="px-4 py-3 font-medium">Audience</th>
+                  <th className="px-4 py-3 font-medium text-right">Delivered</th>
+                  <th className="px-4 py-3 font-medium text-right">Seen</th>
+                  <th className="px-4 py-3 font-medium text-right">Clicked</th>
+                  <th className="px-6 py-3 font-medium whitespace-nowrap">Sent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sent.map((n) => (
+                  <tr key={n.campaignId} className="border-b border-gray-100 dark:border-gray-800 last:border-0 align-top">
+                    <td className="px-6 py-3 max-w-md">
+                      <div className="flex gap-3">
+                        {n.imageUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={n.imageUrl} alt="" className="w-16 aspect-[2/1] object-cover rounded shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-900 dark:text-white truncate">{n.title}</p>
+                          <p className="text-xs text-gray-500 line-clamp-2">{n.body}</p>
+                          {n.actionUrl && (
+                            <p className="text-xs text-brand-600 dark:text-brand-400 truncate mt-0.5">{n.actionUrl}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                      <p>{audienceLabel(n)}</p>
+                      {(n.targetMemberships?.length ?? 0) > 0 && (
+                        <p className="text-xs text-gray-400">{n.targetMemberships!.join(', ')}</p>
+                      )}
+                      {(n.targetCities?.length ?? 0) > 0 && (
+                        <p className="text-xs text-gray-400">{n.targetCities!.join(', ')}</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{n.recipients}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="font-medium text-gray-900 dark:text-white">{n.readCount}</span>
+                      <span className="text-xs text-gray-400 ml-1">{pct(n.readCount, n.recipients)}%</span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {n.actionUrl ? (
+                        <>
+                          <span className="font-medium text-gray-900 dark:text-white">{n.clickCount}</span>
+                          <span className="text-xs text-gray-400 ml-1">{pct(n.clickCount, n.recipients)}%</span>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                      {new Date(n.sentAt ?? n.createdAt ?? '').toLocaleString('en-IN', {
+                        day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true,
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, hint }: { label: string; value: number; hint?: string }) {
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+      <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{value.toLocaleString('en-IN')}</p>
+      {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
     </div>
   );
 }

@@ -49,6 +49,19 @@ export class Notification {
   @Prop()
   sentAt: Date;
 
+  /**
+   * Groups the per-user rows written by one admin broadcast, so the admin panel
+   * can report sent/read/clicked counts for that send.
+   */
+  @Prop({ index: true })
+  campaignId: string;
+
+  @Prop({ default: false })
+  isClicked: boolean;
+
+  @Prop()
+  clickedAt: Date;
+
   @Prop({ type: [String], default: [] })
   targetTokens: string[];
 

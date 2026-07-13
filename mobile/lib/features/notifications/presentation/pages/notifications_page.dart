@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/action_url.dart';
 import '../bloc/notification_bloc.dart';
@@ -44,6 +46,16 @@ class _NotificationsPageState extends State<NotificationsPage> {
     'system': AppColors.textSecondary,
   };
 
+  /// Tells the backend the user followed this notification's action URL, so the
+  /// admin panel can report a click count. Best-effort — never blocks the open.
+  Future<void> _reportClick(String id) async {
+    try {
+      await getIt<ApiClient>().post('/notifications/$id/click');
+    } catch (e) {
+      debugPrint('Click report failed: $e');
+    }
+  }
+
   void _handleTap(BuildContext context, Map<String, dynamic> n) {
     final id = n['_id'] as String?;
     if (id != null) {
@@ -52,21 +64,28 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final type = n['type'] as String? ?? '';
     final data = n['data'] as Map<String, dynamic>? ?? {};
 
-    // An admin-set action URL wins: http(s) opens the browser, anything else is
-    // treated as an in-app route ("/subscription").
-    final actionUrl = (n['actionUrl'] ?? data['actionUrl'] ?? '').toString().trim();
-    if (actionUrl.isNotEmpty) {
-      openActionUrl(context, actionUrl);
-      return;
-    }
-
+    // Activity notices jump straight to the thing they're about.
     if (type == 'requirement_posted' || type == 'requirement_accepted') {
       final requirementId = data['requirementId'] as String?;
       if (requirementId != null) context.push('/requirements/$requirementId');
-    } else if (type == 'vehicle_posted' || type == 'new_vehicle') {
+      return;
+    }
+    if (type == 'vehicle_posted' || type == 'new_vehicle') {
       final vehicleId = data['vehicleId'] as String?;
       if (vehicleId != null) context.push('/vehicles/$vehicleId');
+      return;
     }
+
+    // Admin message: the list only shows two lines of it, so open the full screen.
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _NotificationDetailPage(
+          notification: n,
+          timeAgo: _timeAgo(n['createdAt']),
+          onClick: _reportClick,
+        ),
+      ),
+    );
   }
 
   String _timeAgo(dynamic createdAt) {
@@ -251,6 +270,118 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
           return const SizedBox.shrink();
         },
+      ),
+    );
+  }
+}
+
+/// Full-screen view of one admin notification: title, then the whole message,
+/// then the image. Tapping the image (or the Open button) follows the action URL.
+class _NotificationDetailPage extends StatelessWidget {
+  final Map<String, dynamic> notification;
+  final String timeAgo;
+  final Future<void> Function(String id) onClick;
+
+  const _NotificationDetailPage({
+    required this.notification,
+    required this.timeAgo,
+    required this.onClick,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final n = notification;
+    final id = n['_id'] as String?;
+    final data = n['data'] as Map<String, dynamic>? ?? {};
+    final imageUrl = (n['imageUrl'] ?? data['imageUrl'] ?? '').toString().trim();
+    final actionUrl = (n['actionUrl'] ?? data['actionUrl'] ?? '').toString().trim();
+    final hasAction = actionUrl.isNotEmpty;
+
+    void open() {
+      if (id != null) onClick(id); // fire-and-forget; must not delay the open
+      openActionUrl(context, actionUrl);
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Text(
+          'Notification',
+          style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, fontFamily: 'Poppins', color: Colors.white),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 32.h),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              n['title'] as String? ?? '',
+              style: TextStyle(
+                fontSize: 20.sp,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Poppins',
+                color: AppColors.textPrimary,
+                height: 1.3,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              timeAgo,
+              style: TextStyle(fontSize: 12.sp, color: AppColors.textHint, fontFamily: 'Poppins'),
+            ),
+            SizedBox(height: 16.h),
+
+            // The whole message — no maxLines here, unlike the list row.
+            SelectableText(
+              n['body'] as String? ?? '',
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: AppColors.textSecondary,
+                fontFamily: 'Poppins',
+                height: 1.6,
+              ),
+            ),
+
+            if (imageUrl.isNotEmpty) ...[
+              SizedBox(height: 20.h),
+              GestureDetector(
+                onTap: hasAction ? open : null,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12.r),
+                  child: AspectRatio(
+                    aspectRatio: 2, // matches the 1024×512 upload
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+
+            if (hasAction) ...[
+              SizedBox(height: 24.h),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: open,
+                  icon: const Icon(Icons.open_in_new, size: 18),
+                  label: Text('Open', style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 14.h),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
