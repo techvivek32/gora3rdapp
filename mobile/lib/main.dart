@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
 import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
+import 'core/utils/install_referrer.dart';
 import 'core/utils/membership.dart';
 import 'core/utils/ring_player.dart';
 import 'core/services/push_notification_service.dart';
@@ -68,6 +69,10 @@ void main() async {
 
   // Push notifications (permission, channel, foreground/tap handlers)
   await PushNotificationService.instance.init();
+
+  // If this install came from an invite link, grab the referral code Play passed
+  // along. Not awaited — it must never delay first paint.
+  captureInstallReferrer();
 
   // Orientation
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

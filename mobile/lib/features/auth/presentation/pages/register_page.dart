@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/install_referrer.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
@@ -64,6 +65,18 @@ class _RegisterPageState extends State<RegisterPage> {
   List<String> get _visibleDocKeys => _selectedRole == 'driver'
       ? ['aadhar', 'pan', 'drivingLicense', 'vehicleRc']
       : ['aadhar', 'pan', 'drivingLicense'];
+
+  @override
+  void initState() {
+    super.initState();
+    // If the user got here by tapping someone's invite link, Play handed us their
+    // code at install time — pre-fill it. Still editable / clearable.
+    pendingReferralCode().then((code) {
+      if (code != null && mounted && _referralCtrl.text.isEmpty) {
+        setState(() => _referralCtrl.text = code);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -191,6 +204,9 @@ class _RegisterPageState extends State<RegisterPage> {
         return false; // wrong/expired OTP → re-prompt
       }
       _registered = true;
+      // The invite code has been redeemed — don't pre-fill it for anyone else
+      // who registers on this device.
+      clearPendingReferralCode();
     }
 
     // Documents are OPTIONAL. Upload the profile and any documents the user

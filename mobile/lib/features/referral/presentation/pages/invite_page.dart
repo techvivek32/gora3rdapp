@@ -46,11 +46,21 @@ class _InvitePageState extends State<InvitePage> {
     }
   }
 
+  /// Play Store link carrying the referrer, so the code survives the install and
+  /// the app can auto-fill it on first launch (see captureInstallReferrer).
+  /// The `referrer` value must be URL-encoded — the inner `=` and `&` would
+  /// otherwise be read as part of the Play Store's own query string.
+  String get _inviteLink {
+    final referrer = Uri.encodeComponent('utm_source=invite&ref=$_code');
+    return 'https://play.google.com/store/apps/details'
+        '?id=com.taxi.call_taxi_partner&referrer=$referrer';
+  }
+
   String get _shareText => '''🚖 Join Gora Taxi Partner Today!
 मैं आपको Gora Taxi Partner से जुड़ने के लिए आमंत्रित करता हूँ।
 🤝 भारत के Driver, Agent और Tour & Travels Network का हिस्सा बनें।
 🎁 Sign Up करते समय मेरा Referral Code इस्तेमाल करें: $_code
-📲 Download App: https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner
+📲 Download App: $_inviteLink
 Let's Grow Together! 🚖''';
 
   void _copy() {
