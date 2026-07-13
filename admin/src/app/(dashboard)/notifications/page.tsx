@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { CityMultiSelect } from '@/components/ui/CityMultiSelect';
 import toast from 'react-hot-toast';
 
 const MEMBERSHIP_TYPES = ['new', 'active', 'premium', 'golden'];
@@ -23,7 +24,7 @@ const EMPTY = {
   actionUrl: '',
   audience: 'both',
   targetMemberships: [] as string[],
-  targetCities: '',
+  targetCities: [] as string[],
   type: 'system',
 };
 
@@ -34,13 +35,16 @@ export default function NotificationsPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Guard against a stale non-array value surviving a hot reload.
+  const cities: string[] = Array.isArray(form.targetCities) ? form.targetCities : [];
+
   const sendMutation = useMutation({
     mutationFn: () => {
-      const { audience, targetCities, ...rest } = form;
+      const { audience, targetCities: _ignored, ...rest } = form;
       return adminApi.sendAdminNotification({
         ...rest,
         targetRoles: AUDIENCES.find((a) => a.value === audience)?.roles ?? [],
-        targetCities: targetCities ? targetCities.split(',').map((c) => c.trim()).filter(Boolean) : undefined,
+        targetCities: cities.length ? cities : undefined,
       });
     },
     onSuccess: (res: any) => {
@@ -197,12 +201,12 @@ export default function NotificationsPage() {
             </div>
             <div>
               <label className={LABEL}>Target Cities (Optional)</label>
-              <Input
-                value={form.targetCities}
-                onChange={(e) => setForm({ ...form, targetCities: e.target.value })}
-                placeholder="Mumbai, Delhi, Bangalore"
+              <CityMultiSelect
+                value={cities}
+                onChange={(next) => setForm((f) => ({ ...f, targetCities: next }))}
+                placeholder="Type a city, e.g. Raj…"
               />
-              <p className="text-xs text-gray-400 mt-1">Comma separated. Leave empty to send to all cities.</p>
+              <p className="text-xs text-gray-400 mt-1">Search and pick cities. Leave empty to send to all cities.</p>
             </div>
           </div>
         </div>
@@ -227,7 +231,7 @@ export default function NotificationsPage() {
           <p className="text-xs text-gray-400 mt-3">
             Sending to <span className="font-medium text-gray-600 dark:text-gray-300">{AUDIENCES.find((a) => a.value === form.audience)?.label}</span>
             {form.targetMemberships.length > 0 && ` · ${form.targetMemberships.join(', ')}`}
-            {form.targetCities.trim() && ` · ${form.targetCities}`}
+            {cities.length > 0 && ` · ${cities.join(', ')}`}
           </p>
         </div>
 
