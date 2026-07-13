@@ -186,6 +186,80 @@ export class NotificationsService {
     await this.firebaseService.sendPushNotification(driver.fcmTokens, { title, body, data });
   }
 
+  /**
+   * Send the trip OTP to the requirement's OWNER (not the driver). The owner
+   * reads it out to the driver, who types it in — that's the proof the two are
+   * actually together. It goes in the inbox so it survives a missed push.
+   */
+  async notifyTripOtp(requirement: any, driver: any, otp: string, action: 'start' | 'end') {
+    const ownerId = requirement?.postedBy?._id ?? requirement?.postedBy;
+    if (!ownerId) return;
+
+    const driverName = driver?.agencyName || driver?.fullName || 'Your driver';
+    const verb = action === 'start' ? 'start' : 'end';
+
+    const title = `🔐 OTP to ${verb} trip: ${otp}`;
+    const body =
+      `${driverName} wants to ${verb} Booking #${requirement.bookingId}.\n` +
+      `Share this OTP only when you're with them: ${otp}\n` +
+      `Valid for 15 minutes.`;
+
+    const data = {
+      requirementId: requirement._id.toString(),
+      bookingId: `${requirement.bookingId ?? ''}`,
+      type: NotificationType.TRIP_OTP,
+      otp,
+      action,
+    };
+
+    await this.notificationModel.create({
+      userId: ownerId,
+      title,
+      body,
+      type: NotificationType.TRIP_OTP,
+      isSent: true,
+      sentAt: new Date(),
+      data,
+    });
+
+    const owner = await this.userModel.findById(ownerId).select('fcmTokens').lean();
+    if (!owner?.fcmTokens?.length) return;
+    await this.firebaseService.sendPushNotification(owner.fcmTokens, { title, body, data });
+  }
+
+  /** Tell the owner the trip actually started / finished. */
+  async notifyTripStatus(requirement: any, action: 'start' | 'end') {
+    const ownerId = requirement?.postedBy?._id ?? requirement?.postedBy;
+    if (!ownerId) return;
+
+    const driver = requirement.assignedDriver ?? {};
+    const driverName = driver.agencyName || driver.fullName || 'Your driver';
+    const started = action === 'start';
+
+    const title = started ? '🚗 Trip started' : '✅ Trip completed';
+    const body = `${driverName} ${started ? 'started' : 'completed'} Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity}`;
+
+    const data = {
+      requirementId: requirement._id.toString(),
+      bookingId: `${requirement.bookingId ?? ''}`,
+      type: started ? NotificationType.TRIP_STARTED : NotificationType.TRIP_COMPLETED,
+    };
+
+    await this.notificationModel.create({
+      userId: ownerId,
+      title,
+      body,
+      type: data.type,
+      isSent: true,
+      sentAt: new Date(),
+      data,
+    });
+
+    const owner = await this.userModel.findById(ownerId).select('fcmTokens').lean();
+    if (!owner?.fcmTokens?.length) return;
+    await this.firebaseService.sendPushNotification(owner.fcmTokens, { title, body, data });
+  }
+
   /** Push only — the poster gets a device notification, not an inbox row. */
   async notifyRequirementAccepted(requirement: any, acceptingUser: any) {
     const poster = await this.userModel.findById(requirement.postedBy).select('fcmTokens _id');
@@ -319,6 +393,9 @@ export class NotificationsService {
     NotificationType.SYSTEM,
     NotificationType.PROMOTIONAL,
     NotificationType.REQUIREMENT_ASSIGNED,
+    NotificationType.TRIP_OTP,
+    NotificationType.TRIP_STARTED,
+    NotificationType.TRIP_COMPLETED,
   ];
 
   private visibleFor(userId: string) {

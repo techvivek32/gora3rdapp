@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -6,6 +8,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/api_error.dart';
+import '../../../../core/widgets/otp_input.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/requirement_card_widget.dart';
 
@@ -116,20 +120,25 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
             }
 
             if (state is MyRequirementsLoaded) {
-              // Cancelled posts show under Booked (not Running).
+              // Booked holds everything that's no longer live: booked, cancelled,
+              // and completed (the driver finished the trip). Anything else — open,
+              // on hold — is still Running. Listing these explicitly rather than
+              // "not accepted/cancelled", so a new status can't silently land in
+              // Running the way 'completed' did.
+              const settled = {'accepted', 'cancelled', 'completed'};
               final running = state.requirements
-                  .where((r) => r['status'] != 'accepted' && r['status'] != 'cancelled')
+                  .where((r) => !settled.contains(r['status']))
                   .toList();
               final booked = state.requirements
-                  .where((r) => r['status'] == 'accepted' || r['status'] == 'cancelled')
+                  .where((r) => settled.contains(r['status']))
                   .toList();
               return TabBarView(
                 children: [
                   _buildList(context, running, 'No running requirements', showMenu: true),
                   _buildList(context, booked, 'No booked requirements'),
                   // Requirements OTHER people assigned to me — I'm the driver here,
-                  // so no owner menu, and no BOOKED stamp obscuring the job.
-                  _buildList(context, state.assignedToMe, 'No requirements assigned to you', showStamp: false),
+                  // so no owner menu, and no BOOKED stamp obscuring a live job.
+                  _buildList(context, state.assignedToMe, 'No requirements assigned to you', isAssignedTab: true),
                 ],
               );
             }
@@ -146,7 +155,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
     List<Map<String, dynamic>> items,
     String emptyText, {
     bool showMenu = false,
-    bool showStamp = true,
+    bool isAssignedTab = false,
   }) {
     return RefreshIndicator(
       onRefresh: () async {
@@ -177,10 +186,24 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                 final req = items[index];
                 // Actions menu lives inside the card (Running tab; not for cancelled).
                 final menu = (showMenu && req['status'] != 'cancelled') ? _buildMenu(context, req) : null;
+
+                final trip = (req['tripStatus'] ?? 'pending').toString();
+                // On the Assigned tab the stamp stays hidden while the job is live,
+                // and comes back once the trip is done.
+                final showStamp = !isAssignedTab || trip == 'completed';
+
                 return Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
-                  // Cards are display-only — no navigation to the detail screen.
-                  child: RequirementCardWidget(requirement: req, menu: menu, showStamp: showStamp),
+                  child: Column(
+                    children: [
+                      // Cards are display-only — no navigation to the detail screen.
+                      RequirementCardWidget(requirement: req, menu: menu, showStamp: showStamp),
+                      if (isAssignedTab && trip != 'completed') ...[
+                        SizedBox(height: 8.h),
+                        _tripButton(context, req, trip),
+                      ],
+                    ],
+                  ),
                 );
               },
             ),
@@ -241,6 +264,71 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
       case 'cancel':
         bloc.add(CancelRequirementEvent(id: id, reason: ''));
         break;
+    }
+  }
+
+  /// Assigned tab: Start (trip pending) or End (trip started).
+  Widget _tripButton(BuildContext context, Map<String, dynamic> req, String trip) {
+    final starting = trip == 'pending';
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () => _runTripFlow(context, req, starting ? 'start' : 'end'),
+        icon: Icon(starting ? Icons.play_arrow_rounded : Icons.stop_rounded, size: 20.sp),
+        label: Text(
+          starting ? 'Start Trip' : 'End Trip',
+          style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: starting ? AppColors.success : AppColors.error,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 13.h),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+        ),
+      ),
+    );
+  }
+
+  /// Ask the backend for an OTP (it goes to the *owner*, not to us), then collect
+  /// it from the driver — the owner has to read it out, which is the point.
+  Future<void> _runTripFlow(BuildContext context, Map<String, dynamic> req, String action) async {
+    final id = req['_id'] as String;
+    final messenger = ScaffoldMessenger.of(context);
+    final bloc = context.read<RequirementsBloc>();
+
+    final sent = await _requestOtp(id, action);
+    if (!context.mounted) return;
+    if (sent != null) {
+      messenger.showSnackBar(SnackBar(content: Text(sent), backgroundColor: AppColors.error));
+      return;
+    }
+
+    final done = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _TripOtpDialog(
+        requirementId: id,
+        action: action,
+        onResend: () => _requestOtp(id, action),
+      ),
+    );
+
+    if (done == true) {
+      messenger.showSnackBar(SnackBar(
+        content: Text(action == 'start' ? 'Trip started' : 'Trip completed'),
+        backgroundColor: AppColors.success,
+      ));
+      bloc.add(const LoadMyRequirementsEvent());
+    }
+  }
+
+  /// Returns null on success, or the server's message on failure.
+  Future<String?> _requestOtp(String id, String action) async {
+    try {
+      await getIt<ApiClient>().post('/requirements/$id/trip/request-otp', data: {'action': action});
+      return null;
+    } catch (e) {
+      return serverMessage(e, fallback: 'Could not send OTP');
     }
   }
 
@@ -444,6 +532,164 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Collects the OTP the requirement owner received and read out to the driver.
+/// Pops `true` once the trip has actually been started / ended.
+class _TripOtpDialog extends StatefulWidget {
+  final String requirementId;
+  final String action; // 'start' | 'end'
+  /// Re-sends the OTP to the owner. Returns null on success, else the error text.
+  final Future<String?> Function() onResend;
+
+  const _TripOtpDialog({
+    required this.requirementId,
+    required this.action,
+    required this.onResend,
+  });
+
+  @override
+  State<_TripOtpDialog> createState() => _TripOtpDialogState();
+}
+
+class _TripOtpDialogState extends State<_TripOtpDialog> {
+  static const _cooldown = 30; // seconds before Resend is allowed again
+
+  final _api = getIt<ApiClient>();
+
+  String _code = '';
+  bool _busy = false;
+  String? _error;
+  int _secondsLeft = _cooldown;
+  Timer? _timer;
+
+  bool get _isStart => widget.action == 'start';
+
+  @override
+  void initState() {
+    super.initState();
+    _startCountdown(); // the OTP was already sent before this dialog opened
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _startCountdown() {
+    _timer?.cancel();
+    setState(() => _secondsLeft = _cooldown);
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      if (_secondsLeft <= 1) {
+        t.cancel();
+        setState(() => _secondsLeft = 0);
+      } else {
+        setState(() => _secondsLeft--);
+      }
+    });
+  }
+
+  Future<void> _verify() async {
+    if (_code.length != 6 || _busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _api.post(
+        '/requirements/${widget.requirementId}/trip/verify-otp',
+        data: {'action': widget.action, 'otp': _code},
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = serverMessage(e, fallback: 'Could not verify OTP');
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_busy || _secondsLeft > 0) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final err = await widget.onResend();
+    if (!mounted) return;
+    setState(() {
+      _error = err;
+      _busy = false;
+    });
+    if (err == null) {
+      _startCountdown(); // only restart the clock if a new OTP actually went out
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('New OTP sent to the owner')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(_isStart ? 'Start Trip' : 'End Trip'),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'We sent a 6-digit OTP to the requirement owner.\nAsk them for it to ${_isStart ? 'start' : 'end'} this trip.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 18),
+            OtpInput(
+              onChanged: (v) => setState(() => _code = v),
+              onCompleted: (_) => _verify(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: (_busy || _secondsLeft > 0) ? null : _resend,
+              child: Text(
+                _secondsLeft > 0 ? 'Resend OTP in ${_secondsLeft}s' : 'Resend OTP',
+                style: TextStyle(
+                  color: _secondsLeft > 0 ? AppColors.textHint : AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_code.length == 6 && !_busy) ? _verify : null,
+          child: _busy
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Text(_isStart ? 'Start' : 'End'),
+        ),
+      ],
     );
   }
 }

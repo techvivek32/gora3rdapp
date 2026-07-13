@@ -92,4 +92,5 @@ class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
   Future<void> unassignDriver(String id) async {
     await apiClient.post('/requirements/$id/unassign');
   }
+
 }

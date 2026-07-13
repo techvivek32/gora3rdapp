@@ -364,6 +364,94 @@ export class RequirementsService {
     return { message: 'Driver unassigned', data: updated };
   }
 
+  // ── Trip start / end, gated by an OTP the owner reads out to the driver ──────
+
+  private static readonly OTP_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+  /**
+   * Driver asks to start (or end) the trip. We mint an OTP and deliver it to the
+   * OWNER — the driver never sees it. The owner reads it out, the driver enters
+   * it below. That handshake is what proves the two are actually together.
+   */
+  async requestTripOtp(id: string, driverId: string, action: 'start' | 'end') {
+    if (action !== 'start' && action !== 'end') {
+      throw new BadRequestException('Invalid action');
+    }
+
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.assignedDriver?.toString() !== driverId) {
+      throw new ForbiddenException('This booking is not assigned to you');
+    }
+
+    if (action === 'start' && requirement.tripStatus !== 'pending') {
+      throw new BadRequestException(
+        requirement.tripStatus === 'started' ? 'Trip already started' : 'Trip already completed',
+      );
+    }
+    if (action === 'end' && requirement.tripStatus !== 'started') {
+      throw new BadRequestException('Start the trip first');
+    }
+
+    const otp = `${Math.floor(100000 + Math.random() * 900000)}`; // 6 digits
+    await this.requirementModel.findByIdAndUpdate(id, {
+      tripOtp: otp,
+      tripOtpAction: action,
+      tripOtpExpiresAt: new Date(Date.now() + RequirementsService.OTP_TTL_MS),
+    });
+
+    const driver = await this.userModel.findById(driverId).select('fullName agencyName mobile').lean();
+    this.notificationsService
+      .notifyTripOtp(requirement, driver, otp, action)
+      .catch(() => {});
+
+    return { message: `OTP sent to the requirement owner`, data: { action } };
+  }
+
+  /** Driver enters the OTP the owner gave them. */
+  async verifyTripOtp(id: string, driverId: string, action: 'start' | 'end', otp: string) {
+    // tripOtp* are select:false on the schema — opt in for the comparison.
+    const requirement = await this.requirementModel
+      .findById(id)
+      .select('+tripOtp +tripOtpAction +tripOtpExpiresAt');
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.assignedDriver?.toString() !== driverId) {
+      throw new ForbiddenException('This booking is not assigned to you');
+    }
+
+    if (!requirement.tripOtp || requirement.tripOtpAction !== action) {
+      throw new BadRequestException('No OTP requested. Tap Start again.');
+    }
+    if (!requirement.tripOtpExpiresAt || requirement.tripOtpExpiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('OTP expired. Request a new one.');
+    }
+    if (requirement.tripOtp !== `${otp}`.trim()) {
+      throw new BadRequestException('Incorrect OTP');
+    }
+
+    const update: any = {
+      $unset: { tripOtp: '', tripOtpAction: '', tripOtpExpiresAt: '' },
+      $set:
+        action === 'start'
+          ? { tripStatus: 'started', tripStartedAt: new Date() }
+          : {
+              tripStatus: 'completed',
+              tripCompletedAt: new Date(),
+              status: BookingStatus.COMPLETED,
+            },
+    };
+
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(id, update, { new: true })
+      .populate('postedBy', RequirementsService.PARTY_SELECT)
+      .populate('assignedDriver', RequirementsService.PARTY_SELECT)
+      .lean();
+
+    this.notificationsService.notifyTripStatus(updated, action).catch(() => {});
+
+    return { message: action === 'start' ? 'Trip started' : 'Trip completed', data: updated };
+  }
+
   /** Requirements other users have assigned to me. */
   async getAssignedToMe(userId: string) {
     const requirements = await this.requirementModel

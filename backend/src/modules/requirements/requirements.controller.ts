@@ -105,6 +105,27 @@ export class RequirementsController {
     return this.requirementsService.unassignDriver(id, userId);
   }
 
+  @Post(':id/trip/request-otp')
+  @ApiOperation({ summary: 'Driver: request the start/end OTP (delivered to the owner)' })
+  requestTripOtp(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('action') action: 'start' | 'end',
+  ) {
+    return this.requirementsService.requestTripOtp(id, userId, action);
+  }
+
+  @Post(':id/trip/verify-otp')
+  @ApiOperation({ summary: 'Driver: verify the OTP to start/end the trip' })
+  verifyTripOtp(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('action') action: 'start' | 'end',
+    @Body('otp') otp: string,
+  ) {
+    return this.requirementsService.verifyTripOtp(id, userId, action, otp);
+  }
+
   @Post(':id/cancel')
   @ApiOperation({ summary: 'Cancel a requirement' })
   cancel(

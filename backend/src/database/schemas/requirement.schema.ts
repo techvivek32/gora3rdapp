@@ -122,6 +122,37 @@ export class Requirement {
   @Prop({ type: Date })
   assignedAt: Date;
 
+  /**
+   * Trip lifecycle for an assigned booking. The driver requests an OTP, it is
+   * delivered to the *owner*, who reads it out; the driver enters it to proceed.
+   *   pending → started → completed
+   */
+  @Prop({ type: String, enum: ['pending', 'started', 'completed'], default: 'pending' })
+  tripStatus: string;
+
+  /**
+   * The OTP currently awaiting entry, and which action it authorises.
+   *
+   * `select: false` is load-bearing, not tidiness: the driver reads this very
+   * document from /assigned-to-me, so a returned OTP would let them start the
+   * trip without ever speaking to the owner — defeating the whole handshake.
+   * Server-side reads must opt in with .select('+tripOtp').
+   */
+  @Prop({ select: false })
+  tripOtp: string;
+
+  @Prop({ type: String, enum: ['start', 'end'], select: false })
+  tripOtpAction: string;
+
+  @Prop({ type: Date, select: false })
+  tripOtpExpiresAt: Date;
+
+  @Prop({ type: Date })
+  tripStartedAt: Date;
+
+  @Prop({ type: Date })
+  tripCompletedAt: Date;
+
   @Prop({ type: Date })
   expiresAt: Date;
 

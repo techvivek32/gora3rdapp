@@ -119,11 +119,14 @@ class RequirementCardWidget extends StatelessWidget {
         final isBooked = requirement['status'] == 'accepted';
         final isCancelled = requirement['status'] == 'cancelled';
         final isOnHold = requirement['status'] == 'on_hold';
+        // Set when the driver ends the trip — the stamp must come back for it.
+        final isCompleted = requirement['status'] == 'completed';
         // Cancelled / booked / on-hold posts are read-only for everyone except the
         // owner (who still manages them from My Requirements via the menu).
         // On the Assigned tab (showStamp: false) the driver is not the owner, but
         // the job is theirs — so it must stay fully readable, not dimmed out.
-        final bool locked = showStamp && (isCancelled || isBooked || isOnHold) && !isCurrentUserOwner;
+        final bool locked =
+            showStamp && (isCancelled || isBooked || isOnHold || isCompleted) && !isCurrentUserOwner;
 
         final memberType = (mine ? currentMembership : (postedBy?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
@@ -542,15 +545,31 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (showStamp && (isBooked || isCancelled || isOnHold))
+                  if (showStamp && (isBooked || isCancelled || isOnHold || isCompleted))
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Center(
                           child: Transform.rotate(
                             angle: -0.2,
                             child: _buildStampBadge(
-                              text: isCancelled ? 'CANCELLED' : isOnHold ? 'ON HOLD' : hasCurrentUserAccepted ? 'ACCEPTED' : 'BOOKED',
-                              color: isCancelled ? Colors.grey[600]! : isOnHold ? Colors.orange[800]! : hasCurrentUserAccepted ? Colors.green[700]! : Colors.red[700]!,
+                              text: isCancelled
+                                  ? 'CANCELLED'
+                                  : isCompleted
+                                      ? 'COMPLETED'
+                                      : isOnHold
+                                          ? 'ON HOLD'
+                                          : hasCurrentUserAccepted
+                                              ? 'ACCEPTED'
+                                              : 'BOOKED',
+                              color: isCancelled
+                                  ? Colors.grey[600]!
+                                  : isCompleted
+                                      ? Colors.green[700]!
+                                      : isOnHold
+                                          ? Colors.orange[800]!
+                                          : hasCurrentUserAccepted
+                                              ? Colors.green[700]!
+                                              : Colors.red[700]!,
                             ),
                           ),
                         ),
@@ -625,6 +644,8 @@ class RequirementCardWidget extends StatelessWidget {
     switch (status) {
       case 'accepted':
         return ('Booked', Colors.red.shade600);
+      case 'completed':
+        return ('Completed', Colors.green.shade700);
       case 'on_hold':
         return ('On Hold', Colors.orange.shade700);
       case 'cancelled':
