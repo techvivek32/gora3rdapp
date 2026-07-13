@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { randomInt } from 'crypto';
@@ -22,7 +22,6 @@ import { LoginSendOtpDto, LoginVerifyOtpDto } from './dto/login-otp.dto';
 import { LoginDto } from './dto/login.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { MembershipType, UserRole } from '../../common/enums/user-role.enum';
-import { generateReferralCode } from '../../common/utils/booking-id.util';
 
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const OTP_MAX_ATTEMPTS = 5;
@@ -140,12 +139,7 @@ export class AuthService {
     const hashedPassword = dto.password ? await bcrypt.hash(dto.password, 12) : undefined;
 
     // Resolve the referrer (if a valid code was entered).
-    let referredBy = null;
-    const enteredCode = (dto.referralCode || '').trim().toUpperCase();
-    if (enteredCode) {
-      const referrer = await this.userModel.findOne({ referralCode: enteredCode }).select('_id');
-      if (referrer) referredBy = referrer._id;
-    }
+    const referredBy = await this.resolveReferrer(dto.referralCode);
 
     const user = await this.userModel.create({
       fullName: dto.fullName,
@@ -158,7 +152,9 @@ export class AuthService {
       role: dto.role || UserRole.DRIVER,
       membershipType: MembershipType.NEW,
       isActive: true,
-      referralCode: await this.generateUniqueReferralCode(),
+      // The referral code IS the user's mobile number — one less thing to explain
+      // to someone sharing it. `mobile` is uniquely indexed, so it's collision-free.
+      referralCode: dto.mobile,
       referredBy,
     });
 
@@ -184,14 +180,28 @@ export class AuthService {
     };
   }
 
-  // Generate a referral code that isn't already taken (retries a few times).
-  private async generateUniqueReferralCode(): Promise<string> {
-    for (let i = 0; i < 5; i++) {
-      const code = generateReferralCode();
-      const exists = await this.userModel.exists({ referralCode: code });
-      if (!exists) return code;
+  /**
+   * Find who referred this signup. The code is now a mobile number, so match on
+   * the last 10 digits — the sharer may type "9876543210" while the account is
+   * stored as "+919876543210". Falls back to the old GORAxxxxxx codes so invites
+   * shared before this change still work.
+   */
+  private async resolveReferrer(code?: string): Promise<Types.ObjectId | null> {
+    const entered = (code || '').trim();
+    if (!entered) return null;
+
+    const digits = entered.replace(/\D/g, '');
+    if (digits.length >= 10) {
+      const byMobile = await this.userModel
+        .findOne({ mobile: new RegExp(`${digits.slice(-10)}$`) })
+        .select('_id');
+      if (byMobile) return byMobile._id;
     }
-    return `${generateReferralCode()}${Date.now().toString().slice(-3)}`;
+
+    const legacy = await this.userModel
+      .findOne({ referralCode: entered.toUpperCase() })
+      .select('_id');
+    return legacy?._id ?? null;
   }
 
   async login(dto: LoginDto) {

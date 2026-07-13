@@ -14,7 +14,6 @@ import { RateUserDto } from './dto/rate-user.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
-import { generateReferralCode } from '../../common/utils/booking-id.util';
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
@@ -118,22 +117,14 @@ export class UsersService {
 
   // Referral code + how many users this person invited (+ the invited list).
   async getReferralInfo(userId: string) {
-    let user = await this.userModel.findById(userId).select('referralCode referralCount');
+    const user = await this.userModel.findById(userId).select('mobile referralCode referralCount');
     if (!user) throw new NotFoundException('User not found');
 
-    // Backfill a code for accounts created before the referral system existed.
-    if (!user.referralCode) {
-      for (let i = 0; i < 5; i++) {
-        const code = generateReferralCode();
-        if (!(await this.userModel.exists({ referralCode: code }))) {
-          user = await this.userModel.findByIdAndUpdate(
-            userId,
-            { referralCode: code },
-            { new: true },
-          ).select('referralCode referralCount');
-          break;
-        }
-      }
+    // The code is the user's mobile number. Older accounts still carry a random
+    // GORAxxxxxx code, so migrate them on read — otherwise the code they share
+    // wouldn't be the one shown here.
+    if (user.mobile && user.referralCode !== user.mobile) {
+      await this.userModel.findByIdAndUpdate(userId, { referralCode: user.mobile });
     }
 
     const invited = await this.userModel
@@ -146,8 +137,8 @@ export class UsersService {
     return {
       message: 'Referral info retrieved',
       data: {
-        code: user?.referralCode ?? '',
-        count: user?.referralCount ?? 0,
+        code: user.mobile ?? '',
+        count: user.referralCount ?? 0,
         invited,
       },
     };

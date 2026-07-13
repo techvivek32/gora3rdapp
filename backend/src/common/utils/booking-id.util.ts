@@ -21,12 +21,5 @@ export function generatePaymentOrderId(): string {
   return `PAY${timestamp}`;
 }
 
-/** Short, human-friendly referral code, e.g. "GORA7K3QF". */
-export function generateReferralCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return `GORA${code}`;
-}
+// Referral codes are no longer generated — a user's code is their mobile number
+// (see AuthService.register / UsersService.getReferralInfo).

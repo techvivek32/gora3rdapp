@@ -46,8 +46,12 @@ class _InvitePageState extends State<InvitePage> {
     }
   }
 
-  String get _shareText =>
-      'Join me on Gora Taxi Partner! 🚕\nUse my referral code *$_code* when you sign up.\nDownload the app: https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner';
+  String get _shareText => '''🚖 Join Gora Taxi Partner Today!
+मैं आपको Gora Taxi Partner से जुड़ने के लिए आमंत्रित करता हूँ।
+🤝 भारत के Driver, Agent और Tour & Travels Network का हिस्सा बनें।
+🎁 Sign Up करते समय मेरा Referral Code इस्तेमाल करें: $_code
+📲 Download App: https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner
+Let's Grow Together! 🚖''';
 
   void _copy() {
     Clipboard.setData(ClipboardData(text: _code));
