@@ -12,11 +12,22 @@ import '../utils/ring_player.dart';
 import '../../features/requirements/presentation/widgets/requirement_alert.dart';
 
 // Must match the channelId the backend sets on the FCM android payload.
+//
+// The id carries a version suffix on purpose: Android freezes a channel's sound
+// when it's first created and ignores every later change, so shipping a new tone
+// to existing installs REQUIRES a new channel id. Bump it again if the sound
+// changes.
+//
+// The sound is res/raw/gora_ring.mp3 (a raw resource, referenced without the
+// extension) — Android cannot play a Flutter asset as a notification tone.
+const _channelId = 'gora_cabs_notifications_v2';
 const _channel = AndroidNotificationChannel(
-  'gora_cabs_notifications',
+  _channelId,
   'Gora Cabs Notifications',
   description: 'New requirements and updates',
   importance: Importance.high,
+  playSound: true,
+  sound: RawResourceAndroidNotificationSound('gora_ring'),
 );
 
 /// Handles FCM: permission, token registration, foreground heads-up
@@ -126,6 +137,8 @@ class PushNotificationService {
           priority: Priority.high,
           fullScreenIntent: true, // pop over the lock screen like a call
           category: AndroidNotificationCategory.call,
+          playSound: true,
+          sound: const RawResourceAndroidNotificationSound('gora_ring'),
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
               ? const []
