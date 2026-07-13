@@ -11,6 +11,9 @@ abstract class RequirementsRemoteDataSource {
   Future<void> setStatus(String id, String status);
   Future<Map<String, dynamic>> getMy({String? status});
   Future<Map<String, dynamic>> getAcceptedByMe();
+  Future<Map<String, dynamic>> getAssignedToMe();
+  Future<void> assignDriver(String id, String driverId);
+  Future<void> unassignDriver(String id);
 }
 
 class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
@@ -72,5 +75,21 @@ class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
   Future<Map<String, dynamic>> getAcceptedByMe() async {
     final res = await apiClient.get('/requirements/accepted-by-me');
     return res.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getAssignedToMe() async {
+    final res = await apiClient.get('/requirements/assigned-to-me');
+    return res.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<void> assignDriver(String id, String driverId) async {
+    await apiClient.post('/requirements/$id/assign', data: {'driverId': driverId});
+  }
+
+  @override
+  Future<void> unassignDriver(String id) async {
+    await apiClient.post('/requirements/$id/unassign');
   }
 }

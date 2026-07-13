@@ -69,8 +69,22 @@ class RequirementUpdated extends RequirementsState {
 class RequirementCancelled extends RequirementsState {}
 
 class MyRequirementsLoaded extends RequirementsState {
+  /// Requirements I posted.
   final List<Map<String, dynamic>> requirements;
-  const MyRequirementsLoaded({required this.requirements});
+
+  /// Requirements someone else assigned to me as the driver.
+  final List<Map<String, dynamic>> assignedToMe;
+
+  const MyRequirementsLoaded({
+    required this.requirements,
+    this.assignedToMe = const [],
+  });
+
   @override
-  List<Object?> get props => [requirements];
+  List<Object?> get props => [requirements, assignedToMe];
+}
+
+/// Emitted after a successful assign so the page can show a confirmation.
+class DriverAssigned extends RequirementsState {
+  const DriverAssigned();
 }

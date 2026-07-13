@@ -145,6 +145,28 @@ export class NotificationsService {
 
   async notifyVehiclePosted(_vehicle: any) {}
 
+  /** Tell the driver a booking was handed to them. Push only. */
+  async notifyRequirementAssigned(requirement: any) {
+    const driverId = requirement?.assignedDriver?._id ?? requirement?.assignedDriver;
+    if (!driverId) return;
+
+    const driver = await this.userModel.findById(driverId).select('fcmTokens').lean();
+    if (!driver?.fcmTokens?.length) return;
+
+    const poster = requirement.postedBy ?? {};
+    const posterName = poster.agencyName || poster.fullName || 'A partner';
+
+    await this.firebaseService.sendPushNotification(driver.fcmTokens, {
+      title: '🚕 New booking assigned to you',
+      body: `${posterName} assigned you Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity}`,
+      data: {
+        requirementId: requirement._id.toString(),
+        bookingId: `${requirement.bookingId ?? ''}`,
+        type: 'requirement_assigned',
+      },
+    });
+  }
+
   /** Push only — the poster gets a device notification, not an inbox row. */
   async notifyRequirementAccepted(requirement: any, acceptingUser: any) {
     const poster = await this.userModel.findById(requirement.postedBy).select('fcmTokens _id');

@@ -115,6 +115,13 @@ export class Requirement {
   @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
   interestedUsers: Types.ObjectId[];
 
+  /** The driver the owner handed this booking to. Set via POST :id/assign. */
+  @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+  assignedDriver: Types.ObjectId;
+
+  @Prop({ type: Date })
+  assignedAt: Date;
+
   @Prop({ type: Date })
   expiresAt: Date;
 

@@ -18,4 +18,7 @@ abstract class RequirementsRepository {
   Future<Either<Failure, void>> setStatus(String id, String status);
   Future<Either<Failure, Map<String, dynamic>>> getMyRequirements({String? status});
   Future<Either<Failure, Map<String, dynamic>>> getAcceptedByMe();
+  Future<Either<Failure, Map<String, dynamic>>> getAssignedToMe();
+  Future<Either<Failure, void>> assignDriver(String id, String driverId);
+  Future<Either<Failure, void>> unassignDriver(String id);
 }

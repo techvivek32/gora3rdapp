@@ -45,6 +45,12 @@ export class RequirementsController {
     return this.requirementsService.getAcceptedByMe(userId);
   }
 
+  @Get('assigned-to-me')
+  @ApiOperation({ summary: 'Get requirements assigned to me as the driver' })
+  getAssignedToMe(@CurrentUser('sub') userId: string) {
+    return this.requirementsService.getAssignedToMe(userId);
+  }
+
   @Get('lookup')
   @ApiOperation({ summary: 'Look up a requirement by its display ID (requirementId/bookingId)' })
   lookup(@Query('code') code: string, @CurrentUser('sub') userId: string) {
@@ -81,6 +87,22 @@ export class RequirementsController {
     @Body('status') status: string,
   ) {
     return this.requirementsService.setStatus(id, userId, status);
+  }
+
+  @Post(':id/assign')
+  @ApiOperation({ summary: 'Assign this requirement to a driver (owner only)' })
+  assignDriver(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('driverId') driverId: string,
+  ) {
+    return this.requirementsService.assignDriver(id, userId, driverId);
+  }
+
+  @Post(':id/unassign')
+  @ApiOperation({ summary: 'Remove the assigned driver (owner only)' })
+  unassignDriver(@Param('id') id: string, @CurrentUser('sub') userId: string) {
+    return this.requirementsService.unassignDriver(id, userId);
   }
 
   @Post(':id/cancel')

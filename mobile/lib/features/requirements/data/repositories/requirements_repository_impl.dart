@@ -107,4 +107,34 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       return Left(ServerFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, Map<String, dynamic>>> getAssignedToMe() async {
+    try {
+      final result = await remote.getAssignedToMe();
+      return Right(result);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> assignDriver(String id, String driverId) async {
+    try {
+      await remote.assignDriver(id, driverId);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> unassignDriver(String id) async {
+    try {
+      await remote.unassignDriver(id);
+      return const Right(null);
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
 }

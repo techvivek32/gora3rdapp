@@ -21,6 +21,66 @@ class RequirementCardWidget extends StatelessWidget {
 
   const RequirementCardWidget({super.key, required this.requirement, this.onTap, this.menu, this.mine = false});
 
+  /// The driver this booking was handed to, once the owner has assigned one.
+  /// Populated by the backend, so it's a map — not a bare id.
+  Map<String, dynamic>? get _assignedDriver {
+    final d = requirement['assignedDriver'];
+    return d is Map<String, dynamic> ? d : null;
+  }
+
+  Widget _buildAssignedDriver(BuildContext context) {
+    final d = _assignedDriver!;
+    final name = (d['agencyName'] ?? d['fullName'] ?? '').toString().trim();
+    final mobile = (d['mobile'] ?? '').toString();
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFF4CAF50).withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: const Color(0xFF4CAF50).withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.person_pin_circle, size: 20.sp, color: const Color(0xFF2E7D32)),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Assigned Driver',
+                  style: TextStyle(fontSize: 9.sp, color: Colors.grey[700], fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  name.isEmpty ? mobile : name,
+                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.bold, color: Colors.black87),
+                ),
+              ],
+            ),
+          ),
+          if (mobile.isNotEmpty) ...[
+            InkWell(
+              onTap: () => callNumber(mobile),
+              child: Padding(
+                padding: EdgeInsets.all(4.r),
+                child: Icon(Icons.call, size: 20.sp, color: const Color(0xFF2196F3)),
+              ),
+            ),
+            SizedBox(width: 4.w),
+            InkWell(
+              onTap: () => openWhatsApp(mobile),
+              child: Padding(
+                padding: EdgeInsets.all(4.r),
+                child: FaIcon(FontAwesomeIcons.whatsapp, size: 18.sp, color: const Color(0xFF25D366)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final postedBy = requirement['postedBy'] as Map<String, dynamic>?;
@@ -414,6 +474,12 @@ class RequirementCardWidget extends StatelessWidget {
                               ),
                               SizedBox(height: 12.h),
                               Divider(height: 1, color: Colors.black26),
+                              SizedBox(height: 10.h),
+                            ],
+
+                            // 7b. assigned driver (owner assigned this booking to them)
+                            if (_assignedDriver != null) ...[
+                              _buildAssignedDriver(context),
                               SizedBox(height: 10.h),
                             ],
 

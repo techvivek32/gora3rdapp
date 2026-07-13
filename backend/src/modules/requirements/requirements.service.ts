@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
@@ -296,6 +296,86 @@ export class RequirementsService {
     return { message: 'Requirement cancelled successfully' };
   }
 
+  /** Fields exposed for an assigned driver / poster on a requirement card. */
+  private static readonly PARTY_SELECT =
+    'fullName agencyName mobile membershipType profileImage isVerified rating city state';
+
+  /**
+   * Hand this booking to a driver. Owner-only. Marks the requirement booked
+   * (accepted) in the same step — assigning a driver *is* the booking.
+   */
+  async assignDriver(id: string, ownerId: string, driverId: string) {
+    if (!Types.ObjectId.isValid(driverId)) throw new BadRequestException('Invalid driver');
+
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.postedBy.toString() !== ownerId) {
+      throw new ForbiddenException('Not authorized to update this requirement');
+    }
+    if (requirement.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException('This requirement is cancelled');
+    }
+    if (driverId === ownerId) {
+      throw new BadRequestException('You cannot assign a requirement to yourself');
+    }
+
+    const driver = await this.userModel
+      .findOne({ _id: new Types.ObjectId(driverId), isActive: true, isBlocked: { $ne: true } })
+      .select('_id fcmTokens')
+      .lean();
+    if (!driver) throw new NotFoundException('Driver not found');
+
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(
+        id,
+        {
+          assignedDriver: driver._id,
+          assignedAt: new Date(),
+          status: BookingStatus.ACCEPTED, // assigning a driver books the requirement
+        },
+        { new: true },
+      )
+      .populate('postedBy', RequirementsService.PARTY_SELECT)
+      .populate('assignedDriver', RequirementsService.PARTY_SELECT)
+      .lean();
+
+    this.notificationsService.notifyRequirementAssigned(updated).catch(() => {});
+
+    return { message: 'Driver assigned', data: updated };
+  }
+
+  /** Remove the assigned driver and put the requirement back in Running. */
+  async unassignDriver(id: string, ownerId: string) {
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.postedBy.toString() !== ownerId) {
+      throw new ForbiddenException('Not authorized to update this requirement');
+    }
+
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(
+        id,
+        { $unset: { assignedDriver: '', assignedAt: '' }, $set: { status: BookingStatus.ACTIVE } },
+        { new: true },
+      )
+      .populate('postedBy', RequirementsService.PARTY_SELECT)
+      .lean();
+
+    return { message: 'Driver unassigned', data: updated };
+  }
+
+  /** Requirements other users have assigned to me. */
+  async getAssignedToMe(userId: string) {
+    const requirements = await this.requirementModel
+      .find({ assignedDriver: new Types.ObjectId(userId), isDeleted: false })
+      .sort({ assignedAt: -1 })
+      .populate('postedBy', RequirementsService.PARTY_SELECT)
+      .populate('assignedDriver', RequirementsService.PARTY_SELECT)
+      .lean();
+
+    return { message: 'Assigned requirements', data: requirements };
+  }
+
   async getMyRequirements(userId: string, status?: BookingStatus) {
     const filter: any = { postedBy: new Types.ObjectId(userId), isDeleted: false };
     if (status) filter.status = status;
@@ -304,6 +384,7 @@ export class RequirementsService {
       .find(filter)
       .sort({ createdAt: -1 })
       .populate('postedBy', 'fullName agencyName profileImage membershipType mobile email city state')
+      .populate('assignedDriver', RequirementsService.PARTY_SELECT)
       .lean();
 
     // Manually populate acceptedBy for each requirement

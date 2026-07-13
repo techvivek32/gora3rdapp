@@ -82,3 +82,19 @@ class SetRequirementStatusEvent extends RequirementsEvent {
   @override
   List<Object?> get props => [id, status];
 }
+
+// Owner hands the booking to a driver. Books the requirement in the same step.
+class AssignDriverEvent extends RequirementsEvent {
+  final String id;
+  final String driverId;
+  const AssignDriverEvent({required this.id, required this.driverId});
+  @override
+  List<Object?> get props => [id, driverId];
+}
+
+class UnassignDriverEvent extends RequirementsEvent {
+  final String id;
+  const UnassignDriverEvent({required this.id});
+  @override
+  List<Object?> get props => [id];
+}

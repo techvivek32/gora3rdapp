@@ -24,6 +24,27 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     on<CancelRequirementEvent>(_onCancel);
     on<SetRequirementStatusEvent>(_onSetStatus);
     on<LoadMyRequirementsEvent>(_onLoadMy);
+    on<AssignDriverEvent>(_onAssignDriver);
+    on<UnassignDriverEvent>(_onUnassignDriver);
+  }
+
+  Future<void> _onAssignDriver(AssignDriverEvent event, Emitter<RequirementsState> emit) async {
+    final result = await repository.assignDriver(event.id, event.driverId);
+    result.fold(
+      (f) => emit(RequirementsError(message: f.message)),
+      (_) {
+        emit(const DriverAssigned());
+        add(const LoadMyRequirementsEvent());
+      },
+    );
+  }
+
+  Future<void> _onUnassignDriver(UnassignDriverEvent event, Emitter<RequirementsState> emit) async {
+    final result = await repository.unassignDriver(event.id);
+    result.fold(
+      (f) => emit(RequirementsError(message: f.message)),
+      (_) => add(const LoadMyRequirementsEvent()),
+    );
   }
 
   Future<void> _onSetStatus(SetRequirementStatusEvent event, Emitter<RequirementsState> emit) async {
@@ -212,11 +233,24 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
 
   Future<void> _onLoadMy(LoadMyRequirementsEvent event, Emitter<RequirementsState> emit) async {
     emit(RequirementsLoading());
-    final result = await repository.getMyRequirements();
-    result.fold(
+    // Both tabs' data in one go — "Assigned" holds requirements others gave me.
+    final results = await Future.wait([
+      repository.getMyRequirements(),
+      repository.getAssignedToMe(),
+    ]);
+
+    final mine = results[0];
+    final assigned = results[1];
+
+    mine.fold(
       (f) => emit(RequirementsError(message: f.message)),
       (data) => emit(MyRequirementsLoaded(
         requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
+        // A failure here shouldn't blank the whole page — just show no assignments.
+        assignedToMe: assigned.fold(
+          (_) => const [],
+          (d) => List<Map<String, dynamic>>.from(d['data'] ?? []),
+        ),
       )),
     );
   }
