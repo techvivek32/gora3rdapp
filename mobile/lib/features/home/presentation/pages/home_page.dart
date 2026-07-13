@@ -33,7 +33,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   bool _alertsOn = false;
   bool _awaitingOverlayGrant = false;
-  // Remember the user's last-saved alert picks so reopening the sheet shows them.
   List<String> _alertVehicles = [];
   List<String> _alertTrips = [];
 
@@ -43,13 +42,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     context.read<HomeBloc>().add(LoadHomeDataEvent());
     _fetchSupportContacts();
-    // Reflect the user's saved notification setting (defaults off).
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;
     _alertVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     _alertTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
-    // Register this device for push notifications (user is authenticated here).
     PushNotificationService.instance.registerToken();
   }
 
@@ -75,7 +72,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Coming back from the "Display over other apps" settings page — confirm the grant.
     if (state == AppLifecycleState.resumed && _awaitingOverlayGrant) {
       _awaitingOverlayGrant = false;
       isOverlayPermissionGranted().then((granted) {
@@ -93,7 +89,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Future<void> _toggleAlerts(bool value) async {
-    // Turning OFF — just disable, no filter sheet.
     if (!value) {
       setState(() => _alertsOn = false);
       try {
@@ -104,9 +99,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
-    // Turning ON — pre-select the user's last-saved picks so nothing is lost.
     final filters = await showAlertFilterSheet(context, initialVehicles: _alertVehicles, initialTrips: _alertTrips);
-    if (filters == null) return; // dismissed → keep the toggle off
+    if (filters == null) return;
 
     final savedVehicles = filters['vehicles'] ?? [];
     final savedTrips = filters['trips'] ?? [];
@@ -121,8 +115,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         'vehicleTypes': savedVehicles,
         'tripTypes': savedTrips,
       });
-      // Keep the cached user in sync so reopening the sheet (even after a rebuild)
-      // shows the same picks.
       if (!mounted) return;
       final auth = context.read<AuthBloc>().state;
       if (auth is AuthAuthenticated && auth.user is Map) {
@@ -135,8 +127,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       if (mounted) setState(() => _alertsOn = false);
       return;
     }
-    // Then ask for the "Display over other apps" permission so requirement cards can
-    // float over other apps while the app runs in the background.
     await _ensureOverlayPermission();
   }
 
@@ -167,10 +157,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  // Brand title: "Partner" is stretched horizontally so it lines up exactly under
-  // "Gora Taxi". `height: 1.0` strips the font's default leading, tucking the two
-  // lines together; the larger Partner font makes it taller (scaleX squeezes it
-  // back to the same width).
   Widget _buildBrandTitle() {
     final goraStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, height: 1.0);
     final partnerStyle = TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, height: 1.0);
@@ -207,7 +193,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       body: CustomScrollView(
         physics: const NeverScrollableScrollPhysics(),
         slivers: [
-          // App Bar
           SliverAppBar(
             expandedHeight: 0,
             floating: true,
@@ -223,7 +208,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             titleSpacing: 12,
             actions: [
-              // Alerts toggle
               Text('Alerts', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
               SizedBox(width: 2.w),
               SizedBox(
@@ -241,7 +225,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
               ),
               SizedBox(width: 6.w),
-              // Help menu — WhatsApp + Call options in a dropdown.
               PopupMenuButton<String>(
                 tooltip: 'Help',
                 icon: Icon(Icons.headset_mic, color: AppColors.primary, size: 22.sp),
@@ -293,19 +276,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ],
           ),
 
-          // Content
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Banner Slider
                 BlocBuilder<HomeBloc, HomeState>(
                   builder: (context, state) => BannerSliderWidget(
                     banners: state is HomeLoaded ? state.banners : [],
                   ),
                 ),
 
-                // Scrolling caution line
                 Container(
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: MarqueeText(
@@ -315,15 +295,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
 
-                // Search a partner by phone number
                 Padding(
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: const UserSearchWidget(),
                 ),
 
-                // Scrolling account-verification reminder
                 Container(
-                  padding: EdgeInsets.symmetric(vertical: 6.h),
+                  padding: EdgeInsets.only(top: 6.h),
                   child: MarqueeText(
                     text:
                         'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
@@ -331,7 +309,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
 
-                // Quick Actions — no gap, sits flush under the marquee
                 const QuickActionGridWidget(),
               ],
             ),
