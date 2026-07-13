@@ -7,6 +7,7 @@ export enum NotificationType {
   REQUIREMENT_POSTED = 'requirement_posted',
   VEHICLE_POSTED = 'vehicle_posted',
   REQUIREMENT_ACCEPTED = 'requirement_accepted',
+  REQUIREMENT_ASSIGNED = 'requirement_assigned',
   VEHICLE_BOOKED = 'vehicle_booked',
   NEW_MESSAGE = 'new_message',
   MEMBERSHIP_EXPIRY = 'membership_expiry',

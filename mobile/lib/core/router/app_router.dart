@@ -98,7 +98,10 @@ class AppRouter {
       // Detail Routes
       GoRoute(
         path: '/my-requirements',
-        builder: (_, __) => const MyRequirementsPage(),
+        // ?tab=2 deep-links to the Assigned tab (used by the assignment push).
+        builder: (_, state) => MyRequirementsPage(
+          initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: '/requirements/create',

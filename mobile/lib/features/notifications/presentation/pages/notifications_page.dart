@@ -29,6 +29,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     'vehicle_posted': Icons.directions_car,
     'new_vehicle': Icons.directions_car_outlined,
     'new_message': Icons.chat_bubble_outline,
+    'requirement_assigned': Icons.assignment_ind,
     'subscription_activated': Icons.workspace_premium,
     'promotional': Icons.campaign_outlined,
     'system': Icons.notifications_outlined,
@@ -41,6 +42,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     'vehicle_posted': AppColors.primary,
     'new_vehicle': AppColors.primary,
     'new_message': AppColors.info,
+    'requirement_assigned': AppColors.success,
     'subscription_activated': AppColors.memberGolden,
     'promotional': AppColors.memberGolden,
     'system': AppColors.textSecondary,
@@ -65,6 +67,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final data = n['data'] as Map<String, dynamic>? ?? {};
 
     // Activity notices jump straight to the thing they're about.
+    if (type == 'requirement_assigned') {
+      context.push('/my-requirements?tab=2'); // My Requirements → Assigned
+      return;
+    }
     if (type == 'requirement_posted' || type == 'requirement_accepted') {
       final requirementId = data['requirementId'] as String?;
       if (requirementId != null) context.push('/requirements/$requirementId');

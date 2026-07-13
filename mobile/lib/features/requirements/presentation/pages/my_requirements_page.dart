@@ -10,7 +10,11 @@ import '../bloc/requirements_bloc.dart';
 import '../widgets/requirement_card_widget.dart';
 
 class MyRequirementsPage extends StatefulWidget {
-  const MyRequirementsPage({super.key});
+  /// Which tab to open on: 0 Running, 1 Booked, 2 Assigned. An assignment push
+  /// deep-links straight to Assigned.
+  final int initialTab;
+
+  const MyRequirementsPage({super.key, this.initialTab = 0});
 
   @override
   State<MyRequirementsPage> createState() => _MyRequirementsPageState();
@@ -20,7 +24,10 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
   @override
   void initState() {
     super.initState();
-    if (context.read<RequirementsBloc>().state is! MyRequirementsLoaded) {
+    // Always refetch when deep-linked from a push: the assignment that triggered
+    // it won't be in whatever list the bloc is already holding.
+    if (widget.initialTab != 0 ||
+        context.read<RequirementsBloc>().state is! MyRequirementsLoaded) {
       context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
     }
   }
@@ -29,6 +36,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.initialTab,
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
@@ -120,8 +128,8 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                   _buildList(context, running, 'No running requirements', showMenu: true),
                   _buildList(context, booked, 'No booked requirements'),
                   // Requirements OTHER people assigned to me — I'm the driver here,
-                  // so no owner menu.
-                  _buildList(context, state.assignedToMe, 'No requirements assigned to you'),
+                  // so no owner menu, and no BOOKED stamp obscuring the job.
+                  _buildList(context, state.assignedToMe, 'No requirements assigned to you', showStamp: false),
                 ],
               );
             }
@@ -133,7 +141,13 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
     );
   }
 
-  Widget _buildList(BuildContext context, List<Map<String, dynamic>> items, String emptyText, {bool showMenu = false}) {
+  Widget _buildList(
+    BuildContext context,
+    List<Map<String, dynamic>> items,
+    String emptyText, {
+    bool showMenu = false,
+    bool showStamp = true,
+  }) {
     return RefreshIndicator(
       onRefresh: () async {
         context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
@@ -166,7 +180,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                 return Padding(
                   padding: EdgeInsets.only(bottom: 12.h),
                   // Cards are display-only — no navigation to the detail screen.
-                  child: RequirementCardWidget(requirement: req, menu: menu),
+                  child: RequirementCardWidget(requirement: req, menu: menu, showStamp: showStamp),
                 );
               },
             ),

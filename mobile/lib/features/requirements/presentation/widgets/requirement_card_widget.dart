@@ -19,7 +19,19 @@ class RequirementCardWidget extends StatelessWidget {
   // True on the "My Requirements" list — treat as owner.
   final bool mine;
 
-  const RequirementCardWidget({super.key, required this.requirement, this.onTap, this.menu, this.mine = false});
+  /// Draw the BOOKED / ON HOLD / CANCELLED stamp (and the dimming that goes with
+  /// it). Off on the Assigned tab: every card there is booked by definition, so
+  /// the stamp would only obscure the details the driver actually needs.
+  final bool showStamp;
+
+  const RequirementCardWidget({
+    super.key,
+    required this.requirement,
+    this.onTap,
+    this.menu,
+    this.mine = false,
+    this.showStamp = true,
+  });
 
   /// The driver this booking was handed to, once the owner has assigned one.
   /// Populated by the backend, so it's a map — not a bare id.
@@ -109,7 +121,9 @@ class RequirementCardWidget extends StatelessWidget {
         final isOnHold = requirement['status'] == 'on_hold';
         // Cancelled / booked / on-hold posts are read-only for everyone except the
         // owner (who still manages them from My Requirements via the menu).
-        final bool locked = (isCancelled || isBooked || isOnHold) && !isCurrentUserOwner;
+        // On the Assigned tab (showStamp: false) the driver is not the owner, but
+        // the job is theirs — so it must stay fully readable, not dimmed out.
+        final bool locked = showStamp && (isCancelled || isBooked || isOnHold) && !isCurrentUserOwner;
 
         final memberType = (mine ? currentMembership : (postedBy?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
@@ -528,7 +542,7 @@ class RequirementCardWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (isBooked || isCancelled || isOnHold)
+                  if (showStamp && (isBooked || isCancelled || isOnHold))
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Center(

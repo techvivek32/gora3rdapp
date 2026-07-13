@@ -145,26 +145,45 @@ export class NotificationsService {
 
   async notifyVehiclePosted(_vehicle: any) {}
 
-  /** Tell the driver a booking was handed to them. Push only. */
+  /**
+   * Tell the driver a booking was handed to them: an inbox row they'll see next
+   * time they open the app, plus a push if they have a device registered.
+   */
   async notifyRequirementAssigned(requirement: any) {
     const driverId = requirement?.assignedDriver?._id ?? requirement?.assignedDriver;
     if (!driverId) return;
 
-    const driver = await this.userModel.findById(driverId).select('fcmTokens').lean();
-    if (!driver?.fcmTokens?.length) return;
-
     const poster = requirement.postedBy ?? {};
     const posterName = poster.agencyName || poster.fullName || 'A partner';
 
-    await this.firebaseService.sendPushNotification(driver.fcmTokens, {
-      title: '🚕 New booking assigned to you',
-      body: `${posterName} assigned you Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity}`,
-      data: {
-        requirementId: requirement._id.toString(),
-        bookingId: `${requirement.bookingId ?? ''}`,
-        type: 'requirement_assigned',
-      },
+    const title = '🚕 New booking assigned to you';
+    const body = `${posterName} assigned you Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity}`;
+    // Tapping it opens My Requirements on the Assigned tab.
+    const actionUrl = '/my-requirements?tab=2';
+    const data = {
+      requirementId: requirement._id.toString(),
+      bookingId: `${requirement.bookingId ?? ''}`,
+      type: NotificationType.REQUIREMENT_ASSIGNED,
+      actionUrl,
+    };
+
+    // The inbox row is the reliable channel — a driver with no FCM token (fresh
+    // login, web) would otherwise never learn about the assignment.
+    await this.notificationModel.create({
+      userId: driverId,
+      title,
+      body,
+      type: NotificationType.REQUIREMENT_ASSIGNED,
+      actionUrl,
+      isSent: true,
+      sentAt: new Date(),
+      data,
     });
+
+    const driver = await this.userModel.findById(driverId).select('fcmTokens').lean();
+    if (!driver?.fcmTokens?.length) return;
+
+    await this.firebaseService.sendPushNotification(driver.fcmTokens, { title, body, data });
   }
 
   /** Push only — the poster gets a device notification, not an inbox row. */
@@ -290,7 +309,8 @@ export class NotificationsService {
   }
 
   /**
-   * The in-app inbox shows admin broadcasts only. Activity notices (requirement
+   * What the in-app inbox shows: admin broadcasts, plus notices the user must act
+   * on (a booking assigned to them). The noisy self-confirmations (requirement
    * posted / vehicle listed / new requirement) are no longer written, but rows
    * from before that change still exist — this allowlist keeps them out of both
    * the list and the unread badge without needing a migration.
@@ -298,6 +318,7 @@ export class NotificationsService {
   private static readonly INBOX_TYPES = [
     NotificationType.SYSTEM,
     NotificationType.PROMOTIONAL,
+    NotificationType.REQUIREMENT_ASSIGNED,
   ];
 
   private visibleFor(userId: string) {

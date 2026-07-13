@@ -82,9 +82,13 @@ class PushNotificationService {
     final n = message.notification;
     final data = message.data;
 
-    // App is in the foreground here — show the rich on-screen popup card.
+    // App is in the foreground here — show the rich on-screen popup card. An
+    // assignment carries a requirementId but is not a new-requirement alert: it
+    // gets a plain notification (below) that deep-links to the Assigned tab.
+    final isNewRequirement = (data['requirementId'] ?? '').toString().isNotEmpty &&
+        data['type'] != 'requirement_assigned';
     final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx != null && (data['requirementId'] ?? '').toString().isNotEmpty) {
+    if (ctx != null && isNewRequirement) {
       playRequirementRing();
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
@@ -160,6 +164,15 @@ class PushNotificationService {
     if (!openApp) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx == null) return;
+
+    // A booking handed to me: open My Requirements on the Assigned tab. Checked
+    // before the block below — this push carries a requirementId too, but it is
+    // NOT a new-requirement alert.
+    if (data['type'] == 'requirement_assigned') {
+      ctx.push('/my-requirements?tab=2');
+      return;
+    }
+
     // Show the rich popup card if this was a requirement, else open the feed.
     if ((data['requirementId'] ?? '').toString().isNotEmpty) {
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
