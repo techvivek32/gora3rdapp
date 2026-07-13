@@ -138,32 +138,14 @@ export class NotificationsService {
     await sendToTokens(basicTokens, ''); // non-premium: no contact number
   }
 
-  async notifyRequirementPosted(requirement: any) {
-    await this.notificationModel.create({
-      userId: requirement.postedBy,
-      title: '✅ Requirement Posted Successfully!',
-      body: `Booking #${requirement.bookingId} | ${requirement.pickupCity} → ${requirement.dropCity} is now live.`,
-      type: NotificationType.REQUIREMENT_POSTED,
-      data: {
-        requirementId: requirement._id.toString(),
-        bookingId: requirement.bookingId,
-      },
-    });
-  }
+  // "Requirement posted" / "Vehicle listed" self-confirmations are no longer
+  // written: the inbox is for admin messages, and the user just saw the success
+  // screen after posting. Kept as no-ops so callers don't need to change.
+  async notifyRequirementPosted(_requirement: any) {}
 
-  async notifyVehiclePosted(vehicle: any) {
-    await this.notificationModel.create({
-      userId: vehicle.postedBy,
-      title: '✅ Vehicle Listed Successfully!',
-      body: `Listing #${vehicle.listingId} | ${vehicle.currentCity} → ${vehicle.destinationCity} is now live.`,
-      type: NotificationType.VEHICLE_POSTED,
-      data: {
-        vehicleId: vehicle._id.toString(),
-        listingId: vehicle.listingId,
-      },
-    });
-  }
+  async notifyVehiclePosted(_vehicle: any) {}
 
+  /** Push only — the poster gets a device notification, not an inbox row. */
   async notifyRequirementAccepted(requirement: any, acceptingUser: any) {
     const poster = await this.userModel.findById(requirement.postedBy).select('fcmTokens _id');
     if (!poster?.fcmTokens?.length) return;
@@ -171,19 +153,15 @@ export class NotificationsService {
     const title = '✅ Someone accepted your requirement!';
     const body = `${acceptingUser.fullName || acceptingUser.agencyName} is interested in Booking #${requirement.bookingId}`;
 
-    await this.notificationModel.create({
-      userId: poster._id,
+    await this.firebaseService.sendPushNotification(poster.fcmTokens, {
       title,
       body,
-      type: NotificationType.REQUIREMENT_ACCEPTED,
       data: {
         requirementId: requirement._id.toString(),
-        bookingId: requirement.bookingId,
-        acceptingUserId: acceptingUser._id.toString(),
+        bookingId: `${requirement.bookingId ?? ''}`,
+        type: NotificationType.REQUIREMENT_ACCEPTED,
       },
     });
-
-    await this.firebaseService.sendPushNotification(poster.fcmTokens, { title, body });
   }
 
   async sendGlobalNotification(title: string, body: string, data?: Record<string, string>) {
@@ -214,8 +192,12 @@ export class NotificationsService {
       ? (input.type as NotificationType)
       : NotificationType.SYSTEM;
 
-    const filter: any = { isActive: true, isBlocked: false, notificationsEnabled: true };
-    if (roles.length) filter.role = { $in: roles };
+    // Audience = who the message is for. notificationsEnabled is deliberately NOT
+    // part of this: it's a "don't buzz my phone" preference, so those users still
+    // get the message in their in-app inbox — they're just skipped for push below.
+    const filter: any = { isActive: true, isBlocked: { $ne: true } };
+    // Admins aren't app users — never broadcast to them.
+    filter.role = roles.length ? { $in: roles } : { $nin: ['admin', 'super_admin'] };
     if (memberships.length) filter.membershipType = { $in: memberships };
     // A user who picked no business city counts as "all cities", same as requirement alerts.
     if (cities.length) {
@@ -226,7 +208,7 @@ export class NotificationsService {
       ];
     }
 
-    const users = await this.userModel.find(filter).select('fcmTokens _id').lean();
+    const users = await this.userModel.find(filter).select('fcmTokens _id notificationsEnabled').lean();
     if (users.length === 0) return { message: 'No users matched this audience' };
 
     // Everything in an FCM data payload must be a string.
@@ -255,8 +237,12 @@ export class NotificationsService {
       })),
     );
 
-    // Users without a device token still get the in-app row above; only push below.
-    const allTokens = users.flatMap((u) => u.fcmTokens ?? []).filter(Boolean);
+    // Push only to users who still want push (and have a device token). Everyone
+    // matched above already has the in-app row regardless.
+    const allTokens = users
+      .filter((u) => u.notificationsEnabled !== false)
+      .flatMap((u) => u.fcmTokens ?? [])
+      .filter(Boolean);
     const batchSize = 500;
     for (let i = 0; i < allTokens.length; i += batchSize) {
       try {
@@ -275,13 +261,20 @@ export class NotificationsService {
   }
 
   /**
-   * New-requirement alerts are no longer stored, but rows written before that
-   * change still exist — keep them out of the list and the unread badge.
+   * The in-app inbox shows admin broadcasts only. Activity notices (requirement
+   * posted / vehicle listed / new requirement) are no longer written, but rows
+   * from before that change still exist — this allowlist keeps them out of both
+   * the list and the unread badge without needing a migration.
    */
+  private static readonly INBOX_TYPES = [
+    NotificationType.SYSTEM,
+    NotificationType.PROMOTIONAL,
+  ];
+
   private visibleFor(userId: string) {
     return {
       userId: new Types.ObjectId(userId),
-      type: { $ne: NotificationType.NEW_REQUIREMENT },
+      type: { $in: NotificationsService.INBOX_TYPES },
     };
   }
 

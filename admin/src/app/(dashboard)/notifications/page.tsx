@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
 
-const MEMBERSHIP_TYPES = ['new', 'active', 'verified', 'premium', 'golden'];
+const MEMBERSHIP_TYPES = ['new', 'active', 'premium', 'golden'];
 
 // Backend UserRole values. "Both" = send with no role filter.
 const AUDIENCES = [
