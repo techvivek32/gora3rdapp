@@ -18,6 +18,8 @@ import { AuditLog, AuditLogSchema } from '../../database/schemas/audit-log.schem
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
 import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { RequirementsModule } from '../requirements/requirements.module';
+import { AvailableVehiclesModule } from '../available-vehicles/available-vehicles.module';
 
 @Module({
   imports: [
@@ -39,6 +41,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
     ]),
     NotificationsModule,
+    // Admin "post on behalf of a user" reuses these services, so booking ids,
+    // expiry and the new-requirement notifications behave exactly as they do in
+    // the app rather than being reimplemented here.
+    RequirementsModule,
+    AvailableVehiclesModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],

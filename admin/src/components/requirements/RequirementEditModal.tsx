@@ -44,17 +44,32 @@ interface Stop { address: string; lat?: number; lng?: number; }
 /** Full requirement editor (address autocomplete, stops, vehicle/fuel/trip, date/
  *  time, return date/time for round trips, App-Suggested vs custom fare). Shared
  *  by the Requirements page and the User-detail page. */
-export function RequirementEditModal({ req, mode, onClose, onSaved }: { req: any; mode: 'view' | 'edit'; onClose: () => void; onSaved: () => void }) {
-  const r = req as any;
+export function RequirementEditModal({
+  req,
+  mode,
+  userId,
+  onClose,
+  onSaved,
+}: {
+  /** Omitted in 'create' mode. */
+  req?: any;
+  mode: 'view' | 'edit' | 'create';
+  /** Required in 'create' mode — the user the requirement is posted for. */
+  userId?: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isCreate = mode === 'create';
+  const r = (req ?? {}) as any;
   const [form, setForm] = useState({
-    status: r.status,
-    vehicleType: r.vehicleType,
-    tripType: r.tripType,
+    status: r.status ?? 'active',
+    vehicleType: r.vehicleType ?? VEHICLE_TYPES[0]?.value ?? 'sedan',
+    tripType: r.tripType ?? 'one_way',
     fuelType: (r.fuelType as string) || 'any',
-    pickupCity: r.pickupCity, // full display address
+    pickupCity: r.pickupCity ?? '', // full display address
     pickupCityName: (r.pickupCityName as string) || '',
     pickupCoordinates: r.pickupCoordinates || undefined,
-    dropCity: r.dropCity, // full display address
+    dropCity: r.dropCity ?? '', // full display address
     dropCityName: (r.dropCityName as string) || '',
     dropCoordinates: r.dropCoordinates || undefined,
     stops: (Array.isArray(r.stops) ? r.stops : []).map((s: any) => ({ address: s.address || '', lat: s.lat, lng: s.lng })) as Stop[],
@@ -67,7 +82,8 @@ export function RequirementEditModal({ req, mode, onClose, onSaved }: { req: any
     commission: r.commission != null ? String(r.commission) : '',
     notes: r.notes || '',
   });
-  const isEdit = mode === 'edit';
+  // Fields are editable when creating as well as editing — only 'view' is read-only.
+  const isEdit = mode === 'edit' || isCreate;
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   // Per-vehicle rate (₹/km) from settings to auto-recompute the fare on vehicle change.
@@ -85,32 +101,45 @@ export function RequirementEditModal({ req, mode, onClose, onSaved }: { req: any
   const effFare = form.useCustomFare ? (Number(form.fare) || 0) : suggestedFare;
   const effCommission = form.useCustomFare ? (Number(form.commission) || 0) : 0;
 
-  const mutation = useMutation({
-    mutationFn: () => adminApi.updateRequirement(r._id, {
-      status: form.status,
-      vehicleType: form.vehicleType,
-      tripType: form.tripType,
-      fuelType: form.fuelType,
-      pickupCity: form.pickupCity,
-      pickupCityName: form.pickupCityName || undefined,
-      pickupCoordinates: form.pickupCoordinates,
-      dropCity: form.dropCity,
-      dropCityName: form.dropCityName || undefined,
-      dropCoordinates: form.dropCoordinates,
-      stops: form.stops.filter((s) => s.address.trim()),
-      travelDate: form.travelDate || undefined,
-      travelTime: form.travelTime || undefined,
-      returnDate: form.tripType === 'round_trip' ? (form.returnDate || undefined) : undefined,
-      returnTime: form.tripType === 'round_trip' ? (form.returnTime || undefined) : undefined,
-      isAppSuggested: !form.useCustomFare,
-      fare: effFare,
-      commission: effCommission,
-      totalAmount: effFare + effCommission,
-      notes: form.notes,
-    }),
-    onSuccess: () => { toast.success('Requirement updated'); onSaved(); },
-    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  const payload = () => ({
+    status: form.status,
+    vehicleType: form.vehicleType,
+    tripType: form.tripType,
+    fuelType: form.fuelType,
+    pickupCity: form.pickupCity,
+    pickupCityName: form.pickupCityName || undefined,
+    pickupCoordinates: form.pickupCoordinates,
+    dropCity: form.dropCity,
+    dropCityName: form.dropCityName || undefined,
+    dropCoordinates: form.dropCoordinates,
+    stops: form.stops.filter((s) => s.address.trim()),
+    travelDate: form.travelDate || undefined,
+    travelTime: form.travelTime || undefined,
+    returnDate: form.tripType === 'round_trip' ? (form.returnDate || undefined) : undefined,
+    returnTime: form.tripType === 'round_trip' ? (form.returnTime || undefined) : undefined,
+    isAppSuggested: !form.useCustomFare,
+    fare: effFare,
+    commission: effCommission,
+    totalAmount: effFare + effCommission,
+    notes: form.notes,
   });
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      isCreate
+        ? adminApi.createRequirementFor(userId!, payload())
+        : adminApi.updateRequirement(r._id, payload()),
+    onSuccess: () => {
+      toast.success(isCreate ? 'Requirement posted' : 'Requirement updated');
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.message || (isCreate ? 'Could not post requirement' : 'Update failed')),
+  });
+
+  // The backend rejects a create without these, so guard the button.
+  const canSave = !isCreate || (
+    form.pickupCity.trim() && form.dropCity.trim() && form.travelDate && form.travelTime
+  );
 
   if (!isEdit) {
     return (
@@ -131,7 +160,7 @@ export function RequirementEditModal({ req, mode, onClose, onSaved }: { req: any
   }
 
   return (
-    <Shell title="Edit Requirement" bookingId={r.bookingId} onClose={onClose}>
+    <Shell title={isCreate ? 'Add Requirement' : 'Edit Requirement'} bookingId={r.bookingId} onClose={onClose}>
       <div className="p-5 space-y-4">
         <div>
           <label className="text-xs font-medium text-gray-500 mb-1 block">From (Pickup)</label>
@@ -248,7 +277,9 @@ export function RequirementEditModal({ req, mode, onClose, onSaved }: { req: any
 
       <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+        <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!canSave}>
+          {isCreate ? 'Add Requirement' : 'Save Changes'}
+        </Button>
       </div>
     </Shell>
   );

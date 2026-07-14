@@ -49,6 +49,9 @@ export const adminApi = {
     apiClient.post(`/admin/users/${id}/upgrade-membership`, { membershipType, daysToAdd, planId }),
   getUserRequirements: (id: string) => apiClient.get(`/admin/users/${id}/requirements`),
   getUserVehicles: (id: string) => apiClient.get(`/admin/users/${id}/vehicles`),
+  // Post on behalf of a user (admin adds a requirement / available cab for them).
+  createRequirementFor: (id: string, data: any) => apiClient.post(`/admin/users/${id}/requirements`, data),
+  createVehicleFor: (id: string, data: any) => apiClient.post(`/admin/users/${id}/vehicles`, data),
   getUserPayments: (id: string) => apiClient.get(`/admin/users/${id}/payments`),
   getUserWithdrawals: (id: string) => apiClient.get(`/admin/users/${id}/withdrawals`),
   getUserReviews: (id: string) => apiClient.get(`/admin/users/${id}/reviews`),

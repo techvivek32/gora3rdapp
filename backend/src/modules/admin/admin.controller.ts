@@ -177,6 +177,18 @@ export class AdminController {
     return this.adminService.getRequirements(query);
   }
 
+  @Post('users/:id/requirements')
+  @ApiOperation({ summary: 'Post a requirement on behalf of a user' })
+  createRequirementFor(@Param('id') userId: string, @Body() data: any) {
+    return this.adminService.createRequirementFor(userId, data);
+  }
+
+  @Post('users/:id/vehicles')
+  @ApiOperation({ summary: 'Post an available cab on behalf of a user' })
+  createVehicleFor(@Param('id') userId: string, @Body() data: any) {
+    return this.adminService.createVehicleFor(userId, data);
+  }
+
   @Put('requirements/:id')
   @ApiOperation({ summary: 'Edit a requirement' })
   updateRequirement(@Param('id') id: string, @Body() data: any) {

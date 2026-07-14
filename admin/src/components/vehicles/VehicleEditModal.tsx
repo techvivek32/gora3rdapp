@@ -25,11 +25,26 @@ const vehicleStatusLabel = (s: string) =>
  *  city autocomplete for current + destination, vehicle/trip type, available
  *  date/time, plus admin-only reg/driver fields. Shared by the Vehicles page
  *  and the User-detail page. */
-export function VehicleEditModal({ vehicle, mode, onClose, onSaved }: { vehicle: any; mode: 'view' | 'edit'; onClose: () => void; onSaved: () => void }) {
-  const v = vehicle as any;
+export function VehicleEditModal({
+  vehicle,
+  mode,
+  userId,
+  onClose,
+  onSaved,
+}: {
+  /** Omitted in 'create' mode. */
+  vehicle?: any;
+  mode: 'view' | 'edit' | 'create';
+  /** Required in 'create' mode — the user the cab is listed for. */
+  userId?: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isCreate = mode === 'create';
+  const v = (vehicle ?? {}) as any;
   const [form, setForm] = useState({
-    status: v.status,
-    vehicleType: v.vehicleType,
+    status: v.status ?? 'available',
+    vehicleType: v.vehicleType ?? VEHICLE_TYPES[0]?.value ?? 'sedan',
     tripType: (v.tripType as string) || 'one_way',
     currentCity: v.currentCity || '',
     currentState: (v.currentState as string) || '',
@@ -41,27 +56,38 @@ export function VehicleEditModal({ vehicle, mode, onClose, onSaved }: { vehicle:
     availableTime: (v.availableTime as string) || '',
     notes: v.notes || '',
   });
-  const isEdit = mode === 'edit';
+  // Fields are editable when creating as well as editing — only 'view' is read-only.
+  const isEdit = mode === 'edit' || isCreate;
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
-  const mutation = useMutation({
-    mutationFn: () => adminApi.updateVehicle(v._id, {
-      status: form.status,
-      vehicleType: form.vehicleType,
-      tripType: form.tripType,
-      currentCity: form.currentCity,
-      currentState: form.currentState || undefined,
-      currentCoordinates: form.currentCoordinates,
-      destinationCity: form.destinationCity || undefined,
-      destinationState: form.destinationState || undefined,
-      destinationCoordinates: form.destinationCoordinates,
-      availableDate: form.availableDate || undefined,
-      availableTime: form.availableTime || undefined,
-      notes: form.notes,
-    }),
-    onSuccess: () => { toast.success('Vehicle updated'); onSaved(); },
-    onError: (e: any) => toast.error(e?.message || 'Update failed'),
+  const payload = () => ({
+    status: form.status,
+    vehicleType: form.vehicleType,
+    tripType: form.tripType,
+    currentCity: form.currentCity,
+    currentState: form.currentState || undefined,
+    currentCoordinates: form.currentCoordinates,
+    destinationCity: form.destinationCity || undefined,
+    destinationState: form.destinationState || undefined,
+    destinationCoordinates: form.destinationCoordinates,
+    availableDate: form.availableDate || undefined,
+    availableTime: form.availableTime || undefined,
+    notes: form.notes,
   });
+
+  const mutation = useMutation({
+    mutationFn: () =>
+      isCreate
+        ? adminApi.createVehicleFor(userId!, payload())
+        : adminApi.updateVehicle(v._id, payload()),
+    onSuccess: () => {
+      toast.success(isCreate ? 'Available cab added' : 'Vehicle updated');
+      onSaved();
+    },
+    onError: (e: any) => toast.error(e?.message || (isCreate ? 'Could not add cab' : 'Update failed')),
+  });
+
+  const canSave = !isCreate || (form.currentCity.trim() && form.availableDate && form.availableTime);
 
   // ── View mode (read-only) ──────────────────────────────────────────────────
   if (!isEdit) {
@@ -82,7 +108,7 @@ export function VehicleEditModal({ vehicle, mode, onClose, onSaved }: { vehicle:
 
   // ── Edit mode (full form, like the mobile create page) ─────────────────────
   return (
-    <Shell title="Edit Available Cab" listingId={v.listingId} onClose={onClose}>
+    <Shell title={isCreate ? 'Add Available Cab' : 'Edit Available Cab'} listingId={v.listingId} onClose={onClose}>
       <div className="p-5 space-y-4">
         {/* Location */}
         <div>
@@ -127,7 +153,9 @@ export function VehicleEditModal({ vehicle, mode, onClose, onSaved }: { vehicle:
 
       <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700 sticky bottom-0 bg-white dark:bg-gray-900">
         <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>Save Changes</Button>
+        <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!canSave}>
+          {isCreate ? 'Add Cab' : 'Save Changes'}
+        </Button>
       </div>
     </Shell>
   );

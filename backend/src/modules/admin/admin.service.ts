@@ -18,6 +18,8 @@ import {
   AccountDeletionRequestDocument,
 } from '../../database/schemas/account-deletion-request.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { RequirementsService } from '../requirements/requirements.service';
+import { AvailableVehiclesService } from '../available-vehicles/available-vehicles.service';
 import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { getPaginationParams, buildPaginatedResult, dateRangeFilter } from '../../common/utils/pagination.util';
@@ -41,6 +43,8 @@ export class AdminService {
     @InjectModel(AccountDeletionRequest.name)
     private deletionRequestModel: Model<AccountDeletionRequestDocument>,
     private notificationsService: NotificationsService,
+    private requirementsService: RequirementsService,
+    private availableVehiclesService: AvailableVehiclesService,
   ) {}
 
   // ── Account deletion requests ───────────────────────────────────────────────
@@ -547,6 +551,24 @@ export class AdminService {
   }
 
   // ─── Admin edit/delete for requirements & vehicles (bypass ownership) ──────
+  /**
+   * Post a requirement on behalf of a user. Delegates to the app's own create so
+   * the booking id, expiry and "new requirement" alerts all behave identically —
+   * the only difference is who clicked the button.
+   */
+  async createRequirementFor(userId: string, dto: any) {
+    const user = await this.userModel.findById(userId).select('_id');
+    if (!user) throw new NotFoundException('User not found');
+    return this.requirementsService.create(userId, dto);
+  }
+
+  /** Same, for an available-cab listing. */
+  async createVehicleFor(userId: string, dto: any) {
+    const user = await this.userModel.findById(userId).select('_id');
+    if (!user) throw new NotFoundException('User not found');
+    return this.availableVehiclesService.create(userId, dto);
+  }
+
   async updateRequirement(id: string, data: Partial<any>) {
     const req = await this.requirementModel
       .findByIdAndUpdate(id, data, { new: true })

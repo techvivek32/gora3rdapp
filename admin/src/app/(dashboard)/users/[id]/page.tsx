@@ -14,7 +14,7 @@ import {
   ArrowLeft, Phone, Mail, Building2, MapPin, ShieldCheck,
   FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2, Power, PowerOff,
   Calendar, User, CreditCard, ArrowUpRight, FileCheck, CheckSquare,
-  Eye, Pencil, Trash2, X,
+  Eye, Pencil, Trash2, X, Plus,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { RequirementEditModal } from '@/components/requirements/RequirementEditModal';
@@ -117,8 +117,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('profile');
   const [activeView, setActiveView] = useState<'requirements' | 'vehicles'>('requirements');
-  const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
-  const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit'; v: Vehicle } | null>(null);
+  // r / v are null in 'create' mode — the modal starts from a blank form.
+  const [modal, setModal] = useState<{ mode: 'view' | 'edit' | 'create'; r: Requirement | null } | null>(null);
+  const [vehicleModal, setVehicleModal] = useState<{ mode: 'view' | 'edit' | 'create'; v: Vehicle | null } | null>(null);
   const [reviewModal, setReviewModal] = useState<any | null>(null);
   const [assignPlanModal, setAssignPlanModal] = useState(false);
   const [editSubModal, setEditSubModal] = useState<any | null>(null);
@@ -277,6 +278,31 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   });
 
   const [adjustOpen, setAdjustOpen] = useState(false);
+
+  // Approving/rejecting moves money, so refresh the wallet + user header too —
+  // a rejection refunds the amount back into the user's balance.
+  const refreshAfterWithdrawal = () => {
+    queryClient.invalidateQueries({ queryKey: ['user-withdrawals', id] });
+    queryClient.invalidateQueries({ queryKey: ['user-wallet', id] });
+    queryClient.invalidateQueries({ queryKey: ['user', id] });
+  };
+
+  const approveWithdrawal = useMutation({
+    mutationFn: (wid: string) => adminApi.approveWithdrawal(wid),
+    onSuccess: () => { toast.success('Withdrawal approved'); refreshAfterWithdrawal(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not approve'),
+  });
+
+  const rejectWithdrawal = useMutation({
+    mutationFn: ({ wid, reason }: { wid: string; reason: string }) => adminApi.rejectWithdrawal(wid, reason),
+    onSuccess: () => { toast.success('Withdrawal rejected & amount refunded'); refreshAfterWithdrawal(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not reject'),
+  });
+
+  const onRejectWithdrawal = (wid: string) => {
+    const reason = window.prompt('Reason for rejecting this withdrawal (shown to the user, amount refunded):');
+    if (reason && reason.trim()) rejectWithdrawal.mutate({ wid, reason: reason.trim() });
+  };
 
   const { data: walletData } = useQuery({
     queryKey: ['user-wallet', id],
@@ -579,8 +605,21 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     Available Cabs
                   </button>
                 </div>
+
+                  {/* Posts on behalf of this user — follows whichever view is open. */}
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      activeView === 'requirements'
+                        ? setModal({ r: null, mode: 'create' })
+                        : setVehicleModal({ v: null, mode: 'create' })
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-1.5" />
+                    {activeView === 'requirements' ? 'Add Requirement' : 'Add Cab'}
+                  </Button>
               </div>
-              
+
               {activeView === 'requirements' ? (
                 <DataTable
                   columns={columns}
@@ -663,28 +702,70 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       <thead>
                         <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
                           <th className="pb-3 pr-4 font-medium text-gray-500">Amount</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Bank</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">Account</th>
-                          <th className="pb-3 pr-4 font-medium text-gray-500">IFSC</th>
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Method</th>
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Payout Details</th>
                           <th className="pb-3 pr-4 font-medium text-gray-500">Date</th>
-                          <th className="pb-3 font-medium text-gray-500">Status</th>
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Status</th>
+                          <th className="pb-3 font-medium text-gray-500">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {items.map((w: any) => (
-                          <tr key={w._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                            <td className="py-3 pr-4 font-semibold text-gray-800 dark:text-gray-200">₹{w.amount}</td>
-                            <td className="py-3 pr-4 text-gray-800 dark:text-gray-200">{w.bankName}</td>
-                            <td className="py-3 pr-4 font-mono text-xs text-gray-600 dark:text-gray-400">{w.accountNumber}</td>
-                            <td className="py-3 pr-4 font-mono text-xs text-gray-600 dark:text-gray-400">{w.ifsc}</td>
-                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{w.createdAt ? formatDate(w.createdAt) : '—'}</td>
-                            <td className="py-3">
-                              <Badge variant={w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'destructive' : 'warning'}>
-                                {w.status}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
+                        {items.map((w: any) => {
+                          const isUpi = w.method === 'upi';
+                          return (
+                            <tr key={w._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 align-top">
+                              <td className="py-3 pr-4 font-semibold text-gray-800 dark:text-gray-200">₹{w.amount}</td>
+                              <td className="py-3 pr-4 text-gray-800 dark:text-gray-200 uppercase text-xs">
+                                {isUpi ? 'UPI' : 'Bank'}
+                              </td>
+                              {/* Bank and UPI carry different fields — show whichever this request used. */}
+                              <td className="py-3 pr-4 text-xs text-gray-600 dark:text-gray-400">
+                                {isUpi ? (
+                                  <>
+                                    <div className="font-mono">{w.upiId || '—'}</div>
+                                    <div>{w.accountHolderName || ''}</div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="text-gray-800 dark:text-gray-200">{w.bankName || '—'}</div>
+                                    <div className="font-mono">{w.accountNumber || '—'}{w.ifsc ? ` · ${w.ifsc}` : ''}</div>
+                                  </>
+                                )}
+                                {w.status === 'rejected' && w.rejectionReason && (
+                                  <div className="text-red-500 mt-1">Rejected: {w.rejectionReason}</div>
+                                )}
+                              </td>
+                              <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{w.createdAt ? formatDate(w.createdAt) : '—'}</td>
+                              <td className="py-3 pr-4">
+                                <Badge variant={w.status === 'approved' ? 'success' : w.status === 'rejected' ? 'destructive' : 'warning'}>
+                                  {w.status}
+                                </Badge>
+                              </td>
+                              <td className="py-3">
+                                {w.status === 'pending' ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => approveWithdrawal.mutate(w._id)}
+                                      disabled={approveWithdrawal.isPending}
+                                      className="flex items-center gap-1 bg-green-500 hover:bg-green-600 text-white rounded-lg px-2.5 py-1.5 text-xs font-medium disabled:opacity-50"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" /> Approve
+                                    </button>
+                                    <button
+                                      onClick={() => onRejectWithdrawal(w._id)}
+                                      disabled={rejectWithdrawal.isPending}
+                                      className="flex items-center gap-1 bg-red-500 hover:bg-red-600 text-white rounded-lg px-2.5 py-1.5 text-xs font-medium disabled:opacity-50"
+                                    >
+                                      <X className="w-3.5 h-3.5" /> Reject
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -859,8 +940,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
       {modal && (
         <RequirementEditModal
-          req={modal.r}
+          req={modal.r ?? undefined}
           mode={modal.mode}
+          userId={id}
           onClose={() => setModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-requests', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setModal(null); }}
         />
@@ -868,10 +950,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
       {vehicleModal && (
         <VehicleEditModal
-          vehicle={vehicleModal.v}
+          vehicle={vehicleModal.v ?? undefined}
           mode={vehicleModal.mode}
+          userId={id}
           onClose={() => setVehicleModal(null)}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); setVehicleModal(null); }}
+          onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setVehicleModal(null); }}
         />
       )}
 
