@@ -770,6 +770,85 @@ export class AdminService {
     return this.notificationsService.getSentNotifications(page, limit);
   }
 
+  /**
+   * Admin activity feed (the header bell): plan purchases, wallet top-ups and
+   * withdrawal requests, newest first.
+   *
+   * Derived from the existing collections rather than stored as its own
+   * notification records — the events already exist, so a separate table would
+   * only be a second copy that can drift out of sync.
+   */
+  async getAdminActivity(limit = 20) {
+    const perSource = Math.max(1, +limit);
+    const name = (u: any) => u?.agencyName || u?.fullName || 'A user';
+
+    const [plans, topUps, withdrawals] = await Promise.all([
+      // Plan purchases — a Payment carrying a planId that actually went through.
+      this.paymentModel
+        .find({ status: 'success', planId: { $exists: true, $ne: null }, razorpayPaymentId: this._hasRazorpayId })
+        .sort({ createdAt: -1 })
+        .limit(perSource)
+        .populate('userId', 'fullName agencyName mobile')
+        .populate('planId', 'name')
+        .lean(),
+      // Wallet top-ups — amounts here are already in rupees.
+      this.walletTxModel
+        .find({ type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId })
+        .sort({ createdAt: -1 })
+        .limit(perSource)
+        .populate('userId', 'fullName agencyName mobile')
+        .lean(),
+      this.withdrawalModel
+        .find({})
+        .sort({ createdAt: -1 })
+        .limit(perSource)
+        .populate('userId', 'fullName agencyName mobile')
+        .lean(),
+    ]);
+
+    const items = [
+      ...plans.map((p: any) => ({
+        id: `plan_${p._id}`,
+        type: 'plan',
+        title: 'Plan purchased',
+        // Payment amounts are stored in paise.
+        message: `${name(p.userId)} bought ${p.planId?.name ?? 'a plan'} for ₹${Math.round((p.amount || 0) / 100).toLocaleString('en-IN')}`,
+        amount: Math.round((p.amount || 0) / 100),
+        href: '/payments',
+        createdAt: p.createdAt,
+      })),
+      ...topUps.map((t: any) => ({
+        id: `topup_${t._id}`,
+        type: 'payment',
+        title: 'Wallet top-up',
+        message: `${name(t.userId)} added ₹${(t.amount || 0).toLocaleString('en-IN')} to their wallet`,
+        amount: t.amount || 0,
+        href: '/wallet',
+        createdAt: t.createdAt,
+      })),
+      ...withdrawals.map((w: any) => ({
+        id: `wd_${w._id}`,
+        type: 'withdrawal',
+        title: w.status === 'pending' ? 'Withdrawal request' : `Withdrawal ${w.status}`,
+        message: `${name(w.userId)} requested ₹${(w.amount || 0).toLocaleString('en-IN')} via ${w.method === 'upi' ? 'UPI' : 'bank transfer'}`,
+        amount: w.amount || 0,
+        status: w.status,
+        href: '/withdrawals',
+        createdAt: w.createdAt,
+      })),
+    ]
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, perSource);
+
+    // Drives the bell's badge — the work actually waiting on an admin.
+    const pendingWithdrawals = await this.withdrawalModel.countDocuments({ status: 'pending' });
+
+    return {
+      message: 'Admin activity',
+      data: { items, pendingWithdrawals },
+    };
+  }
+
   async getAnalytics(period: string) {
     const days = period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

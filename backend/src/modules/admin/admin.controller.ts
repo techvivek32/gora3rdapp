@@ -350,6 +350,12 @@ export class AdminController {
     return this.adminService.getSentNotifications(query.page, query.limit);
   }
 
+  @Get('activity')
+  @ApiOperation({ summary: 'Admin activity feed: plan buys, top-ups, withdrawals' })
+  getAdminActivity(@Query('limit') limit?: number) {
+    return this.adminService.getAdminActivity(limit);
+  }
+
   @Post('users/:id/referral-count')
   @ApiOperation({ summary: 'Update user referral count (add/deduct)' })
   updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number) {
