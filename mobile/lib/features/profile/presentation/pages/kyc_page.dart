@@ -15,6 +15,16 @@ class _KycDoc {
   String? existingBackImage; // back URL already on the server
   Uint8List? newBytes; // freshly picked front image
   Uint8List? newBackBytes; // freshly picked back image
+
+  /// Per-document review state from the admin: 'pending' | 'approved' | 'rejected'.
+  /// The admin can approve the Aadhaar and reject only the PAN, so each document
+  /// carries its own verdict — an approved one is final and can't be re-uploaded.
+  String status = 'pending';
+  String? rejectionReason;
+
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+
   _KycDoc(this.key, this.label);
 }
 
@@ -50,6 +60,11 @@ class _KycPageState extends State<KycPage> {
   // yet or was rejected. Pending & verified are read-only.
   bool get _locked => _status == 'pending' || _status == 'verified';
 
+  /// A single document is locked when the whole form is, OR when this particular
+  /// document has already been approved — the user only needs to redo the ones
+  /// the admin actually rejected.
+  bool _docLocked(_KycDoc doc) => _locked || doc.isApproved;
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +90,9 @@ class _KycPageState extends State<KycPage> {
           _docs[key]!.numberCtrl.text = (entry['number'] ?? '').toString();
           _docs[key]!.existingImage = entry['image'] as String?;
           _docs[key]!.existingBackImage = entry['backImage'] as String?;
+          // Older rows have no status — treat them as pending.
+          _docs[key]!.status = (entry['status'] as String?) ?? 'pending';
+          _docs[key]!.rejectionReason = entry['rejectionReason'] as String?;
         }
       }
       if (mounted) {
@@ -266,6 +284,22 @@ class _KycPageState extends State<KycPage> {
     );
   }
 
+  Widget _statusChip(_KycDoc doc) {
+    final approved = doc.isApproved;
+    final color = approved ? AppColors.success : AppColors.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        approved ? 'Approved' : 'Rejected',
+        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+
   Widget _buildDocTile(_KycDoc doc) {
     final hasData = doc.newBytes != null ||
         doc.existingImage != null ||
@@ -286,15 +320,60 @@ class _KycPageState extends State<KycPage> {
           key: PageStorageKey('kyc_${doc.key}'),
           maintainState: true,
           leading: const Icon(Icons.description_outlined),
-          title: Text(doc.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: hasData
-              ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-              : const Icon(Icons.keyboard_arrow_down),
+          title: Row(
+            children: [
+              Flexible(child: Text(doc.label, style: const TextStyle(fontWeight: FontWeight.w600))),
+              // Each document carries its own verdict from the admin.
+              if (doc.isApproved || doc.isRejected) ...[
+                const SizedBox(width: 8),
+                _statusChip(doc),
+              ],
+            ],
+          ),
+          // The icon shows the admin's verdict, not merely "something was filled in":
+          // approved → green tick, rejected → red cross, otherwise pending/empty.
+          trailing: doc.isApproved
+              ? const Icon(Icons.check_circle, color: AppColors.success, size: 20)
+              : doc.isRejected
+                  ? const Icon(Icons.cancel, color: AppColors.error, size: 20)
+                  : hasData
+                      ? const Icon(Icons.schedule, color: AppColors.warning, size: 20)
+                      : const Icon(Icons.keyboard_arrow_down),
           childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
           children: [
+            if (doc.isRejected && (doc.rejectionReason ?? '').isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.error.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Rejected: ${doc.rejectionReason}\nPlease upload this document again.',
+                  style: const TextStyle(fontSize: 12, color: AppColors.error),
+                ),
+              ),
+            ],
+            if (doc.isApproved) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Approved — this document is verified and cannot be changed.',
+                  style: TextStyle(fontSize: 12, color: AppColors.success),
+                ),
+              ),
+            ],
             TextField(
               controller: doc.numberCtrl,
-              enabled: !_locked,
+              enabled: !_docLocked(doc),
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: '${doc.label} Number',
@@ -319,11 +398,13 @@ class _KycPageState extends State<KycPage> {
     final label = back ? 'Back Side' : 'Front Side';
     final hasImage = newBytes != null || existing != null;
 
+    final locked = _docLocked(doc); // approved documents can't be replaced
+
     Widget content;
     if (newBytes != null) {
-      content = _imageWithEdit(Image.memory(newBytes, fit: BoxFit.cover), locked: _locked);
+      content = _imageWithEdit(Image.memory(newBytes, fit: BoxFit.cover), locked: locked);
     } else if (existing != null) {
-      content = _imageWithEdit(Image.network(existing, fit: BoxFit.cover), locked: _locked);
+      content = _imageWithEdit(Image.network(existing, fit: BoxFit.cover), locked: locked);
     } else {
       content = Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -347,7 +428,7 @@ class _KycPageState extends State<KycPage> {
         ),
         const SizedBox(height: 6),
         InkWell(
-          onTap: _locked ? null : () => _pickImage(doc, back: back),
+          onTap: locked ? null : () => _pickImage(doc, back: back),
           borderRadius: BorderRadius.circular(12),
           child: Container(
             height: 150,

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { User, UserDocument } from '../../database/schemas/user.schema';
+import { User, UserDocument, DOCUMENT_KEYS } from '../../database/schemas/user.schema';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
 import { Payment, PaymentDocument } from '../../database/schemas/payment.schema';
@@ -384,10 +384,95 @@ export class AdminService {
     return { message: 'Verification request retrieved', data: user };
   }
 
+  /**
+   * Approve or reject ONE document. The user's overall verification status is then
+   * derived from all their submitted documents:
+   *   every one approved  → VERIFIED
+   *   any one rejected    → REJECTED (only the rejected ones need re-uploading)
+   *   otherwise           → PENDING
+   */
+  async reviewDocument(userId: string, docKey: string, status: 'approved' | 'rejected', reason?: string) {
+    if (!DOCUMENT_KEYS.includes(docKey as any)) {
+      throw new BadRequestException('Unknown document');
+    }
+    if (status !== 'approved' && status !== 'rejected') {
+      throw new BadRequestException('Status must be approved or rejected');
+    }
+
+    const user = await this.userModel.findById(userId).select('documents');
+    if (!user) throw new NotFoundException('User not found');
+
+    const docs: Record<string, any> = { ...(user.documents ?? {}) };
+    if (!docs[docKey]) throw new BadRequestException('This document was not submitted');
+
+    docs[docKey] = {
+      ...docs[docKey],
+      status,
+      rejectionReason: status === 'rejected' ? (reason || 'Document could not be verified') : null,
+      reviewedAt: new Date(),
+    };
+
+    // Only documents the user actually submitted count towards the overall status.
+    const submitted = Object.entries(docs).filter(([, d]: any) => d && (d.image || d.backImage || d.number));
+    const anyRejected = submitted.some(([, d]: any) => d.status === 'rejected');
+    const allApproved = submitted.length > 0 && submitted.every(([, d]: any) => d.status === 'approved');
+
+    const verificationStatus = allApproved
+      ? VerificationStatus.VERIFIED
+      : anyRejected
+        ? VerificationStatus.REJECTED
+        : VerificationStatus.PENDING;
+
+    const rejectedReasons = submitted
+      .filter(([, d]: any) => d.status === 'rejected')
+      .map(([k, d]: any) => `${k}: ${d.rejectionReason}`)
+      .join(' · ');
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          documents: docs,
+          verificationStatus,
+          isVerified: allApproved,
+          isAdminApproved: allApproved,
+          verificationRejectionReason: anyRejected ? rejectedReasons : null,
+        },
+        { new: true },
+      )
+      .select('-password -refreshToken -fcmTokens');
+
+    return { message: `Document ${status}`, data: updated };
+  }
+
+  /** Stamp every submitted document with the same status (the bulk buttons). */
+  private stampAllDocuments(
+    documents: Record<string, any> | undefined,
+    status: 'approved' | 'rejected',
+    reason?: string,
+  ) {
+    const docs: Record<string, any> = { ...(documents ?? {}) };
+    for (const key of Object.keys(docs)) {
+      if (!docs[key]) continue;
+      docs[key] = {
+        ...docs[key],
+        status,
+        rejectionReason: status === 'rejected' ? (reason || 'Document could not be verified') : null,
+        reviewedAt: new Date(),
+      };
+    }
+    return docs;
+  }
+
   async approveVerification(id: string) {
+    const existing = await this.userModel.findById(id).select('documents');
+    if (!existing) throw new NotFoundException('User not found');
+
     const user = await this.userModel.findByIdAndUpdate(
       id,
       {
+        // Keep the per-document statuses in step with the overall one.
+        documents: this.stampAllDocuments(existing.documents, 'approved'),
         isVerified: true,
         isAdminApproved: true,
         verificationStatus: VerificationStatus.VERIFIED,
@@ -395,14 +480,17 @@ export class AdminService {
       },
       { new: true },
     ).select('-password -refreshToken -fcmTokens');
-    if (!user) throw new NotFoundException('User not found');
     return { message: 'Verification approved', data: user };
   }
 
   async rejectVerification(id: string, reason?: string) {
+    const existing = await this.userModel.findById(id).select('documents');
+    if (!existing) throw new NotFoundException('User not found');
+
     const user = await this.userModel.findByIdAndUpdate(
       id,
       {
+        documents: this.stampAllDocuments(existing.documents, 'rejected', reason),
         isVerified: false,
         isAdminApproved: false,
         verificationStatus: VerificationStatus.REJECTED,
@@ -410,7 +498,6 @@ export class AdminService {
       },
       { new: true },
     ).select('-password -refreshToken -fcmTokens');
-    if (!user) throw new NotFoundException('User not found');
     return { message: 'Verification rejected', data: user };
   }
 

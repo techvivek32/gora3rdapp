@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
+import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const DOC_LABELS: Record<string, string> = {
@@ -52,6 +53,23 @@ export default function VerificationRequestDetailPage({ params }: { params: Prom
     onSuccess: () => { toast.success('Verification rejected'); setShowReject(false); invalidate(); },
     onError: (e: any) => toast.error(e.message || 'Failed to reject'),
   });
+
+  // Per-document review. The user's overall status is recomputed on the backend:
+  // all approved → verified; any rejected → rejected (only those need re-uploading).
+  const reviewDoc = useMutation({
+    mutationFn: ({ doc, status, reason }: { doc: string; status: 'approved' | 'rejected'; reason?: string }) =>
+      adminApi.reviewDocument(id, doc, status, reason),
+    onSuccess: (_res, vars) => {
+      toast.success(`${DOC_LABELS[vars.doc] ?? vars.doc} ${vars.status}`);
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e.message || 'Could not update document'),
+  });
+
+  const onRejectDoc = (doc: string) => {
+    const reason = window.prompt(`Why is the ${DOC_LABELS[doc] ?? doc} being rejected? (shown to the user)`);
+    if (reason && reason.trim()) reviewDoc.mutate({ doc, status: 'rejected', reason: reason.trim() });
+  };
 
   if (isLoading) return <div className="h-96 bg-gray-100 rounded-xl animate-pulse" />;
 
@@ -158,11 +176,46 @@ export default function VerificationRequestDetailPage({ params }: { params: Prom
           >
             {submittedDocs.map((key) => {
               const doc = documents[key] || {};
+              // Legacy rows have no per-document status — treat them as pending.
+              const status: string = doc.status || 'pending';
+              const approved = status === 'approved';
+              const rejected = status === 'rejected';
+
               return (
-                <div key={key} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                  <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800">
+                <div key={key} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col">
+                  <div className="px-4 py-2 bg-gray-50 dark:bg-gray-800 flex items-center justify-between gap-2">
                     <span className="font-medium text-sm">{DOC_LABELS[key] || key}</span>
+                    <span
+                      className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                        approved
+                          ? 'bg-emerald-500/15 text-emerald-500'
+                          : rejected
+                            ? 'bg-red-500/15 text-red-500'
+                            : 'bg-amber-500/15 text-amber-500'
+                      }`}
+                    >
+                      {status}
+                    </span>
                   </div>
+
+                  {/* Per-document review — approve the Aadhaar, reject the PAN. */}
+                  <div className="px-3 py-3 flex gap-2 border-b border-gray-200 dark:border-gray-700">
+                    <button
+                      onClick={() => reviewDoc.mutate({ doc: key, status: 'approved' })}
+                      disabled={approved || reviewDoc.isPending}
+                      className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium bg-green-500 hover:bg-green-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Check className="w-3.5 h-3.5" /> Approve
+                    </button>
+                    <button
+                      onClick={() => onRejectDoc(key)}
+                      disabled={rejected || reviewDoc.isPending}
+                      className="flex-1 flex items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium bg-red-500 hover:bg-red-600 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-3.5 h-3.5" /> Reject
+                    </button>
+                  </div>
+
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
                     <DocSide label="Front Side" src={doc.image} alt={`${DOC_LABELS[key]} front`} />
                     <DocSide label="Back Side" src={doc.backImage} alt={`${DOC_LABELS[key]} back`} />
@@ -170,6 +223,9 @@ export default function VerificationRequestDetailPage({ params }: { params: Prom
                   <div className="px-4 py-3">
                     <p className="text-xs text-gray-400">Document Number</p>
                     <p className="font-mono text-sm">{doc.number || '—'}</p>
+                    {rejected && doc.rejectionReason && (
+                      <p className="text-xs text-red-500 mt-2">Rejected: {doc.rejectionReason}</p>
+                    )}
                   </div>
                 </div>
               );

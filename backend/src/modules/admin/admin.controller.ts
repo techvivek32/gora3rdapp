@@ -170,6 +170,17 @@ export class AdminController {
     return this.adminService.rejectVerification(id, reason);
   }
 
+  @Post('verification-requests/:id/documents/:doc')
+  @ApiOperation({ summary: 'Approve or reject a single KYC document' })
+  reviewDocument(
+    @Param('id') id: string,
+    @Param('doc') doc: string,
+    @Body('status') status: 'approved' | 'rejected',
+    @Body('reason') reason?: string,
+  ) {
+    return this.adminService.reviewDocument(id, doc, status, reason);
+  }
+
   // ─── Requirements ──────────────────────────────────────────────────────────
   @Get('requirements')
   @ApiOperation({ summary: 'Get all requirements' })

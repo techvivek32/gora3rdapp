@@ -4,6 +4,21 @@ import { UserRole, MembershipType, VerificationStatus } from '../../common/enums
 
 export type UserDocument = User & Document;
 
+/** Per-document review state. Absent `status` means 'pending' (legacy rows). */
+export type DocumentStatus = 'pending' | 'approved' | 'rejected';
+
+export interface DocumentEntry {
+  number?: string;
+  image?: string; // front
+  backImage?: string; // back
+  status?: DocumentStatus;
+  rejectionReason?: string;
+  reviewedAt?: Date;
+}
+
+/** Every KYC document key the platform knows about. */
+export const DOCUMENT_KEYS = ['aadhar', 'pan', 'drivingLicense', 'vehicleRc'] as const;
+
 @Schema({ timestamps: true, collection: 'users' })
 export class User {
   @Prop({ required: true, trim: true })
@@ -103,14 +118,17 @@ export class User {
     osVersion: string;
   };
 
-  // KYC documents: each entry holds the document id/number plus front (`image`)
-  // and back (`backImage`) side photo URLs.
+  // KYC documents: each entry holds the document id/number, the front (`image`)
+  // and back (`backImage`) photo URLs, and its OWN review status — an admin can
+  // approve the Aadhaar while rejecting the PAN, and the user then only has to
+  // re-upload the PAN. Missing `status` is treated as 'pending' (legacy rows).
   @Prop({ type: Object, default: {} })
   documents: {
-    aadhar?: { number?: string; image?: string; backImage?: string };
-    pan?: { number?: string; image?: string; backImage?: string };
-    drivingLicense?: { number?: string; image?: string; backImage?: string };
-    vehicleRc?: { number?: string; image?: string; backImage?: string };
+    [key: string]: DocumentEntry | undefined;
+    aadhar?: DocumentEntry;
+    pan?: DocumentEntry;
+    drivingLicense?: DocumentEntry;
+    vehicleRc?: DocumentEntry;
   };
 
   @Prop({ type: String, enum: VerificationStatus, default: VerificationStatus.NONE })

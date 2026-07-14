@@ -238,7 +238,7 @@ export class UsersService {
   async submitVerification(userId: string, dto: SubmitVerificationDto) {
     // Once submitted, documents are locked while pending or after being verified —
     // only a rejected (or never-submitted) user may (re)submit.
-    const current = await this.userModel.findById(userId).select('verificationStatus');
+    const current = await this.userModel.findById(userId).select('verificationStatus documents');
     if (
       current?.verificationStatus === VerificationStatus.PENDING ||
       current?.verificationStatus === VerificationStatus.VERIFIED
@@ -259,14 +259,32 @@ export class UsersService {
       ),
     );
 
+    // Merge rather than overwrite. An admin may have approved the Aadhaar and
+    // rejected only the PAN — replacing `documents` wholesale would drop the
+    // Aadhaar's approval and force the user to redo a document that was fine.
+    const existing: Record<string, any> = { ...(current?.documents ?? {}) };
+    const merged: Record<string, any> = { ...existing };
+
+    for (const [key, value] of Object.entries(cleanedDocuments)) {
+      // An already-approved document is final and cannot be resubmitted.
+      if (existing[key]?.status === 'approved') continue;
+      merged[key] = { ...(value as any), status: 'pending', rejectionReason: null };
+    }
+
+    // Anything still approved stays approved; if that's now everything, there is
+    // nothing left for an admin to review.
+    const submitted = Object.values(merged).filter(
+      (d: any) => d && (d.image || d.backImage || d.number),
+    );
+    const allApproved = submitted.length > 0 && submitted.every((d: any) => d.status === 'approved');
+
     const update: Record<string, any> = {
-      documents: cleanedDocuments,
-      verificationStatus: VerificationStatus.PENDING,
+      documents: merged,
+      verificationStatus: allApproved ? VerificationStatus.VERIFIED : VerificationStatus.PENDING,
       verificationSubmittedAt: new Date(),
       verificationRejectionReason: null,
-      // Re-submitting resets any prior approval until an admin reviews again.
-      isVerified: false,
-      isAdminApproved: false,
+      isVerified: allApproved,
+      isAdminApproved: allApproved,
     };
     if (agencyName) update.agencyName = agencyName;
 

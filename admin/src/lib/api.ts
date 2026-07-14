@@ -67,6 +67,9 @@ export const adminApi = {
   approveVerification: (id: string) => apiClient.post(`/admin/verification-requests/${id}/approve`),
   rejectVerification: (id: string, reason: string) =>
     apiClient.post(`/admin/verification-requests/${id}/reject`, { reason }),
+  // Approve/reject one KYC document (aadhar | pan | drivingLicense | vehicleRc).
+  reviewDocument: (id: string, doc: string, status: 'approved' | 'rejected', reason?: string) =>
+    apiClient.post(`/admin/verification-requests/${id}/documents/${doc}`, { status, reason }),
 
   // ─── Requirements ──────────────────────────────────────────────────────────
   getRequirements: (params: any) => apiClient.get('/admin/requirements', { params }),
