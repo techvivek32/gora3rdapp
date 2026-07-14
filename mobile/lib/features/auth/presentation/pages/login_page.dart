@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/error/failures.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
@@ -48,7 +49,14 @@ class _LoginPageState extends State<LoginPage> {
 
     final failure = result.fold((f) => f, (_) => null);
     if (failure != null) {
-      _snack(failure.message); // e.g. "This number is not registered"
+      // No account for this number → send them straight to Register with it
+      // pre-filled, instead of making them read an error and navigate manually.
+      if (failure is NotRegisteredFailure) {
+        _snack('This number is not registered. Please sign up.', error: false);
+        context.go('/auth/register?mobile=$mobile');
+        return;
+      }
+      _snack(failure.message);
       return;
     }
 

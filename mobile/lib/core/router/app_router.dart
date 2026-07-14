@@ -78,7 +78,13 @@ class AppRouter {
 
       // Auth Routes
       GoRoute(path: '/auth/login', builder: (_, __) => const LoginPage()),
-      GoRoute(path: '/auth/register', builder: (_, __) => const RegisterPage()),
+      GoRoute(
+        path: '/auth/register',
+        // ?mobile=… pre-fills the number when Login redirects an unregistered user.
+        builder: (_, state) => RegisterPage(
+          initialMobile: state.uri.queryParameters['mobile'],
+        ),
+      ),
       GoRoute(
         path: '/auth/otp',
         builder: (_, state) => OtpPage(phoneNumber: state.extra as String? ?? ''),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dartz/dartz.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/error/failures.dart';
@@ -31,6 +32,11 @@ class AuthRepositoryImpl implements AuthRepository {
       await remote.loginSendOtp(mobile);
       return const Right(null);
     } catch (e) {
+      // 404 = no account for this number. Flagged as its own failure so the login
+      // page can route the user to Register rather than just showing an error.
+      if (e is DioException && e.response?.statusCode == 404) {
+        return Left(NotRegisteredFailure(message: ErrorMapper.message(e)));
+      }
       return Left(ServerFailure(message: ErrorMapper.message(e)));
     }
   }

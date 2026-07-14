@@ -18,3 +18,10 @@ class CacheFailure extends Failure {
 class AuthFailure extends Failure {
   const AuthFailure({required super.message});
 }
+
+/// The mobile number has no account yet (backend replies 404 to send-login-otp).
+/// Its own type so callers can branch on it — the login page sends these users to
+/// Register instead of showing an error.
+class NotRegisteredFailure extends Failure {
+  const NotRegisteredFailure({required super.message});
+}

@@ -24,7 +24,11 @@ class _DocField {
 }
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  /// Pre-filled when the login page sends an unregistered number here, so the
+  /// user doesn't have to type it a second time.
+  final String? initialMobile;
+
+  const RegisterPage({super.key, this.initialMobile});
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -69,6 +73,10 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
+    // Sent here from Login because this number has no account yet.
+    final mobile = widget.initialMobile?.trim() ?? '';
+    if (mobile.isNotEmpty) _mobileCtrl.text = mobile;
+
     // If the user got here by tapping someone's invite link, Play handed us their
     // code at install time — pre-fill it. Still editable / clearable.
     pendingReferralCode().then((code) {
