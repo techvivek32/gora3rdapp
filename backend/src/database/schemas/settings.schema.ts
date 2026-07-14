@@ -50,6 +50,10 @@ export class PlatformSettings {
 
   @Prop({ default: '' })
   supportWhatsapp: string;
+
+  /** Shown on the app's About Us page alongside supportPhone. */
+  @Prop({ default: '', trim: true, lowercase: true })
+  supportEmail: string;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

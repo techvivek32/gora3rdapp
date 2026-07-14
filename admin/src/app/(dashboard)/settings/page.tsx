@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Settings } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 
@@ -14,13 +15,21 @@ export default function SettingsPage() {
 
   const [supportPhone, setSupportPhone] = useState('');
   const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
   const [contactSaving, setContactSaving] = useState(false);
   const [contactSaved, setContactSaved] = useState(false);
   const [contactError, setContactError] = useState('');
 
   const [loading, setLoading] = useState(true);
 
+  // Wait for the session before fetching. SessionSync feeds the access token to
+  // the axios client from useSession(), which is null on the first render — firing
+  // here on mount sent the request with no Authorization header and got a 401.
+  const { status } = useSession();
+
   useEffect(() => {
+    if (status === 'loading') return;
+
     adminApi.getAdminSettings()
       .then((data: any) => {
         const s = data?.data ?? data;
@@ -28,17 +37,24 @@ export default function SettingsPage() {
         setRzKeySecret(s.razorpayKeySecret ?? '');
         setSupportPhone(s.supportPhone ?? '');
         setSupportWhatsapp(s.supportWhatsapp ?? '');
+        setSupportEmail(s.supportEmail ?? '');
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [status]);
 
   const handleSaveContact = async () => {
     if (!supportPhone.trim() && !supportWhatsapp.trim()) return setContactError('Enter at least one number');
+    const email = supportEmail.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setContactError('Enter a valid email address');
     setContactError('');
     setContactSaving(true);
     try {
-      await adminApi.updateSettings({ supportPhone: supportPhone.trim(), supportWhatsapp: supportWhatsapp.trim() });
+      await adminApi.updateSettings({
+        supportPhone: supportPhone.trim(),
+        supportWhatsapp: supportWhatsapp.trim(),
+        supportEmail: email,
+      });
       setContactSaved(true);
       setTimeout(() => setContactSaved(false), 3000);
     } catch (e: any) {
@@ -78,8 +94,8 @@ export default function SettingsPage() {
 
         {/* Support Contact Numbers */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Support Contact Numbers</h2>
-          <p className="text-gray-500 text-sm mb-5">These numbers are used in the mobile app for WhatsApp and call support.</p>
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Contact Us Details</h2>
+          <p className="text-gray-500 text-sm mb-5">Used by the mobile app for call &amp; WhatsApp support, and shown on its About Us page.</p>
           {loading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
               <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
@@ -108,13 +124,24 @@ export default function SettingsPage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">Include country code e.g. +91xxxxxxxxxx</p>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Support Email</label>
+                <input
+                  type="email"
+                  value={supportEmail}
+                  onChange={(e) => { setSupportEmail(e.target.value); setContactSaved(false); }}
+                  placeholder="support@goracabs.com"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">Shown with the phone number on the app&apos;s About Us page.</p>
+              </div>
               {contactError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{contactError}</p>}
               <button
                 onClick={handleSaveContact}
                 disabled={contactSaving}
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
-                {contactSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : contactSaved ? '✓ Saved!' : 'Save Contact Numbers'}
+                {contactSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : contactSaved ? '✓ Saved!' : 'Save Contact Details'}
               </button>
             </div>
           )}

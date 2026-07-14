@@ -59,6 +59,7 @@ export class SettingsService {
     razorpayWebhookSecret?: string;
     supportPhone?: string;
     supportWhatsapp?: string;
+    supportEmail?: string;
   }): Promise<PlatformSettings> {
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },

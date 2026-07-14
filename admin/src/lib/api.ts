@@ -152,6 +152,7 @@ export const adminApi = {
     razorpayWebhookSecret?: string;
     supportPhone?: string;
     supportWhatsapp?: string;
+    supportEmail?: string;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

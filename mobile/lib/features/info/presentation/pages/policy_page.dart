@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/widgets/app_logo.dart';
 
 class PolicySection {
   final String? heading;
@@ -205,6 +211,8 @@ class PolicyPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 ...content.sections.map(_buildSection),
+                // Contact details + legal links live only on About Us.
+                if (id == 'about') const _AboutFooter(),
                 const SizedBox(height: 24),
               ],
             ),
@@ -246,6 +254,176 @@ class PolicyPage extends StatelessWidget {
                 ),
               )),
         ],
+      ),
+    );
+  }
+}
+
+/// About Us footer: brand mark, Contact Us (phone + email pulled from the admin
+/// panel's platform settings) and the legal links.
+class _AboutFooter extends StatefulWidget {
+  const _AboutFooter();
+
+  @override
+  State<_AboutFooter> createState() => _AboutFooterState();
+}
+
+class _AboutFooterState extends State<_AboutFooter> {
+  String _phone = '';
+  String _email = '';
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      // Public settings endpoint — the admin edits these under Settings →
+      // Contact Us Details, so support numbers change without an app release.
+      final res = await getIt<ApiClient>().get('/settings');
+      final s = (res.data['data'] ?? {}) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _phone = (s['supportPhone'] ?? '').toString().trim();
+        _email = (s['supportEmail'] ?? '').toString().trim();
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _mail(String email) async {
+    await launchUrl(Uri(scheme: 'mailto', path: email), mode: LaunchMode.externalApplication);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasContact = _phone.isNotEmpty || _email.isNotEmpty;
+
+    return Column(
+      children: [
+        const SizedBox(height: 6),
+        const AppLogo(size: 68, radius: 18),
+        const SizedBox(height: 10),
+        const Text(
+          "India's Trusted Taxi Requirement Network",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 18),
+
+        // Contact Us — hidden entirely when the admin hasn't set anything, rather
+        // than showing an empty card.
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else if (hasContact)
+          _card(
+            child: Column(
+              children: [
+                const Text(
+                  'Contact Us',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                if (_phone.isNotEmpty)
+                  _contactTile(
+                    icon: Icons.phone_rounded,
+                    label: _phone,
+                    onTap: () => callNumber(_phone),
+                  ),
+                if (_phone.isNotEmpty && _email.isNotEmpty) const SizedBox(height: 8),
+                if (_email.isNotEmpty)
+                  _contactTile(
+                    icon: Icons.email_rounded,
+                    label: _email,
+                    onTap: () => _mail(_email),
+                  ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 4),
+        _card(
+          child: Column(
+            children: [
+              const Text(
+                'Legal',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 4),
+              _legalLink(context, 'Terms & Conditions', 'terms'),
+              _legalLink(context, 'Privacy Policy', 'privacy'),
+              _legalLink(context, 'Policies', 'policies'),
+              _legalLink(context, 'Penalty Policy', 'penalty'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _card({required Widget child}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _contactTile({required IconData icon, required String label, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: AppColors.primary),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _legalLink(BuildContext context, String label, String id) {
+    return InkWell(
+      // pushReplacement, not push: /policy/:id is the same route, so pushing would
+      // stack About Us under itself and the back button would walk through copies.
+      onTap: () => context.pushReplacement('/policy/$id'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 16, color: AppColors.textHint),
+          ],
+        ),
       ),
     );
   }
