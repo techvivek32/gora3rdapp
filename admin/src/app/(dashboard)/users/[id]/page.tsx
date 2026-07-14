@@ -14,11 +14,13 @@ import {
   ArrowLeft, Phone, Mail, Building2, MapPin, ShieldCheck,
   FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2, Power, PowerOff,
   Calendar, User, CreditCard, ArrowUpRight, FileCheck, CheckSquare,
-  Eye, Pencil, Trash2, X, Plus,
+  Eye, Pencil, Trash2, X, Plus, Upload,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { RequirementEditModal } from '@/components/requirements/RequirementEditModal';
 import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
+import { EditUserModal } from '@/components/users/EditUserModal';
+import { UploadDocumentsModal } from '@/components/users/UploadDocumentsModal';
 import { VehicleEditModal } from '@/components/vehicles/VehicleEditModal';
 
 interface Requirement {
@@ -278,6 +280,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   });
 
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [uploadDocsOpen, setUploadDocsOpen] = useState(false);
 
   // Approving/rejecting moves money, so refresh the wallet + user header too —
   // a rejection refunds the amount back into the user's balance.
@@ -360,6 +364,10 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           <ArrowLeft className="w-4 h-4" /> Back to Users
         </button>
         <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="w-4 h-4 mr-2" />
+            Edit Profile
+          </Button>
           <Button
             variant={user.isActive ? 'outline' : 'default'}
             onClick={() => activeMutation.mutate(!user.isActive)}
@@ -571,6 +579,11 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <ClipboardList className="w-10 h-10 text-gray-300 mb-2" />
                   <p className="text-sm text-gray-400">This user hasn&apos;t submitted any KYC documents yet.</p>
+                  {/* Only offered when there's nothing on file — upload on their behalf. */}
+                  <Button className="mt-4" onClick={() => setUploadDocsOpen(true)}>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Documents
+                  </Button>
                 </div>
               )}
             </div>
@@ -955,6 +968,30 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           userId={id}
           onClose={() => setVehicleModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); setVehicleModal(null); }}
+        />
+      )}
+
+      {uploadDocsOpen && (
+        <UploadDocumentsModal
+          userId={id}
+          onClose={() => setUploadDocsOpen(false)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['user', id] });
+            queryClient.invalidateQueries({ queryKey: ['verification-requests'] });
+            setUploadDocsOpen(false);
+          }}
+        />
+      )}
+
+      {editOpen && user && (
+        <EditUserModal
+          user={user}
+          onClose={() => setEditOpen(false)}
+          onSaved={() => {
+            queryClient.invalidateQueries({ queryKey: ['user', id] });
+            queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+            setEditOpen(false);
+          }}
         />
       )}
 

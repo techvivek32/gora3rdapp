@@ -133,6 +133,24 @@ export const adminApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  // Upload KYC documents for a user who can't do it themselves; sends for review.
+  submitDocumentsFor: (id: string, documents: Record<string, any>) =>
+    apiClient.post(`/admin/users/${id}/documents`, documents),
+  uploadDocumentImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'documents');
+    return apiClient.post('/storage/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadProfileImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/profile', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   uploadNotificationImage: (file: File) => {
     const fd = new FormData();
     fd.append('file', file);

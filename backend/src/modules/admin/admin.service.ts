@@ -316,8 +316,52 @@ export class AdminService {
     return { message: 'Referral leaderboard retrieved', data };
   }
 
+  /**
+   * Admin edit of a user's profile.
+   *
+   * Whitelisted rather than a blind `findByIdAndUpdate(id, data)`: that would let
+   * anything in the request body through — role, walletBalance, isVerified — and
+   * a duplicate mobile/email would surface as a raw E11000 instead of a message.
+   */
   async updateUser(id: string, data: Partial<any>) {
-    const user = await this.userModel.findByIdAndUpdate(id, data, { new: true }).select('-password -refreshToken');
+    const EDITABLE = [
+      'fullName', 'agencyName', 'mobile', 'email',
+      'city', 'state', 'profileImage',
+      // The user page's Active / Inactive buttons go through here too.
+      'isActive',
+    ];
+
+    const update: Record<string, any> = {};
+    for (const key of EDITABLE) {
+      if (data[key] === undefined) continue;
+      update[key] = typeof data[key] === 'string' ? data[key].trim() : data[key];
+    }
+
+    if (update.mobile !== undefined) {
+      if (!/^[6-9]\d{9}$/.test(`${update.mobile}`.replace(/\D/g, '').slice(-10))) {
+        throw new BadRequestException('Enter a valid 10-digit mobile number');
+      }
+      const clash = await this.userModel.exists({ mobile: update.mobile, _id: { $ne: id } });
+      if (clash) throw new BadRequestException('Another user already has this mobile number');
+    }
+
+    if (update.email !== undefined) {
+      const email = `${update.email}`.toLowerCase();
+      if (email) {
+        const clash = await this.userModel.exists({ email, _id: { $ne: id } });
+        if (clash) throw new BadRequestException('Another user already has this email');
+        update.email = email;
+      } else {
+        // Blank clears it — the email index is sparse, so unset rather than store ''.
+        delete update.email;
+        (update as any).$unset = { email: '' };
+      }
+    }
+
+    const { $unset, ...set } = update as any;
+    const user = await this.userModel
+      .findByIdAndUpdate(id, { $set: set, ...($unset ? { $unset } : {}) }, { new: true })
+      .select('-password -refreshToken');
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User updated', data: user };
   }
@@ -382,6 +426,49 @@ export class AdminService {
       .lean();
     if (!user) throw new NotFoundException('User not found');
     return { message: 'Verification request retrieved', data: user };
+  }
+
+  /**
+   * Upload KYC documents on a user's behalf (for people who can't manage it in the
+   * app). Behaves exactly like the user's own submission: it MERGES, so an already
+   * approved document is never overwritten, and it puts the account into PENDING
+   * for review.
+   */
+  async submitDocumentsFor(userId: string, documents: Record<string, any>) {
+    const user = await this.userModel.findById(userId).select('documents');
+    if (!user) throw new NotFoundException('User not found');
+
+    const incoming = Object.entries(documents ?? {}).filter(
+      ([key, value]: any) =>
+        DOCUMENT_KEYS.includes(key as any) &&
+        value && (value.number || value.image || value.backImage),
+    );
+    if (incoming.length === 0) throw new BadRequestException('No documents provided');
+
+    const existing: Record<string, any> = { ...(user.documents ?? {}) };
+    const merged: Record<string, any> = { ...existing };
+
+    for (const [key, value] of incoming as any[]) {
+      if (existing[key]?.status === 'approved') continue; // approved is final
+      merged[key] = { ...value, status: 'pending', rejectionReason: null };
+    }
+
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          documents: merged,
+          verificationStatus: VerificationStatus.PENDING,
+          verificationSubmittedAt: new Date(),
+          verificationRejectionReason: null,
+          isVerified: false,
+          isAdminApproved: false,
+        },
+        { new: true },
+      )
+      .select('-password -refreshToken -fcmTokens');
+
+    return { message: 'Documents submitted for verification', data: updated };
   }
 
   /**

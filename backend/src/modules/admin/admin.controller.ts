@@ -170,6 +170,12 @@ export class AdminController {
     return this.adminService.rejectVerification(id, reason);
   }
 
+  @Post('users/:id/documents')
+  @ApiOperation({ summary: "Upload KYC documents on a user's behalf and send for verification" })
+  submitDocumentsFor(@Param('id') id: string, @Body() documents: Record<string, any>) {
+    return this.adminService.submitDocumentsFor(id, documents);
+  }
+
   @Post('verification-requests/:id/documents/:doc')
   @ApiOperation({ summary: 'Approve or reject a single KYC document' })
   reviewDocument(
