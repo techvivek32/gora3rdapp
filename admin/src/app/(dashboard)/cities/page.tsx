@@ -4,26 +4,26 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
-import { MapPin, ClipboardList, Car, Users, TrendingUp } from 'lucide-react';
+import { MapPin, ClipboardList, UserRound, Users, TrendingUp } from 'lucide-react';
 
 interface CityRow {
   key: string;
   city: string;
   state: string;
   requirements: number;
-  vehicles: number;
-  users: number;
+  drivers: number;
+  agencies: number;
   total: number;
 }
-interface Totals { cities: number; requirements: number; vehicles: number; users: number; }
+interface Totals { cities: number; requirements: number; drivers: number; agencies: number; }
 
-type SortKey = 'total' | 'requirements' | 'vehicles' | 'users';
+type SortKey = 'total' | 'requirements' | 'drivers' | 'agencies';
 
 const SORTS: { key: SortKey; label: string }[] = [
   { key: 'total', label: 'Most Active' },
   { key: 'requirements', label: 'Requirements' },
-  { key: 'vehicles', label: 'Available Cabs' },
-  { key: 'users', label: 'Agencies' },
+  { key: 'drivers', label: 'Drivers' },
+  { key: 'agencies', label: 'Agencies' },
 ];
 
 export default function CitiesPage() {
@@ -36,7 +36,7 @@ export default function CitiesPage() {
   });
 
   const rows: CityRow[] = data?.data?.rows || [];
-  const totals: Totals = data?.data?.totals || { cities: 0, requirements: 0, vehicles: 0, users: 0 };
+  const totals: Totals = data?.data?.totals || { cities: 0, requirements: 0, drivers: 0, agencies: 0 };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -60,8 +60,8 @@ export default function CitiesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<MapPin className="w-5 h-5" />} label="Active Cities" value={totals.cities} color="text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20" />
         <StatCard icon={<ClipboardList className="w-5 h-5" />} label="Requirements" value={totals.requirements} color="text-orange-600 bg-orange-50 dark:bg-orange-900/20" />
-        <StatCard icon={<Car className="w-5 h-5" />} label="Available Cabs" value={totals.vehicles} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" />
-        <StatCard icon={<Users className="w-5 h-5" />} label="Agencies" value={totals.users} color="text-blue-600 bg-blue-50 dark:bg-blue-900/20" />
+        <StatCard icon={<UserRound className="w-5 h-5" />} label="Drivers" value={totals.drivers} color="text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20" />
+        <StatCard icon={<Users className="w-5 h-5" />} label="Agencies" value={totals.agencies} color="text-blue-600 bg-blue-50 dark:bg-blue-900/20" />
       </div>
 
       {/* Controls */}
@@ -106,7 +106,7 @@ export default function CitiesPage() {
             <div className="col-span-1">#</div>
             <div className="col-span-4">City</div>
             <div className="col-span-2 text-center">Requirements</div>
-            <div className="col-span-2 text-center">Available Cabs</div>
+            <div className="col-span-2 text-center">Drivers</div>
             <div className="col-span-2 text-center">Agencies</div>
             <div className="col-span-1 text-right">Total</div>
           </div>
@@ -128,8 +128,8 @@ export default function CitiesPage() {
                 </div>
               </div>
               <Metric className="md:col-span-2" label="Requirements" value={r.requirements} active={sortKey === 'requirements'} />
-              <Metric className="md:col-span-2" label="Available Cabs" value={r.vehicles} active={sortKey === 'vehicles'} />
-              <Metric className="md:col-span-2" label="Agencies" value={r.users} active={sortKey === 'users'} />
+              <Metric className="md:col-span-2" label="Drivers" value={r.drivers} active={sortKey === 'drivers'} />
+              <Metric className="md:col-span-2" label="Agencies" value={r.agencies} active={sortKey === 'agencies'} />
               <div className="md:col-span-1 order-6 text-right">
                 <span className="text-xs text-gray-400 md:hidden">Total </span>
                 <span className="font-bold text-gray-900 dark:text-white">{r.total}</span>

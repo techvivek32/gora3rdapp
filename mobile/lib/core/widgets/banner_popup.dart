@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../theme/app_theme.dart';
+import '../utils/action_url.dart';
 import '../utils/contact_launcher.dart';
 
-/// Opens a popup for a banner: the banner image, Call / WhatsApp buttons below,
-/// and a close (X) button at the top-right.
+/// Opens a popup for a banner: the banner image, an Open button for the admin's
+/// action URL, Call / WhatsApp buttons below, and a close (X) at the top-right.
 void showBannerPopup(BuildContext context, Map<String, dynamic> banner) {
   final imageUrl = (banner['imageUrl'] as String?)?.trim() ?? '';
   final phone = (banner['phone'] as String?)?.trim() ?? '';
   final whatsapp = (banner['whatsapp'] as String?)?.trim() ?? '';
+  final actionUrl = (banner['actionUrl'] as String?)?.trim() ?? '';
 
   showDialog(
     context: context,
@@ -35,6 +38,24 @@ void showBannerPopup(BuildContext context, Map<String, dynamic> banner) {
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(color: Colors.grey.shade200),
+                    ),
+                  ),
+
+                // Action URL — the admin's link for this banner.
+                if (actionUrl.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(14.r, 14.r, 14.r, phone.isEmpty && whatsapp.isEmpty ? 14.r : 0),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: _actionButton(
+                        icon: Icons.open_in_new,
+                        label: 'Open',
+                        color: AppColors.primary,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          openActionUrl(context, actionUrl);
+                        },
+                      ),
                     ),
                   ),
 

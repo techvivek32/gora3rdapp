@@ -791,7 +791,7 @@ export class AdminService {
     // Group requirements by their clean pickup city (fallback to the raw city).
     const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
 
-    const [reqAgg, vehAgg, userAgg] = await Promise.all([
+    const [reqAgg, userAgg] = await Promise.all([
       this.requirementModel.aggregate([
         { $match: { isDeleted: { $ne: true } } },
         { $group: {
@@ -801,30 +801,24 @@ export class AdminService {
           count: { $sum: 1 },
         } },
       ]),
-      this.vehicleModel.aggregate([
-        { $match: { isDeleted: { $ne: true } } },
-        { $group: {
-          _id: { $toLower: { $trim: { input: '$currentCity' } } },
-          city: { $first: '$currentCity' },
-          state: { $first: '$currentState' },
-          count: { $sum: 1 },
-        } },
-      ]),
+      // Split by role: drivers and agencies are counted separately (the old query
+      // lumped every role together and then labelled the total "Agencies").
       this.userModel.aggregate([
         { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } } },
         { $group: {
           _id: { $toLower: { $trim: { input: '$city' } } },
           city: { $first: '$city' },
           state: { $first: '$state' },
-          count: { $sum: 1 },
+          drivers: { $sum: { $cond: [{ $eq: ['$role', 'driver'] }, 1, 0] } },
+          agencies: { $sum: { $cond: [{ $eq: ['$role', 'travel_agency'] }, 1, 0] } },
         } },
       ]),
     ]);
 
-    const map = new Map<string, { key: string; city: string; state: string; requirements: number; vehicles: number; users: number }>();
+    const map = new Map<string, { key: string; city: string; state: string; requirements: number; drivers: number; agencies: number }>();
     const upsert = (k: string, city: string, state: string) => {
       if (!k) return null;
-      if (!map.has(k)) map.set(k, { key: k, city: city || k, state: state || '', requirements: 0, vehicles: 0, users: 0 });
+      if (!map.has(k)) map.set(k, { key: k, city: city || k, state: state || '', requirements: 0, drivers: 0, agencies: 0 });
       const e = map.get(k)!;
       if (state && !e.state) e.state = state;
       if (city && (!e.city || e.city === k)) e.city = city;
@@ -832,11 +826,13 @@ export class AdminService {
     };
 
     for (const r of reqAgg as any[]) { const e = upsert(r._id, r.city, r.state); if (e) e.requirements = r.count; }
-    for (const v of vehAgg as any[]) { const e = upsert(v._id, v.city, v.state); if (e) e.vehicles = v.count; }
-    for (const u of userAgg as any[]) { const e = upsert(u._id, u.city, u.state); if (e) e.users = u.count; }
+    for (const u of userAgg as any[]) {
+      const e = upsert(u._id, u.city, u.state);
+      if (e) { e.drivers = u.drivers; e.agencies = u.agencies; }
+    }
 
     const rows = [...map.values()]
-      .map((e) => ({ ...e, total: e.requirements + e.vehicles + e.users }))
+      .map((e) => ({ ...e, total: e.requirements + e.drivers + e.agencies }))
       .filter((e) => e.total > 0)
       .sort((a, b) => b.total - a.total);
 
@@ -844,10 +840,10 @@ export class AdminService {
       (acc, r) => ({
         cities: acc.cities + 1,
         requirements: acc.requirements + r.requirements,
-        vehicles: acc.vehicles + r.vehicles,
-        users: acc.users + r.users,
+        drivers: acc.drivers + r.drivers,
+        agencies: acc.agencies + r.agencies,
       }),
-      { cities: 0, requirements: 0, vehicles: 0, users: 0 },
+      { cities: 0, requirements: 0, drivers: 0, agencies: 0 },
     );
 
     return { message: 'City insights retrieved', data: { rows, totals } };

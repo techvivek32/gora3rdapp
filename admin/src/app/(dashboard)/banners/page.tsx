@@ -13,13 +13,19 @@ interface Banner {
   imageUrl?: string;
   phone?: string;
   whatsapp?: string;
+  actionUrl?: string;
+  startDate?: string;
+  endDate?: string;
   isActive: boolean;
   sortOrder: number;
   clickCount: number;
   viewCount: number;
 }
 
-const EMPTY_FORM = { title: '', subtitle: '', imageUrl: '', phone: '', whatsapp: '', sameWhatsapp: true, isActive: true };
+const EMPTY_FORM = {
+  title: '', subtitle: '', imageUrl: '', phone: '', whatsapp: '', sameWhatsapp: true,
+  actionUrl: '', startDate: '', endDate: '', isActive: true,
+};
 
 export default function BannersPage() {
   const [showForm, setShowForm] = useState(false);
@@ -45,6 +51,10 @@ export default function BannersPage() {
     imageUrl: form.imageUrl.trim(),
     phone: form.phone.trim(),
     whatsapp: (form.sameWhatsapp ? form.phone : form.whatsapp).trim(),
+    actionUrl: form.actionUrl.trim(),
+    // Empty means "no bound" — the backend treats a missing date as always-on.
+    startDate: form.startDate || null,
+    endDate: form.endDate || null,
     isActive: form.isActive,
   });
 
@@ -106,6 +116,10 @@ export default function BannersPage() {
       phone,
       whatsapp,
       sameWhatsapp,
+      actionUrl: b.actionUrl ?? '',
+      // <input type="date"> needs yyyy-mm-dd.
+      startDate: b.startDate ? String(b.startDate).slice(0, 10) : '',
+      endDate: b.endDate ? String(b.endDate).slice(0, 10) : '',
       isActive: b.isActive,
     });
     setImgError(false);
@@ -297,6 +311,45 @@ export default function BannersPage() {
                 />
                 <span className="text-xs text-gray-600 dark:text-gray-400">WhatsApp same as phone</span>
               </label>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Action URL (Optional)</label>
+            <input
+              type="text"
+              value={form.actionUrl}
+              onChange={(e) => setForm({ ...form, actionUrl: e.target.value })}
+              placeholder="https://goracabs.com/offers  or  /subscription"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Shown as an &quot;Open&quot; button in the app&apos;s banner popup. Full https:// link, or an in-app path like /subscription.
+            </p>
+          </div>
+
+          {/* Schedule: the app only shows the banner inside this window. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date (Optional)</label>
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Leave empty to start immediately.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date (Optional)</label>
+              <input
+                type="date"
+                value={form.endDate}
+                min={form.startDate || undefined}
+                onChange={(e) => setForm({ ...form, endDate: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Leave empty to run forever. Outside this window the banner is hidden.</p>
             </div>
           </div>
 
