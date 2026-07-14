@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { RequirementEditModal } from '@/components/requirements/RequirementEditModal';
+import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
 import { VehicleEditModal } from '@/components/vehicles/VehicleEditModal';
 
 interface Requirement {
@@ -90,6 +91,7 @@ const TABS = [
   { id: 'subscription', label: 'Subscription', icon: CheckSquare },
   { id: 'payments', label: 'Payment History', icon: CreditCard },
   { id: 'withdrawals', label: 'Withdrawal History', icon: ArrowUpRight },
+  { id: 'wallet', label: 'Wallet', icon: Wallet },
   { id: 'reviews', label: 'Review History', icon: Star },
   { id: 'documents', label: 'Documents', icon: FileCheck },
   { id: 'requests', label: 'Request List', icon: ClipboardList },
@@ -272,6 +274,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     queryKey: ['user-withdrawals', id],
     queryFn: () => adminApi.getUserWithdrawals(id),
     enabled: activeTab === 'withdrawals',
+  });
+
+  const [adjustOpen, setAdjustOpen] = useState(false);
+
+  const { data: walletData } = useQuery({
+    queryKey: ['user-wallet', id],
+    queryFn: () => adminApi.getUserWallet(id),
+    enabled: activeTab === 'wallet',
   });
 
   const { data: reviewsData } = useQuery({
@@ -683,6 +693,64 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           )}
 
+          {/* Wallet Tab */}
+          {activeTab === 'wallet' && (() => {
+            const w = (walletData as any)?.data ?? {};
+            const balance = w.balance ?? 0;
+            const txs = w.transactions ?? [];
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900 dark:text-white">Wallet</h3>
+                  <Button size="sm" onClick={() => setAdjustOpen(true)}>
+                    <Wallet className="w-4 h-4 mr-2" />
+                    Adjust Balance
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-5 py-4 mb-6">
+                  <p className="text-xs text-gray-500">Current balance</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                    ₹{balance.toLocaleString('en-IN')}
+                  </p>
+                </div>
+
+                <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-3">Recent Transactions</h4>
+                {txs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Wallet className="w-10 h-10 text-gray-300 mb-2" />
+                    <p className="text-sm text-gray-400">No wallet transactions yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Description</th>
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Source</th>
+                          <th className="pb-3 pr-4 font-medium text-gray-500">Date</th>
+                          <th className="pb-3 font-medium text-gray-500 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {txs.map((t: any) => (
+                          <tr key={t._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td className="py-3 pr-4 text-gray-800 dark:text-gray-200">{t.note || t.description || '—'}</td>
+                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400 capitalize">{t.source ?? '—'}</td>
+                            <td className="py-3 pr-4 text-gray-600 dark:text-gray-400">{t.createdAt ? formatDate(t.createdAt) : '—'}</td>
+                            <td className={`py-3 text-right font-semibold ${t.type === 'credit' ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {t.type === 'credit' ? '+' : '−'}₹{(t.amount ?? 0).toLocaleString('en-IN')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Review History Tab */}
           {activeTab === 'reviews' && (
             <div>
@@ -804,6 +872,25 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           mode={vehicleModal.mode}
           onClose={() => setVehicleModal(null)}
           onSaved={() => { queryClient.invalidateQueries({ queryKey: ['user-vehicles', id] }); setVehicleModal(null); }}
+        />
+      )}
+
+      {adjustOpen && user && (
+        <AdjustWalletModal
+          user={{
+            _id: id,
+            fullName: user.fullName,
+            mobile: user.mobile,
+            // Balance comes from the wallet endpoint — the user record's copy can be
+            // stale right after an adjustment.
+            walletBalance: (walletData as any)?.data?.balance ?? user.walletBalance ?? 0,
+          }}
+          onClose={() => setAdjustOpen(false)}
+          onDone={() => {
+            queryClient.invalidateQueries({ queryKey: ['user-wallet', id] });
+            queryClient.invalidateQueries({ queryKey: ['user', id] });
+            setAdjustOpen(false);
+          }}
         />
       )}
 

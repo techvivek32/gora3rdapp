@@ -95,8 +95,13 @@ export const adminApi = {
 
   // ─── Wallets ───────────────────────────────────────────────────────────────
   getWallets: (params: any) => apiClient.get('/admin/wallets', { params }),
+  getUserWallet: (userId: string) => apiClient.get(`/admin/wallets/${userId}`),
   adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string }) =>
     apiClient.post(`/admin/wallets/${userId}/adjust`, data),
+  // Sends from `userId`'s wallet to the user with that mobile number.
+  transferWallet: (userId: string, data: { mobile: string; amount: number; note?: string }) =>
+    apiClient.post(`/admin/wallets/${userId}/transfer`, data),
+  lookupUserByMobile: (mobile: string) => apiClient.get('/users/lookup', { params: { mobile } }),
 
   // ─── Withdrawals ─────────────────────────────────────────────────────────────
   getWithdrawals: (params?: { status?: string; search?: string; dateFrom?: string; dateTo?: string }) => apiClient.get('/admin/wallets/withdrawals', { params }),

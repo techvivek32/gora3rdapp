@@ -6,7 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
-import { AdjustWalletDto, RejectWithdrawalDto } from './dto/wallet.dto';
+import { AdjustWalletDto, RejectWithdrawalDto, TransferFundsDto } from './dto/wallet.dto';
 
 @ApiTags('Admin Wallets')
 @ApiBearerAuth('access-token')
@@ -32,6 +32,14 @@ export class WalletAdminController {
     return this.walletService.adjustWallet(adminId, userId, dto);
   }
 
+  @Post(':id/transfer')
+  @ApiOperation({ summary: "Transfer from this user's wallet to another user (same as the app's transfer)" })
+  transfer(@Param('id') userId: string, @Body() dto: TransferFundsDto) {
+    // Reuses the app's transfer: race-safe debit, insufficient-balance guard and
+    // the two matching transaction records. :id is the SENDER.
+    return this.walletService.transferFunds(userId, dto);
+  }
+
   // ─── Withdrawals ───────────────────────────────────────────────────────────
 
   @Get('withdrawals')
@@ -54,5 +62,13 @@ export class WalletAdminController {
     @Body() dto: RejectWithdrawalDto,
   ) {
     return this.walletService.rejectWithdrawal(adminId, id, dto);
+  }
+
+  // Declared LAST on purpose: ':id' is a wildcard, so above the withdrawals routes
+  // it would swallow GET /admin/wallets/withdrawals as id="withdrawals".
+  @Get(':id')
+  @ApiOperation({ summary: "One user's wallet balance + transactions" })
+  getOne(@Param('id') userId: string) {
+    return this.walletService.getWallet(userId);
   }
 }

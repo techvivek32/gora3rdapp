@@ -965,9 +965,15 @@ export class AdminService {
       .limit(100)
       .lean();
 
-    // Wallet top-ups and adjustments
+    // Wallet top-ups, admin adjustments, and both sides of a transfer — a transfer
+    // credit is not a top-up, so it must not be labelled as one.
     const walletTxns = await this.walletTxModel
-      .find({ userId: new Types.ObjectId(userId), type: 'credit', status: 'success' })
+      .find({
+        userId: new Types.ObjectId(userId),
+        status: 'success',
+        $or: [{ type: 'credit' }, { type: 'debit', source: 'transfer' }],
+      })
+      .populate('counterpartyId', 'fullName agencyName mobile')
       .sort({ createdAt: -1 })
       .limit(100)
       .lean();
@@ -984,16 +990,27 @@ export class AdminService {
         status: p.status,
         createdAt: p.createdAt,
       })),
-      ...walletTxns.map((w: any) => ({
-        _id: w._id,
-        orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
-        userId: w.userId,
-        planId: { name: w.source === 'admin' ? 'Wallet Adjustment' : 'Wallet Top-up', membershipType: 'wallet' },
-        amount: (w.amount || 0) * 100,
-        method: w.source === 'admin' ? 'admin' : 'razorpay',
-        status: w.status,
-        createdAt: w.createdAt,
-      })),
+      ...walletTxns.map((w: any) => {
+        const isTransfer = w.source === 'transfer';
+        // Name the other party, so a transfer says who the money went to / came from.
+        const other = w.counterpartyId?.mobile ?? '';
+        const label = isTransfer
+          ? `Transfer ${w.type === 'debit' ? 'to' : 'from'}: ${other || 'user'}`
+          : w.source === 'admin'
+            ? 'Wallet Adjustment'
+            : 'Wallet Top-up';
+
+        return {
+          _id: w._id,
+          orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
+          userId: w.userId,
+          planId: { name: label, membershipType: 'wallet' },
+          amount: (w.amount || 0) * 100,
+          method: isTransfer ? 'transfer' : w.source === 'admin' ? 'admin' : 'razorpay',
+          status: w.status,
+          createdAt: w.createdAt,
+        };
+      }),
     ];
 
     // Sort by date descending
@@ -1131,15 +1148,21 @@ export class AdminService {
       .sort({ createdAt: -1 })
       .lean();
 
-    // Wallet top-ups (money the user added). Only include when the status filter
-    // isn't set to something a wallet credit can't be.
+    // Wallet money: top-ups, admin adjustments, and BOTH sides of a transfer (the
+    // sender's debit and the recipient's credit) so a transfer is never mistaken
+    // for a top-up. Only included when the status filter allows a wallet credit.
     const includeWallet = !query.status || ['success', 'paid'].includes(query.status);
-    const walletFilter: any = { type: 'credit', status: 'success', ...dateFilter };
+    const walletFilter: any = {
+      status: 'success',
+      $or: [{ type: 'credit' }, { type: 'debit', source: 'transfer' }],
+      ...dateFilter,
+    };
     if (rx) walletFilter.razorpayOrderId = rx;
     const walletTxns = includeWallet
       ? await this.walletTxModel
           .find(walletFilter)
           .populate('userId', 'fullName email mobile')
+          .populate('counterpartyId', 'fullName agencyName mobile')
           .sort({ createdAt: -1 })
           .lean()
       : [];
@@ -1157,16 +1180,27 @@ export class AdminService {
         status: p.status,
         createdAt: p.createdAt,
       })),
-      ...walletTxns.map((w: any) => ({
-        _id: w._id,
-        orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
-        userId: w.userId,
-        planId: { name: w.source === 'admin' ? 'Wallet Adjustment' : 'Wallet Top-up', membershipType: 'wallet' },
-        amount: (w.amount || 0) * 100,
-        method: w.source === 'admin' ? 'admin' : 'razorpay',
-        status: w.status,
-        createdAt: w.createdAt,
-      })),
+      ...walletTxns.map((w: any) => {
+        const isTransfer = w.source === 'transfer';
+        // Name the other party, so a transfer says who the money went to / came from.
+        const other = w.counterpartyId?.mobile ?? '';
+        const label = isTransfer
+          ? `Transfer ${w.type === 'debit' ? 'to' : 'from'}: ${other || 'user'}`
+          : w.source === 'admin'
+            ? 'Wallet Adjustment'
+            : 'Wallet Top-up';
+
+        return {
+          _id: w._id,
+          orderId: w.razorpayOrderId || `WALLET-${w._id.toString().slice(-8).toUpperCase()}`,
+          userId: w.userId,
+          planId: { name: label, membershipType: 'wallet' },
+          amount: (w.amount || 0) * 100,
+          method: isTransfer ? 'transfer' : w.source === 'admin' ? 'admin' : 'razorpay',
+          status: w.status,
+          createdAt: w.createdAt,
+        };
+      }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const total = unified.length;
