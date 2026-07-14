@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
-import { formatDate } from '@/lib/utils';
-import { Search, Download, Shield, Eye } from 'lucide-react';
+import { useFullscreen } from '@/components/layout/DashboardShell';
+import { Search, Download, Shield, Eye, Maximize2, Minimize2 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface User {
@@ -34,17 +34,24 @@ interface User {
 }
 
 function UsersPageInner() {
+  const { fullscreen, toggleFullscreen } = useFullscreen();
   const params = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   // Filters seeded from the URL so dashboard cards can deep-link into a filtered view.
   const [roleFilter, setRoleFilter] = useState(params.get('role') || '');
   const [membershipFilter, setMembershipFilter] = useState(params.get('membership') || '');
-  const [verifiedFilter, setVerifiedFilter] = useState(params.get('verified') === 'true' ? 'true' : '');
-  const [activeFilter, setActiveFilter] = useState(params.get('active') === 'true' ? 'true' : '');
+  // Account status: '' all | 'true' active | 'false' inactive.
+  const [statusFilter, setStatusFilter] = useState('');
+
+  // No dropdowns for these two any more, but the dashboard's "Verified Users" and
+  // "Active Users" cards still deep-link with ?verified=true / ?active=true — keep
+  // honouring them so those cards don't silently show every user.
+  const verifiedFromUrl = params.get('verified') === 'true';
+  const activeFromUrl = params.get('active') === 'true';
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-users', page, search, roleFilter, membershipFilter, verifiedFilter, activeFilter],
+    queryKey: ['admin-users', page, search, roleFilter, membershipFilter, statusFilter, verifiedFromUrl, activeFromUrl],
     queryFn: () =>
       adminApi.getUsers({
         page,
@@ -52,8 +59,9 @@ function UsersPageInner() {
         search,
         role: roleFilter || undefined,
         membershipType: membershipFilter || undefined,
-        isVerified: verifiedFilter === 'true' ? 'true' : undefined,
-        active: activeFilter === 'true' ? 'true' : undefined,
+        isActive: statusFilter || undefined,
+        isVerified: verifiedFromUrl ? 'true' : undefined,
+        active: activeFromUrl ? 'true' : undefined,
       }),
   });
   const data = rawData as any;
@@ -124,13 +132,6 @@ function UsersPageInner() {
       ),
     },
     {
-      header: 'Joined',
-      accessorKey: 'createdAt',
-      cell: ({ getValue }) => (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(getValue() as string)}</span>
-      ),
-    },
-    {
       id: 'actions',
       header: 'Actions',
       cell: ({ row }) => (
@@ -154,10 +155,16 @@ function UsersPageInner() {
             {meta?.total?.toLocaleString()} total users
           </p>
         </div>
-        <Button variant="outline" size="sm">
-          <Download className="w-4 h-4 mr-2" />
-          Export
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={toggleFullscreen}>
+            {fullscreen ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
+            {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -175,23 +182,18 @@ function UsersPageInner() {
           <option value="">All Roles</option>
           <option value="driver">Driver</option>
           <option value="travel_agency">Travel Agency</option>
-          <option value="fleet_owner">Fleet Owner</option>
         </Select>
         <Select value={membershipFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setMembershipFilter(e.target.value); setPage(1); }}>
           <option value="">All Memberships</option>
           <option value="new">New</option>
           <option value="active">Active</option>
-          <option value="verified">Verified</option>
           <option value="premium">Premium</option>
           <option value="golden">Golden</option>
         </Select>
-        <Select value={verifiedFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setVerifiedFilter(e.target.value); setPage(1); }}>
-          <option value="">All Verification</option>
-          <option value="true">Verified Only</option>
-        </Select>
-        <Select value={activeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setActiveFilter(e.target.value); setPage(1); }}>
-          <option value="">All Activity</option>
-          <option value="true">Active (7 days)</option>
+        <Select value={statusFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatusFilter(e.target.value); setPage(1); }}>
+          <option value="">All Status</option>
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
         </Select>
       </div>
 

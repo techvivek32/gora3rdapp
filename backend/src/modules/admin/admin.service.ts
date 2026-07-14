@@ -188,6 +188,9 @@ export class AdminService {
     if (query.membershipType) filter.membershipType = query.membershipType;
     if (query.isVerified !== undefined) filter.isVerified = query.isVerified === 'true';
     if (query.isBlocked !== undefined) filter.isBlocked = query.isBlocked === 'true';
+    // Account status (what the Status column shows) — distinct from `active` below,
+    // which means "seen in the last 7 days".
+    if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
     if (query.city) filter.city = new RegExp(query.city, 'i');
     // "Active" = same definition as the dashboard card: not blocked and seen in the last 7 days.
     if (query.active === 'true') {

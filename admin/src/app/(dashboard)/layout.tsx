@@ -1,22 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import Sidebar from '@/components/layout/Sidebar';
-import Header from '@/components/layout/Header';
+import DashboardShell from '@/components/layout/DashboardShell';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/login');
 
-  return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
+  // The chrome (sidebar + header) is rendered by DashboardShell, which owns the
+  // fullscreen toggle — this component stays a server component for the session check.
+  return <DashboardShell>{children}</DashboardShell>;
 }
