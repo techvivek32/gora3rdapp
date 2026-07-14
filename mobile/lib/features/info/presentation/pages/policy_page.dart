@@ -24,18 +24,13 @@ class PolicyContent {
 
 /// All static policy / about content keyed by id.
 const Map<String, PolicyContent> kPolicies = {
+  // About Us renders _AboutFooter only (logo → contact → legal); it has no header
+  // row and no body sections. Only `title` is used, for the app bar.
   'about': PolicyContent(
     title: 'About Us',
     icon: Icons.local_taxi_rounded,
     subtitle: 'About Gora Cabs',
-    sections: [
-      PolicySection(paragraphs: [
-        'Welcome to Gora Cabs — your trusted partner for taxi requirement and available-cab networking. We connect travel agencies, fleet owners and drivers on one platform to make transportation operations smooth and reliable.',
-        'Our mission is to simplify business by offering transparent pricing, verified members and a secure way to find and post requirements across India.',
-        'We pride ourselves on trust and safety. Verified KYC, a security wallet system and clear policies help keep every deal fair for both sides.',
-        'Thank you for choosing Gora Cabs. Made in India, crafted in Rajasthan.',
-      ]),
-    ],
+    sections: [],
   ),
   'terms': PolicyContent(
     title: 'Terms & Conditions',
@@ -176,6 +171,10 @@ class PolicyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = kPolicies[id];
+    // About Us is just the brand mark, contact details and legal links — no header
+    // row and no body copy. The other policy pages keep both.
+    final isAbout = id == 'about';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -188,31 +187,32 @@ class PolicyPage extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), shape: BoxShape.circle),
-                      child: Icon(content.icon, color: AppColors.primary, size: 26),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(content.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
-                          const SizedBox(height: 2),
-                          Text(content.subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        ],
+                if (!isAbout) ...[
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), shape: BoxShape.circle),
+                        child: Icon(content.icon, color: AppColors.primary, size: 26),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                ...content.sections.map(_buildSection),
-                // Contact details + legal links live only on About Us.
-                if (id == 'about') const _AboutFooter(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(content.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                            const SizedBox(height: 2),
+                            Text(content.subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  ...content.sections.map(_buildSection),
+                ],
+                if (isAbout) const _AboutFooter(),
                 const SizedBox(height: 24),
               ],
             ),
@@ -306,9 +306,9 @@ class _AboutFooterState extends State<_AboutFooter> {
 
     return Column(
       children: [
-        const SizedBox(height: 6),
-        const AppLogo(size: 68, radius: 18),
-        const SizedBox(height: 10),
+        const SizedBox(height: 24),
+        const AppLogo(size: 124, radius: 20),
+        const SizedBox(height: 24),
         const Text(
           "India's Trusted Taxi Requirement Network",
           textAlign: TextAlign.center,
@@ -360,8 +360,6 @@ class _AboutFooterState extends State<_AboutFooter> {
               const SizedBox(height: 4),
               _legalLink(context, 'Terms & Conditions', 'terms'),
               _legalLink(context, 'Privacy Policy', 'privacy'),
-              _legalLink(context, 'Policies', 'policies'),
-              _legalLink(context, 'Penalty Policy', 'penalty'),
             ],
           ),
         ),
