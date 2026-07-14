@@ -133,6 +133,7 @@ export class AdminService {
       totalRevenue, monthlyRevenue,
       pendingReports, totalNotifications,
       todayRegistrations, todayRequirements,
+      pendingVerifications,
     ] = await Promise.all([
       this.userModel.countDocuments({ isActive: true }),
       this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }),
@@ -149,6 +150,8 @@ export class AdminService {
       this.notificationsService ? 0 : 0,
       this.userModel.countDocuments({ createdAt: { $gte: todayStart } }),
       this.requirementModel.countDocuments({ createdAt: { $gte: todayStart } }),
+      // Matches the default filter on the Verification Requests page.
+      this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING }),
     ]);
 
     return {
@@ -162,6 +165,7 @@ export class AdminService {
           monthly: monthlyRevenue,
         },
         reports: { pending: pendingReports },
+        verifications: { pending: pendingVerifications },
         today: { registrations: todayRegistrations, requirements: todayRequirements },
       },
     };

@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
-import { Users, Car, FileText, TrendingUp, Crown, Shield, Star, IndianRupee } from 'lucide-react';
+import { Users, BadgeCheck, FileText, TrendingUp, Crown, Shield, Star, IndianRupee } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatCard {
@@ -77,12 +77,13 @@ export function StatsCards() {
       href: '/requirements',
     },
     {
-      title: 'Active Vehicles',
-      value: stats?.vehicles?.active?.toLocaleString() || '0',
-      icon: <Car className="w-5 h-5" />,
+      title: 'Verification Requests',
+      value: stats?.verifications?.pending?.toLocaleString() || '0',
+      change: 'awaiting review',
+      icon: <BadgeCheck className="w-5 h-5" />,
       color: 'text-cyan-600',
       bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
-      href: '/vehicles',
+      href: '/verification-requests',
     },
     {
       title: 'Total Revenue',
