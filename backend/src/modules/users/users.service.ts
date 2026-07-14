@@ -144,28 +144,84 @@ export class UsersService {
     };
   }
 
+  /** 'all' (default) | 'YYYY-MM' (a month) | 'YYYY' (a year). */
+  private periodRange(period?: string): { start: Date; end: Date } | null {
+    const p = (period || 'all').trim();
+    if (!p || p === 'all') return null;
+
+    const month = /^(\d{4})-(\d{2})$/.exec(p);
+    if (month) {
+      const y = +month[1];
+      const m = +month[2] - 1;
+      return { start: new Date(y, m, 1), end: new Date(y, m + 1, 1) };
+    }
+    const year = /^(\d{4})$/.exec(p);
+    if (year) {
+      const y = +year[1];
+      return { start: new Date(y, 0, 1), end: new Date(y + 1, 0, 1) };
+    }
+    return null;
+  }
+
   // Leaderboard ranked by how many users each person referred. Users who haven't
-  // invited anyone still appear (with 0), so the board is never empty. Admins are
-  // excluded.
-  async getReferralLeaderboard(currentUserId?: string) {
-    const top = await this.userModel
-      .find({ role: { $nin: ['admin', 'super_admin'] } })
-      .select('fullName agencyName profileImage city referralCount')
-      .sort({ referralCount: -1, createdAt: 1 })
-      .limit(50)
+  // invited anyone still appear (with 0) for the all-time board, so it's never
+  // empty. Admins are excluded.
+  async getReferralLeaderboard(currentUserId?: string, period?: string) {
+    const select = 'fullName agencyName profileImage city referralCount';
+    const notAdmin = { role: { $nin: ['admin', 'super_admin'] } };
+    const range = this.periodRange(period);
+
+    // All time: the stored lifetime counter. No limit — the whole board is shown.
+    if (!range) {
+      const users = await this.userModel
+        .find(notAdmin)
+        .select(select)
+        .sort({ referralCount: -1, createdAt: 1 })
+        .lean();
+
+      return {
+        message: 'Leaderboard retrieved',
+        data: users.map((u, i) => ({
+          rank: i + 1,
+          _id: u._id,
+          name: u.fullName || u.agencyName || 'User',
+          city: u.city ?? '',
+          profileImage: u.profileImage ?? '',
+          count: u.referralCount ?? 0,
+          isMe: currentUserId ? u._id.toString() === currentUserId : false,
+        })),
+      };
+    }
+
+    // A month/year: referralCount is a lifetime total with no time dimension, so
+    // count the invitees who actually SIGNED UP inside the window instead.
+    const grouped = await this.userModel.aggregate([
+      { $match: { referredBy: { $ne: null, $exists: true }, createdAt: { $gte: range.start, $lt: range.end } } },
+      { $group: { _id: '$referredBy', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ]);
+
+    if (grouped.length === 0) return { message: 'Leaderboard retrieved', data: [] };
+
+    const counts = new Map<string, number>(grouped.map((g: any) => [String(g._id), g.count]));
+    const referrers = await this.userModel
+      .find({ ...notAdmin, _id: { $in: grouped.map((g: any) => g._id) } })
+      .select(select)
       .lean();
 
-    const leaderboard = top.map((u, i) => ({
-      rank: i + 1,
-      _id: u._id,
-      name: u.fullName || u.agencyName || 'User',
-      city: u.city ?? '',
-      profileImage: u.profileImage ?? '',
-      count: u.referralCount ?? 0,
-      isMe: currentUserId ? u._id.toString() === currentUserId : false,
-    }));
+    const data = referrers
+      .map((u: any) => ({
+        _id: u._id,
+        name: u.fullName || u.agencyName || 'User',
+        city: u.city ?? '',
+        profileImage: u.profileImage ?? '',
+        count: counts.get(String(u._id)) ?? 0,
+        isMe: currentUserId ? u._id.toString() === currentUserId : false,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .map((u, i) => ({ rank: i + 1, ...u }));
 
-    return { message: 'Leaderboard retrieved', data: leaderboard };
+    return { message: 'Leaderboard retrieved', data };
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {

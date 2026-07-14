@@ -71,9 +71,12 @@ export class UsersController {
   }
 
   @Get('referral-leaderboard')
-  @ApiOperation({ summary: 'Top inviters ranked by referral count' })
-  getReferralLeaderboard(@CurrentUser('sub') userId: string) {
-    return this.usersService.getReferralLeaderboard(userId);
+  @ApiOperation({ summary: 'Top inviters ranked by referral count (?period=all|YYYY-MM|YYYY)' })
+  getReferralLeaderboard(
+    @CurrentUser('sub') userId: string,
+    @Query('period') period?: string,
+  ) {
+    return this.usersService.getReferralLeaderboard(userId, period);
   }
 
   @Get('lookup')

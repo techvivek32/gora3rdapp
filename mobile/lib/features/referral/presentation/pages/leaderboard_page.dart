@@ -11,13 +11,46 @@ class LeaderboardPage extends StatefulWidget {
   State<LeaderboardPage> createState() => _LeaderboardPageState();
 }
 
+/// 'all', a month ("2026-06") or a year ("2026") — the backend parses all three.
+class _Period {
+  final String value;
+  final String label;
+  const _Period(this.value, this.label);
+}
+
 class _LeaderboardPageState extends State<LeaderboardPage> {
   final _api = getIt<ApiClient>();
   bool _loading = true;
   List<Map<String, dynamic>> _rows = [];
+  String _period = 'all';
 
   // Gold / Silver / Bronze
   static const _medal = [Color(0xFFFFD700), Color(0xFFC0C0C0), Color(0xFFCD7F32)];
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  /// All time, the last 12 months, then each year back to 2025. Built from the
+  /// current date so the list never goes stale.
+  List<_Period> get _periods {
+    final now = DateTime.now();
+    final out = <_Period>[const _Period('all', 'All Time')];
+
+    for (var i = 0; i < 12; i++) {
+      final d = DateTime(now.year, now.month - i, 1);
+      final value = '${d.year}-${d.month.toString().padLeft(2, '0')}';
+      out.add(_Period(value, '${_months[d.month - 1]} ${d.year}'));
+    }
+    for (var y = now.year; y >= 2025; y--) {
+      out.add(_Period('$y', 'Year $y'));
+    }
+    return out;
+  }
+
+  String get _periodLabel =>
+      _periods.firstWhere((p) => p.value == _period, orElse: () => const _Period('all', 'All Time')).label;
 
   @override
   void initState() {
@@ -28,7 +61,10 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final res = await _api.get('/users/referral-leaderboard');
+      final res = await _api.get(
+        '/users/referral-leaderboard',
+        params: {'period': _period},
+      );
       final list = (res.data['data'] as List?) ?? [];
       setState(() {
         _rows = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -52,6 +88,33 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          // Month / year filter — reloads the board for the chosen window.
+          PopupMenuButton<String>(
+            initialValue: _period,
+            tooltip: 'Filter',
+            icon: const Icon(Icons.filter_list, color: Colors.white),
+            onSelected: (v) {
+              if (v == _period) return;
+              setState(() => _period = v);
+              _load();
+            },
+            itemBuilder: (_) => _periods
+                .map((p) => PopupMenuItem<String>(
+                      value: p.value,
+                      child: Text(
+                        p.label,
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 13.sp,
+                          fontWeight: p.value == _period ? FontWeight.bold : FontWeight.normal,
+                          color: p.value == _period ? AppColors.primary : AppColors.textPrimary,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -62,8 +125,13 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                     children: [
                       Icon(Icons.emoji_events_outlined, size: 56.sp, color: AppColors.textHint),
                       SizedBox(height: 12.h),
-                      Text('No inviters yet.\nBe the first to top the board!',
-                          textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp)),
+                      Text(
+                        _period == 'all'
+                            ? 'No inviters yet.\nBe the first to top the board!'
+                            : 'No invites in $_periodLabel.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13.sp),
+                      ),
                     ],
                   ),
                 )
@@ -73,6 +141,19 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                   child: ListView(
                     padding: EdgeInsets.all(16.r),
                     children: [
+                      // Which window these ranks are for.
+                      Center(
+                        child: Text(
+                          _periodLabel,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
                       _podium(top3),
                       SizedBox(height: 20.h),
                       ...rest.map(_rankRow),

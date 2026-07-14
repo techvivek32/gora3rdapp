@@ -223,6 +223,31 @@ export class AdminService {
   }
 
   // Invitation leaderboard — all users ranked by how many they referred.
+  /**
+   * `period`: 'all' (default) | 'YYYY-MM' (a month) | 'YYYY' (a year).
+   *
+   * For a period we can't use the stored `referralCount` — it's a lifetime total
+   * with no time dimension. Instead we count the referred users who SIGNED UP in
+   * that window, which is what "invites in June 2026" actually means.
+   */
+  private periodRange(period?: string): { start: Date; end: Date } | null {
+    const p = (period || 'all').trim();
+    if (!p || p === 'all') return null;
+
+    const month = /^(\d{4})-(\d{2})$/.exec(p);
+    if (month) {
+      const y = +month[1];
+      const m = +month[2] - 1;
+      return { start: new Date(y, m, 1), end: new Date(y, m + 1, 1) };
+    }
+    const year = /^(\d{4})$/.exec(p);
+    if (year) {
+      const y = +year[1];
+      return { start: new Date(y, 0, 1), end: new Date(y + 1, 0, 1) };
+    }
+    return null;
+  }
+
   async getReferralLeaderboard(query: any) {
     const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };
     const search = (query.search || '').trim();
@@ -230,25 +255,63 @@ export class AdminService {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ fullName: rx }, { mobile: rx }, { agencyName: rx }, { referralCode: rx }];
     }
-    Object.assign(filter, dateRangeFilter(query));
 
-    const users = await this.userModel
-      .find(filter)
-      .select('fullName agencyName mobile city profileImage referralCode referralCount')
-      .sort({ referralCount: -1, createdAt: 1 })
-      .limit(200)
+    const range = this.periodRange(query.period);
+    const select = 'fullName agencyName mobile city profileImage referralCode referralCount';
+
+    // ── All time: the stored lifetime counter (also carries admin +/- tweaks) ──
+    if (!range) {
+      Object.assign(filter, dateRangeFilter(query));
+      const users = await this.userModel
+        .find(filter)
+        .select(select)
+        .sort({ referralCount: -1, createdAt: 1 })
+        .limit(200)
+        .lean();
+
+      return {
+        message: 'Referral leaderboard retrieved',
+        data: users.map((u, i) => ({
+          rank: i + 1,
+          _id: u._id,
+          name: u.fullName || u.agencyName || 'User',
+          mobile: u.mobile ?? '',
+          city: u.city ?? '',
+          profileImage: u.profileImage ?? '',
+          referralCode: u.referralCode ?? '',
+          count: u.referralCount ?? 0,
+        })),
+      };
+    }
+
+    // ── A month or a year: count invitees by their signup date ────────────────
+    const grouped = await this.userModel.aggregate([
+      { $match: { referredBy: { $ne: null, $exists: true }, createdAt: { $gte: range.start, $lt: range.end } } },
+      { $group: { _id: '$referredBy', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 200 },
+    ]);
+
+    if (grouped.length === 0) return { message: 'Referral leaderboard retrieved', data: [] };
+
+    const counts = new Map<string, number>(grouped.map((g: any) => [String(g._id), g.count]));
+    const referrers = await this.userModel
+      .find({ ...filter, _id: { $in: grouped.map((g: any) => g._id) } })
+      .select(select)
       .lean();
 
-    const data = users.map((u, i) => ({
-      rank: i + 1,
-      _id: u._id,
-      name: u.fullName || u.agencyName || 'User',
-      mobile: u.mobile ?? '',
-      city: u.city ?? '',
-      profileImage: u.profileImage ?? '',
-      referralCode: u.referralCode ?? '',
-      count: u.referralCount ?? 0,
-    }));
+    const data = referrers
+      .map((u: any) => ({
+        _id: u._id,
+        name: u.fullName || u.agencyName || 'User',
+        mobile: u.mobile ?? '',
+        city: u.city ?? '',
+        profileImage: u.profileImage ?? '',
+        referralCode: u.referralCode ?? '',
+        count: counts.get(String(u._id)) ?? 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .map((u, i) => ({ rank: i + 1, ...u }));
 
     return { message: 'Referral leaderboard retrieved', data };
   }

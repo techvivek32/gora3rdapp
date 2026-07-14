@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { Trophy, Plus, Minus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -28,15 +29,37 @@ const medalColor: Record<number, string> = {
 
 const medalEmoji: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
+/**
+ * All time, then the last 12 months ("June 2026"), then each year back to 2025.
+ * Generated from today's date rather than hard-coded, so the list never goes stale.
+ * A month is sent as "YYYY-MM" and a year as "YYYY"; the backend parses both.
+ */
+const PERIODS = (() => {
+  const now = new Date();
+  const out: { value: string; label: string }[] = [{ value: 'all', label: 'All Time' }];
+
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    out.push({ value, label: d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }) });
+  }
+
+  for (let y = now.getFullYear(); y >= 2025; y--) {
+    out.push({ value: String(y), label: `Year ${y}` });
+  }
+  return out;
+})();
+
 export default function ReferralsPage() {
   const [search, setSearch] = useState('');
+  const [period, setPeriod] = useState('all');
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
   const [amount, setAmount] = useState(1);
   const queryClient = useQueryClient();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-referrals', search],
-    queryFn: () => adminApi.getReferralLeaderboard({ search }),
+    queryKey: ['admin-referrals', search, period],
+    queryFn: () => adminApi.getReferralLeaderboard({ search, period }),
   });
   const data = rawData as any;
   const rows: Row[] = data?.data || [];
@@ -147,8 +170,14 @@ export default function ReferralsPage() {
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Search name, mobile, code…"
-        onClear={() => { setSearch(''); }}
-      />
+        onClear={() => { setSearch(''); setPeriod('all'); }}
+      >
+        <Select value={period} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPeriod(e.target.value)}>
+          {PERIODS.map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </Select>
+      </FilterBar>
 
       {top3.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
