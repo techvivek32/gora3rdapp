@@ -27,6 +27,30 @@ const EMPTY_FORM = {
   actionUrl: '', startDate: '', endDate: '', isActive: true,
 };
 
+/** "12 Jul 2026", or null when the date isn't set. */
+function formatBannerDate(value?: string) {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/**
+ * The app hides a banner outside its date window even when it's marked Active,
+ * so flag that here — otherwise an "Active" badge on an expired banner is a lie.
+ */
+function scheduleState(b: Banner): 'Scheduled' | 'Expired' | null {
+  const now = Date.now();
+  if (b.startDate && new Date(b.startDate).getTime() > now) return 'Scheduled';
+  // The window is inclusive of the end date, so compare against its end of day.
+  if (b.endDate) {
+    const end = new Date(b.endDate);
+    end.setHours(23, 59, 59, 999);
+    if (end.getTime() < now) return 'Expired';
+  }
+  return null;
+}
+
 export default function BannersPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -409,11 +433,35 @@ export default function BannersPage() {
                   <span className="text-xs text-gray-400">Order: {banner.sortOrder}</span>
                 </div>
                 {banner.subtitle && <p className="text-gray-500 text-sm mt-0.5">{banner.subtitle}</p>}
-                <div className="flex gap-4 mt-1.5 text-xs text-gray-400">
+                <div className="flex gap-4 mt-1.5 text-xs text-gray-400 flex-wrap">
                   <span>{banner.viewCount} views</span>
                   <span>{banner.clickCount} clicks</span>
                   {banner.phone && <span>📞 {banner.phone}</span>}
                   {banner.whatsapp && banner.whatsapp !== banner.phone && <span>💬 {banner.whatsapp}</span>}
+                  {banner.actionUrl && (
+                    <span className="truncate max-w-[280px] text-brand-600 dark:text-brand-400" title={banner.actionUrl}>
+                      🔗 {banner.actionUrl}
+                    </span>
+                  )}
+                </div>
+
+                {/* Schedule — a banner outside its window is hidden in the app even
+                    while it's marked Active, so surface that here. */}
+                <div className="flex gap-2 mt-1.5 text-xs flex-wrap">
+                  <span className="text-gray-400">
+                    🗓 {formatBannerDate(banner.startDate) ?? 'Always'} → {formatBannerDate(banner.endDate) ?? 'No end'}
+                  </span>
+                  {scheduleState(banner) && (
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-medium ${
+                        scheduleState(banner) === 'Expired'
+                          ? 'bg-red-500/15 text-red-500'
+                          : 'bg-amber-500/15 text-amber-500'
+                      }`}
+                    >
+                      {scheduleState(banner)}
+                    </span>
+                  )}
                 </div>
               </div>
 
