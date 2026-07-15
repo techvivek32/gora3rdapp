@@ -1085,7 +1085,8 @@ export class AdminService {
         title: 'Wallet top-up',
         message: `${name(t.userId)} added ₹${(t.amount || 0).toLocaleString('en-IN')} to their wallet`,
         amount: t.amount || 0,
-        href: '/wallet',
+        // The Wallet Management route is /wallets (plural) — /wallet 404s → redirects.
+        href: '/payments',
         createdAt: t.createdAt,
       })),
       ...withdrawals.map((w: any) => ({
