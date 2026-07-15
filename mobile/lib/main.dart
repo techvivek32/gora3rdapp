@@ -95,14 +95,30 @@ class GoraCabsApp extends StatefulWidget {
   State<GoraCabsApp> createState() => _GoraCabsAppState();
 }
 
-class _GoraCabsAppState extends State<GoraCabsApp> {
+class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
   late final AuthBloc _authBloc;
   late final GoRouter _router;
   StreamSubscription<AuthState>? _authSub;
+  Timer? _sessionHeartbeat;
+
+  /// Ping a cheap authed endpoint. If the account was deleted/blocked, the request
+  /// 401s and the ApiClient interceptor forces sign-out — so a logged-out admin
+  /// action ejects the user even while they sit on a cached screen (no request of
+  /// their own would otherwise fire).
+  Future<void> _checkSession() async {
+    if (_authBloc.state is! AuthAuthenticated) return;
+    try {
+      await getIt<ApiClient>().get('/users/profile');
+    } catch (_) {
+      // A 401 here is handled by the ApiClient interceptor (force sign-out);
+      // any other error is transient and ignored.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _authBloc = getIt<AuthBloc>()..add(AuthCheckStatusEvent());
     _router = AppRouter.createRouter(_authBloc);
 
@@ -116,20 +132,34 @@ class _GoraCabsAppState extends State<GoraCabsApp> {
     // blocs, so mirror "may this user contact posters?" into SharedPreferences
     // whenever the auth state changes. Without this the overlay's Call/WhatsApp
     // buttons stay disabled for everyone.
-    void syncOverlayFlag(AuthState state) {
+    void onAuthState(AuthState state) {
       if (state is AuthAuthenticated) {
         saveOverlayContactFlag(Map<String, dynamic>.from(state.user as Map));
+        // While signed in, re-check the session every 60s so an admin deletion is
+        // caught even with no user activity.
+        _sessionHeartbeat ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkSession());
       } else if (state is AuthUnauthenticated) {
         clearOverlayContactFlag();
+        _sessionHeartbeat?.cancel();
+        _sessionHeartbeat = null;
       }
     }
 
-    syncOverlayFlag(_authBloc.state); // in case auth already resolved
-    _authSub = _authBloc.stream.listen(syncOverlayFlag);
+    onAuthState(_authBloc.state); // in case auth already resolved
+    _authSub = _authBloc.stream.listen(onAuthState);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Foregrounding is the moment a deleted user is most likely still staring at a
+    // stale screen — verify the session right away.
+    if (state == AppLifecycleState.resumed) _checkSession();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sessionHeartbeat?.cancel();
     ApiClient.onSessionExpired = null;
     _authSub?.cancel();
     _authBloc.close();

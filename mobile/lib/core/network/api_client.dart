@@ -76,11 +76,23 @@ class _AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
+      // A 401 from the refresh endpoint itself means the account is gone, blocked
+      // or deactivated. Never try to refresh a refresh (that recurses forever) —
+      // sign out immediately.
+      if (err.requestOptions.path.contains('/auth/refresh')) {
+        await _forceSignOut();
+        return handler.next(err);
+      }
+
       // Try to refresh token
       final refreshToken = await _storage.read(key: 'refresh_token');
       final userId = await _storage.read(key: 'user_id');
 
-      if (refreshToken != null && userId != null) {
+      // A logged-in user with no refresh token can't recover — sign out.
+      if (refreshToken == null || userId == null) {
+        final hadSession = await _storage.read(key: 'access_token') != null;
+        if (hadSession) await _forceSignOut();
+      } else {
         try {
           final response = await _dio.post('/auth/refresh',
               data: {'userId': userId, 'refreshToken': refreshToken});
