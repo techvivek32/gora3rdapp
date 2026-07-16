@@ -6,6 +6,7 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/membership.dart';
+import '../../../../core/utils/ring_player.dart';
 
 /// Native channel (registered in MainActivity) that opens the "Display over
 /// other apps" settings robustly across OEMs — the plugin's default intent opens
@@ -177,6 +178,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     try {
       await _overlayActionChannel.invokeMethod('call', {'number': m});
     } catch (_) {}
+    stopRequirementRing();
     await FlutterOverlayWindow.closeOverlay();
   }
 
@@ -187,6 +189,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     try {
       await _overlayActionChannel.invokeMethod('whatsapp', {'number': m});
     } catch (_) {}
+    stopRequirementRing();
     await FlutterOverlayWindow.closeOverlay();
   }
 
@@ -424,8 +427,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                             const SizedBox(height: 4),
                             Center(
                               child: TextButton(
-                                onPressed: () =>
-                                    FlutterOverlayWindow.closeOverlay(),
+                                onPressed: () {
+                                  stopRequirementRing();
+                                  FlutterOverlayWindow.closeOverlay();
+                                },
                                 child: const Text('Dismiss',
                                     style: TextStyle(
                                         color: Colors.grey,

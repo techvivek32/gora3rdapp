@@ -404,13 +404,13 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     try {
       final dateStr = req['travelDate'] as String?;
       if (dateStr == null) return false;
-      // Keep the requirement visible for the WHOLE travel day (ignore the time
-      // of day). Use only the date part so timezone never shifts the day.
+      // Show requirement for 7 days from travel date, then hide it.
       final datePart = dateStr.contains('T') ? dateStr.split('T').first : dateStr;
       final p = datePart.split('-');
       if (p.length != 3) return false;
-      final endOfDay = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]), 23, 59, 59);
-      return endOfDay.isBefore(DateTime.now());
+      final travelDate = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
+      final expiryDate = travelDate.add(const Duration(days: 7));
+      return DateTime.now().isAfter(expiryDate);
     } catch (_) {
       return false;
     }

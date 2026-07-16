@@ -157,13 +157,13 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     try {
       final dateStr = v['availableDate'] as String?;
       if (dateStr == null) return false;
-      // Keep the listing visible for the WHOLE available day (ignore the time of
-      // day). Use only the date part so timezone never shifts the day.
+      // Show vehicle for 7 days from available date, then hide it.
       final datePart = dateStr.contains('T') ? dateStr.split('T').first : dateStr;
       final p = datePart.split('-');
       if (p.length != 3) return false;
-      final endOfDay = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]), 23, 59, 59);
-      return endOfDay.isBefore(DateTime.now());
+      final availableDate = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
+      final expiryDate = availableDate.add(const Duration(days: 7));
+      return DateTime.now().isAfter(expiryDate);
     } catch (_) {
       return false;
     }
