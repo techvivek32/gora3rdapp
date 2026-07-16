@@ -96,8 +96,12 @@ class PushNotificationService {
     // App is in the foreground here — show the rich on-screen popup card. An
     // assignment carries a requirementId but is not a new-requirement alert: it
     // gets a plain notification (below) that deep-links to the Assigned tab.
+    // Also exclude trip start/end notifications.
     final isNewRequirement = (data['requirementId'] ?? '').toString().isNotEmpty &&
-        data['type'] != 'requirement_assigned';
+        data['type'] != 'requirement_assigned' &&
+        data['type'] != 'trip_started' &&
+        data['type'] != 'trip_ended' &&
+        data['type'] != 'driver_assigned';
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isNewRequirement) {
       playRequirementRing();
@@ -186,8 +190,14 @@ class PushNotificationService {
       return;
     }
 
-    // Show the rich popup card if this was a requirement, else open the feed.
-    if ((data['requirementId'] ?? '').toString().isNotEmpty) {
+    // Trip started/ended: open My Requirements on the Assigned tab.
+    if (data['type'] == 'trip_started' || data['type'] == 'trip_ended') {
+      ctx.push('/my-requirements?tab=2');
+      return;
+    }
+
+    // Show the rich popup card only for NEW requirements, else open the feed.
+    if ((data['requirementId'] ?? '').toString().isNotEmpty && data['type'] != 'requirement_assigned' && data['type'] != 'trip_started' && data['type'] != 'trip_ended') {
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
     }
