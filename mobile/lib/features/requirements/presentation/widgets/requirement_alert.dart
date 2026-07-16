@@ -75,12 +75,12 @@ class _RequirementAlert extends StatelessWidget {
     final note = _str('notes');
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,29 +90,50 @@ class _RequirementAlert extends StatelessWidget {
                 children: [
                   const CircleAvatar(radius: 16, backgroundColor: AppColors.primaryLight, child: Icon(Icons.access_time_rounded, size: 18, color: AppColors.primary)),
                   const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)),
-                    child: Text(dateTime.isEmpty ? 'New Requirement' : dateTime, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)),
+                      child: Text(
+                        dateTime.isEmpty ? 'New Requirement' : dateTime,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                      ),
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   if (bookingId.isNotEmpty)
-                    Text('#$bookingId', style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.memberPremium)),
+                    Flexible(
+                      child: Text(
+                        '#$bookingId',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.memberPremium),
+                      ),
+                    ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
               // Vehicle row
               Row(
                 children: [
                   const Icon(Icons.directions_car, color: AppColors.primary, size: 22),
                   const SizedBox(width: 8),
-                  Text(vehicle.isEmpty ? 'Vehicle' : vehicle, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const Spacer(),
-                  if (trip.isNotEmpty) _tag(trip),
+                  Expanded(
+                    child: Text(
+                      vehicle.isEmpty ? 'Vehicle' : vehicle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (trip.isNotEmpty) Flexible(child: _tag(trip)),
                 ],
               ),
-              const Divider(height: 20),
+              const Divider(height: 16),
 
               // From → (stops) → To
               _routePoint(Colors.green, 'A', from.isEmpty ? '—' : from),
@@ -125,7 +146,14 @@ class _RequirementAlert extends StatelessWidget {
                 child: Row(children: [
                   Container(width: 2, height: 16, color: Colors.grey.shade300),
                   const SizedBox(width: 18),
-                  Text(trip.isEmpty ? '' : trip, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  Expanded(
+                    child: Text(
+                      trip.isEmpty ? '' : trip,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                    ),
+                  ),
                 ]),
               ),
               _routePoint(Colors.red, 'B', to.isEmpty ? '—' : to),
@@ -135,16 +163,26 @@ class _RequirementAlert extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.chat_bubble_outline, size: 18, color: Colors.grey.shade600),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Icon(Icons.chat_bubble_outline, size: 18, color: Colors.grey.shade600),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(note, style: const TextStyle(fontSize: 13, height: 1.4))),
+                    Expanded(
+                      child: Text(
+                        note,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ),
                   ],
                 ),
               },
 
-              const SizedBox(height: 8),
-              Text('just now', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-              const SizedBox(height: 14),
+              const SizedBox(height: 6),
+              Text('just now', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+              const SizedBox(height: 12),
 
               // Actions — Call & WhatsApp (only enabled if user has active plan).
               Builder(
@@ -155,27 +193,27 @@ class _RequirementAlert extends StatelessWidget {
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: canContact ? () => callNumber(mobile) : null,
-                          icon: const Icon(Icons.call, size: 18, color: Colors.white),
-                          label: const Text('Call'),
+                          icon: const Icon(Icons.call, size: 16, color: Colors.white),
+                          label: const Text('Call', style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: Colors.green.withValues(alpha: 0.4),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: canContact ? () => openWhatsApp(mobile) : null,
-                          icon: const Icon(Icons.chat, size: 18, color: Colors.white),
-                          label: const Text('WhatsApp'),
+                          icon: const Icon(Icons.chat, size: 16, color: Colors.white),
+                          label: const Text('WhatsApp', style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF25D366),
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: const Color(0xFF25D366).withValues(alpha: 0.4),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                           ),
                         ),
                       ),
@@ -183,7 +221,7 @@ class _RequirementAlert extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -191,9 +229,9 @@ class _RequirementAlert extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.black,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: const Text('Close', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 ),
               ),
             ],
@@ -206,7 +244,12 @@ class _RequirementAlert extends StatelessWidget {
   Widget _tag(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
-        child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        ),
       );
 
   Widget _routePoint(Color color, String label, String text) => Row(
@@ -214,7 +257,14 @@ class _RequirementAlert extends StatelessWidget {
         children: [
           CircleAvatar(radius: 11, backgroundColor: color, child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       );
 }

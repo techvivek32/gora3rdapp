@@ -243,8 +243,13 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
             child: GestureDetector(
               onTap: () {}, // absorb taps on the card so it doesn't dismiss
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width - 24,
+                    maxHeight: MediaQuery.of(context).size.height * 0.8,
+                  ),
+                  child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
@@ -256,9 +261,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                     ],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       // Brand bar
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -300,16 +306,22 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                     child: Text(poster,
+                                        maxLines: 1,
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 15),
                                         overflow: TextOverflow.ellipsis)),
-                                if (bookingId.isNotEmpty)
-                                  Text('#$bookingId',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: _primary,
-                                          fontSize: 13)),
+                                if (bookingId.isNotEmpty) ...[const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text('#$bookingId',
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: _primary,
+                                            fontSize: 13),
+                                        overflow: TextOverflow.ellipsis),
+                                  ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -318,23 +330,31 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                 const Icon(Icons.directions_car,
                                     color: _primary, size: 20),
                                 const SizedBox(width: 6),
-                                Text(vehicle.isEmpty ? 'Vehicle' : vehicle,
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700)),
-                                const Spacer(),
+                                Expanded(
+                                  child: Text(vehicle.isEmpty ? 'Vehicle' : vehicle,
+                                      maxLines: 1,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700),
+                                      overflow: TextOverflow.ellipsis),
+                                ),
+                                const SizedBox(width: 8),
                                 if (trip.isNotEmpty)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                            color: Colors.grey.shade300)),
-                                    child: Text(trip,
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                              color: Colors.grey.shade300)),
+                                      child: Text(trip,
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600),
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
                                   ),
                               ],
                             ),
@@ -352,8 +372,11 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.chat_bubble_outline,
-                                      size: 16, color: Colors.grey.shade600),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Icon(Icons.chat_bubble_outline,
+                                        size: 16, color: Colors.grey.shade600),
+                                  ),
                                   const SizedBox(width: 6),
                                   Expanded(
                                       child: Text(note,
@@ -413,8 +436,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                         ),
                       ),
                     ],
-                  ),
-                ), // Container
+                    ),
+                  ), // SingleChildScrollView
+                  ), // Container
+                ), // ConstrainedBox
               ), // Padding (horizontal)
             ), // inner GestureDetector (absorb taps)
           ), // Center
@@ -436,6 +461,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
           const SizedBox(width: 10),
           Expanded(
               child: Text(text,
+                  maxLines: 1,
                   style: const TextStyle(
                       fontSize: 14, fontWeight: FontWeight.w600),
                   overflow: TextOverflow.ellipsis)),

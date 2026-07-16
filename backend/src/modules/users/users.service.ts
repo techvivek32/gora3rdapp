@@ -225,14 +225,24 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const user = await this.userModel.findByIdAndUpdate(
+    const user = await this.userModel.findById(userId).select('isActive isBlocked');
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.isActive) throw new BadRequestException('Your account is inactive. Please contact support.');
+    if (user.isBlocked) throw new BadRequestException('Your account is blocked. Please contact support.');
+
+    // Check if there's a pending deletion request
+    const deletionRequest = await this.deletionRequestModel.findOne({ userId, status: 'pending' }).lean();
+    if (deletionRequest) {
+      throw new BadRequestException('Your account deletion is pending. You cannot modify your profile.');
+    }
+
+    const updated = await this.userModel.findByIdAndUpdate(
       userId,
       { $set: dto },
       { new: true, runValidators: true },
     ).select('-password -refreshToken -fcmTokens');
 
-    if (!user) throw new NotFoundException('User not found');
-    return { message: 'Profile updated', data: user };
+    return { message: 'Profile updated', data: updated };
   }
 
   async submitVerification(userId: string, dto: SubmitVerificationDto) {
