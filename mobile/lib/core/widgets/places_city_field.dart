@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../di/injection.dart';
@@ -22,6 +23,7 @@ class PlacesCityField extends StatefulWidget {
   final bool required;
   final String? initialText;
   final void Function(String city, String? state) onChanged;
+  final bool skipAuth;
 
   const PlacesCityField({
     super.key,
@@ -30,6 +32,7 @@ class PlacesCityField extends StatefulWidget {
     required this.onChanged,
     this.required = false,
     this.initialText,
+    this.skipAuth = false,
   });
 
   @override
@@ -83,8 +86,8 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
 
   Future<void> _search(String query) async {
     try {
-      // "geocode" types cover cities, towns and villages — not just big cities.
-      final res = await getIt<ApiClient>().get('/places/autocomplete', params: {'input': query, 'types': 'geocode'});
+      final dio = Dio(BaseOptions(baseUrl: 'http://localhost:7001/api/v1'));
+      final res = await dio.get('/places/autocomplete', queryParameters: {'input': query, 'types': 'geocode'});
       final preds = (res.data['data']?['predictions'] as List?) ?? [];
       final seen = <String>{};
       final results = <_Prediction>[];
@@ -132,7 +135,7 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
             labelText: widget.label,
-            prefixIcon: Icon(widget.icon, color: AppColors.primary),
+            prefixIcon: Icon(widget.icon, color: Colors.grey.shade600),
             suffixIcon: _loading
                 ? Padding(
                     padding: EdgeInsets.all(12.r),
@@ -165,7 +168,7 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
                 final r = _results[i];
                 return ListTile(
                   dense: true,
-                  leading: Icon(Icons.location_city, color: AppColors.primary, size: 20.sp),
+                  leading: Icon(Icons.location_city, color: AppColors.textSecondary, size: 20.sp),
                   title: Text(r.city, style: TextStyle(fontSize: 13.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
                   subtitle: r.region.isEmpty
                       ? null

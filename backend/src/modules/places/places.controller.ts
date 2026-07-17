@@ -4,8 +4,6 @@ import { PlacesService } from './places.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Places')
-@ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
 @Controller('places')
 export class PlacesController {
   constructor(private readonly placesService: PlacesService) {}
@@ -22,6 +20,8 @@ export class PlacesController {
     return this.placesService.autocomplete(input, '(cities)');
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
   @Get('details')
   @ApiOperation({ summary: 'Resolve a place_id to address + coordinates + city' })
   details(@Query('placeId') placeId: string) {

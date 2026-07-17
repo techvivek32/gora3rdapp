@@ -10,6 +10,7 @@ import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/install_referrer.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
+import '../../../../core/widgets/places_city_field.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -40,6 +41,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final _mobileCtrl = TextEditingController();
   final _agencyCtrl = TextEditingController();
   final _referralCtrl = TextEditingController();
+  final _cityCtrl = TextEditingController();
+  final _stateCtrl = TextEditingController();
   String _selectedRole = 'travel_agency';
 
   bool _submitting = false;
@@ -92,6 +95,8 @@ class _RegisterPageState extends State<RegisterPage> {
     _mobileCtrl.dispose();
     _agencyCtrl.dispose();
     _referralCtrl.dispose();
+    _cityCtrl.dispose();
+    _stateCtrl.dispose();
     for (final d in _docs.values) {
       d.numberCtrl.dispose();
     }
@@ -200,6 +205,8 @@ class _RegisterPageState extends State<RegisterPage> {
         fullName: _nameCtrl.text.trim(),
         mobile: _mobileCtrl.text.trim(),
         agencyName: _agencyCtrl.text.trim().isEmpty ? null : _agencyCtrl.text.trim(),
+        city: _cityCtrl.text.trim().isEmpty ? null : _cityCtrl.text.trim(),
+        state: _stateCtrl.text.trim().isEmpty ? null : _stateCtrl.text.trim(),
         role: _selectedRole,
         otp: otp,
         referralCode: _referralCtrl.text.trim().isEmpty ? null : _referralCtrl.text.trim(),
@@ -369,6 +376,25 @@ class _RegisterPageState extends State<RegisterPage> {
                     labelText: 'Referral Code (Optional)',
                     hintText: 'e.g. GORA7K3QF',
                     prefixIcon: Icon(Icons.card_giftcard_outlined),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                PlacesCityField(
+                  label: 'City',
+                  icon: Icons.location_city_outlined,
+                  required: true,
+                  initialText: _cityCtrl.text,
+                  onChanged: (city, state) {
+                    _cityCtrl.text = city;
+                    if (state != null && state.isNotEmpty) _stateCtrl.text = state;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _stateCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'State',
+                    prefixIcon: Icon(Icons.map_outlined),
                   ),
                 ),
 
