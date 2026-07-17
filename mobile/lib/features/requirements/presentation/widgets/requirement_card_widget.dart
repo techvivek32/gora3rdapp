@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
@@ -61,7 +62,7 @@ class RequirementCardWidget extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Assigned Driver',
+                  'Assigned Driver'.tr,
                   style: TextStyle(fontSize: 9.sp, color: Colors.grey[700], fontWeight: FontWeight.w600),
                 ),
                 Text(
@@ -220,7 +221,7 @@ class RequirementCardWidget extends StatelessWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(statusLabel, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: statusColor)),
+                                      Text(statusLabel.tr, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: statusColor)),
                                       Text('ID-${requirement['requirementId'] ?? requirement['bookingId'] ?? ''}',
                                           style: TextStyle(fontSize: 11.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
                                     ],
@@ -354,7 +355,7 @@ class RequirementCardWidget extends StatelessWidget {
                                     children: [
                                       Text(_formatVehicleType(requirement['vehicleType']), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                                       Text(_formatFuel(requirement['fuelType']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
-                                      Text('Carrier Does Not Matter', style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                      Text('Carrier Does Not Matter'.tr, style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
                                     ],
                                   ),
                                 ),
@@ -396,7 +397,7 @@ class RequirementCardWidget extends StatelessWidget {
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text('App Suggested Fare',
+                                    Text('App Suggested Fare'.tr,
                                         style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: topBarColor)),
                                     Icon(Icons.auto_awesome, size: 15.sp, color: topBarColor),
                                     SizedBox(width: 4.w),
@@ -483,7 +484,7 @@ class RequirementCardWidget extends StatelessWidget {
                                       Container(
                                         padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                                         decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
-                                        child: Text(badgeText, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                        child: Text(badgeText.tr, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
                                       ),
                                     ],
                                   ),
@@ -508,7 +509,7 @@ class RequirementCardWidget extends StatelessWidget {
                                     if (mobile != null && mobile.isNotEmpty) {
                                       callNumber(mobile);
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
                                     }
                                   }),
                                   _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
@@ -516,7 +517,7 @@ class RequirementCardWidget extends StatelessWidget {
                                       // Pre-fill the chat with the full requirement details.
                                       openWhatsApp(mobile, message: _buildWhatsAppMessage());
                                     } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Contact number not available')));
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
                                     }
                                   }),
                                   _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
@@ -534,7 +535,7 @@ class RequirementCardWidget extends StatelessWidget {
                                 onTap: () => context.push('/subscriptions'),
                                 child: SizedBox(
                                   width: double.infinity,
-                                  child: Text('Become a premium member to contact immediately',
+                                  child: Text('Become a premium member to contact immediately'.tr,
                                       textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: Colors.red)),
                                 ),
                               ),
@@ -602,7 +603,7 @@ class RequirementCardWidget extends StatelessWidget {
       children: [
         Text('₹${amount.round()}', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
         SizedBox(height: 2.h),
-        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
+        Text(label.tr, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
       ],
     );
   }
@@ -616,7 +617,7 @@ class RequirementCardWidget extends StatelessWidget {
           children: [
             icon,
             SizedBox(height: 5.h),
-            Text(label, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
+            Text(label.tr, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ],
         ),
       ),

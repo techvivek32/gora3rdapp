@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -67,7 +68,7 @@ class _MyReportsPageState extends State<MyReportsPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('My Reports', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
+        title: Text('My Reports'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -92,7 +93,7 @@ class _MyReportsPageState extends State<MyReportsPage> {
                           border: Border.all(color: _filter == f ? AppColors.primary : AppColors.border),
                         ),
                         child: Text(
-                          f[0].toUpperCase() + f.substring(1),
+                          (f[0].toUpperCase() + f.substring(1)).tr,
                           style: TextStyle(
                             fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
@@ -121,7 +122,7 @@ class _MyReportsPageState extends State<MyReportsPage> {
                                     children: [
                                       Icon(Icons.flag_outlined, size: 56.sp, color: AppColors.textHint),
                                       SizedBox(height: 12.h),
-                                      Text('No reports', style: TextStyle(color: AppColors.textSecondary, fontSize: 15.sp)),
+                                      Text('No reports'.tr, style: TextStyle(color: AppColors.textSecondary, fontSize: 15.sp)),
                                     ],
                                   ),
                                 ),

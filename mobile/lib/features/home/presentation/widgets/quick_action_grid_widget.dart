@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class QuickActionGridWidget extends StatelessWidget {
@@ -9,12 +10,12 @@ class QuickActionGridWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _QuickAction(icon: Icons.search_rounded, label: 'Requirement', onTap: () => context.go('/requirements')),
-      _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab', onTap: () => context.go('/vehicles')),
-      _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans', onTap: () => context.push('/subscriptions')),
-      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities', onTap: () => context.push('/select-city')),
-      _QuickAction(icon: Icons.person_rounded, label: 'My Account', onTap: () => context.push('/my-profile')),
-      _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications', onTap: () => context.push('/notifications')),
+      _QuickAction(icon: Icons.search_rounded, label: 'Requirement'.tr, onTap: () => context.go('/requirements')),
+      _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab'.tr, onTap: () => context.go('/vehicles')),
+      _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans'.tr, onTap: () => context.push('/subscriptions')),
+      _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities'.tr, onTap: () => context.push('/select-city')),
+      _QuickAction(icon: Icons.person_rounded, label: 'My Account'.tr, onTap: () => context.push('/my-profile')),
+      _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
     ];
 
     const navy = Color(0xFF111827);

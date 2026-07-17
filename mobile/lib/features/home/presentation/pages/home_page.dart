@@ -8,6 +8,7 @@ import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/push_notification_service.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/app_logo.dart';
@@ -208,7 +209,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             titleSpacing: 12,
             actions: [
-              Text('Alerts', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              Text('Alerts'.tr, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
               SizedBox(width: 2.w),
               SizedBox(
                 width: 38.w,

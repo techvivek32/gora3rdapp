@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
@@ -89,7 +90,7 @@ class _MyGaragePageState extends State<MyGaragePage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('My Vehicles', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
+        title: Text('My Vehicles'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -98,7 +99,7 @@ class _MyGaragePageState extends State<MyGaragePage> {
         onPressed: () => _openForm(),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),
-        label: Text('Add Vehicle', style: TextStyle(color: Colors.white, fontFamily: 'Poppins', fontSize: 14.sp)),
+        label: Text('Add Vehicle'.tr, style: TextStyle(color: Colors.white, fontFamily: 'Poppins', fontSize: 14.sp)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -301,7 +302,7 @@ class _VehicleFormState extends State<_VehicleForm> {
                 ),
               ),
               SizedBox(height: 16.h),
-              Text(_isEdit ? 'Edit Vehicle' : 'Add Vehicle',
+              Text(_isEdit ? 'Edit Vehicle'.tr : 'Add Vehicle'.tr,
                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
               SizedBox(height: 16.h),
 
@@ -391,7 +392,7 @@ class _VehicleFormState extends State<_VehicleForm> {
                   ),
                   child: _saving
                       ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text(_isEdit ? 'Save Changes' : 'Add Vehicle', style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                      : Text(_isEdit ? 'Save Changes'.tr : 'Add Vehicle'.tr, style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
                 ),
               ),
             ],

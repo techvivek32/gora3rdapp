@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -559,7 +560,7 @@ class _WalletPageState extends State<WalletPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('My Wallet'),
+        title: Text('My Wallet'.tr),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -572,7 +573,7 @@ class _WalletPageState extends State<WalletPage> {
                 children: [
                   _balanceCard(),
                   const SizedBox(height: 20),
-                  const Text('Add Money', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text('Add Money'.tr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 10,
@@ -600,7 +601,7 @@ class _WalletPageState extends State<WalletPage> {
                       style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
                       child: _processing
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Add Money', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                          : Text('Add Money'.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -609,7 +610,7 @@ class _WalletPageState extends State<WalletPage> {
                     child: OutlinedButton.icon(
                       onPressed: (_processing || _balance <= 0) ? null : _showWithdrawSheet,
                       icon: const Icon(Icons.account_balance_outlined, size: 20),
-                      label: const Text('Withdraw', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      label: Text('Withdraw'.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -623,7 +624,7 @@ class _WalletPageState extends State<WalletPage> {
                     child: OutlinedButton.icon(
                       onPressed: (_processing || _balance <= 0) ? null : _showTransferSheet,
                       icon: const Icon(Icons.send_rounded, size: 20),
-                      label: const Text('Transfer', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      label: Text('Transfer'.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
@@ -632,12 +633,12 @@ class _WalletPageState extends State<WalletPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Recent Transactions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text('Recent Transactions'.tr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   if (_transactions.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: Text('No transactions yet', style: TextStyle(color: AppColors.textSecondary))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(child: Text('No transactions yet'.tr, style: const TextStyle(color: AppColors.textSecondary))),
                     )
                   else
                     ..._transactions.map(_txTile),
@@ -663,7 +664,7 @@ class _WalletPageState extends State<WalletPage> {
             children: [
               const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 22),
               const SizedBox(width: 8),
-              const Text('Wallet Balance', style: TextStyle(color: Colors.white70, fontSize: 13)),
+              Text('Wallet Balance'.tr, style: const TextStyle(color: Colors.white70, fontSize: 13)),
             ],
           ),
           const SizedBox(height: 10),

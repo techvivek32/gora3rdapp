@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -80,7 +81,7 @@ Let's Grow Together! 🚖''';
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text('Invite Friends', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
+        title: Text('Invite Friends'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
         centerTitle: true,
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -105,7 +106,7 @@ Let's Grow Together! 🚖''';
                   SizedBox(height: 20.h),
                   _statCard(),
                   SizedBox(height: 20.h),
-                  Text('Friends you invited', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                  Text('Friends you invited'.tr, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
                   SizedBox(height: 8.h),
                   if (_invited.isEmpty)
                     Padding(
@@ -144,7 +145,7 @@ Let's Grow Together! 🚖''';
             children: [
               const Icon(Icons.card_giftcard, color: Colors.white),
               SizedBox(width: 8.w),
-              Text('Your Referral Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14.sp)),
+              Text('Your Referral Code'.tr, style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14.sp)),
             ],
           ),
           SizedBox(height: 14.h),
@@ -168,7 +169,7 @@ Let's Grow Together! 🚖''';
                     children: [
                       const Icon(Icons.copy, size: 18, color: AppColors.primary),
                       SizedBox(width: 4.w),
-                      Text('Copy', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13.sp)),
+                      Text('Copy'.tr, style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 13.sp)),
                     ],
                   ),
                 ),
@@ -181,7 +182,7 @@ Let's Grow Together! 🚖''';
             child: ElevatedButton.icon(
               onPressed: _share,
               icon: const Icon(Icons.share, size: 18),
-              label: const Text('Share Invite'),
+              label: Text('Share Invite'.tr),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.primary,
@@ -215,7 +216,7 @@ Let's Grow Together! 🚖''';
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('$_count', style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.bold, color: AppColors.primary)),
-              Text('Friends invited', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+              Text('Friends invited'.tr, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
             ],
           ),
         ],

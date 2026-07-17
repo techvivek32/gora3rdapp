@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -385,7 +386,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1),
               ),
               child: Text(
-                o['label']!,
+                o['label']!.tr,
                 style: TextStyle(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,

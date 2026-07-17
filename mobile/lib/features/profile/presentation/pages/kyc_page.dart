@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -186,7 +187,7 @@ class _KycPageState extends State<KycPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('KYC Verification'),
+        title: Text('KYC Verification'.tr),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -199,14 +200,14 @@ class _KycPageState extends State<KycPage> {
                 children: [
                   _statusBanner(),
                   const SizedBox(height: 16),
-                  const Text('Documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text('Documents'.tr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(
                     _locked
                         ? (_status == 'verified'
                             ? 'Your documents are verified and can no longer be changed.'
                             : 'Your documents are under review. You can\'t change them until the review is complete.')
-                        : 'Add your document number and a clear photo, then submit for verification.',
+                        : 'Add your document number and a clear photo, then submit for verification.'.tr,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),
@@ -219,7 +220,7 @@ class _KycPageState extends State<KycPage> {
                       style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                       child: _submitting
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text(_status == 'rejected' ? 'Re-submit Documents' : 'Submit for Verification',
+                          : Text(_status == 'rejected' ? 'Re-submit Documents'.tr : 'Submit for Verification'.tr,
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
                   const SizedBox(height: 24),
@@ -256,8 +257,8 @@ class _KycPageState extends State<KycPage> {
       default:
         color = AppColors.textHint;
         icon = Icons.info_outline;
-        title = 'Not Submitted';
-        subtitle = 'Upload your documents to get verified.';
+        title = 'Not Submitted'.tr;
+        subtitle = 'Upload your documents to get verified.'.tr;
     }
     return Container(
       padding: const EdgeInsets.all(14),

@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/constants/vehicle_types.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -138,7 +139,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
                 border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 1),
               ),
               child: Text(
-                o['label']!,
+                o['label']!.tr,
                 style: TextStyle(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,
@@ -648,20 +649,20 @@ class VehicleCard extends StatelessWidget {
                                   _CardAction(
                                     icon: const Icon(Icons.call, color: Colors.white, size: 18),
                                     circleColor: const Color(0xFF2196F3),
-                                    label: 'Call',
+                                    label: 'Call'.tr,
                                     onTap: (mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : snackNoNumber,
                                   ),
                                   SizedBox(width: 20.w),
                                   _CardAction(
                                     icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.white, size: 18),
                                     circleColor: const Color(0xFF25D366),
-                                    label: 'Whatsapp',
+                                    label: 'Whatsapp'.tr,
                                     onTap: (mobile != null && mobile.isNotEmpty) ? () => openWhatsApp(mobile) : snackNoNumber,
                                   ),
                                   const Spacer(),
                                   _CardAction(
                                     icon: Icon(Icons.person_outline, color: topBarColor, size: 22),
-                                    label: 'User Detail',
+                                    label: 'User Detail'.tr,
                                     onTap: openSheet,
                                   ),
                                   if (menu != null) ...[
