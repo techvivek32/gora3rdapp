@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -43,7 +44,7 @@ class ProfilePage extends StatelessWidget {
                 foregroundColor: Colors.white,
                 automaticallyImplyLeading: false,
                 centerTitle: true,
-                title: Text('Settings', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
+                title: Text('Settings'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -77,7 +78,7 @@ class ProfilePage extends StatelessWidget {
                       
                       // Membership card (top)
                       _InfoCard(
-                        title: 'Membership',
+                        title: 'Membership'.tr,
                         children: [
                           Row(
                             children: [
@@ -96,7 +97,7 @@ class ProfilePage extends StatelessWidget {
                                   children: [
                                     Text(planLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.sp, color: planColor, fontFamily: 'Poppins')),
                                     Text(
-                                      membership == 'new' ? 'Upgrade to access premium features' : 'You have premium access',
+                                      membership == 'new' ? 'Upgrade to access premium features'.tr : 'You have premium access',
                                       style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins'),
                                     ),
                                   ],
@@ -111,7 +112,7 @@ class ProfilePage extends StatelessWidget {
                                       color: AppColors.primary,
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
-                                    child: Text('Upgrade', style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                                    child: Text('Upgrade'.tr, style: TextStyle(color: Colors.white, fontSize: 11.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                                   ),
                                 ),
                             ],
@@ -120,27 +121,28 @@ class ProfilePage extends StatelessWidget {
                       ),
                       SizedBox(height: 12.h),
                       
-                      _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'My Wallet', onTap: () => context.push('/wallet')),
-                      _ProfileAction(icon: Icons.directions_car_outlined, label: 'My Vehicles', onTap: () => context.push('/my-vehicles-garage')),
-                      _ProfileAction(icon: Icons.card_giftcard_outlined, label: 'Invite Friends', onTap: () => context.push('/invite')),
-                      _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification', onTap: () => context.push('/kyc')),
-                      _ProfileAction(icon: Icons.flag_outlined, label: 'My Reports', onTap: () => context.push('/my-reports')),
-                      _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications', onTap: () => context.push('/notifications')),
+                      _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'My Wallet'.tr, onTap: () => context.push('/wallet')),
+                      _ProfileAction(icon: Icons.directions_car_outlined, label: 'My Vehicles'.tr, onTap: () => context.push('/my-vehicles-garage')),
+                      _ProfileAction(icon: Icons.card_giftcard_outlined, label: 'Invite Friends'.tr, onTap: () => context.push('/invite')),
+                      _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification'.tr, onTap: () => context.push('/kyc')),
+                      _ProfileAction(icon: Icons.flag_outlined, label: 'My Reports'.tr, onTap: () => context.push('/my-reports')),
+                      _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
+                      _ProfileAction(icon: Icons.language_outlined, label: 'Language'.tr, onTap: () => context.push('/language')),
                       SizedBox(height: 12.h),
 
                       // About & Policies
-                      _ProfileAction(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', onTap: () => context.push('/policy/privacy')),
-                      _ProfileAction(icon: Icons.description_outlined, label: 'Terms & Conditions', onTap: () => context.push('/policy/terms')),
-                      _ProfileAction(icon: Icons.info_outline, label: 'About Us', onTap: () => context.push('/policy/about')),
+                      _ProfileAction(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy'.tr, onTap: () => context.push('/policy/privacy')),
+                      _ProfileAction(icon: Icons.description_outlined, label: 'Terms & Conditions'.tr, onTap: () => context.push('/policy/terms')),
+                      _ProfileAction(icon: Icons.info_outline, label: 'About Us'.tr, onTap: () => context.push('/policy/about')),
                       SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.logout,
-                        label: 'Sign Out',
+                        label: 'Sign Out'.tr,
                         color: AppColors.error,
                         onTap: () => showDialog(
                           context: context,
                           builder: (dialogCtx) => AlertDialog(
-                            title: const Text('Sign Out', style: TextStyle(fontFamily: 'Poppins')),
+                            title: Text('Sign Out'.tr, style: const TextStyle(fontFamily: 'Poppins')),
                             content: const Text('Are you sure you want to sign out?', style: TextStyle(fontFamily: 'Poppins')),
                             actions: [
                               TextButton(onPressed: () => Navigator.of(dialogCtx).pop(), child: const Text('Cancel')),
@@ -149,7 +151,7 @@ class ProfilePage extends StatelessWidget {
                                   Navigator.of(dialogCtx).pop();
                                   context.read<AuthBloc>().add(AuthLogoutEvent());
                                 },
-                                child: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
+                                child: Text('Sign Out'.tr, style: const TextStyle(color: AppColors.error)),
                               ),
                             ],
                           ),

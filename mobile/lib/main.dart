@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:go_router/go_router.dart';
 import 'core/di/injection.dart';
+import 'core/localization/app_translations.dart';
+import 'core/localization/locale_controller.dart';
 import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
 import 'core/utils/install_referrer.dart';
@@ -69,6 +72,9 @@ void main() async {
 
   // Push notifications (permission, channel, foreground/tap handlers)
   await PushNotificationService.instance.init();
+
+  // Restore the saved app language before the first frame.
+  await LocaleController.instance.load();
 
   // If this install came from an invite link, grab the referral code Play passed
   // along. Not awaited — it must never delay first paint.
@@ -183,12 +189,24 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
         minTextAdapt: true,
         splitScreenMode: true,
         builder: (context, child) {
-          return MaterialApp.router(
-            title: 'Gora Cabs',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            themeMode: ThemeMode.light,
-            routerConfig: _router,
+          // Rebuild the whole app when the language changes so every `.tr` string
+          // and the Material widgets re-render in the chosen locale.
+          return ListenableBuilder(
+            listenable: LocaleController.instance,
+            builder: (context, _) => MaterialApp.router(
+              title: 'Gora Cabs',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              themeMode: ThemeMode.light,
+              locale: LocaleController.instance.locale,
+              supportedLocales: kSupportedLocales,
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              routerConfig: _router,
+            ),
           );
         },
       ),
