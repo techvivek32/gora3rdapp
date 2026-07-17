@@ -29,6 +29,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { WalletModule } from './modules/wallet/wallet.module';
 import { PlacesModule } from './modules/places/places.module';
 import { SupportModule } from './modules/support/support.module';
+import { GarageModule } from './modules/garage/garage.module';
 
 @Module({
   imports: [
@@ -93,6 +94,7 @@ import { SupportModule } from './modules/support/support.module';
     WalletModule,
     PlacesModule,
     SupportModule,
+    GarageModule,
   ],
 })
 export class AppModule {}
