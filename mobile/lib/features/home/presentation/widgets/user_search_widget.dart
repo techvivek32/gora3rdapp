@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
 
@@ -64,7 +65,7 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
               inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
               onSubmitted: (_) => _search(),
               decoration: InputDecoration(
-                hintText: 'Search partner by phone number',
+                hintText: 'Search partner by phone number'.tr,
                 prefixIcon: const Icon(Icons.phone_outlined),
                 isDense: true,
                 contentPadding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 8.w),

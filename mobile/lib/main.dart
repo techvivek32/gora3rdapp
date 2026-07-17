@@ -194,6 +194,10 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
           return ListenableBuilder(
             listenable: LocaleController.instance,
             builder: (context, _) => MaterialApp.router(
+              // Rekey on language change so go_router tears down and rebuilds the
+              // CURRENT page too — otherwise it only re-renders on next navigation.
+              // The GoRouter keeps its location, so the same screen comes back.
+              key: ValueKey(LocaleController.instance.lang),
               title: 'Gora Cabs',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.lightTheme,

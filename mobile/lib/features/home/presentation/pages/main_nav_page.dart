@@ -68,7 +68,7 @@ class MainNavPage extends StatelessWidget {
                 Expanded(
                   child: _PostOptionCard(
                     icon: Icons.search_rounded,
-                    title: 'Requirement',
+                    title: 'Requirement'.tr,
                     subtitle: 'Need a vehicle?',
                     color: AppColors.info,
                     onTap: () { Navigator.pop(ctx); context.push('/requirements/create'); },
@@ -78,7 +78,7 @@ class MainNavPage extends StatelessWidget {
                 Expanded(
                   child: _PostOptionCard(
                     icon: Icons.directions_car_rounded,
-                    title: 'Available Cab',
+                    title: 'Available Cab'.tr,
                     subtitle: 'Have a vehicle?',
                     color: AppColors.success,
                     onTap: () { Navigator.pop(ctx); context.push('/vehicles/create'); },
