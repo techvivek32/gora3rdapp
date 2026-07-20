@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/config/env.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
@@ -275,11 +276,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_travelDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'), backgroundColor: AppColors.error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'.tr), backgroundColor: AppColors.error));
       return;
     }
     if (_travelTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel time'), backgroundColor: AppColors.error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel time'.tr), backgroundColor: AppColors.error));
       return;
     }
     final data = <String, dynamic>{
@@ -326,7 +327,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_isEdit ? 'Edit Requirement' : 'Post Requirement', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Requirement' : 'Post Requirement'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<RequirementsBloc, RequirementsState>(
         listener: (context, state) {
           if (state is RequirementCreated || state is RequirementUpdated) {
@@ -347,7 +348,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Route Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    Text('Route Details'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
                     AddressAutocompleteField(
                       controller: _pickupCtrl,
@@ -371,7 +372,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                           onSelected: (a, lat, lng, city) => _onStopSelected(stop, a, lat, lng, city),
                           suffix: IconButton(
                             icon: Icon(Icons.close, color: AppColors.error, size: 20.sp),
-                            tooltip: 'Remove stop',
+                            tooltip: 'Remove stop'.tr,
                             onPressed: () => _removeStop(i),
                           ),
                         ),
@@ -391,7 +392,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       child: TextButton.icon(
                         onPressed: _addStop,
                         icon: Icon(Icons.add_circle_outline, color: AppColors.primary, size: 20.sp),
-                        label: Text('Add Stop', style: TextStyle(color: AppColors.primary, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
+                        label: Text('Add Stop'.tr, style: TextStyle(color: AppColors.primary, fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
                         style: TextButton.styleFrom(padding: EdgeInsets.symmetric(horizontal: 4.w)),
                       ),
                     ),
@@ -401,12 +402,12 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    Text('Vehicle Details'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
                     DropdownButtonFormField<String>(
                       value: _tripType,
                       decoration: InputDecoration(
-                        labelText: 'Trip Type',
+                        labelText: 'Trip Type'.tr,
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -420,7 +421,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     DropdownButtonFormField<String>(
                       value: _vehicleType,
                       decoration: InputDecoration(
-                        labelText: 'Vehicle Type',
+                        labelText: 'Vehicle Type'.tr,
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -434,7 +435,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     DropdownButtonFormField<String>(
                       value: _fuelType,
                       decoration: InputDecoration(
-                        labelText: 'Fuel Type',
+                        labelText: 'Fuel Type'.tr,
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -450,7 +451,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Date & Time', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    Text('Date & Time'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
                     Row(
                       children: [
@@ -525,7 +526,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     ),
                     if (_tripType == 'round_trip') ...[
                       SizedBox(height: 12.h),
-                      Text('Return Date & Time', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                      Text('Return Date & Time'.tr, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                       SizedBox(height: 12.h),
                       Row(
                         children: [
@@ -555,7 +556,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                       child: Text(
                                         _returnDate != null
                                             ? '${_returnDate!.day}-${_returnDate!.month}-${_returnDate!.year}'
-                                            : 'Return Date',
+                                            : 'Return Date'.tr,
                                         style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _returnDate != null ? AppColors.textPrimary : AppColors.textHint),
                                       ),
                                     ),
@@ -587,7 +588,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                     SizedBox(width: 8.w),
                                     Expanded(
                                       child: Text(
-                                        _returnTime != null ? _formatTime(_returnTime!) : 'Return Time',
+                                        _returnTime != null ? _formatTime(_returnTime!) : 'Return Time'.tr,
                                         style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _returnTime != null ? AppColors.textPrimary : AppColors.textHint),
                                       ),
                                     ),
@@ -605,13 +606,13 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Additional Notes (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    Text('Additional Notes (Optional)'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
                     TextFormField(
                       controller: _notesCtrl,
                       maxLines: 3,
                       decoration: InputDecoration(
-                        hintText: 'Add any additional notes here...',
+                        hintText: 'Add any additional notes here...'.tr,
                         filled: true,
                         fillColor: Colors.grey[50],
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -627,7 +628,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Fare', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                    Text('Fare'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                     SizedBox(height: 12.h),
                     
                     // Suggested vs Custom Option
@@ -652,7 +653,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                               ),
                               child: Center(
                                 child: Text(
-                                  'App Suggested',
+                                  'App Suggested'.tr,
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontWeight: FontWeight.w600,
@@ -684,7 +685,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                               ),
                               child: Center(
                                 child: Text(
-                                  'Enter Your Own',
+                                  'Enter Your Own'.tr,
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontWeight: FontWeight.w600,
@@ -722,7 +723,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   children: [
                                     SizedBox(width: 14.w, height: 14.h, child: const CircularProgressIndicator(strokeWidth: 2)),
                                     SizedBox(width: 8.w),
-                                    Text('Calculating route...', style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: AppColors.textHint)),
+                                    Text('Calculating route...'.tr, style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: AppColors.textHint)),
                                   ],
                                 )
                               else
@@ -746,7 +747,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Suggested Fare',
+                                  'Suggested Fare'.tr,
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 15.sp,
@@ -778,7 +779,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                                   onChanged: (_) => setState(() {}),
                                   decoration: InputDecoration(
                                     labelText: 'Driver Fee (₹)',
-                                    hintText: _suggestedFare > 0 ? '₹${_suggestedFare.toStringAsFixed(0)} (${_rateForVehicle.toStringAsFixed(0)}/km)' : 'Fare',
+                                    hintText: _suggestedFare > 0 ? '₹${_suggestedFare.toStringAsFixed(0)} (${_rateForVehicle.toStringAsFixed(0)}/km)' : 'Fare'.tr,
                                     prefixText: '₹ ',
                                     isDense: true,
                                     contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 12.h),
@@ -854,7 +855,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     onPressed: (state is RequirementsLoading || _isCustomFareBelowMin) ? null : _submit,
                     child: state is RequirementsLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_isEdit ? 'Save Changes' : 'Post Requirement', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Requirement'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),

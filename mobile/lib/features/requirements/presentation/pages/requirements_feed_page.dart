@@ -114,7 +114,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         backgroundColor: AppColors.primary,
         elevation: 4,
         automaticallyImplyLeading: false,
-        title: Text('Requirement', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Requirement'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
             icon: Icon(Icons.history_rounded, color: Colors.white),

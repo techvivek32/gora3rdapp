@@ -186,7 +186,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         backgroundColor: AppColors.primary,
         elevation: 4,
         automaticallyImplyLeading: false,
-        title: Text('Available Cabs', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Available Cabs'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
@@ -563,7 +563,7 @@ class VehicleCard extends StatelessWidget {
                                 Icon(Icons.directions_car, size: 18.sp, color: topBarColor),
                                 SizedBox(width: 8.w),
                                 Expanded(
-                                  child: Text('${vehicleTypeLabel(vehicle['vehicleType'] as String?)} is available',
+                                  child: Text('${vehicleTypeLabel(vehicle['vehicleType'] as String?)} ${'is available'.tr}',
                                       style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                                 ),
                                 Container(
@@ -573,7 +573,7 @@ class VehicleCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(6.r),
                                   ),
                                   child: Text(
-                                    (vehicle['tripType'] as String?) == 'round_trip' ? 'Round Trip' : 'One Way',
+                                    (vehicle['tripType'] as String?) == 'round_trip' ? 'Round Trip'.tr : 'One Way'.tr,
                                     style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: topBarColor),
                                   ),
                                 ),

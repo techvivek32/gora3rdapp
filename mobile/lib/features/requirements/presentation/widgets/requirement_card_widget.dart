@@ -234,7 +234,7 @@ class RequirementCardWidget extends StatelessWidget {
                                       menu!,
                                       SizedBox(height: 6.h),
                                     ],
-                                    _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase(), topBarColor, filled: true),
+                                    _chip((requirement['tripType'] as String? ?? '').replaceAll('_', ' ').toUpperCase().tr, topBarColor, filled: true),
                                     if (requirement['tripType'] == 'round_trip')
                                       Builder(builder: (_) {
                                         final d = _roundTripDays(requirement['travelDate'], requirement['returnDate']);

@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/widgets/otp_input.dart';
@@ -45,7 +46,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            'My Requirements',
+            'My Requirements'.tr,
             style: TextStyle(fontFamily: 'Poppins', fontSize: 17.sp, fontWeight: FontWeight.bold),
           ),
           backgroundColor: AppColors.primary,
@@ -55,15 +56,15 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
             preferredSize: const Size.fromHeight(48),
             child: Container(
               color: Colors.white,
-              child: const TabBar(
+              child: TabBar(
                 indicatorColor: AppColors.primary,
                 labelColor: AppColors.primary,
                 unselectedLabelColor: AppColors.textHint,
                 labelStyle: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold),
                 tabs: [
-                  Tab(text: 'Running'),
-                  Tab(text: 'Booked'),
-                  Tab(text: 'Assigned'),
+                  Tab(text: 'Running'.tr),
+                  Tab(text: 'Booked'.tr),
+                  Tab(text: 'Assigned'.tr),
                 ],
               ),
             ),
@@ -134,11 +135,11 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                   .toList();
               return TabBarView(
                 children: [
-                  _buildList(context, running, 'No running requirements', showMenu: true),
-                  _buildList(context, booked, 'No booked requirements'),
+                  _buildList(context, running, 'No running requirements'.tr, showMenu: true),
+                  _buildList(context, booked, 'No booked requirements'.tr),
                   // Requirements OTHER people assigned to me — I'm the driver here,
                   // so no owner menu, and no BOOKED stamp obscuring a live job.
-                  _buildList(context, state.assignedToMe, 'No requirements assigned to you', isAssignedTab: true),
+                  _buildList(context, state.assignedToMe, 'No requirements assigned to you'.tr, isAssignedTab: true),
                 ],
               );
             }
@@ -236,7 +237,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         children: [
           Icon(icon, size: 20.sp, color: color ?? AppColors.textSecondary),
           SizedBox(width: 10.w),
-          Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp, color: color ?? AppColors.textPrimary)),
+          Text(label.tr, style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp, color: color ?? AppColors.textPrimary)),
         ],
       ),
     );
@@ -276,7 +277,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         onPressed: () => _runTripFlow(context, req, starting ? 'start' : 'end'),
         icon: Icon(starting ? Icons.play_arrow_rounded : Icons.stop_rounded, size: 20.sp),
         label: Text(
-          starting ? 'Start Trip' : 'End Trip',
+          starting ? 'Start Trip'.tr : 'End Trip'.tr,
           style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         style: ElevatedButton.styleFrom(
@@ -638,7 +639,7 @@ class _TripOtpDialogState extends State<_TripOtpDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(_isStart ? 'Start Trip' : 'End Trip'),
+      title: Text(_isStart ? 'Start Trip'.tr : 'End Trip'.tr),
       contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       content: SizedBox(

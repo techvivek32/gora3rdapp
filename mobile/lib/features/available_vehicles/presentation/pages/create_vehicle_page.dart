@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/city_autocomplete_field.dart';
 import '../bloc/vehicles_bloc.dart';
@@ -84,7 +85,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_availableDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select available date'), backgroundColor: AppColors.error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select available date'.tr), backgroundColor: AppColors.error));
       return;
     }
     final data = <String, dynamic>{
@@ -111,7 +112,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_isEdit ? 'Edit Cab' : 'Post Available Cab', style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Cab' : 'Post Available Cab'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<VehiclesBloc, VehiclesState>(
         listener: (context, state) {
           if (state is VehicleCreated || state is VehicleUpdated) {
@@ -129,7 +130,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                Text('Location'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 12.h),
                 CityAutocompleteField(
                   label: 'Current City *',
@@ -143,7 +144,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                 ),
                 SizedBox(height: 12.h),
                 CityAutocompleteField(
-                  label: 'Available For (Destination City)',
+                  label: 'Available For (Destination City)'.tr,
                   icon: Icons.location_on_outlined,
                   initialText: _destInitial,
                   onChanged: (city, state) {
@@ -153,12 +154,12 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                 ),
                 SizedBox(height: 20.h),
 
-                Text('Vehicle Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                Text('Vehicle Details'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 12.h),
                 DropdownButtonFormField<String>(
                   value: _vehicleType,
                   decoration: InputDecoration(
-                    labelText: 'Vehicle Type',
+                    labelText: 'Vehicle Type'.tr,
                     filled: true,
                     fillColor: Colors.grey[50],
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -172,22 +173,22 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                 DropdownButtonFormField<String>(
                   value: _tripType,
                   decoration: InputDecoration(
-                    labelText: 'Trip Type',
+                    labelText: 'Trip Type'.tr,
                     filled: true,
                     fillColor: Colors.grey[50],
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.7))),
                     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.primary, width: 2)),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'one_way', child: Text('One Way', style: TextStyle(fontFamily: 'Poppins'))),
-                    DropdownMenuItem(value: 'round_trip', child: Text('Round Trip', style: TextStyle(fontFamily: 'Poppins'))),
+                  items: [
+                    DropdownMenuItem(value: 'one_way', child: Text('One Way'.tr, style: TextStyle(fontFamily: 'Poppins'))),
+                    DropdownMenuItem(value: 'round_trip', child: Text('Round Trip'.tr, style: TextStyle(fontFamily: 'Poppins'))),
                   ],
                   onChanged: (v) => setState(() => _tripType = v!),
                 ),
                 SizedBox(height: 20.h),
 
-                Text('Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                Text('Availability'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 12.h),
                 Row(
                   children: [
@@ -246,7 +247,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                               SizedBox(width: 8.w),
                               Expanded(
                                 child: Text(
-                                  _availableTime != null ? _formatTime(_availableTime!) : 'Time',
+                                  _availableTime != null ? _formatTime(_availableTime!) : 'Time'.tr,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, color: _availableTime != null ? AppColors.textPrimary : AppColors.textHint),
@@ -261,13 +262,13 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                 ),
                 SizedBox(height: 20.h),
 
-                Text('Additional Notes (Optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                Text('Additional Notes (Optional)'.tr, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
                 SizedBox(height: 12.h),
                 TextFormField(
                   controller: _notesCtrl,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    hintText: 'Add any additional notes here...',
+                    hintText: 'Add any additional notes here...'.tr,
                     filled: true,
                     fillColor: Colors.grey[50],
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),
@@ -282,7 +283,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                     onPressed: state is VehiclesLoading ? null : _submit,
                     child: state is VehiclesLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_isEdit ? 'Save Changes' : 'Post Available Cab', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Available Cab'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),
