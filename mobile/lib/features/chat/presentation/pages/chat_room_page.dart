@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/config/env.dart';
+import '../../../../core/di/injection.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -27,7 +28,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   }
 
   Future<void> _initSocket() async {
-    const storage = FlutterSecureStorage();
+    // Use the SAME storage instance/options as the rest of the app. A fresh
+    // `FlutterSecureStorage()` with default AndroidOptions reads from a different
+    // backing store than the app's `encryptedSharedPreferences` one, so it would
+    // read a null token here even while the user is signed in.
+    final storage = getIt<FlutterSecureStorage>();
     final token = await storage.read(key: 'access_token');
     if (token == null) return;
 
