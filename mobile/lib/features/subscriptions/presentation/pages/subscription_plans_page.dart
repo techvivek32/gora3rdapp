@@ -383,6 +383,22 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   }
 
   // ── Grouped tier section: header + 1/3/6-month duration cards ──────────────
+  /// Splits [n] card indices into display rows of up to three, with the smaller
+  /// remainder row FIRST. e.g. 4 → [[0], [1,2,3]]; 5 → [[0,1], [2,3,4]];
+  /// 3 → [[0,1,2]]; 6 → [[0,1,2], [3,4,5]].
+  List<List<int>> _rowGroups(int n) {
+    final rows = <List<int>>[];
+    final rem = n % 3;
+    var i = 0;
+    if (rem > 0) {
+      rows.add([for (var c = 0; c < rem; c++) i++]);
+    }
+    while (i < n) {
+      rows.add([for (var c = 0; c < 3 && i < n; c++) i++]);
+    }
+    return rows;
+  }
+
   Widget _buildTierSection(String tier, List<Map<String, dynamic>> tierPlans, bool isLoading) {
     final color = _tierColor[tier] ?? AppColors.memberActive;
     final icon = _tierIcon[tier] ?? Icons.verified_user;
@@ -441,19 +457,24 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           ),
           if (!collapsed) ...[
             SizedBox(height: 14.h),
-            // IntrinsicHeight bounds the vertical extent so the cards can be equal
-            // height (stretch) inside the scroll view.
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (int i = 0; i < tierPlans.length; i++) ...[
-                    if (i > 0) SizedBox(width: 8.w),
-                    Expanded(child: _buildDurationCard(tier, tierPlans[i], color, oneMonthRupees, isLoading)),
+            // Rows of up to three cards. The SMALLER remainder row goes on TOP —
+            // e.g. 4 plans → 1 on top + 3 below; 5 → 2 on top + 3 below; 3 or 6 →
+            // even rows of three. Each row spreads across the full width.
+            for (int r = 0; r < _rowGroups(tierPlans.length).length; r++) ...[
+              if (r > 0) SizedBox(height: 8.h),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (int j = 0; j < _rowGroups(tierPlans.length)[r].length; j++) ...[
+                      if (j > 0) SizedBox(width: 8.w),
+                      Expanded(child: _buildDurationCard(
+                        tier, tierPlans[_rowGroups(tierPlans.length)[r][j]], color, oneMonthRupees, isLoading)),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+            ],
           ],
         ],
       ),

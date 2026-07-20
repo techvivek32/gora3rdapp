@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Star, X } from 'lucide-react';
+import { Star, X, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Plan {
@@ -88,6 +88,18 @@ export default function PlansPage() {
     onError: (e: any) => toast.error(e?.message || 'Could not save plan'),
   });
 
+  const openCreate = () => setForm({
+    name: '',
+    membershipType: 'active',
+    durationDays: 30,
+    price: 0,
+    discountedPrice: 0,
+    features: '',
+    isActive: true,
+    isPopular: false,
+    sortOrder: 0,
+  });
+
   const openEdit = (p: Plan) => setForm({
     _id: p._id,
     name: p.name,
@@ -110,10 +122,16 @@ export default function PlansPage() {
           <Star className="w-6 h-6 text-orange-500" />
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Plan Management</h1>
-            <p className="text-sm text-gray-500">Edit membership plans — name, duration, price and more.</p>
+            <p className="text-sm text-gray-500">Add &amp; edit membership plans — name, duration, price and more.</p>
           </div>
         </div>
 
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Add Plan
+        </button>
       </div>
 
       {isLoading ? (
