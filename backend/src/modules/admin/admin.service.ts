@@ -189,8 +189,9 @@ export class AdminService {
       this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false, ...owner }),
       this.vehicleModel.countDocuments({ isDeleted: false, ...owner }),
       this.vehicleModel.countDocuments({ status: 'available', isDeleted: false, ...owner }),
-      this.razorpayRevenue(undefined, ids),
-      this.razorpayRevenue(monthStart, ids),
+      // Franchise revenue = plan/subscription purchases only (no wallet top-ups).
+      this.razorpayRevenue(undefined, ids, !!franchiseCity),
+      this.razorpayRevenue(monthStart, ids, !!franchiseCity),
       this.reportModel.countDocuments({ status: ReportStatus.PENDING, ...reportOwner }),
       this.notificationsService ? 0 : 0,
       this.userModel.countDocuments({ createdAt: { $gte: todayStart }, ...uCity }),
@@ -1234,7 +1235,8 @@ export class AdminService {
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
-      this.razorpayDailyRevenue(startDate, ids),
+      // Franchise revenue chart = plan/subscription purchases only (matches the card).
+      this.razorpayDailyRevenue(startDate, ids, !!franchiseCity),
       this.requirementModel.aggregate([
         { $match: { isDeleted: false, ...owner } },
         { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
@@ -1260,7 +1262,9 @@ export class AdminService {
   // stored in paise (÷100 → rupees); wallet amounts are already in rupees.
   private readonly _hasRazorpayId = { $exists: true, $nin: [null, ''] };
 
-  private async razorpayRevenue(since?: Date, userIds?: Types.ObjectId[] | null): Promise<number> {
+  // `plansOnly` counts only plan/subscription purchases (excludes wallet top-ups).
+  // Used for the franchise dashboard, whose revenue = plan buys by its city's users.
+  private async razorpayRevenue(since?: Date, userIds?: Types.ObjectId[] | null, plansOnly = false): Promise<number> {
     const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId };
     const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId };
     if (since) {
@@ -1273,14 +1277,16 @@ export class AdminService {
     }
     const [p, w] = await Promise.all([
       this.paymentModel.aggregate([{ $match: pMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
-      this.walletTxModel.aggregate([{ $match: wMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+      plansOnly
+        ? Promise.resolve([] as any[])
+        : this.walletTxModel.aggregate([{ $match: wMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
     ]);
     const planRupees = (p[0]?.total || 0) / 100; // paise → rupees
     const walletRupees = w[0]?.total || 0; // already rupees
     return Math.round(planRupees + walletRupees);
   }
 
-  private async razorpayDailyRevenue(since: Date, userIds?: Types.ObjectId[] | null) {
+  private async razorpayDailyRevenue(since: Date, userIds?: Types.ObjectId[] | null, plansOnly = false) {
     const dateKey = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
     const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
     const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
@@ -1293,10 +1299,12 @@ export class AdminService {
         { $match: pMatch },
         { $group: { _id: dateKey, paise: { $sum: '$amount' }, count: { $sum: 1 } } },
       ]),
-      this.walletTxModel.aggregate([
-        { $match: wMatch },
-        { $group: { _id: dateKey, rupees: { $sum: '$amount' }, count: { $sum: 1 } } },
-      ]),
+      plansOnly
+        ? Promise.resolve([] as any[])
+        : this.walletTxModel.aggregate([
+            { $match: wMatch },
+            { $group: { _id: dateKey, rupees: { $sum: '$amount' }, count: { $sum: 1 } } },
+          ]),
     ]);
     const map = new Map<string, { revenue: number; count: number }>();
     for (const d of planDaily as any[]) map.set(d._id, { revenue: (d.paise || 0) / 100, count: d.count || 0 });

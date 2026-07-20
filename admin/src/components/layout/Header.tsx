@@ -9,6 +9,16 @@ export default function Header() {
   const { data: session } = useSession();
   const [isDark, setIsDark] = useState(true);
 
+  // Show the real role — a franchise session must not read "Super Admin".
+  const role = (session?.user as any)?.role as string | undefined;
+  const franchiseCity = (session?.user as any)?.franchiseCity as string | undefined;
+  const roleLabel =
+    role === 'franchise'
+      ? `Franchise${franchiseCity ? ` · ${franchiseCity}` : ''}`
+      : role === 'admin'
+        ? 'Admin'
+        : 'Super Admin';
+
   // Sync with the theme applied by the pre-paint init script (defaults to dark).
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains('dark'));
@@ -52,7 +62,7 @@ export default function Header() {
             <p className="text-sm font-medium text-gray-900 dark:text-white">
               {session?.user?.name || 'Admin'}
             </p>
-            <p className="text-xs text-gray-500">Super Admin</p>
+            <p className="text-xs text-gray-500">{roleLabel}</p>
           </div>
         </div>
       </div>
