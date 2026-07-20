@@ -189,6 +189,12 @@ export const adminApi = {
   sendAdminNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
   getSentNotifications: (params?: any) => apiClient.get('/admin/notifications', { params }),
 
+  // ─── Franchises ──────────────────────────────────────────────────────────────
+  getFranchises: (params?: any) => apiClient.get('/admin/franchises', { params }),
+  createFranchise: (data: any) => apiClient.post('/admin/franchises', data),
+  updateFranchise: (id: string, data: any) => apiClient.put(`/admin/franchises/${id}`, data),
+  deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
+
   // ─── Training Videos ─────────────────────────────────────────────────────────
   getTrainingVideos: () => apiClient.get('/admin/training-videos'),
   createTrainingVideo: (data: { title: string; url: string; isActive?: boolean; sortOrder?: number }) =>

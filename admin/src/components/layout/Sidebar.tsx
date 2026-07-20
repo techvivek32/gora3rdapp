@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, Bell, CreditCard,
-  BarChart3, Flag, Image, Settings, LogOut, PlayCircle,
+  BarChart3, Flag, Image, Settings, LogOut, PlayCircle, Building2,
   FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -22,6 +22,7 @@ const navigation = [
     label: 'Users & Platform',
     items: [
       { href: '/users', label: 'Users', icon: Users },
+      { href: '/franchises', label: 'Franchises', icon: Building2 },
       { href: '/support-chats', label: 'Support Chats', icon: MessageSquare },
       { href: '/referrals', label: 'Invite Leaderboard', icon: Trophy },
       { href: '/verification-requests', label: 'Verification Requests', icon: BadgeCheck },

@@ -31,6 +31,7 @@ import { PlacesModule } from './modules/places/places.module';
 import { SupportModule } from './modules/support/support.module';
 import { GarageModule } from './modules/garage/garage.module';
 import { TrainingModule } from './modules/training/training.module';
+import { FranchiseModule } from './modules/franchise/franchise.module';
 
 @Module({
   imports: [
@@ -97,6 +98,7 @@ import { TrainingModule } from './modules/training/training.module';
     SupportModule,
     GarageModule,
     TrainingModule,
+    FranchiseModule,
   ],
 })
 export class AppModule {}
