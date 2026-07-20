@@ -45,6 +45,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        // 1) Try the normal admin / super-admin login first.
         try {
           const response = await axios.post(`${API_URL}/auth/login`, {
             identifier: credentials?.email,
@@ -54,20 +55,43 @@ export const authOptions: NextAuthOptions = {
           const { data } = response.data;
           const user = data?.user;
 
-          if (!user || !['admin', 'super_admin'].includes(user.role)) {
-            throw new Error('Not authorized for admin panel');
+          if (user && ['admin', 'super_admin'].includes(user.role)) {
+            return {
+              id: user._id,
+              name: user.fullName,
+              email: user.email,
+              role: user.role,
+              franchiseCity: null,
+              accessToken: data.accessToken,
+              refreshToken: data.refreshToken,
+            };
           }
+          // A real app user (not admin) reached here — fall through to franchise.
+        } catch {
+          // Not a user/admin account (or wrong password there) — try franchise next.
+        }
+
+        // 2) Fall back to a franchise login (separate identity space).
+        try {
+          const res = await axios.post(`${API_URL}/auth/franchise/login`, {
+            identifier: credentials?.email,
+            password: credentials?.password,
+          });
+          const { data } = res.data;
+          const f = data?.franchise;
+          if (!f) throw new Error('Invalid credentials');
 
           return {
-            id: user._id,
-            name: user.fullName,
-            email: user.email,
-            role: user.role,
+            id: f.id,
+            name: f.name,
+            email: f.email,
+            role: 'franchise',
+            franchiseCity: f.city ?? null,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
           };
         } catch (error: any) {
-          throw new Error(error.response?.data?.message || 'Login failed');
+          throw new Error(error.response?.data?.message || 'Invalid email or password');
         }
       },
     }),
@@ -80,6 +104,7 @@ export const authOptions: NextAuthOptions = {
         token.refreshToken = (user as any).refreshToken;
         token.userId = (user as any).id;
         token.role = (user as any).role;
+        token.franchiseCity = (user as any).franchiseCity ?? null;
         token.accessTokenExpires = jwtExpiryMs((user as any).accessToken);
         token.error = undefined;
         return token;
@@ -97,6 +122,7 @@ export const authOptions: NextAuthOptions = {
       session.user.accessToken = token.accessToken as string;
       session.user.refreshToken = token.refreshToken as string;
       session.user.role = token.role as string;
+      (session.user as any).franchiseCity = (token as any).franchiseCity ?? null;
       (session as any).error = (token as any).error;
       return session;
     },

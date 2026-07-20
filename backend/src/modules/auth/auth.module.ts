@@ -11,6 +11,7 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { AuditLog, AuditLogSchema } from '../../database/schemas/audit-log.schema';
 import { OtpVerification, OtpVerificationSchema } from '../../database/schemas/otp-verification.schema';
+import { Franchise, FranchiseSchema } from '../../database/schemas/franchise.schema';
 import { FirebaseModule } from '../firebase/firebase.module';
 
 @Module({
@@ -28,6 +29,7 @@ import { FirebaseModule } from '../firebase/firebase.module';
       { name: User.name, schema: UserSchema },
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: OtpVerification.name, schema: OtpVerificationSchema },
+      { name: Franchise.name, schema: FranchiseSchema },
     ]),
     FirebaseModule,
   ],

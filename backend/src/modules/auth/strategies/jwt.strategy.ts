@@ -5,12 +5,14 @@ import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../../database/schemas/user.schema';
+import { Franchise, FranchiseDocument } from '../../../database/schemas/franchise.schema';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private configService: ConfigService,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -20,6 +22,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: any) {
+    // Franchise tokens are a separate identity space (franchises collection),
+    // so they must NOT be looked up in the users collection.
+    if (payload.type === 'franchise') {
+      const franchise = await this.franchiseModel.findById(payload.sub);
+      if (!franchise || !franchise.isActive) {
+        throw new UnauthorizedException('Franchise not found or inactive');
+      }
+      return {
+        sub: payload.sub,
+        _id: payload.sub,
+        email: payload.email,
+        role: 'franchise',
+        type: 'franchise',
+        // City the franchise is scoped to — every list/detail endpoint filters by this.
+        franchiseCity: franchise.city || null,
+        franchiseId: payload.sub,
+      };
+    }
+
     const user = await this.userModel.findById(payload.sub).select('-password -refreshToken');
     if (!user || !user.isActive || user.isBlocked) {
       throw new UnauthorizedException('User not found or inactive');

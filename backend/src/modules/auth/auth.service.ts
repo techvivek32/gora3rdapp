@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
 import { AuditLog } from '../../database/schemas/audit-log.schema';
 import { OtpVerification, OtpVerificationDocument } from '../../database/schemas/otp-verification.schema';
 import { FirebaseService } from '../firebase/firebase.service';
@@ -30,6 +31,7 @@ const OTP_MAX_ATTEMPTS = 5;
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLog>,
     @InjectModel(OtpVerification.name) private otpModel: Model<OtpVerificationDocument>,
     private jwtService: JwtService,
@@ -289,9 +291,116 @@ export class AuthService {
     };
   }
 
+  // ---------------------------------------------------------------------------
+  // Franchise authentication (separate identity space from app users / admins).
+  // A franchise logs into the SAME admin login form; NextAuth tries the normal
+  // /auth/login first, then falls back to this endpoint. Tokens carry
+  // `type: 'franchise'` + `role: 'franchise'` so JwtStrategy scopes them.
+  // ---------------------------------------------------------------------------
+  async franchiseLogin(dto: LoginDto) {
+    const email = (dto.identifier || '').toLowerCase().trim();
+    const franchise = await this.franchiseModel
+      .findOne({ email })
+      .select('+password');
+
+    if (!franchise || !franchise.password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+    if (!franchise.isActive) {
+      throw new UnauthorizedException('Franchise account is inactive');
+    }
+
+    const ok = await bcrypt.compare(dto.password, franchise.password);
+    if (!ok) throw new UnauthorizedException('Invalid credentials');
+
+    const tokens = await this.generateFranchiseTokens(franchise);
+    await this.saveFranchiseRefreshToken(franchise._id.toString(), tokens.refreshToken);
+
+    return {
+      message: 'Franchise login successful',
+      data: {
+        franchise: {
+          id: franchise._id.toString(),
+          name: franchise.name,
+          email: franchise.email,
+          city: franchise.city || null,
+          state: franchise.state || null,
+          agencyName: franchise.agencyName || null,
+          role: 'franchise',
+        },
+        ...tokens,
+      },
+    };
+  }
+
+  // The logged-in franchise's own profile (password/refreshToken excluded by select:false).
+  async franchiseProfile(franchiseId: string) {
+    const franchise = await this.franchiseModel.findById(franchiseId).lean();
+    if (!franchise) throw new NotFoundException('Franchise not found');
+    return { data: franchise };
+  }
+
+  private async generateFranchiseTokens(franchise: FranchiseDocument) {
+    const payload = {
+      sub: franchise._id.toString(),
+      email: franchise.email,
+      role: 'franchise',
+      type: 'franchise',
+      city: franchise.city || null,
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('jwt.secret'),
+        expiresIn: this.configService.get<string>('jwt.expiresIn', '1h'),
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+        expiresIn: this.configService.get<string>('jwt.refreshExpiresIn', '30d'),
+      }),
+    ]);
+
+    return { accessToken, refreshToken };
+  }
+
+  private async saveFranchiseRefreshToken(franchiseId: string, refreshToken: string) {
+    const hashedToken = await bcrypt.hash(refreshToken, 10);
+    await this.franchiseModel.findByIdAndUpdate(franchiseId, { refreshToken: hashedToken });
+  }
+
+  // Refresh a franchise's access token. Mirrors refreshTokens() (no rotation).
+  private async refreshFranchiseTokens(franchise: FranchiseDocument, refreshToken: string) {
+    const accessToken = await this.jwtService.signAsync(
+      {
+        sub: franchise._id.toString(),
+        email: franchise.email,
+        role: 'franchise',
+        type: 'franchise',
+        city: franchise.city || null,
+      },
+      {
+        secret: this.configService.get<string>('jwt.secret'),
+        expiresIn: this.configService.get<string>('jwt.expiresIn', '1h'),
+      },
+    );
+    return { message: 'Tokens refreshed', data: { accessToken, refreshToken } };
+  }
+
   async refreshTokens(userId: string, refreshToken: string) {
+    // A refresh may belong to either a normal user/admin OR a franchise; both
+    // share the /auth/refresh endpoint. Try the franchise space first only when
+    // the user space has no such id, to avoid an extra query on the hot path.
     const user = await this.userModel.findById(userId).select('+refreshToken');
-    if (!user || !user.refreshToken) throw new UnauthorizedException('Access denied');
+    if (!user) {
+      const franchise = await this.franchiseModel.findById(userId).select('+refreshToken');
+      if (franchise && franchise.refreshToken) {
+        const valid = await bcrypt.compare(refreshToken, franchise.refreshToken);
+        if (!valid) throw new UnauthorizedException('Invalid refresh token');
+        return this.refreshFranchiseTokens(franchise, refreshToken);
+      }
+      throw new UnauthorizedException('Access denied');
+    }
+    if (!user.refreshToken) throw new UnauthorizedException('Access denied');
 
     const isTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!isTokenValid) throw new UnauthorizedException('Invalid refresh token');

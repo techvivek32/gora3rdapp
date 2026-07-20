@@ -43,6 +43,14 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  @Post('franchise/login')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login as a franchise (email + password)' })
+  franchiseLogin(@Body() dto: LoginDto) {
+    return this.authService.franchiseLogin(dto);
+  }
+
   @Post('login/send-otp')
   @Public()
   @HttpCode(HttpStatus.OK)
@@ -90,5 +98,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current user profile' })
   getMe(@CurrentUser() user: any) {
     return { message: 'Current user', data: user };
+  }
+
+  @Get('franchise/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: "Get the logged-in franchise's own profile" })
+  getFranchiseMe(@CurrentUser('sub') franchiseId: string) {
+    return this.authService.franchiseProfile(franchiseId);
   }
 }

@@ -50,6 +50,10 @@ export class Franchise {
   @Prop({ select: false })
   password: string;
 
+  // Hashed refresh token (bcrypt); never returned by default.
+  @Prop({ select: false })
+  refreshToken?: string;
+
   @Prop({ default: 0, min: 0, max: 100 })
   commissionPercent: number;
 

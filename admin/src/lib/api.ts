@@ -195,6 +195,8 @@ export const adminApi = {
   createFranchise: (data: any) => apiClient.post('/admin/franchises', data),
   updateFranchise: (id: string, data: any) => apiClient.put(`/admin/franchises/${id}`, data),
   deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
+  // The logged-in franchise's own profile (franchise panel → Profile page).
+  getFranchiseMe: () => apiClient.get('/auth/franchise/me'),
 
   // ─── Training Videos ─────────────────────────────────────────────────────────
   getTrainingVideos: () => apiClient.get('/admin/training-videos'),
