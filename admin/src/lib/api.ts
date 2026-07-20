@@ -191,6 +191,7 @@ export const adminApi = {
 
   // ─── Franchises ──────────────────────────────────────────────────────────────
   getFranchises: (params?: any) => apiClient.get('/admin/franchises', { params }),
+  getFranchise: (id: string) => apiClient.get(`/admin/franchises/${id}`),
   createFranchise: (data: any) => apiClient.post('/admin/franchises', data),
   updateFranchise: (id: string, data: any) => apiClient.put(`/admin/franchises/${id}`, data),
   deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
