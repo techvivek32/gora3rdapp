@@ -120,10 +120,20 @@ class _AuthInterceptor extends Interceptor {
             // do NOT delete storage; just propagate the original error.
             return handler.next(err);
           }
+        } on DioException catch (e) {
+          // Only sign out when the refresh is DEFINITIVELY rejected: 401/403 means
+          // the refresh token is invalid/expired/revoked or the account is gone or
+          // blocked. A network blip, timeout, or 5xx (server restart, deploy, brief
+          // outage) must NOT log the user out — otherwise ONE transient failure on
+          // any of the frequent token refreshes permanently kicks them out. Leave
+          // the session intact; the next request simply retries the refresh.
+          final code = e.response?.statusCode;
+          if (code == 401 || code == 403) {
+            await _forceSignOut();
+          }
+          // else: transient — fall through and propagate the original error only.
         } catch (_) {
-          // Refresh was rejected — the account is gone, blocked or deactivated.
-          // (A failed *login* has no refresh token stored, so it never lands here.)
-          await _forceSignOut();
+          // Non-Dio error (parsing, etc.) — treat as transient, keep the session.
         }
       }
     }
