@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/app_logo.dart';
@@ -178,7 +179,7 @@ class PolicyPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(content?.title ?? 'Policy'),
+        title: Text((content?.title ?? 'Policy').tr),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
@@ -201,9 +202,9 @@ class PolicyPage extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(content.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                            Text(content.title.tr, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
                             const SizedBox(height: 2),
-                            Text(content.subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                            Text(content.subtitle.tr, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                           ],
                         ),
                       ),
@@ -232,12 +233,12 @@ class PolicyPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (s.heading != null) ...[
-            Text(s.heading!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            Text(s.heading!.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const Divider(height: 16, color: AppColors.border),
           ],
           ...s.paragraphs.map((p) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Text(p, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.5)),
+                child: Text(p.tr, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.5)),
               )),
           ...s.bullets.map((b) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
@@ -249,7 +250,7 @@ class PolicyPage extends StatelessWidget {
                       child: Icon(Icons.circle, size: 6, color: AppColors.primary),
                     ),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(b, style: const TextStyle(fontSize: 13.5, color: AppColors.textPrimary, height: 1.5))),
+                    Expanded(child: Text(b.tr, style: const TextStyle(fontSize: 13.5, color: AppColors.textPrimary, height: 1.5))),
                   ],
                 ),
               )),
@@ -309,8 +310,8 @@ class _AboutFooterState extends State<_AboutFooter> {
         const SizedBox(height: 24),
         const AppLogo(size: 124, radius: 20),
         const SizedBox(height: 24),
-        const Text(
-          "India's Trusted Taxi Requirement Network",
+        Text(
+          "India's Trusted Taxi Requirement Network".tr,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
@@ -327,8 +328,8 @@ class _AboutFooterState extends State<_AboutFooter> {
           _card(
             child: Column(
               children: [
-                const Text(
-                  'Contact Us',
+                Text(
+                  'Contact Us'.tr,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
                 ),
                 const SizedBox(height: 12),
@@ -353,8 +354,8 @@ class _AboutFooterState extends State<_AboutFooter> {
         _card(
           child: Column(
             children: [
-              const Text(
-                'Legal',
+              Text(
+                'Legal'.tr,
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 4),
