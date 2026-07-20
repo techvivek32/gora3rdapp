@@ -36,6 +36,17 @@ export class GarageVehicle {
 
   @Prop({ trim: true })
   notes: string;
+
+  /** Up to 2 photos of the vehicle (uploaded image URLs). */
+  @Prop({ type: [String], default: [] })
+  carPhotos: string[];
+
+  /** RC (registration certificate) front & back image URLs. */
+  @Prop({ trim: true })
+  rcFrontImage: string;
+
+  @Prop({ trim: true })
+  rcBackImage: string;
 }
 
 export const GarageVehicleSchema = SchemaFactory.createForClass(GarageVehicle);

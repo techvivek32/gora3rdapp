@@ -1,5 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
@@ -140,6 +144,8 @@ class _MyGaragePageState extends State<MyGaragePage> {
       if (v['seatingCapacity'] != null) '${v['seatingCapacity']} seats',
       if ((v['color'] ?? '').toString().trim().isNotEmpty) v['color'].toString(),
     ];
+    final photos = (v['carPhotos'] as List?)?.whereType<String>().where((s) => s.isNotEmpty).toList() ?? [];
+    final firstPhoto = photos.isNotEmpty ? photos.first : null;
     return Container(
       padding: EdgeInsets.all(14.r),
       decoration: BoxDecoration(
@@ -149,11 +155,17 @@ class _MyGaragePageState extends State<MyGaragePage> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 46.w,
-            height: 46.w,
-            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
-            child: Icon(Icons.directions_car, color: AppColors.primary, size: 24.sp),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12.r),
+            child: Container(
+              width: 46.w,
+              height: 46.w,
+              color: AppColors.primary.withValues(alpha: 0.1),
+              child: firstPhoto != null
+                  ? Image.network(firstPhoto, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(Icons.directions_car, color: AppColors.primary, size: 24.sp))
+                  : Icon(Icons.directions_car, color: AppColors.primary, size: 24.sp),
+            ),
           ),
           SizedBox(width: 12.w),
           Expanded(
@@ -213,10 +225,17 @@ class _VehicleFormState extends State<_VehicleForm> {
   final _seatsCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _picker = ImagePicker();
 
   late String _vehicleType;
   late String _fuelType;
   bool _saving = false;
+
+  // Uploaded image URLs. Two car photos + RC front/back.
+  final List<String?> _carPhotos = [null, null];
+  String? _rcFront;
+  String? _rcBack;
+  String? _uploadingSlot; // which slot is uploading right now
 
   static const _fuelTypes = [
     {'value': 'any', 'label': 'Any Fuel'},
@@ -239,7 +258,56 @@ class _VehicleFormState extends State<_VehicleForm> {
     _seatsCtrl.text = v?['seatingCapacity'] != null ? '${v!['seatingCapacity']}' : '';
     _colorCtrl.text = (v?['color'] ?? '').toString();
     _notesCtrl.text = (v?['notes'] ?? '').toString();
+    final cp = (v?['carPhotos'] as List?) ?? [];
+    if (cp.isNotEmpty) _carPhotos[0] = cp[0] as String?;
+    if (cp.length > 1) _carPhotos[1] = cp[1] as String?;
+    _rcFront = v?['rcFrontImage'] as String?;
+    _rcBack = v?['rcBackImage'] as String?;
   }
+
+  /// Pick from the gallery and upload to storage; returns the URL slot updates.
+  Future<void> _pick(String slot) async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1400, imageQuality: 80);
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() => _uploadingSlot = slot);
+    try {
+      final url = await _upload(bytes, slot);
+      if (!mounted) return;
+      setState(() => _setSlot(slot, url));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Upload failed'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingSlot = null);
+    }
+  }
+
+  Future<String?> _upload(Uint8List bytes, String name) async {
+    final res = await _api.dio.post('/storage/upload', data: FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: '$name.jpg'),
+      'folder': 'garage',
+    }));
+    return res.data['data'] as String?;
+  }
+
+  void _setSlot(String slot, String? url) {
+    switch (slot) {
+      case 'car0':
+        _carPhotos[0] = url;
+      case 'car1':
+        _carPhotos[1] = url;
+      case 'rcFront':
+        _rcFront = url;
+      case 'rcBack':
+        _rcBack = url;
+    }
+  }
+
+  void _clearSlot(String slot) => setState(() => _setSlot(slot, null));
 
   @override
   void dispose() {
@@ -262,6 +330,9 @@ class _VehicleFormState extends State<_VehicleForm> {
       if (_seatsCtrl.text.trim().isNotEmpty) 'seatingCapacity': int.tryParse(_seatsCtrl.text.trim()),
       'color': _colorCtrl.text.trim(),
       'notes': _notesCtrl.text.trim(),
+      'carPhotos': _carPhotos.whereType<String>().toList(),
+      'rcFrontImage': _rcFront ?? '',
+      'rcBackImage': _rcBack ?? '',
     };
     try {
       if (_isEdit) {
@@ -378,6 +449,26 @@ class _VehicleFormState extends State<_VehicleForm> {
                 maxLines: 2,
                 decoration: _dec(Icons.notes_outlined, hint: 'e.g. Carrier fitted'),
               ),
+              SizedBox(height: 16.h),
+
+              _label('Vehicle Photos'),
+              Row(
+                children: [
+                  _imageSlot('car0', 'Photo 1', _carPhotos[0]),
+                  SizedBox(width: 10.w),
+                  _imageSlot('car1', 'Photo 2', _carPhotos[1]),
+                ],
+              ),
+              SizedBox(height: 14.h),
+
+              _label('RC (Registration Certificate)'),
+              Row(
+                children: [
+                  _imageSlot('rcFront', 'RC Front', _rcFront),
+                  SizedBox(width: 10.w),
+                  _imageSlot('rcBack', 'RC Back', _rcBack),
+                ],
+              ),
               SizedBox(height: 22.h),
 
               SizedBox(
@@ -406,6 +497,57 @@ class _VehicleFormState extends State<_VehicleForm> {
         padding: EdgeInsets.only(bottom: 6.h),
         child: Text(t, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
       );
+
+  /// One tappable image box: shows the uploaded photo (with a remove ✕) or an
+  /// upload placeholder / spinner while uploading.
+  Widget _imageSlot(String slot, String caption, String? url) {
+    final busy = _uploadingSlot == slot;
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(caption, style: TextStyle(fontSize: 11.sp, color: AppColors.textHint, fontFamily: 'Poppins')),
+          SizedBox(height: 4.h),
+          GestureDetector(
+            onTap: busy ? null : () => _pick(slot),
+            child: Container(
+              height: 92.h,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: url != null && url.isNotEmpty
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                        Positioned(
+                          top: 4.h,
+                          right: 4.w,
+                          child: GestureDetector(
+                            onTap: () => _clearSlot(slot),
+                            child: CircleAvatar(
+                              radius: 11.r,
+                              backgroundColor: Colors.black54,
+                              child: Icon(Icons.close, size: 13.sp, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: busy
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+                          : Icon(Icons.add_a_photo_outlined, color: AppColors.textHint, size: 24.sp),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   InputDecoration _dec(IconData icon, {String? hint}) => InputDecoration(
         prefixIcon: Icon(icon, size: 20.sp),

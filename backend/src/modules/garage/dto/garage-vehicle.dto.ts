@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 export class CreateGarageVehicleDto {
   @ApiProperty({ example: 'crysta' })
@@ -42,6 +42,23 @@ export class CreateGarageVehicleDto {
   @IsString()
   @MaxLength(200)
   notes?: string;
+
+  @ApiPropertyOptional({ type: [String], description: 'Up to 2 vehicle photo URLs' })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(2)
+  carPhotos?: string[];
+
+  @ApiPropertyOptional({ description: 'RC front image URL' })
+  @IsOptional()
+  @IsString()
+  rcFrontImage?: string;
+
+  @ApiPropertyOptional({ description: 'RC back image URL' })
+  @IsOptional()
+  @IsString()
+  rcBackImage?: string;
 }
 
 export class UpdateGarageVehicleDto extends PartialType(CreateGarageVehicleDto) {}
