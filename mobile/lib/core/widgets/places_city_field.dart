@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../di/injection.dart';
-import '../network/api_client.dart';
+import '../config/env.dart';
 import '../theme/app_theme.dart';
 
 class _Prediction {
@@ -86,7 +85,10 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
 
   Future<void> _search(String query) async {
     try {
-      final dio = Dio(BaseOptions(baseUrl: 'http://localhost:7001/api/v1'));
+      // Use the real backend base URL — NOT localhost (on a device that points at
+      // the phone itself, so suggestions never loaded). `/places/autocomplete` is
+      // public, so a plain Dio without auth headers is fine here.
+      final dio = Dio(BaseOptions(baseUrl: Env.apiBaseUrl));
       final res = await dio.get('/places/autocomplete', queryParameters: {'input': query, 'types': 'geocode'});
       final preds = (res.data['data']?['predictions'] as List?) ?? [];
       final seen = <String>{};

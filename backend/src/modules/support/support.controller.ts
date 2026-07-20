@@ -29,6 +29,8 @@ export class SupportController {
 }
 
 // ─── Admin-facing support chats ──────────────────────────────────────────────
+const FRANCHISE_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FRANCHISE];
+
 @ApiTags('Admin Support')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,20 +40,23 @@ export class SupportAdminController {
   constructor(private readonly supportService: SupportService) {}
 
   @Get('conversations')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'List all support conversations' })
-  getConversations() {
-    return this.supportService.getConversations();
+  getConversations(@CurrentUser('franchiseCity') city?: string) {
+    return this.supportService.getConversations(city);
   }
 
   @Get('conversations/:userId')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "Get a user's support conversation" })
-  getConversation(@Param('userId') userId: string) {
-    return this.supportService.getConversation(userId);
+  getConversation(@Param('userId') userId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.supportService.getConversation(userId, city);
   }
 
   @Post('conversations/:userId/reply')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Reply to a user in support chat' })
-  reply(@Param('userId') userId: string, @Body('text') text: string) {
-    return this.supportService.adminReply(userId, text);
+  reply(@Param('userId') userId: string, @Body('text') text: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.supportService.adminReply(userId, text, city);
   }
 }

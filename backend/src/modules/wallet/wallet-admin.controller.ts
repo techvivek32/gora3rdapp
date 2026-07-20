@@ -8,6 +8,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { AdjustWalletDto, RejectWithdrawalDto, TransferFundsDto } from './dto/wallet.dto';
 
+// Franchise operators manage wallets for their own city only (city passed from the
+// JWT to the service, which scopes/guards every query). Admin-only: unrestricted.
+const FRANCHISE_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FRANCHISE];
+
 @ApiTags('Admin Wallets')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,58 +21,67 @@ export class WalletAdminController {
   constructor(private readonly walletService: WalletService) {}
 
   @Get()
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'List all users with their wallet balance' })
-  getAll(@Query() query: { page?: number; limit?: number; search?: string }) {
-    return this.walletService.getAllWalletsForAdmin(query);
+  getAll(@Query() query: { page?: number; limit?: number; search?: string }, @CurrentUser('franchiseCity') city?: string) {
+    return this.walletService.getAllWalletsForAdmin(query, city);
   }
 
   @Post(':id/adjust')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "Add or cut a user's wallet balance with a reason" })
   adjust(
     @CurrentUser('sub') adminId: string,
     @Param('id') userId: string,
     @Body() dto: AdjustWalletDto,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.walletService.adjustWallet(adminId, userId, dto);
+    return this.walletService.adjustWallet(adminId, userId, dto, city);
   }
 
   @Post(':id/transfer')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "Transfer from this user's wallet to another user (same as the app's transfer)" })
-  transfer(@Param('id') userId: string, @Body() dto: TransferFundsDto) {
+  transfer(@Param('id') userId: string, @Body() dto: TransferFundsDto, @CurrentUser('franchiseCity') city?: string) {
     // Reuses the app's transfer: race-safe debit, insufficient-balance guard and
     // the two matching transaction records. :id is the SENDER.
-    return this.walletService.transferFunds(userId, dto);
+    return this.walletService.transferFunds(userId, dto, city);
   }
 
   // ─── Withdrawals ───────────────────────────────────────────────────────────
 
   @Get('withdrawals')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'List withdrawal requests' })
-  getWithdrawals(@Query() query: any) {
-    return this.walletService.getWithdrawals(query);
+  getWithdrawals(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.walletService.getWithdrawals(query, city);
   }
 
   @Post('withdrawals/:id/approve')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Approve a withdrawal request' })
-  approveWithdrawal(@CurrentUser('sub') adminId: string, @Param('id') id: string) {
-    return this.walletService.approveWithdrawal(adminId, id);
+  approveWithdrawal(@CurrentUser('sub') adminId: string, @Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.walletService.approveWithdrawal(adminId, id, city);
   }
 
   @Post('withdrawals/:id/reject')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Reject a withdrawal request and refund the amount' })
   rejectWithdrawal(
     @CurrentUser('sub') adminId: string,
     @Param('id') id: string,
     @Body() dto: RejectWithdrawalDto,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.walletService.rejectWithdrawal(adminId, id, dto);
+    return this.walletService.rejectWithdrawal(adminId, id, dto, city);
   }
 
   // Declared LAST on purpose: ':id' is a wildcard, so above the withdrawals routes
   // it would swallow GET /admin/wallets/withdrawals as id="withdrawals".
   @Get(':id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "One user's wallet balance + transactions" })
-  getOne(@Param('id') userId: string) {
-    return this.walletService.getWallet(userId);
+  getOne(@Param('id') userId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.walletService.getWallet(userId, city);
   }
 }

@@ -34,8 +34,24 @@ export class SupportService {
     return { message: 'Sent', data: msg };
   }
 
+  // ─── Franchise city-scoping helpers (see AdminService for the rationale) ──────
+  private cityRx(city: string) {
+    return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  }
+  private cityMatches(a?: string | null, b?: string | null) {
+    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  }
+  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+    if (!franchiseCity) return;
+    if (!Types.ObjectId.isValid(userId)) throw new BadRequestException('Not found');
+    const u = await this.userModel.findById(userId).select('city').lean();
+    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+      throw new BadRequestException('Not found');
+    }
+  }
+
   // ─── Admin side ────────────────────────────────────────────────────────────
-  async getConversations() {
+  async getConversations(franchiseCity?: string | null) {
     const rows = await this.msgModel.aggregate([
       { $sort: { createdAt: -1 } },
       {
@@ -52,6 +68,8 @@ export class SupportService {
       { $sort: { lastMessageAt: -1 } },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      // Franchise: keep only conversations with users in their city.
+      ...(franchiseCity ? [{ $match: { 'user.city': this.cityRx(franchiseCity) } }] : []),
       {
         $project: {
           _id: 0,
@@ -69,7 +87,8 @@ export class SupportService {
     return { message: 'Conversations retrieved', data: rows };
   }
 
-  async getConversation(userId: string) {
+  async getConversation(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const uid = new Types.ObjectId(userId);
     // Admin is viewing → mark the user's messages as read.
     await this.msgModel.updateMany({ userId: uid, sender: 'user', read: false }, { read: true });
@@ -80,7 +99,8 @@ export class SupportService {
     return { message: 'Conversation retrieved', data: { user, messages } };
   }
 
-  async adminReply(userId: string, text: string) {
+  async adminReply(userId: string, text: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const clean = (text || '').trim();
     if (!clean) throw new BadRequestException('Reply cannot be empty');
 

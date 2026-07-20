@@ -23,6 +23,27 @@ export class WalletService {
     private settingsService: SettingsService,
   ) {}
 
+  // ─── Franchise city-scoping helpers (see AdminService for the rationale) ──────
+  private cityRx(city: string) {
+    return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  }
+  private cityMatches(a?: string | null, b?: string | null) {
+    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  }
+  /** Throws unless the target user is in the franchise's city. No-op for admins. */
+  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+    if (!franchiseCity) return;
+    if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('Not found');
+    const u = await this.userModel.findById(userId).select('city').lean();
+    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+      throw new NotFoundException('Not found');
+    }
+  }
+  private async cityUserIds(city: string): Promise<Types.ObjectId[]> {
+    const rows = await this.userModel.find({ city: this.cityRx(city) }).select('_id').lean();
+    return rows.map((r) => r._id as Types.ObjectId);
+  }
+
   // Read Razorpay keys from admin settings (DB), so admin can set them dynamically.
   private async getRazorpay(): Promise<Razorpay> {
     const { keyId, keySecret } = await this.settingsService.getRazorpayKeys();
@@ -33,7 +54,8 @@ export class WalletService {
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
-  async getWallet(userId: string) {
+  async getWallet(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select('walletBalance').lean(),
       // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
@@ -126,12 +148,13 @@ export class WalletService {
   // ─── Admin ───────────────────────────────────────────────────────────────
 
   /** Paginated list of users with their wallet balance (admin wallet management). */
-  async getAllWalletsForAdmin(query: { page?: number; limit?: number; search?: string }) {
+  async getAllWalletsForAdmin(query: { page?: number; limit?: number; search?: string }, franchiseCity?: string | null) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
 
     const filter: Record<string, unknown> = {};
+    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
     const search = (query.search || '').trim();
     if (search) {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -159,7 +182,8 @@ export class WalletService {
   }
 
   /** Manually add (credit) or cut (debit) a user's wallet balance with a reason. */
-  async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto) {
+  async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
     if (amount < 1) throw new BadRequestException('Enter a valid amount');
 
@@ -250,7 +274,9 @@ export class WalletService {
 
   /** Send money from the current user's wallet to another user, found by mobile.
    *  Fails (without moving anything) when the sender's balance is short. */
-  async transferFunds(userId: string, dto: TransferFundsDto) {
+  async transferFunds(userId: string, dto: TransferFundsDto, franchiseCity?: string | null) {
+    // The sender (:id) must be in the franchise's city. The recipient may be anywhere.
+    await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
     if (amount < 1) throw new BadRequestException('Enter a valid amount');
 
@@ -321,10 +347,12 @@ export class WalletService {
   }
 
   /** Admin: list withdrawal requests (optionally filtered by status). */
-  async getWithdrawals(query: any = {}) {
+  async getWithdrawals(query: any = {}, franchiseCity?: string | null) {
     const status = typeof query === 'string' ? query : query?.status;
     const filter: any = { ...dateRangeFilter(query) };
     if (status && ['pending', 'approved', 'rejected'].includes(status)) filter.status = status;
+    // Franchise: only withdrawals raised by this city's users (ANDed with any search).
+    if (franchiseCity) filter.userId = { $in: await this.cityUserIds(franchiseCity) };
 
     // Search by the requester's name / mobile, or the payout account details.
     const search = (query?.search || '').trim();
@@ -349,9 +377,10 @@ export class WalletService {
   }
 
   /** Admin: approve a pending withdrawal (amount was already debited). */
-  async approveWithdrawal(adminId: string, id: string) {
+  async approveWithdrawal(adminId: string, id: string, franchiseCity?: string | null) {
     const request = await this.withdrawalModel.findById(id);
     if (!request) throw new NotFoundException('Withdrawal request not found');
+    await this.assertUserInCity(request.userId.toString(), franchiseCity);
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
@@ -363,9 +392,10 @@ export class WalletService {
   }
 
   /** Admin: reject a pending withdrawal and refund the held amount. */
-  async rejectWithdrawal(adminId: string, id: string, dto: RejectWithdrawalDto) {
+  async rejectWithdrawal(adminId: string, id: string, dto: RejectWithdrawalDto, franchiseCity?: string | null) {
     const request = await this.withdrawalModel.findById(id);
     if (!request) throw new NotFoundException('Withdrawal request not found');
+    await this.assertUserInCity(request.userId.toString(), franchiseCity);
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }

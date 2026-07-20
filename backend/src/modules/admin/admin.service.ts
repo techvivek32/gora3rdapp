@@ -47,9 +47,40 @@ export class AdminService {
     private availableVehiclesService: AvailableVehiclesService,
   ) {}
 
+  // ─── Franchise city-scoping helpers ─────────────────────────────────────────
+  // Every franchise-facing method receives an optional `franchiseCity`. When it is
+  // set (i.e. the caller is a franchise, not an admin) the query is restricted to
+  // that city; when it is null/undefined the method behaves exactly as before for
+  // admins. A "Rajkot franchise" only ever sees data owned by Rajkot users.
+
+  /** Case-insensitive exact match on a city name. */
+  private cityRx(city: string) {
+    return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+  }
+
+  private cityMatches(a?: string | null, b?: string | null) {
+    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  }
+
+  /** _ids of all users in a city — used to scope owner-referenced collections. */
+  private async cityUserIds(city: string): Promise<Types.ObjectId[]> {
+    const rows = await this.userModel.find({ city: this.cityRx(city) }).select('_id').lean();
+    return rows.map((r) => r._id as Types.ObjectId);
+  }
+
+  /** Throws NotFound unless the target user belongs to the franchise's city. No-op for admins. */
+  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+    if (!franchiseCity) return;
+    if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('Not found');
+    const u = await this.userModel.findById(userId).select('city').lean();
+    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+      throw new NotFoundException('Not found');
+    }
+  }
+
   // ── Account deletion requests ───────────────────────────────────────────────
 
-  async getDeletionRequests(query: any) {
+  async getDeletionRequests(query: any, franchiseCity?: string | null) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = { ...dateRangeFilter(query) };
     if (query.status) filter.status = query.status;
@@ -57,6 +88,7 @@ export class AdminService {
       const rx = new RegExp(String(query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ fullName: rx }, { mobile: rx }, { email: rx }, { reason: rx }];
     }
+    if (franchiseCity) filter.userId = { $in: await this.cityUserIds(franchiseCity) };
 
     const [requests, total] = await Promise.all([
       this.deletionRequestModel
@@ -73,9 +105,10 @@ export class AdminService {
   }
 
   /** Approving permanently removes the user and hides everything they posted. */
-  async approveDeletionRequest(id: string, adminId: string) {
+  async approveDeletionRequest(id: string, adminId: string, franchiseCity?: string | null) {
     const request = await this.deletionRequestModel.findById(id);
     if (!request) throw new NotFoundException('Deletion request not found');
+    await this.assertUserInCity(request.userId.toString(), franchiseCity);
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
@@ -103,9 +136,10 @@ export class AdminService {
     return { message: 'Account deleted', data: request };
   }
 
-  async rejectDeletionRequest(id: string, adminId: string, reason?: string) {
+  async rejectDeletionRequest(id: string, adminId: string, reason?: string, franchiseCity?: string | null) {
     const request = await this.deletionRequestModel.findById(id);
     if (!request) throw new NotFoundException('Deletion request not found');
+    await this.assertUserInCity(request.userId.toString(), franchiseCity);
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
@@ -125,10 +159,17 @@ export class AdminService {
     return { message: 'Deletion request rejected', data: request };
   }
 
-  async getDashboardStats() {
+  async getDashboardStats(franchiseCity?: string | null) {
     const now = new Date();
     const todayStart = new Date(now.setHours(0, 0, 0, 0));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // City scoping: users match by their own `city`; requirements/vehicles/reports
+    // match by their owner being one of this city's users; revenue by those users.
+    const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
+    const uCity: any = franchiseCity ? { city: this.cityRx(franchiseCity) } : {};
+    const owner: any = ids ? { postedBy: { $in: ids } } : {};
+    const reportOwner: any = ids ? { reportedBy: { $in: ids } } : {};
 
     const [
       totalUsers, activeUsers, verifiedUsers, premiumUsers, goldenUsers,
@@ -139,23 +180,23 @@ export class AdminService {
       todayRegistrations, todayRequirements,
       pendingVerifications,
     ] = await Promise.all([
-      this.userModel.countDocuments({ isActive: true }),
-      this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } }),
-      this.userModel.countDocuments({ isVerified: true }),
-      this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM }),
-      this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN }),
-      this.requirementModel.countDocuments({ isDeleted: false }),
-      this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false }),
-      this.vehicleModel.countDocuments({ isDeleted: false }),
-      this.vehicleModel.countDocuments({ status: 'available', isDeleted: false }),
-      this.razorpayRevenue(),
-      this.razorpayRevenue(monthStart),
-      this.reportModel.countDocuments({ status: ReportStatus.PENDING }),
+      this.userModel.countDocuments({ isActive: true, ...uCity }),
+      this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, ...uCity }),
+      this.userModel.countDocuments({ isVerified: true, ...uCity }),
+      this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM, ...uCity }),
+      this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN, ...uCity }),
+      this.requirementModel.countDocuments({ isDeleted: false, ...owner }),
+      this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false, ...owner }),
+      this.vehicleModel.countDocuments({ isDeleted: false, ...owner }),
+      this.vehicleModel.countDocuments({ status: 'available', isDeleted: false, ...owner }),
+      this.razorpayRevenue(undefined, ids),
+      this.razorpayRevenue(monthStart, ids),
+      this.reportModel.countDocuments({ status: ReportStatus.PENDING, ...reportOwner }),
       this.notificationsService ? 0 : 0,
-      this.userModel.countDocuments({ createdAt: { $gte: todayStart } }),
-      this.requirementModel.countDocuments({ createdAt: { $gte: todayStart } }),
+      this.userModel.countDocuments({ createdAt: { $gte: todayStart }, ...uCity }),
+      this.requirementModel.countDocuments({ createdAt: { $gte: todayStart }, ...owner }),
       // Matches the default filter on the Verification Requests page.
-      this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING }),
+      this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING, ...uCity }),
     ]);
 
     return {
@@ -175,7 +216,7 @@ export class AdminService {
     };
   }
 
-  async getUsers(query: any) {
+  async getUsers(query: any, franchiseCity?: string | null) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
 
@@ -202,6 +243,8 @@ export class AdminService {
       filter.isBlocked = false;
       filter.lastActive = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
     }
+    // Franchise: force the city filter to their own city (overrides any query.city).
+    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
 
     const [users, total] = await Promise.all([
       this.userModel.find(filter).select('-password -refreshToken -fcmTokens').sort(sort).skip(skip).limit(limit).lean(),
@@ -212,13 +255,17 @@ export class AdminService {
   }
 
   // Single user detail for the admin user page.
-  async getUser(id: string) {
+  async getUser(id: string, franchiseCity?: string | null) {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('User not found');
     const user = await this.userModel
       .findById(id)
       .select('-password -refreshToken -fcmTokens')
       .lean();
     if (!user) throw new NotFoundException('User not found');
+    // A franchise may only open users in its own city.
+    if (franchiseCity && !this.cityMatches((user as any).city, franchiseCity)) {
+      throw new NotFoundException('User not found');
+    }
     return { message: 'User retrieved', data: user };
   }
 
@@ -248,8 +295,9 @@ export class AdminService {
     return null;
   }
 
-  async getReferralLeaderboard(query: any) {
+  async getReferralLeaderboard(query: any, franchiseCity?: string | null) {
     const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };
+    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
     const search = (query.search || '').trim();
     if (search) {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -323,7 +371,8 @@ export class AdminService {
    * anything in the request body through — role, walletBalance, isVerified — and
    * a duplicate mobile/email would surface as a raw E11000 instead of a message.
    */
-  async updateUser(id: string, data: Partial<any>) {
+  async updateUser(id: string, data: Partial<any>, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const EDITABLE = [
       'fullName', 'agencyName', 'mobile', 'email',
       'city', 'state', 'profileImage',
@@ -366,28 +415,32 @@ export class AdminService {
     return { message: 'User updated', data: user };
   }
 
-  async verifyUser(id: string) {
+  async verifyUser(id: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isVerified: true, isAdminApproved: true }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User verified', data: user };
   }
 
-  async blockUser(id: string, reason?: string) {
+  async blockUser(id: string, reason?: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: true }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User blocked' };
   }
 
-  async unblockUser(id: string) {
+  async unblockUser(id: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: false }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User unblocked' };
   }
 
   // ─── Verification Requests ─────────────────────────────────────────────────
-  async getVerificationRequests(query: any) {
+  async getVerificationRequests(query: any, franchiseCity?: string | null) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
+    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
 
     // Default to pending requests; allow ?status=all or a specific status.
     filter.verificationStatus = query.status && query.status !== 'all'
@@ -419,12 +472,15 @@ export class AdminService {
     return { message: 'Verification requests retrieved', data: buildPaginatedResult(users, total, page, limit) };
   }
 
-  async getVerificationRequest(id: string) {
+  async getVerificationRequest(id: string, franchiseCity?: string | null) {
     const user = await this.userModel
       .findById(id)
       .select('fullName email mobile agencyName role profileImage membershipType isVerified isAdminApproved verificationStatus verificationSubmittedAt verificationRejectionReason documents city state createdAt')
       .lean();
     if (!user) throw new NotFoundException('User not found');
+    if (franchiseCity && !this.cityMatches((user as any).city, franchiseCity)) {
+      throw new NotFoundException('User not found');
+    }
     return { message: 'Verification request retrieved', data: user };
   }
 
@@ -434,7 +490,8 @@ export class AdminService {
    * approved document is never overwritten, and it puts the account into PENDING
    * for review.
    */
-  async submitDocumentsFor(userId: string, documents: Record<string, any>) {
+  async submitDocumentsFor(userId: string, documents: Record<string, any>, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('documents');
     if (!user) throw new NotFoundException('User not found');
 
@@ -478,7 +535,8 @@ export class AdminService {
    *   any one rejected    → REJECTED (only the rejected ones need re-uploading)
    *   otherwise           → PENDING
    */
-  async reviewDocument(userId: string, docKey: string, status: 'approved' | 'rejected', reason?: string) {
+  async reviewDocument(userId: string, docKey: string, status: 'approved' | 'rejected', reason?: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     if (!DOCUMENT_KEYS.includes(docKey as any)) {
       throw new BadRequestException('Unknown document');
     }
@@ -551,7 +609,8 @@ export class AdminService {
     return docs;
   }
 
-  async approveVerification(id: string) {
+  async approveVerification(id: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const existing = await this.userModel.findById(id).select('documents');
     if (!existing) throw new NotFoundException('User not found');
 
@@ -570,7 +629,8 @@ export class AdminService {
     return { message: 'Verification approved', data: user };
   }
 
-  async rejectVerification(id: string, reason?: string) {
+  async rejectVerification(id: string, reason?: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(id, franchiseCity);
     const existing = await this.userModel.findById(id).select('documents');
     if (!existing) throw new NotFoundException('User not found');
 
@@ -597,7 +657,9 @@ export class AdminService {
     membershipType: MembershipType,
     daysToAdd?: number,
     planId?: string,
+    franchiseCity?: string | null,
   ) {
+    await this.assertUserInCity(id, franchiseCity);
     const plan = planId
       ? await this.planModel.findById(planId).lean()
       : await this.planModel.findOne({ membershipType, isActive: true }).sort({ price: 1 }).lean();
@@ -709,7 +771,7 @@ export class AdminService {
     return { message: 'Plan deleted' };
   }
 
-  async getRequirements(query: any) {
+  async getRequirements(query: any, franchiseCity?: string | null) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };
 
@@ -719,6 +781,7 @@ export class AdminService {
     }
     if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');
     if (query.status) filter.status = query.status;
+    if (franchiseCity) filter.postedBy = { $in: await this.cityUserIds(franchiseCity) };
     Object.assign(filter, dateRangeFilter(query));
 
     const [requirements, total] = await Promise.all([
@@ -732,20 +795,22 @@ export class AdminService {
     return { message: 'Requirements retrieved', data: buildPaginatedResult(requirements, total, page, limit) };
   }
 
-  async getSubscriptions(query: any) {
+  async getSubscriptions(query: any, franchiseCity?: string | null) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
     Object.assign(filter, dateRangeFilter(query));
 
     // Search by the subscriber's name / mobile (resolve matching users first).
+    // For a franchise the user query is additionally restricted to their city.
     if (query.search) {
       const rx = new RegExp(query.search, 'i');
-      const matchedUsers = await this.userModel
-        .find({ $or: [{ fullName: rx }, { mobile: rx }, { agencyName: rx }] })
-        .select('_id')
-        .lean();
+      const userFilter: any = { $or: [{ fullName: rx }, { mobile: rx }, { agencyName: rx }] };
+      if (franchiseCity) userFilter.city = this.cityRx(franchiseCity);
+      const matchedUsers = await this.userModel.find(userFilter).select('_id').lean();
       filter.userId = { $in: matchedUsers.map((u) => u._id) };
+    } else if (franchiseCity) {
+      filter.userId = { $in: await this.cityUserIds(franchiseCity) };
     }
 
     const [subscriptions, total] = await Promise.all([
@@ -760,7 +825,7 @@ export class AdminService {
     return { message: 'Subscriptions retrieved', data: buildPaginatedResult(subscriptions, total, page, limit) };
   }
 
-  async getVehicles(query: any) {
+  async getVehicles(query: any, franchiseCity?: string | null) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };
 
@@ -774,6 +839,7 @@ export class AdminService {
       ];
     }
     if (query.status) filter.status = query.status;
+    if (franchiseCity) filter.postedBy = { $in: await this.cityUserIds(franchiseCity) };
     Object.assign(filter, dateRangeFilter(query));
 
     const [vehicles, total] = await Promise.all([
@@ -793,20 +859,37 @@ export class AdminService {
    * the booking id, expiry and "new requirement" alerts all behave identically —
    * the only difference is who clicked the button.
    */
-  async createRequirementFor(userId: string, dto: any) {
+  async createRequirementFor(userId: string, dto: any, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('_id');
     if (!user) throw new NotFoundException('User not found');
     return this.requirementsService.create(userId, dto);
   }
 
   /** Same, for an available-cab listing. */
-  async createVehicleFor(userId: string, dto: any) {
+  async createVehicleFor(userId: string, dto: any, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('_id');
     if (!user) throw new NotFoundException('User not found');
     return this.availableVehiclesService.create(userId, dto);
   }
 
-  async updateRequirement(id: string, data: Partial<any>) {
+  /** Guard: the requirement/vehicle's owner must be in the franchise's city. */
+  private async assertRequirementInCity(id: string, franchiseCity?: string | null) {
+    if (!franchiseCity) return;
+    const doc = await this.requirementModel.findById(id).select('postedBy').lean();
+    if (!doc) throw new NotFoundException('Requirement not found');
+    await this.assertUserInCity((doc as any).postedBy?.toString(), franchiseCity);
+  }
+  private async assertVehicleInCity(id: string, franchiseCity?: string | null) {
+    if (!franchiseCity) return;
+    const doc = await this.vehicleModel.findById(id).select('postedBy').lean();
+    if (!doc) throw new NotFoundException('Vehicle not found');
+    await this.assertUserInCity((doc as any).postedBy?.toString(), franchiseCity);
+  }
+
+  async updateRequirement(id: string, data: Partial<any>, franchiseCity?: string | null) {
+    await this.assertRequirementInCity(id, franchiseCity);
     const req = await this.requirementModel
       .findByIdAndUpdate(id, data, { new: true })
       .populate('postedBy', 'fullName agencyName mobile membershipType');
@@ -814,7 +897,8 @@ export class AdminService {
     return { message: 'Requirement updated', data: req };
   }
 
-  async deleteRequirement(id: string) {
+  async deleteRequirement(id: string, franchiseCity?: string | null) {
+    await this.assertRequirementInCity(id, franchiseCity);
     const req = await this.requirementModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!req) throw new NotFoundException('Requirement not found');
     await this.userModel.findByIdAndUpdate(req.postedBy, {
@@ -823,7 +907,8 @@ export class AdminService {
     return { message: 'Requirement deleted' };
   }
 
-  async updateVehicle(id: string, data: Partial<any>) {
+  async updateVehicle(id: string, data: Partial<any>, franchiseCity?: string | null) {
+    await this.assertVehicleInCity(id, franchiseCity);
     const vehicle = await this.vehicleModel
       .findByIdAndUpdate(id, data, { new: true })
       .populate('postedBy', 'fullName agencyName mobile membershipType');
@@ -831,7 +916,8 @@ export class AdminService {
     return { message: 'Vehicle updated', data: vehicle };
   }
 
-  async deleteVehicle(id: string) {
+  async deleteVehicle(id: string, franchiseCity?: string | null) {
+    await this.assertVehicleInCity(id, franchiseCity);
     const vehicle = await this.vehicleModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!vehicle) throw new NotFoundException('Vehicle not found');
     await this.userModel.findByIdAndUpdate(vehicle.postedBy, {
@@ -847,11 +933,13 @@ export class AdminService {
     return { message: 'City created', data: city };
   }
 
-  async getCities(query: any) {
+  async getCities(query: any, franchiseCity?: string | null) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
     if (query.search) filter.name = new RegExp(query.search, 'i');
     if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
+    // A franchise only sees its own city in the Cities list.
+    if (franchiseCity) filter.name = this.cityRx(franchiseCity);
 
     const [cities, total] = await Promise.all([
       this.cityModel.find(filter).sort({ sortOrder: 1, name: 1 }).skip(skip).limit(limit).lean(),
@@ -874,13 +962,20 @@ export class AdminService {
    * managed cities list), grouped by a normalized city key so "Rajkot" and
    * "rajkot " collapse together, then ranked by total activity.
    */
-  async getCityInsights() {
+  async getCityInsights(franchiseCity?: string | null) {
     // Group requirements by their clean pickup city (fallback to the raw city).
     const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
 
+    // Franchise scoping: requirements by their city's users, users by city.
+    const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
+    const reqMatch: any = { isDeleted: { $ne: true } };
+    if (ids) reqMatch.postedBy = { $in: ids };
+    const userMatch: any = { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } };
+    if (franchiseCity) userMatch.city = this.cityRx(franchiseCity);
+
     const [reqAgg, userAgg] = await Promise.all([
       this.requirementModel.aggregate([
-        { $match: { isDeleted: { $ne: true } } },
+        { $match: reqMatch },
         { $group: {
           _id: cityKey,
           city: { $first: { $ifNull: ['$pickupCityName', '$pickupCity'] } },
@@ -891,7 +986,7 @@ export class AdminService {
       // Split by role: drivers and agencies are counted separately (the old query
       // lumped every role together and then labelled the total "Agencies").
       this.userModel.aggregate([
-        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } } },
+        { $match: userMatch },
         { $group: {
           _id: { $toLower: { $trim: { input: '$city' } } },
           city: { $first: '$city' },
@@ -966,7 +1061,7 @@ export class AdminService {
   }
 
   // Reports
-  async getReports(query: any) {
+  async getReports(query: any, franchiseCity?: string | null) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
@@ -974,6 +1069,8 @@ export class AdminService {
       const rx = new RegExp(query.search, 'i');
       filter.$or = [{ reason: rx }, { description: rx }, { targetType: rx }];
     }
+    // Scope to reports raised by this city's users.
+    if (franchiseCity) filter.reportedBy = { $in: await this.cityUserIds(franchiseCity) };
     Object.assign(filter, dateRangeFilter(query));
 
     const [reports, total] = await Promise.all([
@@ -1002,7 +1099,12 @@ export class AdminService {
     return { message: 'Reports retrieved', data: buildPaginatedResult(reports, total, page, limit) };
   }
 
-  async resolveReport(id: string, adminId: string, action: string, notes?: string) {
+  async resolveReport(id: string, adminId: string, action: string, notes?: string, franchiseCity?: string | null) {
+    if (franchiseCity) {
+      const existing = await this.reportModel.findById(id).select('reportedBy').lean();
+      if (!existing) throw new NotFoundException('Report not found');
+      await this.assertUserInCity((existing as any).reportedBy?.toString(), franchiseCity);
+    }
     const report = await this.reportModel.findByIdAndUpdate(id, {
       status: ReportStatus.RESOLVED,
       reviewedBy: new Types.ObjectId(adminId),
@@ -1112,29 +1214,35 @@ export class AdminService {
     };
   }
 
-  async getAnalytics(period: string) {
+  async getAnalytics(period: string, franchiseCity?: string | null) {
     const days = period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
+    // Franchise scoping: users by city, requirements/revenue by this city's users.
+    const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
+    const uCity: any = franchiseCity ? { city: this.cityRx(franchiseCity) } : {};
+    const owner: any = ids ? { postedBy: { $in: ids } } : {};
+
     const [userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown] = await Promise.all([
       this.userModel.aggregate([
-        { $match: { createdAt: { $gte: startDate } } },
+        { $match: { createdAt: { $gte: startDate }, ...uCity } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
       this.requirementModel.aggregate([
-        { $match: { createdAt: { $gte: startDate }, isDeleted: false } },
+        { $match: { createdAt: { $gte: startDate }, isDeleted: false, ...owner } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
-      this.razorpayDailyRevenue(startDate),
+      this.razorpayDailyRevenue(startDate, ids),
       this.requirementModel.aggregate([
-        { $match: { isDeleted: false } },
+        { $match: { isDeleted: false, ...owner } },
         { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 10 },
       ]),
       this.userModel.aggregate([
+        { $match: { ...uCity } },
         { $group: { _id: '$membershipType', count: { $sum: 1 } } },
       ]),
     ]);
@@ -1152,12 +1260,16 @@ export class AdminService {
   // stored in paise (÷100 → rupees); wallet amounts are already in rupees.
   private readonly _hasRazorpayId = { $exists: true, $nin: [null, ''] };
 
-  private async razorpayRevenue(since?: Date): Promise<number> {
+  private async razorpayRevenue(since?: Date, userIds?: Types.ObjectId[] | null): Promise<number> {
     const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId };
     const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId };
     if (since) {
       pMatch.createdAt = { $gte: since };
       wMatch.createdAt = { $gte: since };
+    }
+    if (userIds) {
+      pMatch.userId = { $in: userIds };
+      wMatch.userId = { $in: userIds };
     }
     const [p, w] = await Promise.all([
       this.paymentModel.aggregate([{ $match: pMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
@@ -1168,15 +1280,21 @@ export class AdminService {
     return Math.round(planRupees + walletRupees);
   }
 
-  private async razorpayDailyRevenue(since: Date) {
+  private async razorpayDailyRevenue(since: Date, userIds?: Types.ObjectId[] | null) {
     const dateKey = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
+    const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
+    const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
+    if (userIds) {
+      pMatch.userId = { $in: userIds };
+      wMatch.userId = { $in: userIds };
+    }
     const [planDaily, walletDaily] = await Promise.all([
       this.paymentModel.aggregate([
-        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } } },
+        { $match: pMatch },
         { $group: { _id: dateKey, paise: { $sum: '$amount' }, count: { $sum: 1 } } },
       ]),
       this.walletTxModel.aggregate([
-        { $match: { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } } },
+        { $match: wMatch },
         { $group: { _id: dateKey, rupees: { $sum: '$amount' }, count: { $sum: 1 } } },
       ]),
     ]);
@@ -1194,7 +1312,8 @@ export class AdminService {
   }
 
   // Combined transaction history: subscription payments + wallet top-ups.
-  async getUserRequirements(userId: string) {
+  async getUserRequirements(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const requirements = await this.requirementModel
       .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
       .sort({ createdAt: -1 })
@@ -1203,7 +1322,8 @@ export class AdminService {
     return { message: 'User requirements retrieved', data: requirements };
   }
 
-  async getUserVehicles(userId: string) {
+  async getUserVehicles(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const vehicles = await this.vehicleModel
       .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
       .sort({ createdAt: -1 })
@@ -1212,7 +1332,8 @@ export class AdminService {
     return { message: 'User vehicles retrieved', data: vehicles };
   }
 
-  async getUserPayments(userId: string) {
+  async getUserPayments(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     // Subscription/plan payments
     const payments = await this.paymentModel
       .find({ userId: new Types.ObjectId(userId) })
@@ -1275,7 +1396,8 @@ export class AdminService {
     return { message: 'User payments retrieved', data: unified };
   }
 
-  async getUserWithdrawals(userId: string) {
+  async getUserWithdrawals(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const withdrawals = await this.withdrawalModel
       .find({ userId: new Types.ObjectId(userId) })
       .sort({ createdAt: -1 })
@@ -1284,7 +1406,8 @@ export class AdminService {
     return { message: 'User withdrawals retrieved', data: withdrawals };
   }
 
-  async getUserReviews(userId: string) {
+  async getUserReviews(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     // Match by string form so it works whether ratedUser was stored as an ObjectId
     // or a plain string (legacy/seeded data).
     const reviews = await this.ratingModel
@@ -1296,7 +1419,12 @@ export class AdminService {
     return { message: 'User reviews retrieved', data: reviews };
   }
 
-  async updateReview(id: string, data: { stars?: number; review?: string }) {
+  async updateReview(id: string, data: { stars?: number; review?: string }, franchiseCity?: string | null) {
+    if (franchiseCity) {
+      const existing = await this.ratingModel.findById(id).select('ratedUser').lean();
+      if (!existing) throw new NotFoundException('Review not found');
+      await this.assertUserInCity((existing as any).ratedUser?.toString(), franchiseCity);
+    }
     const rating = await this.ratingModel.findByIdAndUpdate(id, data, { new: true }).populate('rater', 'fullName profileImage');
     if (!rating) throw new NotFoundException('Review not found');
     // Recompute rated user's average
@@ -1313,7 +1441,12 @@ export class AdminService {
     return { message: 'Review updated', data: rating };
   }
 
-  async deleteReview(id: string) {
+  async deleteReview(id: string, franchiseCity?: string | null) {
+    if (franchiseCity) {
+      const existing = await this.ratingModel.findById(id).select('ratedUser').lean();
+      if (!existing) throw new NotFoundException('Review not found');
+      await this.assertUserInCity((existing as any).ratedUser?.toString(), franchiseCity);
+    }
     const rating = await this.ratingModel.findByIdAndDelete(id);
     if (!rating) throw new NotFoundException('Review not found');
     // Recompute rated user's average
@@ -1328,7 +1461,8 @@ export class AdminService {
     return { message: 'Review deleted' };
   }
 
-  async getUserSubscriptions(userId: string) {
+  async getUserSubscriptions(userId: string, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     const subscriptions = await this.subscriptionModel
       .find({ userId: new Types.ObjectId(userId) })
       .populate('planId', 'name membershipType duration durationDays')
@@ -1338,7 +1472,12 @@ export class AdminService {
     return { message: 'User subscriptions retrieved', data: subscriptions };
   }
 
-  async cancelSubscription(subscriptionId: string) {
+  async cancelSubscription(subscriptionId: string, franchiseCity?: string | null) {
+    if (franchiseCity) {
+      const existing = await this.subscriptionModel.findById(subscriptionId).select('userId').lean();
+      if (!existing) throw new NotFoundException('Subscription not found');
+      await this.assertUserInCity((existing as any).userId?.toString(), franchiseCity);
+    }
     const sub = await this.subscriptionModel.findByIdAndUpdate(
       subscriptionId,
       { status: SubscriptionStatus.CANCELLED },
@@ -1361,7 +1500,12 @@ export class AdminService {
     return { message: 'Subscription cancelled', data: sub };
   }
 
-  async updateSubscriptionEndDate(subscriptionId: string, endDate: string) {
+  async updateSubscriptionEndDate(subscriptionId: string, endDate: string, franchiseCity?: string | null) {
+    if (franchiseCity) {
+      const existing = await this.subscriptionModel.findById(subscriptionId).select('userId').lean();
+      if (!existing) throw new NotFoundException('Subscription not found');
+      await this.assertUserInCity((existing as any).userId?.toString(), franchiseCity);
+    }
     const sub = await this.subscriptionModel.findByIdAndUpdate(
       subscriptionId,
       { endDate: new Date(endDate) },
@@ -1375,7 +1519,8 @@ export class AdminService {
     return { message: 'Subscription end date updated', data: sub };
   }
 
-  async updateUserReferralCount(userId: string, delta: number) {
+  async updateUserReferralCount(userId: string, delta: number, franchiseCity?: string | null) {
+    await this.assertUserInCity(userId, franchiseCity);
     if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
     const user = await this.userModel.findByIdAndUpdate(
       userId,
@@ -1386,15 +1531,19 @@ export class AdminService {
     return { message: `Referral count updated by ${delta}`, data: user };
   }
 
-  async getPayments(query: any) {
+  async getPayments(query: any, franchiseCity?: string | null) {
     const { page, limit } = getPaginationParams(query);
     const search = (query.search || '').trim();
     const rx = search ? new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;
+
+    // Franchise: only money moved by this city's users.
+    const cityIds = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
 
     const dateFilter = dateRangeFilter(query);
     const paymentFilter: any = { ...dateFilter };
     if (query.status) paymentFilter.status = query.status;
     if (rx) paymentFilter.$or = [{ orderId: rx }, { razorpayPaymentId: rx }];
+    if (cityIds) paymentFilter.userId = { $in: cityIds };
 
     // Subscription/plan payments.
     const payments = await this.paymentModel
@@ -1414,6 +1563,7 @@ export class AdminService {
       ...dateFilter,
     };
     if (rx) walletFilter.razorpayOrderId = rx;
+    if (cityIds) walletFilter.userId = { $in: cityIds };
     const walletTxns = includeWallet
       ? await this.walletTxModel
           .find(walletFilter)

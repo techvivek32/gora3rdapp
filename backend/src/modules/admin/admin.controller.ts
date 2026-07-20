@@ -10,6 +10,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
 
+// Class default: admin-only. Endpoints a franchise may use are individually marked
+// with @Roles(...FRANCHISE_ROLES) — method-level @Roles fully overrides the class
+// one (RolesGuard uses getAllAndOverride). Each such endpoint receives the caller's
+// `franchiseCity` from the JWT (undefined for admins → no scoping) and passes it to
+// the service, which restricts every query to that city.
+const FRANCHISE_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FRANCHISE];
+
 @ApiTags('Admin')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -20,212 +27,246 @@ export class AdminController {
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────
   @Get('dashboard')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get dashboard statistics' })
-  getDashboard() {
-    return this.adminService.getDashboardStats();
+  getDashboard(@CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getDashboardStats(city);
   }
 
   @Get('analytics')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get analytics data' })
-  getAnalytics(@Query('period') period: string) {
-    return this.adminService.getAnalytics(period || 'month');
+  getAnalytics(@Query('period') period: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getAnalytics(period || 'month', city);
   }
 
   // ─── Users ─────────────────────────────────────────────────────────────────
   @Get('users')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all users' })
-  getUsers(@Query() query: any) {
-    return this.adminService.getUsers(query);
+  getUsers(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUsers(query, city);
   }
 
   @Get('referral-leaderboard')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Invitation leaderboard (users ranked by referrals)' })
-  getReferralLeaderboard(@Query() query: any) {
-    return this.adminService.getReferralLeaderboard(query);
+  getReferralLeaderboard(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getReferralLeaderboard(query, city);
   }
 
   @Get('users/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get a single user' })
-  getUser(@Param('id') id: string) {
-    return this.adminService.getUser(id);
+  getUser(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUser(id, city);
   }
 
   @Put('users/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Update user' })
-  updateUser(@Param('id') id: string, @Body() data: any) {
-    return this.adminService.updateUser(id, data);
+  updateUser(@Param('id') id: string, @Body() data: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateUser(id, data, city);
   }
 
   @Post('users/:id/verify')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Verify user account' })
-  verifyUser(@Param('id') id: string) {
-    return this.adminService.verifyUser(id);
+  verifyUser(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.verifyUser(id, city);
   }
 
   @Post('users/:id/block')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Block user' })
-  blockUser(@Param('id') id: string, @Body('reason') reason: string) {
-    return this.adminService.blockUser(id, reason);
+  blockUser(@Param('id') id: string, @Body('reason') reason: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.blockUser(id, reason, city);
   }
 
   @Post('users/:id/unblock')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Unblock user' })
-  unblockUser(@Param('id') id: string) {
-    return this.adminService.unblockUser(id);
+  unblockUser(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.unblockUser(id, city);
   }
 
   @Post('users/:id/upgrade-membership')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Upgrade user membership' })
   upgradeMembership(
     @Param('id') id: string,
     @Body('membershipType') membershipType: MembershipType,
     @Body('daysToAdd') daysToAdd: number,
     @Body('planId') planId: string,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.adminService.upgradeMembership(id, membershipType, daysToAdd, planId);
+    return this.adminService.upgradeMembership(id, membershipType, daysToAdd, planId, city);
   }
 
   @Get('users/:id/requirements')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get requirements posted by a user' })
-  getUserRequirements(@Param('id') id: string) {
-    return this.adminService.getUserRequirements(id);
+  getUserRequirements(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserRequirements(id, city);
   }
 
   @Get('users/:id/vehicles')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get vehicles posted by a user' })
-  getUserVehicles(@Param('id') id: string) {
-    return this.adminService.getUserVehicles(id);
+  getUserVehicles(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserVehicles(id, city);
   }
 
   @Get('users/:id/payments')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get payments made by a user' })
-  getUserPayments(@Param('id') id: string) {
-    return this.adminService.getUserPayments(id);
+  getUserPayments(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserPayments(id, city);
   }
 
   @Get('users/:id/withdrawals')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get withdrawal requests by a user' })
-  getUserWithdrawals(@Param('id') id: string) {
-    return this.adminService.getUserWithdrawals(id);
+  getUserWithdrawals(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserWithdrawals(id, city);
   }
 
   @Get('users/:id/reviews')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get reviews received by a user' })
-  getUserReviews(@Param('id') id: string) {
-    return this.adminService.getUserReviews(id);
+  getUserReviews(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserReviews(id, city);
   }
 
   @Put('reviews/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Edit a review' })
-  updateReview(@Param('id') id: string, @Body() data: { stars?: number; review?: string }) {
-    return this.adminService.updateReview(id, data);
+  updateReview(@Param('id') id: string, @Body() data: { stars?: number; review?: string }, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateReview(id, data, city);
   }
 
   @Delete('reviews/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Delete a review' })
-  deleteReview(@Param('id') id: string) {
-    return this.adminService.deleteReview(id);
+  deleteReview(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.deleteReview(id, city);
   }
 
   @Get('users/:id/subscriptions')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get subscriptions of a user' })
-  getUserSubscriptions(@Param('id') id: string) {
-    return this.adminService.getUserSubscriptions(id);
+  getUserSubscriptions(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserSubscriptions(id, city);
   }
 
   @Post('subscriptions/:id/cancel')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Cancel a subscription' })
-  cancelSubscription(@Param('id') id: string) {
-    return this.adminService.cancelSubscription(id);
+  cancelSubscription(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.cancelSubscription(id, city);
   }
 
   @Put('subscriptions/:id/end-date')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Update subscription end date' })
-  updateSubscriptionEndDate(@Param('id') id: string, @Body('endDate') endDate: string) {
-    return this.adminService.updateSubscriptionEndDate(id, endDate);
+  updateSubscriptionEndDate(@Param('id') id: string, @Body('endDate') endDate: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateSubscriptionEndDate(id, endDate, city);
   }
 
   // ─── Verification Requests ─────────────────────────────────────────────────
   @Get('verification-requests')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'List KYC verification requests' })
-  getVerificationRequests(@Query() query: any) {
-    return this.adminService.getVerificationRequests(query);
+  getVerificationRequests(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getVerificationRequests(query, city);
   }
 
   @Get('verification-requests/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get a single verification request with documents' })
-  getVerificationRequest(@Param('id') id: string) {
-    return this.adminService.getVerificationRequest(id);
+  getVerificationRequest(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getVerificationRequest(id, city);
   }
 
   @Post('verification-requests/:id/approve')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Approve a verification request' })
-  approveVerification(@Param('id') id: string) {
-    return this.adminService.approveVerification(id);
+  approveVerification(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.approveVerification(id, city);
   }
 
   @Post('verification-requests/:id/reject')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Reject a verification request' })
-  rejectVerification(@Param('id') id: string, @Body('reason') reason: string) {
-    return this.adminService.rejectVerification(id, reason);
+  rejectVerification(@Param('id') id: string, @Body('reason') reason: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.rejectVerification(id, reason, city);
   }
 
   @Post('users/:id/documents')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "Upload KYC documents on a user's behalf and send for verification" })
-  submitDocumentsFor(@Param('id') id: string, @Body() documents: Record<string, any>) {
-    return this.adminService.submitDocumentsFor(id, documents);
+  submitDocumentsFor(@Param('id') id: string, @Body() documents: Record<string, any>, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.submitDocumentsFor(id, documents, city);
   }
 
   @Post('verification-requests/:id/documents/:doc')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Approve or reject a single KYC document' })
   reviewDocument(
     @Param('id') id: string,
     @Param('doc') doc: string,
     @Body('status') status: 'approved' | 'rejected',
     @Body('reason') reason?: string,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.adminService.reviewDocument(id, doc, status, reason);
+    return this.adminService.reviewDocument(id, doc, status, reason, city);
   }
 
   // ─── Requirements ──────────────────────────────────────────────────────────
   @Get('requirements')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all requirements' })
-  getRequirements(@Query() query: any) {
-    return this.adminService.getRequirements(query);
+  getRequirements(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getRequirements(query, city);
   }
 
   @Post('users/:id/requirements')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Post a requirement on behalf of a user' })
-  createRequirementFor(@Param('id') userId: string, @Body() data: any) {
-    return this.adminService.createRequirementFor(userId, data);
+  createRequirementFor(@Param('id') userId: string, @Body() data: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.createRequirementFor(userId, data, city);
   }
 
   @Post('users/:id/vehicles')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Post an available cab on behalf of a user' })
-  createVehicleFor(@Param('id') userId: string, @Body() data: any) {
-    return this.adminService.createVehicleFor(userId, data);
+  createVehicleFor(@Param('id') userId: string, @Body() data: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.createVehicleFor(userId, data, city);
   }
 
   @Put('requirements/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Edit a requirement' })
-  updateRequirement(@Param('id') id: string, @Body() data: any) {
-    return this.adminService.updateRequirement(id, data);
+  updateRequirement(@Param('id') id: string, @Body() data: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateRequirement(id, data, city);
   }
 
   @Delete('requirements/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Delete a requirement' })
-  deleteRequirement(@Param('id') id: string) {
-    return this.adminService.deleteRequirement(id);
+  deleteRequirement(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.deleteRequirement(id, city);
   }
 
   // ─── Subscriptions ─────────────────────────────────────────────────────────
   @Get('subscriptions')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all subscriptions' })
-  getSubscriptions(@Query() query: any) {
-    return this.adminService.getSubscriptions(query);
+  getSubscriptions(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getSubscriptions(query, city);
   }
 
-  // ─── Subscription Plans (admin editable) ─────────────────────────────────────
+  // ─── Subscription Plans (admin only — platform config) ───────────────────────
   @Get('subscription-plans')
   @ApiOperation({ summary: 'List all subscription plans (incl. inactive)' })
   getPlans() {
@@ -252,24 +293,29 @@ export class AdminController {
 
   // ─── Vehicles ──────────────────────────────────────────────────────────────
   @Get('vehicles')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all available vehicles' })
-  getVehicles(@Query() query: any) {
-    return this.adminService.getVehicles(query);
+  getVehicles(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getVehicles(query, city);
   }
 
   @Put('vehicles/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Edit an available vehicle' })
-  updateVehicle(@Param('id') id: string, @Body() data: any) {
-    return this.adminService.updateVehicle(id, data);
+  updateVehicle(@Param('id') id: string, @Body() data: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateVehicle(id, data, city);
   }
 
   @Delete('vehicles/:id')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Delete an available vehicle' })
-  deleteVehicle(@Param('id') id: string) {
-    return this.adminService.deleteVehicle(id);
+  deleteVehicle(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.deleteVehicle(id, city);
   }
 
   // ─── Cities ────────────────────────────────────────────────────────────────
+  // A franchise can VIEW cities (its own only) and city-insights, but city CRUD is
+  // platform config — admin only.
   @Post('cities')
   @ApiOperation({ summary: 'Create city' })
   createCity(@Body() data: any) {
@@ -277,15 +323,17 @@ export class AdminController {
   }
 
   @Get('cities')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all cities' })
-  getCities(@Query() query: any) {
-    return this.adminService.getCities(query);
+  getCities(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getCities(query, city);
   }
 
   @Get('city-insights')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'City-wise activity (requirements / cabs / users)' })
-  getCityInsights() {
-    return this.adminService.getCityInsights();
+  getCityInsights(@CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getCityInsights(city);
   }
 
   @Put('cities/:id')
@@ -300,7 +348,7 @@ export class AdminController {
     return this.adminService.deleteCity(id);
   }
 
-  // ─── Banners ───────────────────────────────────────────────────────────────
+  // ─── Banners (admin only — platform config) ──────────────────────────────────
   @Post('banners')
   @ApiOperation({ summary: 'Create banner' })
   createBanner(@Body() data: any) {
@@ -327,46 +375,53 @@ export class AdminController {
 
   // ─── Reports ───────────────────────────────────────────────────────────────
   @Get('reports')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all reports' })
-  getReports(@Query() query: any) {
-    return this.adminService.getReports(query);
+  getReports(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getReports(query, city);
   }
 
   @Post('reports/:id/resolve')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Resolve a report' })
   resolveReport(
     @Param('id') id: string,
     @CurrentUser('sub') adminId: string,
     @Body('action') action: string,
     @Body('notes') notes: string,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.adminService.resolveReport(id, adminId, action, notes);
+    return this.adminService.resolveReport(id, adminId, action, notes, city);
   }
 
   // ─── Account deletion requests ─────────────────────────────────────────────
   @Get('deletion-requests')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'List account deletion requests' })
-  getDeletionRequests(@Query() query: any) {
-    return this.adminService.getDeletionRequests(query);
+  getDeletionRequests(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getDeletionRequests(query, city);
   }
 
   @Post('deletion-requests/:id/approve')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Approve a deletion request (removes the user)' })
-  approveDeletionRequest(@Param('id') id: string, @CurrentUser('sub') adminId: string) {
-    return this.adminService.approveDeletionRequest(id, adminId);
+  approveDeletionRequest(@Param('id') id: string, @CurrentUser('sub') adminId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.approveDeletionRequest(id, adminId, city);
   }
 
   @Post('deletion-requests/:id/reject')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Reject a deletion request' })
   rejectDeletionRequest(
     @Param('id') id: string,
     @CurrentUser('sub') adminId: string,
     @Body('reason') reason?: string,
+    @CurrentUser('franchiseCity') city?: string,
   ) {
-    return this.adminService.rejectDeletionRequest(id, adminId, reason);
+    return this.adminService.rejectDeletionRequest(id, adminId, reason, city);
   }
 
-  // ─── Notifications ─────────────────────────────────────────────────────────
+  // ─── Notifications (admin only) ──────────────────────────────────────────────
   @Post('notifications/send')
   @ApiOperation({ summary: 'Send admin notification' })
   sendNotification(@Body() data: any) {
@@ -386,15 +441,17 @@ export class AdminController {
   }
 
   @Post('users/:id/referral-count')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Update user referral count (add/deduct)' })
-  updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number) {
-    return this.adminService.updateUserReferralCount(id, delta);
+  updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.updateUserReferralCount(id, delta, city);
   }
 
   // ─── Payments ──────────────────────────────────────────────────────────────
   @Get('payments')
+  @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get all payments' })
-  getPayments(@Query() query: any) {
-    return this.adminService.getPayments(query);
+  getPayments(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getPayments(query, city);
   }
 }
