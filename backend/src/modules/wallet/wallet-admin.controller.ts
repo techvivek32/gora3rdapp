@@ -28,7 +28,7 @@ export class WalletAdminController {
   }
 
   @Post(':id/adjust')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — a franchise can view wallets but not adjust user balances.
   @ApiOperation({ summary: "Add or cut a user's wallet balance with a reason" })
   adjust(
     @CurrentUser('sub') adminId: string,
@@ -40,7 +40,7 @@ export class WalletAdminController {
   }
 
   @Post(':id/transfer')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — franchises cannot move money out of user wallets.
   @ApiOperation({ summary: "Transfer from this user's wallet to another user (same as the app's transfer)" })
   transfer(@Param('id') userId: string, @Body() dto: TransferFundsDto, @CurrentUser('franchiseCity') city?: string) {
     // Reuses the app's transfer: race-safe debit, insufficient-balance guard and

@@ -22,6 +22,7 @@ import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
 import { EditUserModal } from '@/components/users/EditUserModal';
 import { UploadDocumentsModal } from '@/components/users/UploadDocumentsModal';
 import { VehicleEditModal } from '@/components/vehicles/VehicleEditModal';
+import { useRole } from '@/hooks/useRole';
 
 interface Requirement {
   _id: string;
@@ -117,6 +118,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { isFranchise } = useRole();
   const [activeTab, setActiveTab] = useState('profile');
   const [activeView, setActiveView] = useState<'requirements' | 'vehicles'>('requirements');
   // r / v are null in 'create' mode — the modal starts from a blank form.
@@ -796,10 +798,13 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-gray-900 dark:text-white">Wallet</h3>
-                  <Button size="sm" onClick={() => setAdjustOpen(true)}>
-                    <Wallet className="w-4 h-4 mr-2" />
-                    Adjust Balance
-                  </Button>
+                  {/* Adjusting balances is admin-only. */}
+                  {!isFranchise && (
+                    <Button size="sm" onClick={() => setAdjustOpen(true)}>
+                      <Wallet className="w-4 h-4 mr-2" />
+                      Adjust Balance
+                    </Button>
+                  )}
                 </div>
 
                 <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-5 py-4 mb-6">
@@ -896,7 +901,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Subscription History</h3>
-                <Button onClick={() => setAssignPlanModal(true)}>Assign Plan</Button>
+                {/* Assigning/changing a plan is admin-only. */}
+                {!isFranchise && <Button onClick={() => setAssignPlanModal(true)}>Assign Plan</Button>}
               </div>
               {(() => {
                 const items = (subscriptionsData as any)?.data ?? [];
@@ -933,7 +939,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                             <div className="text-right">
                               <p className="font-semibold text-gray-800 dark:text-gray-200">₹{Math.round((s.amount ?? 0) / 100).toLocaleString('en-IN')}</p>
                             </div>
-                            {s.status === 'active' && (
+                            {/* Editing/cancelling a subscription is admin-only. */}
+                            {s.status === 'active' && !isFranchise && (
                               <div className="flex gap-1">
                                 <IconBtn title="Edit End Date" onClick={() => setEditSubModal(s)}><Pencil className="w-4 h-4" /></IconBtn>
                                 <IconBtn title="Cancel Plan" danger onClick={() => { if (confirm('Cancel this subscription?')) cancelSubMutation.mutate(s._id); }}><X className="w-4 h-4" /></IconBtn>

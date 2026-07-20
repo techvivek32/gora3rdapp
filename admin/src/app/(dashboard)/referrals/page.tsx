@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Trophy, Plus, Minus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useRole } from '@/hooks/useRole';
 
 interface Row {
   rank: number;
@@ -56,6 +57,7 @@ export default function ReferralsPage() {
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
   const [amount, setAmount] = useState(1);
   const queryClient = useQueryClient();
+  const { isFranchise } = useRole();
 
   const { data: rawData, isLoading } = useQuery({
     queryKey: ['admin-referrals', search, period],
@@ -126,34 +128,37 @@ export default function ReferralsPage() {
         return <span className={`font-bold ${c > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`}>{c}</span>;
       },
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => {
-              setModal({ mode: 'add', userId: row.original._id, name: row.original.name });
-              setAmount(1);
-            }}
-            title="Add referral"
-            className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => {
-              setModal({ mode: 'deduct', userId: row.original._id, name: row.original.name });
-              setAmount(1);
-            }}
-            title="Deduct referral"
-            className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-        </div>
-      ),
-    },
+    // Add/deduct invites is admin-only — omit the column entirely for franchises.
+    ...(isFranchise
+      ? []
+      : [{
+          id: 'actions',
+          header: 'Actions',
+          cell: ({ row }: { row: { original: Row } }) => (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => {
+                  setModal({ mode: 'add', userId: row.original._id, name: row.original.name });
+                  setAmount(1);
+                }}
+                title="Add referral"
+                className="p-1.5 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setModal({ mode: 'deduct', userId: row.original._id, name: row.original.name });
+                  setAmount(1);
+                }}
+                title="Deduct referral"
+                className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </div>
+          ),
+        } as ColumnDef<Row>]),
   ];
 
   return (

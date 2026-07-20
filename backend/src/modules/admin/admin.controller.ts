@@ -91,7 +91,7 @@ export class AdminController {
   }
 
   @Post('users/:id/upgrade-membership')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — a franchise can view subscriptions but not change membership.
   @ApiOperation({ summary: 'Upgrade user membership' })
   upgradeMembership(
     @Param('id') id: string,
@@ -160,14 +160,14 @@ export class AdminController {
   }
 
   @Post('subscriptions/:id/cancel')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — franchises view subscriptions but cannot cancel them.
   @ApiOperation({ summary: 'Cancel a subscription' })
   cancelSubscription(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
     return this.adminService.cancelSubscription(id, city);
   }
 
   @Put('subscriptions/:id/end-date')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — franchises view subscriptions but cannot change the end date.
   @ApiOperation({ summary: 'Update subscription end date' })
   updateSubscriptionEndDate(@Param('id') id: string, @Body('endDate') endDate: string, @CurrentUser('franchiseCity') city?: string) {
     return this.adminService.updateSubscriptionEndDate(id, endDate, city);
@@ -441,7 +441,7 @@ export class AdminController {
   }
 
   @Post('users/:id/referral-count')
-  @Roles(...FRANCHISE_ROLES)
+  // Admin only — franchises view the invite leaderboard but cannot add/deduct invites.
   @ApiOperation({ summary: 'Update user referral count (add/deduct)' })
   updateUserReferralCount(@Param('id') id: string, @Body('delta') delta: number, @CurrentUser('franchiseCity') city?: string) {
     return this.adminService.updateUserReferralCount(id, delta, city);

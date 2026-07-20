@@ -10,6 +10,7 @@ import { MembershipBadge } from '@/components/ui/MembershipBadge';
 import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
 import { Search, Wallet } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { useRole } from '@/hooks/useRole';
 
 interface WalletUser {
   _id: string;
@@ -27,6 +28,7 @@ export default function WalletsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [target, setTarget] = useState<WalletUser | null>(null);
+  const { isFranchise } = useRole();
 
   const { data: rawData, isLoading } = useQuery({
     queryKey: ['admin-wallets', page, search],
@@ -78,16 +80,19 @@ export default function WalletsPage() {
         );
       },
     },
-    {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => (
-        <Button size="sm" variant="outline" onClick={() => setTarget(row.original)}>
-          <Wallet className="w-3.5 h-3.5 mr-1.5" />
-          Adjust
-        </Button>
-      ),
-    },
+    // Adjusting balances is admin-only — franchises view wallets but can't change them.
+    ...(isFranchise
+      ? []
+      : [{
+          id: 'actions',
+          header: 'Actions',
+          cell: ({ row }: { row: { original: WalletUser } }) => (
+            <Button size="sm" variant="outline" onClick={() => setTarget(row.original)}>
+              <Wallet className="w-3.5 h-3.5 mr-1.5" />
+              Adjust
+            </Button>
+          ),
+        } as ColumnDef<WalletUser>]),
   ];
 
   return (
