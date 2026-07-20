@@ -391,9 +391,17 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final collapsed = _collapsed.contains(tier);
 
     // 1-month price is the baseline for computing savings on longer durations.
+    // Must be an actual ~30-day plan — not a day-scale plan — so a 1-day plan in
+    // the tier doesn't get mistaken for the monthly baseline.
     final oneMonth = tierPlans.firstWhere(
-      (p) => ((p['durationDays'] as num?) ?? 0) <= 31,
-      orElse: () => tierPlans.first,
+      (p) {
+        final d = ((p['durationDays'] as num?) ?? 0);
+        return d >= 28 && d <= 31;
+      },
+      orElse: () => tierPlans.firstWhere(
+        (p) => ((p['durationDays'] as num?) ?? 0) > 27,
+        orElse: () => tierPlans.first,
+      ),
     );
     final oneMonthRupees = ((oneMonth['price'] as num?) ?? 0) / 100;
 
@@ -456,11 +464,16 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final priceRupees = ((plan['price'] as num?) ?? 0) / 100;
     final priceRupeesInt = priceRupees.round();
     final days = ((plan['durationDays'] as num?) ?? 30).toInt();
+    // Day-scale plans (a 24-hour / few-day plan) are labelled in days; longer ones
+    // in months, with the per-month + savings maths that only makes sense there.
+    final isDayScale = days <= 27;
     final months = (days / 30).round().clamp(1, 12);
     final perMonth = months > 0 ? (priceRupees / months).round() : priceRupeesInt;
-    final label = months == 1 ? '1 Month' : '$months Months';
+    final label = isDayScale
+        ? (days == 1 ? '1 Day' : '$days Days')
+        : (months == 1 ? '1 Month' : '$months Months');
     int savePct = 0;
-    if (months > 1 && oneMonthRupees > 0) {
+    if (!isDayScale && months > 1 && oneMonthRupees > 0) {
       final full = oneMonthRupees * months;
       savePct = (((full - priceRupees) / full) * 100).round();
     }
@@ -495,7 +508,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
           ),
           Text('₹$priceRupeesInt', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19.sp, color: AppColors.textPrimary, fontFamily: 'Poppins')),
           SizedBox(height: 2.h),
-          Text(months == 1 ? 'per month' : '₹$perMonth / month',
+          Text(isDayScale ? (days == 1 ? 'for 24 hours' : 'for $days days') : (months == 1 ? 'per month' : '₹$perMonth / month'),
               style: TextStyle(fontSize: 8.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
           SizedBox(height: 8.h),
           Row(

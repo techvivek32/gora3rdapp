@@ -22,8 +22,11 @@ export class SubscriptionPlan {
   @Prop({ type: String, enum: MembershipType, required: true })
   membershipType: MembershipType;
 
-  @Prop({ type: String, enum: PlanDuration, required: true })
-  duration: PlanDuration;
+  // Free-form duration label (e.g. '1_day', '1_month', '3_months'). Not enum-
+  // constrained: the actual validity is driven by `durationDays`, and the admin
+  // can create any duration — including a 24-hour (1-day) plan.
+  @Prop({ type: String, required: true })
+  duration: string;
 
   @Prop({ required: true, min: 0 })
   price: number;

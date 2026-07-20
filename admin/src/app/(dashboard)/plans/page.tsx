@@ -41,9 +41,19 @@ const TIER_COLORS: Record<string, string> = {
   verified: 'bg-emerald-100 text-emerald-700',
 };
 
+// Free-form duration label stored on the plan. Day-scale plans (≤ ~4 weeks) get a
+// day label; larger ones get a month label.
 function durationKey(days: number) {
+  if (days <= 27) return days === 1 ? '1_day' : `${days}_days`;
   const m = Math.round(days / 30);
   return `${m}_month${m > 1 ? 's' : ''}`;
+}
+
+// Human label for the plans table.
+function durationLabel(days: number) {
+  if (days <= 27) return days === 1 ? '1 day' : `${days} days`;
+  const m = Math.round(days / 30);
+  return `${m} month${m > 1 ? 's' : ''}`;
 }
 
 export default function PlansPage() {
@@ -131,7 +141,7 @@ export default function PlansPage() {
                   <td className="px-4 py-3">
                     <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${TIER_COLORS[p.membershipType] || 'bg-gray-100 text-gray-600'}`}>{p.membershipType}</span>
                   </td>
-                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{Math.round(p.durationDays / 30)} month(s) <span className="text-gray-400">({p.durationDays}d)</span></td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{durationLabel(p.durationDays)} <span className="text-gray-400">({p.durationDays}d)</span></td>
                   <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{rupees(p.price)}</td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-1 rounded-full ${p.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{p.isActive ? 'Active' : 'Hidden'}</span>
@@ -174,7 +184,24 @@ export default function PlansPage() {
                 </select>
               </Field>
               <Field label="Duration (days)">
-                <input type="number" className={inputCls} value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: +e.target.value })} placeholder="30 / 90 / 180" />
+                <input type="number" min={1} className={inputCls} value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: +e.target.value })} placeholder="1 / 30 / 90 / 180 / 365" />
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {[{ d: 1, l: '1 Day' }, { d: 30, l: '1 Month' }, { d: 90, l: '3 Months' }, { d: 180, l: '6 Months' }, { d: 365, l: '1 Year' }].map((o) => (
+                    <button
+                      key={o.d}
+                      type="button"
+                      onClick={() => setForm({ ...form, durationDays: o.d })}
+                      className={`px-2 py-0.5 rounded-md text-xs font-medium border transition-colors ${
+                        form.durationDays === o.d
+                          ? 'bg-orange-500 border-orange-500 text-white'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                      }`}
+                    >
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1">1 day = a 24-hour plan.</p>
               </Field>
             </div>
 
