@@ -25,6 +25,7 @@ import '../../features/wallet/presentation/pages/wallet_page.dart';
 import '../../features/referral/presentation/pages/invite_page.dart';
 import '../../features/garage/presentation/pages/my_garage_page.dart';
 import '../localization/language_page.dart';
+import '../../features/training/presentation/pages/training_videos_page.dart';
 import '../../features/referral/presentation/pages/leaderboard_page.dart';
 import '../../features/support/presentation/pages/support_chat_page.dart';
 import '../../features/reports/presentation/pages/my_reports_page.dart';
@@ -177,6 +178,10 @@ class AppRouter {
       GoRoute(
         path: '/language',
         builder: (_, __) => const LanguagePage(),
+      ),
+      GoRoute(
+        path: '/training-videos',
+        builder: (_, __) => const TrainingVideosPage(),
       ),
       GoRoute(
         path: '/invite',

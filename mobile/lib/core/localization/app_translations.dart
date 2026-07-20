@@ -231,6 +231,8 @@ const Map<String, Map<String, String>> _translations = {
     'Prohibition on Copying: You may not copy, reproduce, republish, upload, post, transmit or distribute any material from this application without prior written permission from us. Unauthorized use may violate copyright laws, trademark laws and other regulations.': 'नकल पर प्रतिबंध: आप हमारी पूर्व लिखित अनुमति के बिना इस एप्लिकेशन से किसी भी सामग्री की नकल, पुनरुत्पादन, पुनर्प्रकाशन, अपलोड, पोस्ट, प्रसारण या वितरण नहीं कर सकते। अनधिकृत उपयोग कॉपीराइट कानूनों, ट्रेडमार्क कानूनों और अन्य नियमों का उल्लंघन कर सकता है।',
     'By accessing this application, you agree to use it only for lawful purposes. You are prohibited from posting or transmitting any material that constitutes or encourages conduct that would be a criminal offense or give rise to civil liability.': 'इस एप्लिकेशन तक पहुंचकर, आप इसे केवल वैध उद्देश्यों के लिए उपयोग करने के लिए सहमत होते हैं। आपको ऐसी कोई भी सामग्री पोस्ट या प्रसारित करने से प्रतिबंधित किया जाता है जो ऐसे आचरण का गठन करती है या प्रोत्साहित करती है जो एक आपराधिक अपराध होगा या नागरिक दायित्व को जन्म देगा।',
     'We reserve the right to modify these terms at any time. Your continued use of the application following any changes indicates your acceptance of the new terms.': 'हम किसी भी समय इन शर्तों को संशोधित करने का अधिकार सुरक्षित रखते हैं। किसी भी बदलाव के बाद एप्लिकेशन का आपका निरंतर उपयोग नई शर्तों की आपकी स्वीकृति को दर्शाता है।',
+    'Training Videos': 'प्रशिक्षण वीडियो',
+    'No training videos yet.': 'अभी तक कोई प्रशिक्षण वीडियो नहीं।',
   },
   'gu': {
     'Settings': 'સેટિંગ્સ',
@@ -422,6 +424,8 @@ const Map<String, Map<String, String>> _translations = {
     'Prohibition on Copying: You may not copy, reproduce, republish, upload, post, transmit or distribute any material from this application without prior written permission from us. Unauthorized use may violate copyright laws, trademark laws and other regulations.': 'નકલ પર પ્રતિબંધ: તમે અમારી પૂર્વ લેખિત પરવાનગી વિના આ એપ્લિકેશનમાંથી કોઈપણ સામગ્રીની નકલ, પુનઃઉત્પાદન, પુનઃપ્રકાશન, અપલોડ, પોસ્ટ, પ્રસારણ કે વિતરણ કરી શકતા નથી. અનધિકૃત ઉપયોગ કૉપિરાઇટ કાયદા, ટ્રેડમાર્ક કાયદા અને અન્ય નિયમોનું ઉલ્લંઘન કરી શકે છે.',
     'By accessing this application, you agree to use it only for lawful purposes. You are prohibited from posting or transmitting any material that constitutes or encourages conduct that would be a criminal offense or give rise to civil liability.': 'આ એપ્લિકેશનનો ઉપયોગ કરીને, તમે તેને ફક્ત કાયદેસર હેતુઓ માટે વાપરવા સંમત થાઓ છો. તમને એવી કોઈપણ સામગ્રી પોસ્ટ કે પ્રસારિત કરવાની મનાઈ છે જે ફોજદારી ગુનો બને અથવા દીવાની જવાબદારીને જન્મ આપે તેવા વર્તનને પ્રોત્સાહન આપે.',
     'We reserve the right to modify these terms at any time. Your continued use of the application following any changes indicates your acceptance of the new terms.': 'અમે કોઈપણ સમયે આ શરતોમાં ફેરફાર કરવાનો અધિકાર અનામત રાખીએ છીએ. કોઈપણ ફેરફાર પછી એપ્લિકેશનનો તમારો સતત ઉપયોગ નવી શરતોની તમારી સ્વીકૃતિ દર્શાવે છે.',
+    'Training Videos': 'તાલીમ વીડિયો',
+    'No training videos yet.': 'હજી કોઈ તાલીમ વીડિયો નથી.',
   },
   'mr': {
     'Settings': 'सेटिंग्ज',
@@ -581,6 +585,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'सेवेबद्दल',
     'Copyright & Intellectual Property': 'कॉपीराइट व बौद्धिक संपदा',
     'General Terms of Use': 'वापराच्या सामान्य अटी',
+    'Training Videos': 'प्रशिक्षण व्हिडिओ',
+    'No training videos yet.': 'अजून कोणतेही प्रशिक्षण व्हिडिओ नाहीत.',
   },
   'bn': {
     'Settings': 'সেটিংস',
@@ -740,6 +746,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'সেবা সম্পর্কে',
     'Copyright & Intellectual Property': 'কপিরাইট ও মেধাস্বত্ব',
     'General Terms of Use': 'ব্যবহারের সাধারণ শর্তাবলী',
+    'Training Videos': 'প্রশিক্ষণ ভিডিও',
+    'No training videos yet.': 'এখনও কোনো প্রশিক্ষণ ভিডিও নেই।',
   },
   'pa': {
     'Settings': 'ਸੈਟਿੰਗਾਂ',
@@ -899,6 +907,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'ਸੇਵਾ ਬਾਰੇ',
     'Copyright & Intellectual Property': 'ਕਾਪੀਰਾਈਟ ਅਤੇ ਬੌਧਿਕ ਸੰਪਤੀ',
     'General Terms of Use': 'ਵਰਤੋਂ ਦੀਆਂ ਆਮ ਸ਼ਰਤਾਂ',
+    'Training Videos': 'ਸਿਖਲਾਈ ਵੀਡੀਓ',
+    'No training videos yet.': 'ਹਾਲੇ ਕੋਈ ਸਿਖਲਾਈ ਵੀਡੀਓ ਨਹੀਂ।',
   },
   'ta': {
     'Settings': 'அமைப்புகள்',
@@ -1058,6 +1068,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'சேவை பற்றி',
     'Copyright & Intellectual Property': 'பதிப்புரிமை & அறிவுசார் சொத்து',
     'General Terms of Use': 'பயன்பாட்டின் பொது விதிமுறைகள்',
+    'Training Videos': 'பயிற்சி வீடியோக்கள்',
+    'No training videos yet.': 'இதுவரை பயிற்சி வீடியோக்கள் இல்லை.',
   },
   'te': {
     'Settings': 'సెట్టింగ్‌లు',
@@ -1217,6 +1229,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'సేవ గురించి',
     'Copyright & Intellectual Property': 'కాపీరైట్ & మేధో సంపత్తి',
     'General Terms of Use': 'వినియోగ సాధారణ నిబంధనలు',
+    'Training Videos': 'శిక్షణ వీడియోలు',
+    'No training videos yet.': 'ఇంకా శిక్షణ వీడియోలు లేవు.',
   },
   'kn': {
     'Settings': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
@@ -1376,6 +1390,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'ಸೇವೆ ಬಗ್ಗೆ',
     'Copyright & Intellectual Property': 'ಕೃತಿಸ್ವಾಮ್ಯ & ಬೌದ್ಧಿಕ ಆಸ್ತಿ',
     'General Terms of Use': 'ಬಳಕೆಯ ಸಾಮಾನ್ಯ ನಿಯಮಗಳು',
+    'Training Videos': 'ತರಬೇತಿ ವೀಡಿಯೊಗಳು',
+    'No training videos yet.': 'ಇನ್ನೂ ತರಬೇತಿ ವೀಡಿಯೊಗಳಿಲ್ಲ.',
   },
   'ml': {
     'Settings': 'ക്രമീകരണങ്ങൾ',
@@ -1535,6 +1551,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'സേവനത്തെക്കുറിച്ച്',
     'Copyright & Intellectual Property': 'പകർപ്പവകാശം & ബൗദ്ധിക സ്വത്ത്',
     'General Terms of Use': 'ഉപയോഗത്തിന്റെ പൊതു നിബന്ധനകൾ',
+    'Training Videos': 'പരിശീലന വീഡിയോകൾ',
+    'No training videos yet.': 'ഇതുവരെ പരിശീലന വീഡിയോകളൊന്നുമില്ല.',
   },
   'or': {
     'Settings': 'ସେଟିଂସ୍',
@@ -1694,6 +1712,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'ସେବା ବିଷୟରେ',
     'Copyright & Intellectual Property': 'କପିରାଇଟ୍ ଓ ବୌଦ୍ଧିକ ସମ୍ପତ୍ତି',
     'General Terms of Use': 'ବ୍ୟବହାରର ସାଧାରଣ ସର୍ତ୍ତ',
+    'Training Videos': 'ତାଲିମ ଭିଡିଓ',
+    'No training videos yet.': 'ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ତାଲିମ ଭିଡିଓ ନାହିଁ।',
   },
   'ur': {
     'Settings': 'ترتیبات',
@@ -1853,6 +1873,8 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'سروس کے بارے میں',
     'Copyright & Intellectual Property': 'کاپی رائٹ اور دانشورانہ ملکیت',
     'General Terms of Use': 'استعمال کی عمومی شرائط',
+    'Training Videos': 'تربیتی ویڈیوز',
+    'No training videos yet.': 'ابھی تک کوئی تربیتی ویڈیو نہیں۔',
   },
   'as': {
     'Settings': 'ছেটিংছ',
@@ -2012,5 +2034,7 @@ const Map<String, Map<String, String>> _translations = {
     'About Service': 'সেৱাৰ বিষয়ে',
     'Copyright & Intellectual Property': 'কপিৰাইট আৰু বৌদ্ধিক সম্পত্তি',
     'General Terms of Use': 'ব্যৱহাৰৰ সাধাৰণ চৰ্ত',
+    'Training Videos': 'প্ৰশিক্ষণ ভিডিঅ’',
+    'No training videos yet.': 'এতিয়ালৈকে কোনো প্ৰশিক্ষণ ভিডিঅ’ নাই।',
   },
 };

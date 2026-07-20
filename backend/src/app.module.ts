@@ -30,6 +30,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { PlacesModule } from './modules/places/places.module';
 import { SupportModule } from './modules/support/support.module';
 import { GarageModule } from './modules/garage/garage.module';
+import { TrainingModule } from './modules/training/training.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { GarageModule } from './modules/garage/garage.module';
     PlacesModule,
     SupportModule,
     GarageModule,
+    TrainingModule,
   ],
 })
 export class AppModule {}

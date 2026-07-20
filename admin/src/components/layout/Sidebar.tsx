@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, Bell, CreditCard,
-  BarChart3, Flag, Image, Settings, LogOut,
+  BarChart3, Flag, Image, Settings, LogOut, PlayCircle,
   FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX
 } from 'lucide-react';
 import { signOut } from 'next-auth/react';
@@ -46,6 +46,7 @@ const navigation = [
     items: [
       { href: '/cities', label: 'Cities', icon: Map },
       { href: '/banners', label: 'Banners', icon: Image },
+      { href: '/training-videos', label: 'Training Videos', icon: PlayCircle },
       { href: '/notifications', label: 'Notifications', icon: Bell },
       { href: '/pricing', label: 'Pricing Config', icon: DollarSign },
       { href: '/settings', label: 'Settings', icon: Settings },

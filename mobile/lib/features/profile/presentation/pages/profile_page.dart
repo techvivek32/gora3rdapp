@@ -127,6 +127,7 @@ class ProfilePage extends StatelessWidget {
                       _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification'.tr, onTap: () => context.push('/kyc')),
                       _ProfileAction(icon: Icons.flag_outlined, label: 'My Reports'.tr, onTap: () => context.push('/my-reports')),
                       _ProfileAction(icon: Icons.notifications_outlined, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
+                      _ProfileAction(icon: Icons.ondemand_video_outlined, label: 'Training Videos'.tr, onTap: () => context.push('/training-videos')),
                       _ProfileAction(icon: Icons.language_outlined, label: 'Language'.tr, onTap: () => context.push('/language')),
                       SizedBox(height: 12.h),
 

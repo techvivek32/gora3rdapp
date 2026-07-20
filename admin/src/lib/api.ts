@@ -188,6 +188,13 @@ export const adminApi = {
   sendNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
   sendAdminNotification: (data: any) => apiClient.post('/admin/notifications/send', data),
   getSentNotifications: (params?: any) => apiClient.get('/admin/notifications', { params }),
+
+  // ─── Training Videos ─────────────────────────────────────────────────────────
+  getTrainingVideos: () => apiClient.get('/admin/training-videos'),
+  createTrainingVideo: (data: { title: string; url: string; isActive?: boolean; sortOrder?: number }) =>
+    apiClient.post('/admin/training-videos', data),
+  updateTrainingVideo: (id: string, data: any) => apiClient.put(`/admin/training-videos/${id}`, data),
+  deleteTrainingVideo: (id: string) => apiClient.delete(`/admin/training-videos/${id}`),
   getAdminActivity: (limit = 20) => apiClient.get('/admin/activity', { params: { limit } }),
 
   // ─── Subscriptions ─────────────────────────────────────────────────────────
