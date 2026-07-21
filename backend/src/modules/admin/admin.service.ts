@@ -298,7 +298,9 @@ export class AdminService {
 
   async getReferralLeaderboard(query: any, franchiseCity?: string | null) {
     const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };
-    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
+    // A franchise defaults to its own city's leaderboard, but may switch to the
+    // all-India view with ?scope=all. Admins are never city-scoped here.
+    if (franchiseCity && query.scope !== 'all') filter.city = this.cityRx(franchiseCity);
     const search = (query.search || '').trim();
     if (search) {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');

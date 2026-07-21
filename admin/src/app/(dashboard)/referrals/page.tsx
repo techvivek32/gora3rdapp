@@ -54,14 +54,16 @@ const PERIODS = (() => {
 export default function ReferralsPage() {
   const [search, setSearch] = useState('');
   const [period, setPeriod] = useState('all');
+  // Franchise view: 'city' (their city, default) or 'all' (all-India). Ignored for admins.
+  const [scope, setScope] = useState<'city' | 'all'>('city');
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
   const [amount, setAmount] = useState(1);
   const queryClient = useQueryClient();
   const { isFranchise } = useRole();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-referrals', search, period],
-    queryFn: () => adminApi.getReferralLeaderboard({ search, period }),
+    queryKey: ['admin-referrals', search, period, scope],
+    queryFn: () => adminApi.getReferralLeaderboard({ search, period, scope }),
   });
   const data = rawData as any;
   const rows: Row[] = data?.data || [];
@@ -175,8 +177,35 @@ export default function ReferralsPage() {
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Search name, mobile, code…"
-        onClear={() => { setSearch(''); setPeriod('all'); }}
+        onClear={() => { setSearch(''); setPeriod('all'); setScope('city'); }}
       >
+        {/* Franchise-only: switch between their city and the all-India leaderboard. */}
+        {isFranchise && (
+          <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setScope('city')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                scope === 'city'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              My City
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope('all')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                scope === 'all'
+                  ? 'bg-orange-500 text-white'
+                  : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              All India
+            </button>
+          </div>
+        )}
         <Select value={period} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPeriod(e.target.value)}>
           {PERIODS.map((p) => (
             <option key={p.value} value={p.value}>{p.label}</option>
