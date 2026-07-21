@@ -120,7 +120,6 @@ export default function PaymentsPage() {
         <Select value={status} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setStatus(e.target.value); reset(); }}>
           <option value="">All Status</option>
           <option value="success">Success</option>
-          <option value="pending">Pending</option>
           <option value="failed">Failed</option>
           <option value="refunded">Refunded</option>
         </Select>

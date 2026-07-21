@@ -1642,7 +1642,13 @@ export class AdminService {
 
     const dateFilter = dateRangeFilter(query);
     const paymentFilter: any = { ...dateFilter };
-    if (query.status) paymentFilter.status = query.status;
+    // Never show pending/incomplete payments — only settled ones (success or failed).
+    // A specific status filter still wins, but 'pending' is never surfaced.
+    if (query.status && query.status !== 'pending') {
+      paymentFilter.status = query.status;
+    } else {
+      paymentFilter.status = { $ne: 'pending' };
+    }
     if (rx) paymentFilter.$or = [{ orderId: rx }, { razorpayPaymentId: rx }];
     if (cityIds) paymentFilter.userId = { $in: cityIds };
 
