@@ -969,10 +969,16 @@ export class AdminService {
     // Group requirements by their clean pickup city (fallback to the raw city).
     const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
 
-    // Franchise scoping: requirements by their city's users, users by city.
-    const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
+    // Franchise scoping: show ONLY the franchise's own city — requirements whose
+    // PICKUP is that city (its demand), and drivers/agencies whose profile city
+    // matches. This collapses the insights to a single-city view for the franchise.
     const reqMatch: any = { isDeleted: { $ne: true } };
-    if (ids) reqMatch.postedBy = { $in: ids };
+    if (franchiseCity) {
+      reqMatch.$or = [
+        { pickupCityName: this.cityRx(franchiseCity) },
+        { pickupCity: this.cityRx(franchiseCity) },
+      ];
+    }
     const userMatch: any = { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } };
     if (franchiseCity) userMatch.city = this.cityRx(franchiseCity);
 
