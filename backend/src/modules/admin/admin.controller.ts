@@ -454,4 +454,11 @@ export class AdminController {
   getPayments(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
     return this.adminService.getPayments(query, city);
   }
+
+  // ─── Franchise leaderboard (admin only) ──────────────────────────────────────
+  @Get('franchise-leaderboard')
+  @ApiOperation({ summary: 'All franchises ranked by their city activity/revenue' })
+  getFranchiseLeaderboard() {
+    return this.adminService.getFranchiseLeaderboard();
+  }
 }

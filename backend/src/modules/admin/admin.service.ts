@@ -17,6 +17,7 @@ import {
   AccountDeletionRequest,
   AccountDeletionRequestDocument,
 } from '../../database/schemas/account-deletion-request.schema';
+import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { AvailableVehiclesService } from '../available-vehicles/available-vehicles.service';
@@ -42,6 +43,7 @@ export class AdminService {
     @InjectModel(AuditLog.name) private auditLogModel: Model<AuditLogDocument>,
     @InjectModel(AccountDeletionRequest.name)
     private deletionRequestModel: Model<AccountDeletionRequestDocument>,
+    @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
     private notificationsService: NotificationsService,
     private requirementsService: RequirementsService,
     private availableVehiclesService: AvailableVehiclesService,
@@ -76,6 +78,89 @@ export class AdminService {
     if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
       throw new NotFoundException('Not found');
     }
+  }
+
+  // ─── Franchise leaderboard (admin panel) ─────────────────────────────────────
+  /**
+   * Ranks every franchise by the activity in its city: users, drivers, agencies,
+   * requirements, available cabs, and plan revenue. Computed with a handful of
+   * city-keyed aggregations (not one query per franchise) so it scales. The admin
+   * UI sorts by whichever metric it wants — all metrics are returned per row.
+   */
+  async getFranchiseLeaderboard() {
+    const franchises = await this.franchiseModel
+      .find()
+      .select('name city state agencyName commissionPercent isActive')
+      .lean();
+
+    const norm = (c?: string | null) => (c || '').trim().toLowerCase();
+    const cityKey = { $toLower: { $trim: { input: '$u.city' } } };
+
+    const [userAgg, reqAgg, vehAgg, revAgg] = await Promise.all([
+      // Users / drivers / agencies grouped by their own city.
+      this.userModel.aggregate([
+        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } } },
+        { $group: {
+          _id: { $toLower: { $trim: { input: '$city' } } },
+          users: { $sum: 1 },
+          drivers: { $sum: { $cond: [{ $eq: ['$role', 'driver'] }, 1, 0] } },
+          agencies: { $sum: { $cond: [{ $eq: ['$role', 'travel_agency'] }, 1, 0] } },
+        } },
+      ]),
+      // Requirements grouped by their poster's city.
+      this.requirementModel.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
+        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
+        { $unwind: '$u' },
+        { $group: { _id: cityKey, requirements: { $sum: 1 } } },
+      ]),
+      // Available cabs grouped by their poster's city.
+      this.vehicleModel.aggregate([
+        { $match: { isDeleted: { $ne: true } } },
+        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
+        { $unwind: '$u' },
+        { $group: { _id: cityKey, vehicles: { $sum: 1 } } },
+      ]),
+      // Plan/subscription revenue (real Razorpay only) grouped by the payer's city.
+      this.paymentModel.aggregate([
+        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId } },
+        { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'u' } },
+        { $unwind: '$u' },
+        { $group: { _id: cityKey, paise: { $sum: '$amount' } } },
+      ]),
+    ]);
+
+    const uMap = new Map<string, any>((userAgg as any[]).map((r) => [r._id, r]));
+    const reqMap = new Map<string, number>((reqAgg as any[]).map((r) => [r._id, r.requirements]));
+    const vehMap = new Map<string, number>((vehAgg as any[]).map((r) => [r._id, r.vehicles]));
+    const revMap = new Map<string, number>((revAgg as any[]).map((r) => [r._id, Math.round((r.paise || 0) / 100)]));
+
+    const rows = franchises.map((f: any) => {
+      const key = norm(f.city);
+      const u = uMap.get(key) || {};
+      return {
+        _id: f._id,
+        name: f.name,
+        city: f.city || '',
+        state: f.state || '',
+        agencyName: f.agencyName || '',
+        commissionPercent: f.commissionPercent ?? 0,
+        isActive: f.isActive !== false,
+        users: u.users || 0,
+        drivers: u.drivers || 0,
+        agencies: u.agencies || 0,
+        requirements: reqMap.get(key) || 0,
+        vehicles: vehMap.get(key) || 0,
+        revenue: revMap.get(key) || 0,
+      };
+    });
+
+    // Default ordering by total activity; the UI re-sorts by the chosen metric.
+    rows.sort((a, b) =>
+      (b.users + b.requirements + b.vehicles) - (a.users + a.requirements + a.vehicles),
+    );
+
+    return { message: 'Franchise leaderboard', data: rows };
   }
 
   // ── Account deletion requests ───────────────────────────────────────────────

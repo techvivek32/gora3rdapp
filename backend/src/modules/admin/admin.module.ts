@@ -17,6 +17,7 @@ import { SubscriptionPlan, SubscriptionPlanSchema } from '../../database/schemas
 import { AuditLog, AuditLogSchema } from '../../database/schemas/audit-log.schema';
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
 import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
+import { Franchise, FranchiseSchema } from '../../database/schemas/franchise.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RequirementsModule } from '../requirements/requirements.module';
 import { AvailableVehiclesModule } from '../available-vehicles/available-vehicles.module';
@@ -39,6 +40,7 @@ import { AvailableVehiclesModule } from '../available-vehicles/available-vehicle
       { name: AuditLog.name, schema: AuditLogSchema },
       { name: Notification.name, schema: NotificationSchema },
       { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
+      { name: Franchise.name, schema: FranchiseSchema },
     ]),
     NotificationsModule,
     // Admin "post on behalf of a user" reuses these services, so booking ids,

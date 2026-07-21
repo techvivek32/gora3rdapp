@@ -22,7 +22,6 @@ const navigation = [
     label: 'Users & Platform',
     items: [
       { href: '/users', label: 'Users', icon: Users },
-      { href: '/franchises', label: 'Franchises', icon: Building2 },
       { href: '/support-chats', label: 'Support Chats', icon: MessageSquare },
       { href: '/referrals', label: 'Invite Leaderboard', icon: Trophy },
       { href: '/verification-requests', label: 'Verification Requests', icon: BadgeCheck },
@@ -30,6 +29,13 @@ const navigation = [
       { href: '/requirements', label: 'Requirements', icon: FileText },
       { href: '/vehicles', label: 'Available Vehicles', icon: Car },
       { href: '/reports', label: 'Reports', icon: Flag },
+    ],
+  },
+  {
+    label: 'Franchises',
+    items: [
+      { href: '/franchises', label: 'Franchises', icon: Building2 },
+      { href: '/franchise-leaderboard', label: 'Franchise Leaderboard', icon: Trophy },
     ],
   },
   {
