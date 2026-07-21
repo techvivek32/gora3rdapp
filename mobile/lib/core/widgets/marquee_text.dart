@@ -65,11 +65,32 @@ class _MarqueeTextState extends State<MarqueeText> with SingleTickerProviderStat
       physics: const NeverScrollableScrollPhysics(),
       child: Row(
         children: [
-          Text(widget.text, style: widget.style, maxLines: 1),
+          _line(),
           SizedBox(width: widget.gap),
-          Text(widget.text, style: widget.style, maxLines: 1),
+          _line(),
           SizedBox(width: widget.gap),
         ],
+      ),
+    );
+  }
+
+  /// A single line of the marquee. `forceStrutHeight` pins the line box to a fixed
+  /// multiple of the font size on EVERY platform — without it, Android's Devanagari
+  /// font reserves a much taller line than web, leaving a big empty gap below the
+  /// text on real phones. `even` leading splits any remaining slack top/bottom.
+  Widget _line() {
+    final fs = widget.style.fontSize ?? 14;
+    final h = widget.style.height ?? 1.3;
+    return Text(
+      widget.text,
+      maxLines: 1,
+      style: widget.style.copyWith(height: h, leadingDistribution: TextLeadingDistribution.even),
+      strutStyle: StrutStyle(
+        fontSize: fs,
+        height: h,
+        leading: 0,
+        forceStrutHeight: true,
+        leadingDistribution: TextLeadingDistribution.even,
       ),
     );
   }

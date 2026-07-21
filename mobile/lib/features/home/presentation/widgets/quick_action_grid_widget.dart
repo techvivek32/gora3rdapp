@@ -40,6 +40,10 @@ class QuickActionGridWidget extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
       child: GridView.count(
+        // A vertical GridView with `padding: null` auto-applies MediaQuery padding
+        // (the status-bar height) as TOP padding — that was the mysterious gap above
+        // the tiles. Force zero so the grid sits directly under the marquee.
+        padding: EdgeInsets.zero,
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisCount: 3,

@@ -287,12 +287,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
                 ),
 
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 6.h),
-                  child: MarqueeText(
-                    text:
-                        'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
-                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                // Fixed-height row so the marquee's footprint is deterministic — the
+                // Row inside MarqueeText centres the text, so the tall Devanagari line
+                // box can't leave a big empty gap below the text (the bug on phones).
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4.h),
+                  child: SizedBox(
+                    height: 26.h,
+                    child: MarqueeText(
+                      text:
+                          'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.',
+                      style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                    ),
                   ),
                 ),
 
@@ -301,12 +307,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: const UserSearchWidget(),
                 ),
 
-                Container(
-                  padding: EdgeInsets.only(top: 6.h),
-                  child: MarqueeText(
-                    text:
-                        'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
-                    style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                Padding(
+                  padding: EdgeInsets.only(top: 4.h),
+                  child: SizedBox(
+                    height: 26.h,
+                    child: MarqueeText(
+                      text:
+                          'बुकिंग लेने या देने से पहले अकाउंट अवश्य वेरिफाई कर लें।   Please verify account before accepting or posting a booking.',
+                      style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700, color: AppColors.error),
+                    ),
                   ),
                 ),
 
