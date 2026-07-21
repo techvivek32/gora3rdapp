@@ -1566,7 +1566,9 @@ export class AdminService {
     // Wallet money: top-ups, admin adjustments, and BOTH sides of a transfer (the
     // sender's debit and the recipient's credit) so a transfer is never mistaken
     // for a top-up. Only included when the status filter allows a wallet credit.
-    const includeWallet = !query.status || ['success', 'paid'].includes(query.status);
+    // A franchise's Payments page shows plan/subscription purchases ONLY — no wallet
+    // top-ups or transfers — so wallet rows are excluded entirely for a franchise.
+    const includeWallet = !franchiseCity && (!query.status || ['success', 'paid'].includes(query.status));
     const walletFilter: any = {
       status: 'success',
       $or: [{ type: 'credit' }, { type: 'debit', source: 'transfer' }],
