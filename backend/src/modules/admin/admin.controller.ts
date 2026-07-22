@@ -455,6 +455,23 @@ export class AdminController {
     return this.adminService.getPayments(query, city);
   }
 
+  // ─── Admin profile ───────────────────────────────────────────────────────────
+  @Get('profile')
+  @ApiOperation({ summary: "The logged-in admin's own profile" })
+  getMyProfile(@CurrentUser('sub') userId: string) {
+    return this.adminService.getMyProfile(userId);
+  }
+
+  @Post('profile/change-password')
+  @ApiOperation({ summary: "Change the logged-in admin's password (verifies the current one)" })
+  changePassword(
+    @CurrentUser('sub') userId: string,
+    @Body('oldPassword') oldPassword: string,
+    @Body('newPassword') newPassword: string,
+  ) {
+    return this.adminService.changePassword(userId, oldPassword, newPassword);
+  }
+
   // ─── Franchise leaderboard (admin only) ──────────────────────────────────────
   @Get('franchise-leaderboard')
   @ApiOperation({ summary: 'All franchises ranked by their city activity/revenue' })

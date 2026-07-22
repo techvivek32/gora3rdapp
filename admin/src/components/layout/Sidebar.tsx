@@ -57,6 +57,7 @@ const navigation = [
       { href: '/notifications', label: 'Notifications', icon: Bell },
       { href: '/pricing', label: 'Pricing Config', icon: DollarSign },
       { href: '/settings', label: 'Settings', icon: Settings },
+      { href: '/profile', label: 'Profile', icon: UserCircle },
     ],
   },
 ];

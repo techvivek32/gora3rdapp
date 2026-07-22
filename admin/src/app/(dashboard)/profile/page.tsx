@@ -1,13 +1,178 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Building2, CreditCard, Landmark, MapPin } from 'lucide-react';
+import { Building2, CreditCard, Landmark, MapPin, ShieldCheck, Mail, Phone, User, KeyRound, Eye, EyeOff } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { FRANCHISE_DOCS, type Franchise } from '@/components/franchises/FranchiseFormModal';
+import { useRole } from '@/hooks/useRole';
+
+// One /profile route serves both panels: a franchise sees its franchise profile,
+// an admin/super-admin sees their own account details.
+export default function ProfilePage() {
+  const { isFranchise } = useRole();
+  return isFranchise ? <FranchiseProfile /> : <AdminProfile />;
+}
+
+// ─── Admin / super-admin own profile ─────────────────────────────────────────
+function AdminProfile() {
+  const { role } = useRole();
+  const { data: raw, isLoading } = useQuery({
+    queryKey: ['admin-me'],
+    queryFn: () => adminApi.getAdminProfile(),
+  });
+  const u: any = (raw as any)?.data;
+
+  if (isLoading) return <p className="p-6 text-sm text-gray-500">Loading…</p>;
+  if (!u) return <p className="p-6 text-sm text-gray-500">Profile not available.</p>;
+
+  const roleLabel = u.role === 'super_admin' ? 'Super Admin' : u.role === 'admin' ? 'Admin' : (role || 'User');
+  const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+  return (
+    <div className="space-y-5 max-w-4xl">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="w-6 h-6 text-orange-500" />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Profile</h1>
+          <p className="text-sm text-gray-500">Your account details.</p>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0 overflow-hidden">
+            {u.profileImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={u.profileImage} alt={u.fullName || 'Admin'} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xl font-bold text-orange-500">{(u.fullName || u.email || 'A')[0]?.toUpperCase()}</span>
+            )}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{u.fullName || '—'}</h2>
+            <p className="text-sm text-gray-500">{u.email || '—'}</p>
+          </div>
+          <span className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-orange-500/15 text-orange-500">
+            <ShieldCheck className="w-3.5 h-3.5" /> {roleLabel}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+          <Info label="Full Name" value={u.fullName || '—'} icon={<User className="w-3.5 h-3.5" />} />
+          <Info label="Email" value={u.email || '—'} icon={<Mail className="w-3.5 h-3.5" />} />
+          <Info label="Mobile" value={u.mobile || '—'} mono icon={<Phone className="w-3.5 h-3.5" />} />
+          <Info label="Role" value={roleLabel} />
+          <Info label="City" value={u.city || '—'} />
+          <Info label="Member Since" value={joined} />
+        </div>
+      </div>
+
+      <ChangePasswordCard />
+    </div>
+  );
+}
+
+// ─── Change password (verify current, then set new) ──────────────────────────
+function ChangePasswordCard() {
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [show, setShow] = useState({ old: false, next: false, confirm: false });
+
+  const mutation = useMutation({
+    mutationFn: () => adminApi.changeAdminPassword({ oldPassword, newPassword }),
+    onSuccess: () => {
+      toast.success('Password changed successfully');
+      setOldPassword(''); setNewPassword(''); setConfirm('');
+    },
+    onError: (e: any) => toast.error(e?.message || 'Could not change password'),
+  });
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!oldPassword || !newPassword) return toast.error('Enter your current and new password');
+    if (newPassword.length < 6) return toast.error('New password must be at least 6 characters');
+    if (newPassword !== confirm) return toast.error('New passwords do not match');
+    if (oldPassword === newPassword) return toast.error('New password must be different from the current one');
+    mutation.mutate();
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <KeyRound className="w-5 h-5 text-orange-500" />
+        <h2 className="font-semibold text-gray-900 dark:text-white">Change Password</h2>
+      </div>
+      <form onSubmit={submit} className="space-y-4 max-w-md">
+        <PasswordField
+          label="Current Password"
+          value={oldPassword}
+          onChange={setOldPassword}
+          visible={show.old}
+          onToggle={() => setShow((s) => ({ ...s, old: !s.old }))}
+        />
+        <PasswordField
+          label="New Password"
+          value={newPassword}
+          onChange={setNewPassword}
+          visible={show.next}
+          onToggle={() => setShow((s) => ({ ...s, next: !s.next }))}
+          hint="At least 6 characters"
+        />
+        <PasswordField
+          label="Confirm New Password"
+          value={confirm}
+          onChange={setConfirm}
+          visible={show.confirm}
+          onToggle={() => setShow((s) => ({ ...s, confirm: !s.confirm }))}
+        />
+        <button
+          type="submit"
+          disabled={mutation.isPending}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-semibold"
+        >
+          <KeyRound className="w-4 h-4" /> {mutation.isPending ? 'Updating…' : 'Update Password'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function PasswordField({
+  label, value, onChange, visible, onToggle, hint,
+}: {
+  label: string; value: string; onChange: (v: string) => void; visible: boolean; onToggle: () => void; hint?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-400 mb-1">{label}</label>
+      <div className="relative">
+        <input
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="off"
+          className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+          tabIndex={-1}
+        >
+          {visible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+        </button>
+      </div>
+      {hint && <p className="text-xs text-gray-400 mt-1">{hint}</p>}
+    </div>
+  );
+}
 
 // Read-only profile of the logged-in franchise. Editing is done by the admin
 // from the admin panel — a franchise cannot change its own commission/documents.
-export default function FranchiseProfilePage() {
+function FranchiseProfile() {
   const { data: raw, isLoading } = useQuery({
     queryKey: ['franchise-me'],
     queryFn: () => adminApi.getFranchiseMe(),
@@ -122,10 +287,10 @@ export default function FranchiseProfilePage() {
   );
 }
 
-function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Info({ label, value, mono, icon }: { label: string; value: string; mono?: boolean; icon?: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-xs text-gray-400 flex items-center gap-1">{icon}{label}</p>
       <p className={`text-sm text-gray-900 dark:text-white ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
   );

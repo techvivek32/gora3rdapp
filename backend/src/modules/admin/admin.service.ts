@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import * as bcrypt from 'bcryptjs';
 import { User, UserDocument, DOCUMENT_KEYS } from '../../database/schemas/user.schema';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
@@ -353,6 +354,39 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
     return { message: 'User retrieved', data: user };
+  }
+
+  // The logged-in admin's own profile (for the admin panel's Profile page).
+  async getMyProfile(userId: string) {
+    const user = await this.userModel
+      .findById(userId)
+      .select('-password -refreshToken -fcmTokens')
+      .lean();
+    if (!user) throw new NotFoundException('Profile not found');
+    return { message: 'Profile retrieved', data: user };
+  }
+
+  // Change the logged-in admin's password: verify the current one, then set the new.
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    if (!oldPassword || !newPassword) {
+      throw new BadRequestException('Both current and new password are required');
+    }
+    if (newPassword.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters');
+    }
+    const user = await this.userModel.findById(userId).select('+password');
+    if (!user) throw new NotFoundException('User not found');
+    if (!user.password) {
+      throw new BadRequestException('No password is set on this account');
+    }
+    const ok = await bcrypt.compare(oldPassword, user.password);
+    if (!ok) throw new BadRequestException('Current password is incorrect');
+    if (oldPassword === newPassword) {
+      throw new BadRequestException('New password must be different from the current one');
+    }
+    user.password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    return { message: 'Password changed successfully' };
   }
 
   // Invitation leaderboard — all users ranked by how many they referred.

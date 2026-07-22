@@ -199,6 +199,10 @@ export const adminApi = {
   getFranchiseLeaderboard: () => apiClient.get('/admin/franchise-leaderboard'),
   // The logged-in franchise's own profile (franchise panel → Profile page).
   getFranchiseMe: () => apiClient.get('/auth/franchise/me'),
+  // The logged-in admin's own profile (admin panel → Profile page).
+  getAdminProfile: () => apiClient.get('/admin/profile'),
+  changeAdminPassword: (data: { oldPassword: string; newPassword: string }) =>
+    apiClient.post('/admin/profile/change-password', data),
 
   // ─── Training Videos ─────────────────────────────────────────────────────────
   getTrainingVideos: () => apiClient.get('/admin/training-videos'),
