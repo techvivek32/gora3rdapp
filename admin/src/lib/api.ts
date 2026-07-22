@@ -203,6 +203,8 @@ export const adminApi = {
   getAdminProfile: () => apiClient.get('/admin/profile'),
   changeAdminPassword: (data: { oldPassword: string; newPassword: string }) =>
     apiClient.post('/admin/profile/change-password', data),
+  // Google Places city suggestions (same source the app's register page uses).
+  getCitySuggestions: (input: string) => apiClient.get('/places/cities', { params: { input } }),
 
   // ─── Training Videos ─────────────────────────────────────────────────────────
   getTrainingVideos: () => apiClient.get('/admin/training-videos'),

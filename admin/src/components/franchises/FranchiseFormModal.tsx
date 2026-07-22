@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { X, Trash2, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { CityAutocomplete } from '@/components/ui/CityAutocomplete';
 
 export interface DocEntry { number?: string; frontImage?: string; backImage?: string }
 export interface Payout {
@@ -109,7 +110,15 @@ export function FranchiseFormModal({ franchise, onClose, onSaved }: { franchise?
             <div><label className={labelCls}>Date of Birth</label><input type="date" className={inputCls} value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} /></div>
             <div><label className={labelCls}>Phone *</label><input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
             <div><label className={labelCls}>Email</label><input type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div><label className={labelCls}>City</label><input className={inputCls} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></div>
+            <div>
+              <label className={labelCls}>City</label>
+              <CityAutocomplete
+                inputCls={inputCls}
+                value={form.city}
+                placeholder="Start typing a city…"
+                onChange={(city, state) => setForm((prev) => ({ ...prev, city, ...(state ? { state } : {}) }))}
+              />
+            </div>
             <div><label className={labelCls}>State</label><input className={inputCls} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></div>
             <div><label className={labelCls}>Agency Name</label><input className={inputCls} value={form.agencyName} onChange={(e) => setForm({ ...form, agencyName: e.target.value })} /></div>
             <div>
