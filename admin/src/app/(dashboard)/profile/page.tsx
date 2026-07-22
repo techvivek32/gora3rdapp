@@ -31,7 +31,7 @@ function AdminProfile() {
   const joined = u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5">
       <div className="flex items-center gap-2">
         <ShieldCheck className="w-6 h-6 text-orange-500" />
         <div>
@@ -74,18 +74,25 @@ function AdminProfile() {
   );
 }
 
-// ─── Change password (verify current, then set new) ──────────────────────────
+// ─── Change password (collapsed until opened; verify current, then set new) ───
 function ChangePasswordCard() {
+  const [open, setOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState({ old: false, next: false, confirm: false });
 
+  const reset = () => {
+    setOldPassword(''); setNewPassword(''); setConfirm('');
+    setShow({ old: false, next: false, confirm: false });
+  };
+
   const mutation = useMutation({
     mutationFn: () => adminApi.changeAdminPassword({ oldPassword, newPassword }),
     onSuccess: () => {
       toast.success('Password changed successfully');
-      setOldPassword(''); setNewPassword(''); setConfirm('');
+      reset();
+      setOpen(false);
     },
     onError: (e: any) => toast.error(e?.message || 'Could not change password'),
   });
@@ -101,41 +108,62 @@ function ChangePasswordCard() {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <KeyRound className="w-5 h-5 text-orange-500" />
-        <h2 className="font-semibold text-gray-900 dark:text-white">Change Password</h2>
-      </div>
-      <form onSubmit={submit} className="space-y-4 max-w-md">
-        <PasswordField
-          label="Current Password"
-          value={oldPassword}
-          onChange={setOldPassword}
-          visible={show.old}
-          onToggle={() => setShow((s) => ({ ...s, old: !s.old }))}
-        />
-        <PasswordField
-          label="New Password"
-          value={newPassword}
-          onChange={setNewPassword}
-          visible={show.next}
-          onToggle={() => setShow((s) => ({ ...s, next: !s.next }))}
-          hint="At least 6 characters"
-        />
-        <PasswordField
-          label="Confirm New Password"
-          value={confirm}
-          onChange={setConfirm}
-          visible={show.confirm}
-          onToggle={() => setShow((s) => ({ ...s, confirm: !s.confirm }))}
-        />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="w-5 h-5 text-orange-500" />
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Change Password</h2>
+            {!open && <p className="text-xs text-gray-500">Update your account password.</p>}
+          </div>
+        </div>
         <button
-          type="submit"
-          disabled={mutation.isPending}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-semibold"
+          type="button"
+          onClick={() => { if (open) reset(); setOpen((o) => !o); }}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold ${
+            open
+              ? 'border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+              : 'bg-orange-500 hover:bg-orange-600 text-white'
+          }`}
         >
-          <KeyRound className="w-4 h-4" /> {mutation.isPending ? 'Updating…' : 'Update Password'}
+          {open ? 'Cancel' : (<><KeyRound className="w-4 h-4" /> Change Password</>)}
         </button>
-      </form>
+      </div>
+
+      {open && (
+        <form onSubmit={submit} className="mt-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <PasswordField
+              label="Current Password"
+              value={oldPassword}
+              onChange={setOldPassword}
+              visible={show.old}
+              onToggle={() => setShow((s) => ({ ...s, old: !s.old }))}
+            />
+            <PasswordField
+              label="New Password"
+              value={newPassword}
+              onChange={setNewPassword}
+              visible={show.next}
+              onToggle={() => setShow((s) => ({ ...s, next: !s.next }))}
+              hint="At least 6 characters"
+            />
+            <PasswordField
+              label="Confirm New Password"
+              value={confirm}
+              onChange={setConfirm}
+              visible={show.confirm}
+              onToggle={() => setShow((s) => ({ ...s, confirm: !s.confirm }))}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white text-sm font-semibold"
+          >
+            <KeyRound className="w-4 h-4" /> {mutation.isPending ? 'Updating…' : 'Update Password'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }
