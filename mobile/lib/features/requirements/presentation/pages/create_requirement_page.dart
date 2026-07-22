@@ -210,7 +210,9 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       // OSRM returns the total distance through all waypoints in order.
       final coordStr = points.map((p) => '${p[1]},${p[0]}').join(';');
       final res = await Dio().get(
-        'http://router.project-osrm.org/route/v1/driving/$coordStr',
+        // HTTPS, not HTTP: Android blocks cleartext by default, which silently made
+        // this fail and fall back to straight-line distance (e.g. 96 vs 154 km).
+        'https://router.project-osrm.org/route/v1/driving/$coordStr',
         queryParameters: {'overview': 'false'},
         options: Options(receiveTimeout: const Duration(seconds: 8)),
       );

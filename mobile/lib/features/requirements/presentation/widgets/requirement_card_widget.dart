@@ -303,6 +303,18 @@ class RequirementCardWidget extends StatelessWidget {
 
                               final fromCoord = requirement['pickupCoordinates'];
                               final dropCoord = requirement['dropCoordinates'];
+                              // The ROAD distance stored at creation (OSRM) is the source of
+                              // truth — it matches Google Maps. Straight-line (haversine) badly
+                              // underestimates (e.g. 96 vs 154 km on the road), so only fall back
+                              // to it when no road distance was stored. Per-leg labels are
+                              // straight-line, so scale them by road/straight to stay consistent.
+                              final roadKm = (requirement['estimatedDistance'] is num && (requirement['estimatedDistance'] as num) > 0)
+                                  ? (requirement['estimatedDistance'] as num).toDouble()
+                                  : null;
+                              final straightSum = _straightSumKm(fromCoord, stops, dropCoord);
+                              final legScale = (roadKm != null && straightSum != null && straightSum > 0)
+                                  ? roadKm / straightSum
+                                  : 1.0;
                               final timeline = Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
@@ -312,18 +324,19 @@ class RequirementCardWidget extends StatelessWidget {
                                     // Distance from the previous point (pickup or prior stop) to this stop.
                                     final prev = e.key == 0 ? fromCoord : stops[e.key - 1];
                                     return point(Icons.add_location_alt, topBarColor, 'STOP ${e.key + 1}', (e.value['address'] ?? '').toString(),
-                                        showLine: true, legInfo: _legInfo(prev, e.value));
+                                        showLine: true, legInfo: _legInfo(prev, e.value, scale: legScale));
                                   }),
                                   point(Icons.location_on, Colors.red, 'TO', requirement['dropCity'] as String? ?? '',
                                       showLine: false,
-                                      legInfo: stops.isNotEmpty ? _legInfo(stops.last, dropCoord) : null),
+                                      legInfo: stops.isNotEmpty ? _legInfo(stops.last, dropCoord, scale: legScale) : null),
                                 ],
                               );
 
-                              // Prefer the summed legs so the total matches the
-                              // per-leg labels; else the stored road distance.
-                              final totalKm = _totalRouteKm(fromCoord, stops, dropCoord) ??
-                                  (requirement['estimatedDistance'] != null ? '${requirement['estimatedDistance']}' : null);
+                              // Prefer the stored road distance; only sum straight-line legs
+                              // when there is no road distance to show.
+                              final totalKm = roadKm != null
+                                  ? roadKm.toStringAsFixed(0)
+                                  : _totalRouteKm(fromCoord, stops, dropCoord);
                               return Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
@@ -735,21 +748,11 @@ class RequirementCardWidget extends StatelessWidget {
   /// "154 KMs / 3 Hrs" — sums the pickup→stops→drop legs, falling back to the
   /// stored estimatedDistance when coordinates are missing.
   String? _routeSummary(dynamic from, List stops, dynamic to) {
-    final points = <dynamic>[from, ...stops, to];
-    double sum = 0;
-    for (var i = 0; i < points.length - 1; i++) {
-      final leg = _haversineKm(points[i], points[i + 1]);
-      if (leg == null) {
-        sum = 0;
-        break;
-      }
-      sum += leg;
-    }
-    if (sum <= 0) {
-      final est = requirement['estimatedDistance'];
-      if (est is! num || est <= 0) return null;
-      sum = est.toDouble();
-    }
+    // Prefer the stored road distance (OSRM, matches Google); only fall back to the
+    // straight-line sum when no road distance is available.
+    final est = requirement['estimatedDistance'];
+    final sum = (est is num && est > 0) ? est.toDouble() : _straightSumKm(from, stops, to);
+    if (sum == null || sum <= 0) return null;
     final hrs = (sum / 50).round(); // same ~50 km/h estimate the card's leg labels use
     return '${sum.toStringAsFixed(0)} KMs / $hrs Hrs';
   }
@@ -840,20 +843,25 @@ class RequirementCardWidget extends StatelessWidget {
   /// the per-leg labels. Falls back to the stored estimatedDistance when the
   /// coordinates needed to sum the legs aren't available.
   String? _totalRouteKm(dynamic from, List stops, dynamic to) {
+    return _straightSumKm(from, stops, to)?.toStringAsFixed(0);
+  }
+
+  /// Straight-line (haversine) total across pickup→stops→drop in km. Null if any
+  /// coordinate is missing so the sum can't be trusted.
+  double? _straightSumKm(dynamic from, List stops, dynamic to) {
     final points = <dynamic>[from, ...stops, to];
     double sum = 0;
     for (var i = 0; i < points.length - 1; i++) {
       final leg = _haversineKm(points[i], points[i + 1]);
-      if (leg == null) return null; // missing a coord → can't sum reliably
+      if (leg == null) return null;
       sum += leg;
     }
-    if (sum <= 0) return null;
-    return sum.toStringAsFixed(0);
+    return sum > 0 ? sum : null;
   }
 
   /// Straight-line (Haversine) distance + estimated drive time between two coord
   /// maps, formatted as "94 km takes 1:34 hrs". Null if coords are missing.
-  String? _legInfo(dynamic a, dynamic b) {
+  String? _legInfo(dynamic a, dynamic b, {double scale = 1.0}) {
     final la = _coordLat(a), lna = _coordLng(a), lb = _coordLat(b), lnb = _coordLng(b);
     if (la == null || lna == null || lb == null || lnb == null) return null;
     const r = 6371.0; // earth radius km
@@ -861,7 +869,9 @@ class RequirementCardWidget extends StatelessWidget {
     final dLng = (lnb - lna) * (pi / 180);
     final h = sin(dLat / 2) * sin(dLat / 2) +
         cos(la * (pi / 180)) * cos(lb * (pi / 180)) * sin(dLng / 2) * sin(dLng / 2);
-    final km = 2 * r * atan2(sqrt(h), sqrt(1 - h));
+    // Straight-line km, scaled to approximate the road distance so the per-leg
+    // labels sum to the same road total shown for the whole trip.
+    final km = 2 * r * atan2(sqrt(h), sqrt(1 - h)) * scale;
     // Estimated drive time at ~50 km/h average.
     const avgSpeed = 50.0;
     final totalMin = (km / avgSpeed * 60).round();
