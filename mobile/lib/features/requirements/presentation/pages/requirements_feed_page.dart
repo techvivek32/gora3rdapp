@@ -30,7 +30,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   String _searchQuery = '';
   final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
-  List<Map<String, dynamic>> _lastMyAccepted = [];
   bool _lastHasMore = false;
   List<Map<String, dynamic>> _banners = [];
 
@@ -137,7 +136,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         builder: (context, state) {
           if (state is RequirementsLoaded) {
             _lastLoadedRequirements = state.requirements;
-            _lastMyAccepted = state.myAccepted;
             _lastHasMore = state.hasMore;
           }
 
@@ -147,29 +145,24 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           }
 
           List<Map<String, dynamic>> requirements = [];
-          List<Map<String, dynamic>> myAccepted = [];
           bool isLoadingMore = false;
+          // Show every requirement the backend returns (the backend applies the
+          // 7-day expiry, so pagination stays correct and "load more" works).
           if (state is RequirementsLoaded) {
-            requirements = state.requirements.where((r) => !_isExpired(r)).toList();
-            myAccepted = state.myAccepted.where((r) => !_isExpired(r)).toList();
+            requirements = List<Map<String, dynamic>>.from(state.requirements);
             isLoadingMore = state.isLoadingMore;
           } else {
-            requirements = _lastLoadedRequirements.where((r) => !_isExpired(r)).toList();
-            myAccepted = _lastMyAccepted.where((r) => !_isExpired(r)).toList();
+            requirements = List<Map<String, dynamic>>.from(_lastLoadedRequirements);
             isLoadingMore = false;
           }
 
           // Apply the top vehicle-type filter (empty = All).
           if (_vehicleFilters.isNotEmpty) {
             requirements = requirements.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
-            myAccepted = myAccepted.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
           }
-
-          final hasMyAccepted = myAccepted.isNotEmpty;
 
           // Build flat mixed list: requirements interleaved with banners
           final List<dynamic> items = [];
-          if (hasMyAccepted) items.add('accepted_section');
           for (int i = 0; i < requirements.length; i++) {
             items.add(requirements[i]);
             // After every card insert a random banner
@@ -179,7 +172,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           }
           if (isLoadingMore) items.add('loading');
 
-          if (requirements.isEmpty && !hasMyAccepted) {
+          if (requirements.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
               onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
@@ -200,9 +193,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
               separatorBuilder: (_, __) => SizedBox(height: 16.h),
               itemBuilder: (context, index) {
                 final item = items[index];
-                if (item == 'accepted_section') {
-                  return _buildMyAcceptedSection(myAccepted);
-                }
                 if (item == 'loading') {
                   return Center(child: Padding(
                     padding: EdgeInsets.all(16.r),
@@ -261,55 +251,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           return const SizedBox();
         },
       ),
-    );
-  }
-
-  Widget _buildMyAcceptedSection(List<Map<String, dynamic>> myAccepted) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
-          child: Row(
-            children: [
-              Container(
-                width: 4.w,
-                height: 18.h,
-                decoration: BoxDecoration(color: Colors.green[700], borderRadius: BorderRadius.circular(2.r)),
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                'My Accepted Requirements',
-                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.green[800]),
-              ),
-              SizedBox(width: 8.w),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
-                decoration: BoxDecoration(color: Colors.green[50], borderRadius: BorderRadius.circular(10.r), border: Border.all(color: Colors.green.shade300)),
-                child: Text('${myAccepted.length}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: Colors.green[700])),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 4.h),
-        ...myAccepted.map((req) => Padding(
-          padding: EdgeInsets.only(bottom: 10.h),
-          child: Stack(
-            children: [
-              RequirementCardWidget(
-                requirement: req,
-                onTap: () => context.push('/requirements/${req['_id']}', extra: req).then((result) {
-                  if (result == true && mounted) {
-                    context.read<RequirementsBloc>().add(const LoadRequirementsEvent());
-                  }
-                }),
-              ),
-            ],
-          ),
-        )),
-        Divider(height: 1, thickness: 1, color: Colors.grey[300]),
-        SizedBox(height: 8.h),
-      ],
     );
   }
 
@@ -399,22 +340,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         },
       ),
     );
-  }
-
-  bool _isExpired(Map<String, dynamic> req) {
-    try {
-      final dateStr = req['travelDate'] as String?;
-      if (dateStr == null) return false;
-      // Show requirement for 7 days from travel date, then hide it.
-      final datePart = dateStr.contains('T') ? dateStr.split('T').first : dateStr;
-      final p = datePart.split('-');
-      if (p.length != 3) return false;
-      final travelDate = DateTime(int.parse(p[0]), int.parse(p[1]), int.parse(p[2]));
-      final expiryDate = travelDate.add(const Duration(days: 7));
-      return DateTime.now().isAfter(expiryDate);
-    } catch (_) {
-      return false;
-    }
   }
 
   @override

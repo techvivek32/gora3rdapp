@@ -92,6 +92,15 @@ export class RequirementsService {
       if (query.dateTo) filter.travelDate.$lte = new Date(query.dateTo);
     }
 
+    // Expiry: a requirement stops showing in the feed 7 days after its travel date
+    // (a trip that's already a week past is no longer useful). Enforcing this here —
+    // not on the client — keeps pagination correct, so each page returns full pages
+    // of still-valid requirements and "load more" always works.
+    const expiryCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    filter.travelDate = filter.travelDate || {};
+    const currentGte = filter.travelDate.$gte as Date | undefined;
+    filter.travelDate.$gte = currentGte && currentGte > expiryCutoff ? currentGte : expiryCutoff;
+
     const [requirements, total] = await Promise.all([
       this.requirementModel
         .find(filter)
