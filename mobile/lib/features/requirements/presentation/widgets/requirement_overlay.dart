@@ -172,6 +172,14 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
           .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
           .join(' ');
 
+  /// The single close path — always stop the ring, then close the overlay. Used by
+  /// the Close button, the tap-outside barrier, and the header X, so the ring can
+  /// never keep playing after the popup is gone.
+  Future<void> _close() async {
+    stopRequirementRing();
+    await FlutterOverlayWindow.closeOverlay();
+  }
+
   Future<void> _call() async {
     final m = _s('posterMobile');
     if (m.isEmpty) return;
@@ -238,10 +246,11 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
-        // Dim the rest of the screen; tapping outside the card dismisses it.
+        // Dim the rest of the screen; tapping outside the card dismisses it AND
+        // stops the ring.
         color: Colors.black45,
         child: GestureDetector(
-          onTap: () => FlutterOverlayWindow.closeOverlay(),
+          onTap: _close,
           child: Center(
             child: GestureDetector(
               onTap: () {}, // absorb taps on the card so it doesn't dismiss
@@ -286,7 +295,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                       fontSize: 15)),
                             ),
                             GestureDetector(
-                              onTap: () => FlutterOverlayWindow.closeOverlay(),
+                              onTap: _close,
                               child: const Icon(Icons.close,
                                   color: Colors.white, size: 22),
                             ),
@@ -424,17 +433,21 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            Center(
-                              child: TextButton(
-                                onPressed: () {
-                                  stopRequirementRing();
-                                  FlutterOverlayWindow.closeOverlay();
-                                },
-                                child: const Text('Dismiss',
+                            const SizedBox(height: 10),
+                            // Same black "Close" button as the in-app Requirement
+                            // Alert popup — closes the overlay and stops the ring.
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _close,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.black,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                child: const Text('Close',
                                     style: TextStyle(
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.w600)),
+                                        fontWeight: FontWeight.w600, fontSize: 14)),
                               ),
                             ),
                           ],
