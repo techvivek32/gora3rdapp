@@ -133,7 +133,9 @@ class _RequirementAlert extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  if (trip.isNotEmpty) Flexible(child: _tag(trip)),
+                  // Natural width (not Flexible) so the trip tag sits flush at the
+                  // right end — the vehicle name (Expanded) takes the rest.
+                  if (trip.isNotEmpty) _tag(trip),
                 ],
               ),
               const Divider(height: 16),

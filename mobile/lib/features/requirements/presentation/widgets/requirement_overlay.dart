@@ -345,22 +345,22 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                       overflow: TextOverflow.ellipsis),
                                 ),
                                 const SizedBox(width: 8),
+                                // Natural width (not Flexible) so the trip tag sits
+                                // flush at the right end of the row.
                                 if (trip.isNotEmpty)
-                                  Flexible(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(
-                                              color: Colors.grey.shade300)),
-                                      child: Text(trip,
-                                          maxLines: 1,
-                                          style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w600),
-                                          overflow: TextOverflow.ellipsis),
-                                    ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: Colors.grey.shade300)),
+                                    child: Text(trip,
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600),
+                                        overflow: TextOverflow.ellipsis),
                                   ),
                               ],
                             ),
