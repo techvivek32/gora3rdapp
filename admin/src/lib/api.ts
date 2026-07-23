@@ -180,6 +180,7 @@ export const adminApi = {
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;
     supportPhone?: string;
+    supportPhone2?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
   }) => apiClient.put('/settings', data),

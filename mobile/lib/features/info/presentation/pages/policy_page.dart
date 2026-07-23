@@ -271,6 +271,7 @@ class _AboutFooter extends StatefulWidget {
 
 class _AboutFooterState extends State<_AboutFooter> {
   String _phone = '';
+  String _phone2 = '';
   String _email = '';
   bool _loading = true;
 
@@ -289,6 +290,7 @@ class _AboutFooterState extends State<_AboutFooter> {
       if (!mounted) return;
       setState(() {
         _phone = (s['supportPhone'] ?? '').toString().trim();
+        _phone2 = (s['supportPhone2'] ?? '').toString().trim();
         _email = (s['supportEmail'] ?? '').toString().trim();
         _loading = false;
       });
@@ -303,7 +305,7 @@ class _AboutFooterState extends State<_AboutFooter> {
 
   @override
   Widget build(BuildContext context) {
-    final hasContact = _phone.isNotEmpty || _email.isNotEmpty;
+    final hasContact = _phone.isNotEmpty || _phone2.isNotEmpty || _email.isNotEmpty;
 
     return Column(
       children: [
@@ -339,7 +341,16 @@ class _AboutFooterState extends State<_AboutFooter> {
                     label: _phone,
                     onTap: () => callNumber(_phone),
                   ),
-                if (_phone.isNotEmpty && _email.isNotEmpty) const SizedBox(height: 8),
+                // Fallback line — call this if the first is busy.
+                if (_phone2.isNotEmpty) ...[
+                  if (_phone.isNotEmpty) const SizedBox(height: 8),
+                  _contactTile(
+                    icon: Icons.phone_rounded,
+                    label: _phone2,
+                    onTap: () => callNumber(_phone2),
+                  ),
+                ],
+                if ((_phone.isNotEmpty || _phone2.isNotEmpty) && _email.isNotEmpty) const SizedBox(height: 8),
                 if (_email.isNotEmpty)
                   _contactTile(
                     icon: Icons.email_rounded,

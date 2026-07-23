@@ -48,6 +48,10 @@ export class PlatformSettings {
   @Prop({ default: '' })
   supportPhone: string;
 
+  /** Fallback call number, shown on About Us when the primary line is busy. */
+  @Prop({ default: '' })
+  supportPhone2: string;
+
   @Prop({ default: '' })
   supportWhatsapp: string;
 

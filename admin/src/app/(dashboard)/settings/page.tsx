@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [error, setError] = useState('');
 
   const [supportPhone, setSupportPhone] = useState('');
+  const [supportPhone2, setSupportPhone2] = useState('');
   const [supportWhatsapp, setSupportWhatsapp] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [contactSaving, setContactSaving] = useState(false);
@@ -36,6 +37,7 @@ export default function SettingsPage() {
         setRzKeyId(s.razorpayKeyId ?? '');
         setRzKeySecret(s.razorpayKeySecret ?? '');
         setSupportPhone(s.supportPhone ?? '');
+        setSupportPhone2(s.supportPhone2 ?? '');
         setSupportWhatsapp(s.supportWhatsapp ?? '');
         setSupportEmail(s.supportEmail ?? '');
       })
@@ -52,6 +54,7 @@ export default function SettingsPage() {
     try {
       await adminApi.updateSettings({
         supportPhone: supportPhone.trim(),
+        supportPhone2: supportPhone2.trim(),
         supportWhatsapp: supportWhatsapp.trim(),
         supportEmail: email,
       });
@@ -112,6 +115,17 @@ export default function SettingsPage() {
                   placeholder="+919587090620"
                   className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Second Phone Number (fallback)</label>
+                <input
+                  type="text"
+                  value={supportPhone2}
+                  onChange={(e) => { setSupportPhone2(e.target.value); setContactSaved(false); }}
+                  placeholder="+91xxxxxxxxxx"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">Shown on About Us so users can call this if the first line is busy.</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">WhatsApp Number</label>
