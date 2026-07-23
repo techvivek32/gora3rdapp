@@ -14,8 +14,10 @@ Future<void> showRequirementAlert(BuildContext context, Map<String, dynamic> dat
     barrierDismissible: true,
     barrierColor: Colors.black54,
     builder: (_) => _RequirementAlert(data: data),
-    // Cut the ring short once the user has seen (and dismissed) the alert.
-  ).whenComplete(stopRequirementRing);
+    // Cut the ring short once the user has seen (and dismissed) the alert. Use
+    // requestStopRing (not stopRequirementRing) so it also stops a ring that a
+    // different isolate started.
+  ).whenComplete(requestStopRing);
 }
 
 class _RequirementAlert extends StatelessWidget {

@@ -176,7 +176,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
   /// the Close button, the tap-outside barrier, and the header X, so the ring can
   /// never keep playing after the popup is gone.
   Future<void> _close() async {
-    stopRequirementRing();
+    // requestStopRing flips a shared-prefs flag the background isolate (which is
+    // actually playing the ring) polls — a plain stopRequirementRing here only
+    // touches THIS overlay isolate's player, which never played anything.
+    await requestStopRing();
     await FlutterOverlayWindow.closeOverlay();
   }
 
@@ -186,7 +189,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     try {
       await _overlayActionChannel.invokeMethod('call', {'number': m});
     } catch (_) {}
-    stopRequirementRing();
+    await requestStopRing();
     await FlutterOverlayWindow.closeOverlay();
   }
 
@@ -197,7 +200,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     try {
       await _overlayActionChannel.invokeMethod('whatsapp', {'number': m});
     } catch (_) {}
-    stopRequirementRing();
+    await requestStopRing();
     await FlutterOverlayWindow.closeOverlay();
   }
 
