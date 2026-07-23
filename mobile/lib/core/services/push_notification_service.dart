@@ -23,11 +23,23 @@ import '../../features/requirements/presentation/widgets/requirement_alert.dart'
 const _channelId = 'gora_cabs_notifications_v2';
 const _channel = AndroidNotificationChannel(
   _channelId,
-  'Gora Cabs Notifications',
-  description: 'New requirements and updates',
+  'New Requirements',
+  description: 'New ride requirements (loud alert ring)',
   importance: Importance.high,
   playSound: true,
   sound: RawResourceAndroidNotificationSound('gora_ring'),
+);
+
+// Everything that is NOT a new requirement (driver assigned, trip OTP, trip
+// started/ended, admin messages) uses this quieter channel — the default system
+// tone, no loud gora_ring and no full-screen/ring popup.
+const _updatesChannelId = 'gora_cabs_updates';
+const _updatesChannel = AndroidNotificationChannel(
+  _updatesChannelId,
+  'Trip & Account Updates',
+  description: 'Assignments, trip OTP and other updates',
+  importance: Importance.high,
+  playSound: true,
 );
 
 /// Handles FCM: permission, token registration, foreground heads-up
@@ -55,6 +67,7 @@ class PushNotificationService {
 
       final android = _fln.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
       await android?.createNotificationChannel(_channel);
+      await android?.createNotificationChannel(_updatesChannel);
       // Android 13+ runtime notification permission.
       await android?.requestNotificationsPermission();
 
@@ -93,15 +106,10 @@ class PushNotificationService {
     final n = message.notification;
     final data = message.data;
 
-    // App is in the foreground here — show the rich on-screen popup card. An
-    // assignment carries a requirementId but is not a new-requirement alert: it
-    // gets a plain notification (below) that deep-links to the Assigned tab.
-    // Also exclude trip start/end notifications.
-    final isNewRequirement = (data['requirementId'] ?? '').toString().isNotEmpty &&
-        data['type'] != 'requirement_assigned' &&
-        data['type'] != 'trip_started' &&
-        data['type'] != 'trip_ended' &&
-        data['type'] != 'driver_assigned';
+    // Only a brand-new requirement gets the loud ring + full-screen popup card.
+    // Everything else (driver assigned, trip OTP, trip started/ended, admin
+    // messages) is just a quiet notification — no ring, no popup.
+    final isNewRequirement = (data['type'] ?? '').toString() == 'new_requirement';
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isNewRequirement) {
       playRequirementRing();
@@ -134,15 +142,17 @@ class PushNotificationService {
       body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          _channel.id,
-          _channel.name,
-          channelDescription: _channel.description,
+          isNewRequirement ? _channel.id : _updatesChannel.id,
+          isNewRequirement ? _channel.name : _updatesChannel.name,
+          channelDescription: isNewRequirement ? _channel.description : _updatesChannel.description,
           importance: Importance.high,
           priority: Priority.high,
-          fullScreenIntent: true, // pop over the lock screen like a call
-          category: AndroidNotificationCategory.call,
+          // Only new requirements pop over the lock screen like a call and use the
+          // loud gora_ring; other updates are a normal notification.
+          fullScreenIntent: isNewRequirement,
+          category: isNewRequirement ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
           playSound: true,
-          sound: const RawResourceAndroidNotificationSound('gora_ring'),
+          sound: isNewRequirement ? const RawResourceAndroidNotificationSound('gora_ring') : null,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
               ? const []
@@ -196,8 +206,8 @@ class PushNotificationService {
       return;
     }
 
-    // Show the rich popup card only for NEW requirements, else open the feed.
-    if ((data['requirementId'] ?? '').toString().isNotEmpty && data['type'] != 'requirement_assigned' && data['type'] != 'trip_started' && data['type'] != 'trip_ended') {
+    // Show the rich popup card only for NEW requirements, else open the feed/inbox.
+    if ((data['type'] ?? '').toString() == 'new_requirement') {
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
     }

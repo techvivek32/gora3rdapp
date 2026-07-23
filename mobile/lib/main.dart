@@ -37,7 +37,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // whatever the user is doing (Truecaller-style), if it's a requirement push
     // and the "Display over other apps" permission was granted.
     final data = message.data;
-    if ((data['requirementId'] ?? '').toString().isNotEmpty) {
+    // ONLY a brand-new requirement floats the overlay + rings. Driver-assigned,
+    // trip OTP and trip start/end pushes also carry a requirementId, so gate on the
+    // type — otherwise the popup + ring fired for all of them.
+    if ((data['type'] ?? '').toString() == 'new_requirement') {
       // Overlay first so it appears immediately, then hold this isolate open for
       // the ring — it is killed as soon as this handler returns.
       await showRequirementOverlay(Map<String, dynamic>.from(data));

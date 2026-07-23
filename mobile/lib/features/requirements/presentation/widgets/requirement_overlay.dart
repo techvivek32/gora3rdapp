@@ -277,52 +277,37 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                      // Brand bar
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        color: _primary,
-                        child: Row(
-                          children: [
-                            const Icon(Icons.local_taxi,
-                                color: Colors.white, size: 20),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text('New Vehicle Requirement',
-                                  style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15)),
-                            ),
-                            GestureDetector(
-                              onTap: _close,
-                              child: const Icon(Icons.close,
-                                  color: Colors.white, size: 22),
-                            ),
-                          ],
-                        ),
-                      ),
                       Padding(
                         padding: const EdgeInsets.all(14),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            // Header matches the in-app Requirement Alert: a clock
+                            // avatar + a date/time chip + the booking id.
                             Row(
                               children: [
                                 const CircleAvatar(
-                                    radius: 15,
+                                    radius: 16,
                                     backgroundColor: _primaryLight,
                                     child: Icon(Icons.access_time_rounded,
                                         size: 18, color: _primary)),
                                 const SizedBox(width: 8),
                                 Expanded(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: _primaryLight,
+                                        borderRadius: BorderRadius.circular(20)),
                                     child: Text(poster,
                                         maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w700,
-                                            fontSize: 15),
-                                        overflow: TextOverflow.ellipsis)),
+                                            color: _primary)),
+                                  ),
+                                ),
                                 if (bookingId.isNotEmpty) ...[const SizedBox(width: 8),
                                   Flexible(
                                     child: Text('#$bookingId',
