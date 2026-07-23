@@ -197,7 +197,7 @@ class _RequirementAlert extends StatelessWidget {
                     children: [
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: canContact ? () => callNumber(mobile) : null,
+                          onPressed: canContact ? () { requestStopRing(); callNumber(mobile); } : null,
                           icon: const Icon(Icons.call, size: 16, color: Colors.white),
                           label: const Text('Call', style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
@@ -211,7 +211,7 @@ class _RequirementAlert extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: canContact ? () => openWhatsApp(mobile, message: buildRequirementWhatsAppMessage(data)) : null,
+                          onPressed: canContact ? () { requestStopRing(); openWhatsApp(mobile, message: buildRequirementWhatsAppMessage(data)); } : null,
                           icon: const Icon(Icons.chat, size: 16, color: Colors.white),
                           label: const Text('WhatsApp', style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(
