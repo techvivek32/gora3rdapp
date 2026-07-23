@@ -6,6 +6,7 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/membership.dart';
+import '../../../../core/utils/requirement_message.dart';
 import '../../../../core/utils/ring_player.dart';
 
 /// Native channel (registered in MainActivity) that opens the "Display over
@@ -198,7 +199,12 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     if (m.isEmpty) return;
     if (m.length == 10) m = '91$m';
     try {
-      await _overlayActionChannel.invokeMethod('whatsapp', {'number': m});
+      // Pass the pre-filled message so WhatsApp opens with the requirement details
+      // (same as the in-app card / alert). The native side URL-encodes it.
+      await _overlayActionChannel.invokeMethod('whatsapp', {
+        'number': m,
+        'message': buildRequirementWhatsAppMessage(_data),
+      });
     } catch (_) {}
     await requestStopRing();
     await FlutterOverlayWindow.closeOverlay();

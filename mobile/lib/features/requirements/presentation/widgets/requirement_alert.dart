@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
+import '../../../../core/utils/requirement_message.dart';
 import '../../../../core/utils/ring_player.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
@@ -208,7 +209,7 @@ class _RequirementAlert extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: canContact ? () => openWhatsApp(mobile) : null,
+                          onPressed: canContact ? () => openWhatsApp(mobile, message: buildRequirementWhatsAppMessage(data)) : null,
                           icon: const Icon(Icons.chat, size: 16, color: Colors.white),
                           label: const Text('WhatsApp', style: TextStyle(fontSize: 13)),
                           style: ElevatedButton.styleFrom(

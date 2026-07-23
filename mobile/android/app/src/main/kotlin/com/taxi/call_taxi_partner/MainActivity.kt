@@ -52,7 +52,14 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "whatsapp" -> {
-                        launchIntent(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$number")))
+                        // Pre-fill the chat with the requirement details, matching the
+                        // in-app card/alert. `?text=` must be URL-encoded.
+                        val message = call.argument<String>("message") ?: ""
+                        val url = if (message.isNotEmpty())
+                            "https://wa.me/$number?text=${Uri.encode(message)}"
+                        else
+                            "https://wa.me/$number"
+                        launchIntent(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         result.success(true)
                     }
                     else -> result.notImplemented()
