@@ -25,6 +25,7 @@ export interface Franchise {
   state?: string;
   email?: string;
   phone: string;
+  whatsappNumber?: string;
   agencyName?: string;
   commissionPercent?: number;
   documents?: Record<string, DocEntry>;
@@ -36,7 +37,7 @@ export interface Franchise {
 interface FormState {
   _id?: string;
   name: string; dob: string; city: string; state: string; email: string;
-  phone: string; agencyName: string; password: string;
+  phone: string; whatsappNumber: string; agencyName: string; password: string;
   commissionPercent: number;
   documents: Record<string, DocEntry>;
   payoutAccounts: Payout[];
@@ -55,12 +56,12 @@ const labelCls = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-
 
 function fromFranchise(f?: Franchise): FormState {
   if (!f) {
-    return { name: '', dob: '', city: '', state: '', email: '', phone: '', agencyName: '', password: '', commissionPercent: 0, documents: {}, payoutAccounts: [], isActive: true };
+    return { name: '', dob: '', city: '', state: '', email: '', phone: '', whatsappNumber: '', agencyName: '', password: '', commissionPercent: 0, documents: {}, payoutAccounts: [], isActive: true };
   }
   return {
     _id: f._id,
     name: f.name, dob: f.dob ? String(f.dob).slice(0, 10) : '', city: f.city ?? '', state: f.state ?? '',
-    email: f.email ?? '', phone: f.phone, agencyName: f.agencyName ?? '', password: '',
+    email: f.email ?? '', phone: f.phone, whatsappNumber: f.whatsappNumber ?? '', agencyName: f.agencyName ?? '', password: '',
     commissionPercent: f.commissionPercent ?? 0,
     documents: f.documents ?? {}, payoutAccounts: f.payoutAccounts ?? [], isActive: f.isActive,
   };
@@ -109,6 +110,7 @@ export function FranchiseFormModal({ franchise, onClose, onSaved }: { franchise?
             <div><label className={labelCls}>Name *</label><input className={inputCls} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
             <div><label className={labelCls}>Date of Birth</label><input type="date" className={inputCls} value={form.dob} onChange={(e) => setForm({ ...form, dob: e.target.value })} /></div>
             <div><label className={labelCls}>Phone *</label><input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+            <div><label className={labelCls}>WhatsApp Number</label><input className={inputCls} value={form.whatsappNumber} onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })} placeholder="Shown to users in this city" /></div>
             <div><label className={labelCls}>Email</label><input type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
             <div>
               <label className={labelCls}>City</label>

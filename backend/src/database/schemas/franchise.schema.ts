@@ -43,6 +43,10 @@ export class Franchise {
   @Prop({ required: true, trim: true })
   phone: string;
 
+  /** WhatsApp support number shown to users in this franchise's city. */
+  @Prop({ trim: true })
+  whatsappNumber: string;
+
   @Prop({ trim: true })
   agencyName: string;
 

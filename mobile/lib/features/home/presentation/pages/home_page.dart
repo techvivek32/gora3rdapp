@@ -3,8 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dio/dio.dart';
-import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/push_notification_service.dart';
@@ -53,15 +51,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _fetchSupportContacts() async {
     try {
-      final res = await Dio().get('${Env.apiBaseUrl}/settings');
-      final body = res.data as Map<String, dynamic>?;
-      final s = (body?['data'] as Map<String, dynamic>?) ?? body;
-      if (s != null && mounted) {
-        setState(() {
-          if ((s['supportPhone'] as String?)?.isNotEmpty == true) _supportPhone = s['supportPhone'];
-          if ((s['supportWhatsapp'] as String?)?.isNotEmpty == true) _supportWhatsapp = s['supportWhatsapp'];
-        });
-      }
+      // Franchise-aware: the backend returns this user's city franchise support
+      // numbers when their city has a franchise, else the global Contact Us numbers.
+      // Authenticated (the server reads the user's city).
+      final res = await getIt<ApiClient>().get('/settings/support-contact');
+      final d = (res.data['data'] as Map<String, dynamic>?) ?? {};
+      if (!mounted) return;
+      setState(() {
+        final phone = (d['phone'] ?? '').toString().trim();
+        final whatsapp = (d['whatsapp'] ?? '').toString().trim();
+        if (phone.isNotEmpty) _supportPhone = phone;
+        if (whatsapp.isNotEmpty) _supportWhatsapp = whatsapp;
+      });
     } catch (_) {}
   }
 
