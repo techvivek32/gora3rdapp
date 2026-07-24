@@ -4,7 +4,6 @@ import { SettingsService } from './settings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 
 @ApiTags('Settings')
@@ -16,14 +15,6 @@ export class SettingsController {
   @ApiOperation({ summary: 'Get platform settings (public — secrets stripped)' })
   getSettings() {
     return this.settingsService.getPublicSettings();
-  }
-
-  @Get('support-contact')
-  @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: "Support numbers for the current user — their city's franchise, else global" })
-  getSupportContact(@CurrentUser('sub') userId: string) {
-    return this.settingsService.resolveSupportContact(userId);
   }
 
   @Get('admin')

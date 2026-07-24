@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/services/push_notification_service.dart';
@@ -27,10 +29,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  // Support numbers come from the backend (this user's franchise, else the global
-  // Settings numbers) — no hard-coded fallback.
-  String _supportPhone = '';
-  String _supportWhatsapp = '';
+  String _supportPhone = '+919587090620';
+  String _supportWhatsapp = '+919587090620';
 
   bool _alertsOn = false;
   bool _awaitingOverlayGrant = false;
@@ -53,18 +53,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   Future<void> _fetchSupportContacts() async {
     try {
-      // Franchise-aware: the backend returns this user's city franchise support
-      // numbers when their city has a franchise, else the global Contact Us numbers.
-      // Authenticated (the server reads the user's city).
-      final res = await getIt<ApiClient>().get('/settings/support-contact');
-      final d = (res.data['data'] as Map<String, dynamic>?) ?? {};
-      if (!mounted) return;
-      setState(() {
-        final phone = (d['phone'] ?? '').toString().trim();
-        final whatsapp = (d['whatsapp'] ?? '').toString().trim();
-        if (phone.isNotEmpty) _supportPhone = phone;
-        if (whatsapp.isNotEmpty) _supportWhatsapp = whatsapp;
-      });
+      final res = await Dio().get('${Env.apiBaseUrl}/settings');
+      final body = res.data as Map<String, dynamic>?;
+      final s = (body?['data'] as Map<String, dynamic>?) ?? body;
+      if (s != null && mounted) {
+        setState(() {
+          if ((s['supportPhone'] as String?)?.isNotEmpty == true) _supportPhone = s['supportPhone'];
+          if ((s['supportWhatsapp'] as String?)?.isNotEmpty == true) _supportWhatsapp = s['supportWhatsapp'];
+        });
+      }
     } catch (_) {}
   }
 
@@ -236,17 +233,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 onSelected: (value) {
                   if (value == 'whatsapp') {
-                    if (_supportWhatsapp.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support number not available right now')));
-                    } else {
-                      openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs');
-                    }
+                    openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs');
                   } else if (value == 'help') {
-                    if (_supportPhone.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support number not available right now')));
-                    } else {
-                      callNumber(_supportPhone);
-                    }
+                    callNumber(_supportPhone);
                   } else if (value == 'chat') {
                     context.push('/support-chat');
                   }

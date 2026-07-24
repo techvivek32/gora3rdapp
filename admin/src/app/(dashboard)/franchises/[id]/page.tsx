@@ -70,7 +70,6 @@ export default function FranchiseDetailPage({ params }: { params: Promise<{ id: 
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
           <Info label="Phone" value={f.phone} mono />
-          <Info label="WhatsApp" value={f.whatsappNumber || '—'} mono />
           <Info label="Email" value={f.email || '—'} />
           <Info label="Date of Birth" value={dob} />
           <Info label="City" value={f.city || '—'} />
