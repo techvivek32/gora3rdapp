@@ -19,6 +19,7 @@ import {
   AccountDeletionRequestDocument,
 } from '../../database/schemas/account-deletion-request.schema';
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
+import { FranchiseSettlement, FranchiseSettlementDocument } from '../../database/schemas/franchise-settlement.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { AvailableVehiclesService } from '../available-vehicles/available-vehicles.service';
@@ -45,6 +46,7 @@ export class AdminService {
     @InjectModel(AccountDeletionRequest.name)
     private deletionRequestModel: Model<AccountDeletionRequestDocument>,
     @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
+    @InjectModel(FranchiseSettlement.name) private franchiseSettlementModel: Model<FranchiseSettlementDocument>,
     private notificationsService: NotificationsService,
     private requirementsService: RequirementsService,
     private availableVehiclesService: AvailableVehiclesService,
@@ -162,6 +164,81 @@ export class AdminService {
     );
 
     return { message: 'Franchise leaderboard', data: rows };
+  }
+
+  // ─── Franchise earnings & settlements ────────────────────────────────────────
+  /**
+   * A franchise earns `commissionPercent` of the PLAN revenue generated in its
+   * city (real Razorpay plan/subscription payments by that city's users). This
+   * returns the monthly + total revenue, the commission on it, how much the admin
+   * has already settled (paid out), and the remaining pending balance.
+   */
+  async getFranchiseEarnings(franchiseId: string) {
+    if (!Types.ObjectId.isValid(franchiseId)) throw new NotFoundException('Franchise not found');
+    const franchise = await this.franchiseModel
+      .findById(franchiseId)
+      .select('name city state commissionPercent')
+      .lean();
+    if (!franchise) throw new NotFoundException('Franchise not found');
+
+    const pct = (franchise as any).commissionPercent ?? 0;
+    const city = (franchise as any).city as string | undefined;
+    const ids = city ? await this.cityUserIds(city) : [];
+
+    // Plan revenue per month (paise → rupees), real Razorpay plan payments only.
+    const monthlyAgg = ids.length
+      ? await this.paymentModel.aggregate([
+          { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId, userId: { $in: ids } } },
+          { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, paise: { $sum: '$amount' } } },
+          { $sort: { _id: -1 } },
+        ])
+      : [];
+
+    let totalRevenue = 0;
+    const months = (monthlyAgg as any[]).map((m) => {
+      const revenue = Math.round((m.paise || 0) / 100);
+      totalRevenue += revenue;
+      return { month: m._id, revenue, commission: Math.round((revenue * pct) / 100) };
+    });
+    const totalCommission = Math.round((totalRevenue * pct) / 100);
+
+    const settlements = await this.franchiseSettlementModel
+      .find({ franchiseId: new Types.ObjectId(franchiseId) })
+      .populate('paidBy', 'fullName')
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    const totalSettled = settlements.reduce((s, x: any) => s + (x.amount || 0), 0);
+
+    return {
+      message: 'Franchise earnings',
+      data: {
+        commissionPercent: pct,
+        city: city || '',
+        totalRevenue,
+        totalCommission,
+        totalSettled,
+        pending: Math.max(0, totalCommission - totalSettled),
+        months,
+        settlements,
+      },
+    };
+  }
+
+  /** Record a payout the admin made to a franchise (reduces its pending balance). */
+  async settleFranchise(franchiseId: string, adminId: string, amount: number, note?: string) {
+    if (!Types.ObjectId.isValid(franchiseId)) throw new NotFoundException('Franchise not found');
+    const franchise = await this.franchiseModel.findById(franchiseId).select('_id');
+    if (!franchise) throw new NotFoundException('Franchise not found');
+    const amt = Math.round(Number(amount) || 0);
+    if (amt <= 0) throw new BadRequestException('Enter a valid amount');
+    const settlement = await this.franchiseSettlementModel.create({
+      franchiseId: new Types.ObjectId(franchiseId),
+      amount: amt,
+      note: (note || '').trim(),
+      paidBy: adminId && Types.ObjectId.isValid(adminId) ? new Types.ObjectId(adminId) : undefined,
+    });
+    return { message: 'Settlement recorded', data: settlement };
   }
 
   // ── Account deletion requests ───────────────────────────────────────────────

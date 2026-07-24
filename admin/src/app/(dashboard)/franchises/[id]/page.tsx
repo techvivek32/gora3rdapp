@@ -8,6 +8,7 @@ import { adminApi } from '@/lib/api';
 import { ArrowLeft, Pencil, Trash2, Building2, CreditCard, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { FranchiseFormModal, FRANCHISE_DOCS, type Franchise } from '@/components/franchises/FranchiseFormModal';
+import { FranchiseEarnings } from '@/components/franchises/FranchiseEarnings';
 
 export default function FranchiseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -141,6 +142,9 @@ export default function FranchiseDetailPage({ params }: { params: Promise<{ id: 
           </div>
         )}
       </div>
+
+      {/* Commission earnings + settlements (admin can record payouts) */}
+      <FranchiseEarnings franchiseId={id} canSettle />
 
       {editing && (
         <FranchiseFormModal

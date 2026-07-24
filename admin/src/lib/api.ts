@@ -198,6 +198,12 @@ export const adminApi = {
   deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
   // All franchises ranked by their city activity/revenue (admin leaderboard page).
   getFranchiseLeaderboard: () => apiClient.get('/admin/franchise-leaderboard'),
+  // Commission earnings + settlements for a franchise (admin detail page).
+  getFranchiseEarnings: (id: string) => apiClient.get(`/admin/franchise-earnings/${id}`),
+  settleFranchise: (id: string, data: { amount: number; note?: string }) =>
+    apiClient.post(`/admin/franchise-earnings/${id}/settle`, data),
+  // The logged-in franchise's own earnings (franchise panel Profile page).
+  getMyFranchiseEarnings: () => apiClient.get('/admin/my-earnings'),
   // The logged-in franchise's own profile (franchise panel → Profile page).
   getFranchiseMe: () => apiClient.get('/auth/franchise/me'),
   // The logged-in admin's own profile (admin panel → Profile page).

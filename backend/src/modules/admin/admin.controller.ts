@@ -478,4 +478,30 @@ export class AdminController {
   getFranchiseLeaderboard() {
     return this.adminService.getFranchiseLeaderboard();
   }
+
+  // ─── Franchise earnings & settlements ────────────────────────────────────────
+  @Get('franchise-earnings/:id')
+  @ApiOperation({ summary: "A franchise's commission earnings + settlements (admin)" })
+  getFranchiseEarnings(@Param('id') id: string) {
+    return this.adminService.getFranchiseEarnings(id);
+  }
+
+  @Post('franchise-earnings/:id/settle')
+  @ApiOperation({ summary: 'Record a payout to a franchise (admin settles commission)' })
+  settleFranchise(
+    @Param('id') id: string,
+    @CurrentUser('sub') adminId: string,
+    @Body('amount') amount: number,
+    @Body('note') note?: string,
+  ) {
+    return this.adminService.settleFranchise(id, adminId, amount, note);
+  }
+
+  // A logged-in franchise's own earnings (for the franchise panel Profile page).
+  @Get('my-earnings')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: "The logged-in franchise's own commission earnings" })
+  getMyFranchiseEarnings(@CurrentUser('sub') franchiseId: string) {
+    return this.adminService.getFranchiseEarnings(franchiseId);
+  }
 }

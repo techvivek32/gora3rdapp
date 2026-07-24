@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { Building2, CreditCard, Landmark, MapPin, ShieldCheck, Mail, Phone, User, KeyRound, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { FRANCHISE_DOCS, type Franchise } from '@/components/franchises/FranchiseFormModal';
+import { FranchiseEarnings } from '@/components/franchises/FranchiseEarnings';
 import { useRole } from '@/hooks/useRole';
 
 // One /profile route serves both panels: a franchise sees its franchise profile,
@@ -311,6 +312,9 @@ function FranchiseProfile() {
           </div>
         )}
       </div>
+
+      {/* The franchise's own commission earnings + settlement history (read-only). */}
+      <FranchiseEarnings self />
     </div>
   );
 }
