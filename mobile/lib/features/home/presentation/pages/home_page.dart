@@ -27,8 +27,10 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
-  String _supportPhone = '+919587090620';
-  String _supportWhatsapp = '+919587090620';
+  // Support numbers come from the backend (this user's franchise, else the global
+  // Settings numbers) — no hard-coded fallback.
+  String _supportPhone = '';
+  String _supportWhatsapp = '';
 
   bool _alertsOn = false;
   bool _awaitingOverlayGrant = false;
@@ -234,9 +236,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 onSelected: (value) {
                   if (value == 'whatsapp') {
-                    openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs');
+                    if (_supportWhatsapp.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support number not available right now')));
+                    } else {
+                      openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs');
+                    }
                   } else if (value == 'help') {
-                    callNumber(_supportPhone);
+                    if (_supportPhone.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Support number not available right now')));
+                    } else {
+                      callNumber(_supportPhone);
+                    }
                   } else if (value == 'chat') {
                     context.push('/support-chat');
                   }
