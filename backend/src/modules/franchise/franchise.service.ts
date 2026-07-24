@@ -6,7 +6,7 @@ import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.s
 
 // Fields the admin form may send. Password handled separately (hashed).
 const ASSIGNABLE = [
-  'name', 'dob', 'city', 'state', 'email', 'phone', 'agencyName',
+  'name', 'dob', 'city', 'state', 'email', 'phone', 'whatsappNumber', 'agencyName',
   'commissionPercent', 'documents', 'payoutAccounts', 'isActive',
 ];
 
