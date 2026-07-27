@@ -8,6 +8,12 @@ const _paidTiers = ['active', 'verified', 'premium', 'golden'];
 /// the floating overlay all agree.
 bool canContactPosters(Map<String, dynamic>? user) {
   if (user == null) return false;
+  // Expired plan → free tier, no contact (matches the backend's expiry check).
+  final exp = user['membershipExpiresAt'];
+  if (exp != null) {
+    final d = DateTime.tryParse(exp.toString());
+    if (d != null && DateTime.now().isAfter(d)) return false;
+  }
   if (user['isPremium'] == true || user['isGolden'] == true) return true;
   return _paidTiers.contains((user['membershipType'] ?? '').toString());
 }

@@ -55,6 +55,23 @@ export class RequirementsService {
     };
   }
 
+  /**
+   * True when the user currently has a paid membership that unlocks contacting
+   * posters. Respects expiry: once membershipExpiresAt is in the past the plan is
+   * treated as gone (free tier), even before the scheduled downgrade sweep runs.
+   */
+  private isPaidMember(user: any): boolean {
+    if (!user) return false;
+    if (user.membershipExpiresAt && new Date(user.membershipExpiresAt) < new Date()) {
+      return false;
+    }
+    return (
+      [MembershipType.PREMIUM, MembershipType.GOLDEN, MembershipType.ACTIVE, MembershipType.VERIFIED]
+        .includes(user.membershipType) ||
+      user.isPremium === true
+    );
+  }
+
   async findAll(userId: string, query: FilterRequirementsDto) {
     const { page, limit, skip, sort } = getPaginationParams(query);
 
@@ -115,11 +132,7 @@ export class RequirementsService {
     // Apply contact lock based on membership. Keep this in sync with findOne()
     // and the app card's `canContact` so the Phone/WhatsApp buttons always work
     // when they are shown.
-    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
-      user?.membershipType === MembershipType.GOLDEN ||
-      user?.membershipType === MembershipType.ACTIVE ||
-      user?.membershipType === MembershipType.VERIFIED ||
-      user?.isPremium;
+    const isPremium = this.isPaidMember(user);
 
     const processedRequirements = requirements.map((req) => {
       const postedBy = req.postedBy as any;
@@ -152,11 +165,7 @@ export class RequirementsService {
     await this.requirementModel.findByIdAndUpdate(id, { $inc: { viewCount: 1 } });
 
     const user = await this.userModel.findById(userId);
-    const isPremium = user?.membershipType === MembershipType.PREMIUM ||
-      user?.membershipType === MembershipType.GOLDEN ||
-      user?.membershipType === MembershipType.ACTIVE ||
-      user?.membershipType === MembershipType.VERIFIED ||
-      user?.isPremium;
+    const isPremium = this.isPaidMember(user);
 
     if (!isPremium) {
       const postedBy = requirement.postedBy as any;

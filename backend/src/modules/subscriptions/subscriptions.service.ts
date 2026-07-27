@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import {
@@ -18,8 +19,45 @@ import { SettingsService } from '../settings/settings.service';
 import * as crypto from 'crypto';
 
 @Injectable()
-export class SubscriptionsService {
+export class SubscriptionsService implements OnModuleInit {
   private readonly logger = new Logger(SubscriptionsService.name);
+
+  // Run one sweep at boot so plans that expired while the server was down are
+  // cleaned up right away, then keep sweeping on a schedule.
+  async onModuleInit() {
+    try {
+      await this.expireMemberships();
+    } catch (e) {
+      this.logger.error('Initial expiry sweep failed', e as any);
+    }
+  }
+
+  /**
+   * Enforce plan expiry: any subscription past its end date becomes EXPIRED, and
+   * any user whose membership has run out is downgraded to the free NEW tier (no
+   * premium/golden). Without this, an expired plan kept showing "Premium" forever
+   * because the premium checks only read the stored membershipType.
+   */
+  @Cron(CronExpression.EVERY_30_MINUTES)
+  async expireMemberships() {
+    const now = new Date();
+
+    const subs = await this.subscriptionModel.updateMany(
+      { status: SubscriptionStatus.ACTIVE, endDate: { $lt: now } },
+      { $set: { status: SubscriptionStatus.EXPIRED } },
+    );
+
+    const users = await this.userModel.updateMany(
+      { membershipExpiresAt: { $ne: null, $lt: now }, membershipType: { $ne: MembershipType.NEW } },
+      { $set: { membershipType: MembershipType.NEW, isPremium: false, isGolden: false, membershipExpiresAt: null } },
+    );
+
+    const subCount = (subs as any).modifiedCount ?? 0;
+    const userCount = (users as any).modifiedCount ?? 0;
+    if (subCount > 0 || userCount > 0) {
+      this.logger.log(`Expiry sweep: ${subCount} subscription(s) expired, ${userCount} user(s) downgraded`);
+    }
+  }
 
   constructor(
     @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
