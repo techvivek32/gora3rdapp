@@ -42,12 +42,10 @@ export class SettingsService {
     const fPhone = (franchise as any)?.phone?.trim() || '';
     const fWhatsapp = (franchise as any)?.whatsappNumber?.trim() || '';
     if (franchise && (fPhone || fWhatsapp)) {
-      // Per-field fallback to the GLOBAL settings number when the franchise hasn't
-      // set that particular one — never a hard-coded value.
       return {
         data: {
           phone: fPhone || globalContact.phone,
-          whatsapp: fWhatsapp || globalContact.whatsapp,
+          whatsapp: fWhatsapp || fPhone || globalContact.whatsapp,
           source: 'franchise' as const,
         },
       };
