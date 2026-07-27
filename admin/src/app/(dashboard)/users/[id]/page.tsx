@@ -165,8 +165,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
 
   const cancelSubMutation = useMutation({
     mutationFn: (subId: string) => adminApi.cancelSubscription(subId),
-    onSuccess: () => { toast.success('Subscription cancelled'); queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
-    onError: (e: any) => toast.error(e?.message || 'Could not cancel'),
+    onSuccess: () => { toast.success('Plan expired — user moved to the free plan'); queryClient.invalidateQueries({ queryKey: ['user-subscriptions', id] }); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
+    onError: (e: any) => toast.error(e?.message || 'Could not expire the plan'),
   });
 
   const columns: ColumnDef<Requirement>[] = [
@@ -943,7 +943,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                             {s.status === 'active' && !isFranchise && (
                               <div className="flex gap-1">
                                 <IconBtn title="Edit End Date" onClick={() => setEditSubModal(s)}><Pencil className="w-4 h-4" /></IconBtn>
-                                <IconBtn title="Cancel Plan" danger onClick={() => { if (confirm('Cancel this subscription?')) cancelSubMutation.mutate(s._id); }}><X className="w-4 h-4" /></IconBtn>
+                                <IconBtn title="Expire Plan" danger onClick={() => { if (confirm('Expire this plan now? The user will move to the free plan.')) cancelSubMutation.mutate(s._id); }}><X className="w-4 h-4" /></IconBtn>
                               </div>
                             )}
                           </div>
@@ -1133,6 +1133,8 @@ function ReviewModal({ review, onClose, onSaved }: { review: any; onClose: () =>
 function EditSubEndDateModal({ subscription, onClose, onSaved }: { subscription: any; onClose: () => void; onSaved: () => void }) {
   const currentEnd = subscription.endDate ? new Date(subscription.endDate).toISOString().split('T')[0] : '';
   const [endDate, setEndDate] = useState(currentEnd);
+  const today = new Date().toISOString().split('T')[0];
+  const isPast = !!endDate && endDate < today; // no back-dating the end date
 
   const mutation = useMutation({
     mutationFn: () => adminApi.updateSubscriptionEndDate(subscription._id, endDate),
@@ -1160,7 +1162,8 @@ function EditSubEndDateModal({ subscription, onClose, onSaved }: { subscription:
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">New End Date</label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+            <input type="date" value={endDate} min={today} onChange={(e) => setEndDate(e.target.value)} className={inputCls} />
+            {isPast && <p className="text-xs text-red-500 mt-1">End date can't be in the past.</p>}
           </div>
           {endDate && subscription.startDate && (
             <p className="text-xs text-gray-500">
@@ -1170,7 +1173,7 @@ function EditSubEndDateModal({ subscription, onClose, onSaved }: { subscription:
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!endDate}>Save</Button>
+          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending} disabled={!endDate || isPast}>Save</Button>
         </div>
       </div>
     </div>

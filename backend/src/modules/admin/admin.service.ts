@@ -1690,26 +1690,27 @@ export class AdminService {
       if (!existing) throw new NotFoundException('Subscription not found');
       await this.assertUserInCity((existing as any).userId?.toString(), franchiseCity);
     }
+    // Admin "Expire Plan": mark the plan EXPIRED (not just cancelled) and, unless
+    // the user still has another active plan, drop them to the free NEW tier.
     const sub = await this.subscriptionModel.findByIdAndUpdate(
       subscriptionId,
-      { status: SubscriptionStatus.CANCELLED },
+      { status: SubscriptionStatus.EXPIRED },
       { new: true },
     );
     if (!sub) throw new NotFoundException('Subscription not found');
-    // If this was the active subscription, downgrade user to basic 'active' membership
     const hasActive = await this.subscriptionModel.exists({
       userId: sub.userId,
       status: SubscriptionStatus.ACTIVE,
     });
     if (!hasActive) {
       await this.userModel.findByIdAndUpdate(sub.userId, {
-        membershipType: MembershipType.ACTIVE,
+        membershipType: MembershipType.NEW,
         isPremium: false,
         isGolden: false,
         membershipExpiresAt: null,
       });
     }
-    return { message: 'Subscription cancelled', data: sub };
+    return { message: 'Plan expired', data: sub };
   }
 
   async updateSubscriptionEndDate(subscriptionId: string, endDate: string, franchiseCity?: string | null) {
@@ -1718,9 +1719,18 @@ export class AdminService {
       if (!existing) throw new NotFoundException('Subscription not found');
       await this.assertUserInCity((existing as any).userId?.toString(), franchiseCity);
     }
+    // Reject a back-dated end date — you can only extend/keep it in the future,
+    // else the plan would instantly count as expired.
+    const parsed = new Date(endDate);
+    if (isNaN(parsed.getTime())) throw new BadRequestException('Invalid end date');
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    if (parsed < startOfToday) {
+      throw new BadRequestException("End date can't be in the past");
+    }
     const sub = await this.subscriptionModel.findByIdAndUpdate(
       subscriptionId,
-      { endDate: new Date(endDate) },
+      { endDate: parsed },
       { new: true },
     );
     if (!sub) throw new NotFoundException('Subscription not found');
