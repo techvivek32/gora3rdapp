@@ -214,7 +214,7 @@ function FranchiseProfile() {
   const dob = f.dob ? new Date(f.dob).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5">
       <div className="flex items-center gap-2">
         <Building2 className="w-6 h-6 text-orange-500" />
         <div>
