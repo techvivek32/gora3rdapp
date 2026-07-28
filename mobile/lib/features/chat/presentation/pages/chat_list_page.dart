@@ -35,7 +35,7 @@ class _ChatListPageState extends State<ChatListPage> {
                     SizedBox(height: 16),
                     Text('No messages yet', style: TextStyle(fontSize: 18, color: Colors.grey)),
                     SizedBox(height: 8),
-                    Text('Start a conversation from a requirement', style: TextStyle(color: Colors.grey)),
+                    Text('Start a conversation from a booking', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               );

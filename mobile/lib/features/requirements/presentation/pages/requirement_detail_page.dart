@@ -189,7 +189,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
             SizedBox(height: 16.h),
             Text('Confirm Cancel', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp)),
             SizedBox(height: 12.h),
-            Text('Are you sure you want to cancel this requirement?', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
+            Text('Are you sure you want to cancel this booking?', textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp)),
             SizedBox(height: 8.h),
             Container(
               padding: EdgeInsets.all(12.r),
@@ -305,7 +305,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Requirement updated!'), backgroundColor: AppColors.success),
+                const SnackBar(content: Text('Booking updated!'), backgroundColor: AppColors.success),
               );
             }
           });
@@ -314,7 +314,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Requirement cancelled.'), backgroundColor: AppColors.error),
+                const SnackBar(content: Text('Booking cancelled.'), backgroundColor: AppColors.error),
               );
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (mounted && Navigator.canPop(context)) {
@@ -329,7 +329,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Requirement accepted successfully!'),
+                  content: Text('Booking accepted successfully!'),
                   backgroundColor: AppColors.success,
                 ),
               );
@@ -364,7 +364,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                       Text(_requirement!['travelTime'] as String? ?? '', style: TextStyle(fontSize: 12.sp, color: Colors.white70)),
                     ],
                   )
-                : Text('Requirement Detail', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+                : Text('Booking Detail', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.white)),
           ),
           body: _requirement == null
               ? const Center(child: CircularProgressIndicator())
@@ -483,7 +483,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                     children: [
                       Icon(Icons.check_circle, color: Colors.green, size: 20.sp),
                       SizedBox(width: 8.w),
-                      Text('Requirement Booked', style: TextStyle(color: Colors.green, fontSize: 14.sp, fontWeight: FontWeight.bold)),
+                      Text('Booking Confirmed', style: TextStyle(color: Colors.green, fontSize: 14.sp, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -575,7 +575,7 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
         child: ElevatedButton.icon(
           onPressed: () => context.read<RequirementsBloc>().add(AcceptRequirementEvent(widget.requirementId)),
           icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-          label: const Text('Accept Requirement', style: TextStyle(color: Colors.white, fontSize: 15)),
+          label: const Text('Accept Booking', style: TextStyle(color: Colors.white, fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             padding: EdgeInsets.symmetric(vertical: 14.h),
@@ -1384,7 +1384,7 @@ class _CancelReasonSheetState extends State<_CancelReasonSheet> {
   static const _reasons = [
     'Found a vehicle already',
     'Trip plan changed',
-    'Requirement posted by mistake',
+    'Booking posted by mistake',
     'Price not matching',
     'Dates changed',
     'Other',

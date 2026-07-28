@@ -41,7 +41,7 @@ class _RequirementsFilterSheetState extends State<RequirementsFilterSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Filter Requirements', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Filter Bookings', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 TextButton(
                   onPressed: () => setState(() { _vehicleType = null; _tripType = null; _status = null; }),
                   child: const Text('Clear All'),

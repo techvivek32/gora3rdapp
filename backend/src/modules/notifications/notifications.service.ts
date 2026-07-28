@@ -265,7 +265,7 @@ export class NotificationsService {
     const poster = await this.userModel.findById(requirement.postedBy).select('fcmTokens _id');
     if (!poster?.fcmTokens?.length) return;
 
-    const title = '✅ Someone accepted your requirement!';
+    const title = '✅ Someone accepted your booking!';
     const body = `${acceptingUser.fullName || acceptingUser.agencyName} is interested in Booking #${requirement.bookingId}`;
 
     await this.firebaseService.sendPushNotification(poster.fcmTokens, {

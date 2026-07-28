@@ -81,7 +81,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(granted
-                ? 'On-screen alerts enabled — requirements will pop over other apps.'
+                ? 'On-screen alerts enabled — bookings will pop over other apps.'
                 : 'Permission not granted yet. Turn on "Display over other apps" to see pop-ups.'),
             backgroundColor: granted ? Colors.green : Colors.redAccent,
           ),
@@ -142,7 +142,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         builder: (dialogCtx) => AlertDialog(
           title: const Text('Show alerts over other apps'),
           content: const Text(
-            'To pop new ride requirements on your screen even while you are using other '
+            'To pop new ride bookings on your screen even while you are using other '
             'apps or on the home screen, Gora Cabs needs the "Display over other apps" '
             'permission.',
           ),

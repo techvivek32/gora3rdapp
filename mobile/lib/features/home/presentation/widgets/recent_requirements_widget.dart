@@ -17,7 +17,7 @@ class RecentRequirementsWidget extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Recent Requirements', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Recent Bookings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               GestureDetector(
                 onTap: () => context.go('/requirements'),
                 child: Text('See All', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600)),

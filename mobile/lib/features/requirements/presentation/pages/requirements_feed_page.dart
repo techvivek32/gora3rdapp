@@ -113,11 +113,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         backgroundColor: AppColors.primary,
         elevation: 4,
         automaticallyImplyLeading: false,
-        title: Text('Requirement'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Booking'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
             icon: Icon(Icons.history_rounded, color: Colors.white),
-            tooltip: 'My Requirements',
+            tooltip: 'My Bookings',
             onPressed: () => context.push('/my-requirements'),
           ),
           IconButton(
@@ -277,14 +277,14 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         children: [
           Icon(Icons.search_off_rounded, size: 64.sp, color: AppColors.textHint),
           SizedBox(height: 16.h),
-          Text('No requirements found', style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+          Text('No bookings found', style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
           SizedBox(height: 8.h),
-          Text('Be the first to post a requirement!', style: TextStyle(fontSize: 13.sp, color: AppColors.textHint)),
+          Text('Be the first to post a booking!', style: TextStyle(fontSize: 13.sp, color: AppColors.textHint)),
           SizedBox(height: 24.h),
           ElevatedButton.icon(
             onPressed: () => context.push('/requirements/create'),
             icon: const Icon(Icons.add),
-            label: const Text('Post Requirement'),
+            label: const Text('Post Booking'),
           ),
         ],
       ),

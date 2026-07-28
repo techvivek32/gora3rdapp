@@ -92,7 +92,7 @@ const Map<String, PolicyContent> kPolicies = {
       ]),
       // ── Service & Copyright policies ────────────────────────────────────────
       PolicySection(heading: 'About Service', paragraphs: [
-        'Gora Cabs is a platform dedicated to taxi-service availability and creation. We connect service providers with requirements to facilitate smooth transportation operations. By using this application, you acknowledge that we are a service aggregator and facilitator.',
+        'Gora Cabs is a platform dedicated to taxi-service availability and creation. We connect service providers with bookings to facilitate smooth transportation operations. By using this application, you acknowledge that we are a service aggregator and facilitator.',
       ]),
       PolicySection(heading: 'Copyright & Intellectual Property', paragraphs: [
         'All content included in this application — text, graphics, logos, button icons, images and software — is the property of Gora Cabs and is protected by copyright laws.',
@@ -110,7 +110,7 @@ const Map<String, PolicyContent> kPolicies = {
     subtitle: 'Service, copyright and general terms.',
     sections: [
       PolicySection(heading: 'About Service', paragraphs: [
-        'Gora Cabs is a platform dedicated to taxi-service availability and creation. We connect service providers with requirements to facilitate smooth transportation operations. By using this application, you acknowledge that we are a service aggregator and facilitator.',
+        'Gora Cabs is a platform dedicated to taxi-service availability and creation. We connect service providers with bookings to facilitate smooth transportation operations. By using this application, you acknowledge that we are a service aggregator and facilitator.',
       ]),
       PolicySection(heading: 'Copyright & Intellectual Property', paragraphs: [
         'All content included in this application — text, graphics, logos, button icons, images and software — is the property of Gora Cabs and is protected by copyright laws.',
@@ -313,7 +313,7 @@ class _AboutFooterState extends State<_AboutFooter> {
         const AppLogo(size: 124, radius: 20),
         const SizedBox(height: 24),
         Text(
-          "India's Trusted Taxi Requirement Network".tr,
+          "India's Trusted Taxi Booking Network".tr,
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),

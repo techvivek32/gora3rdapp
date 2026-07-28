@@ -42,7 +42,7 @@ String buildRequirementWhatsAppMessage(Map<String, dynamic> data) {
   final stops = s('stops').split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
   final b = StringBuffer();
-  b.writeln('📢 *Requirement*');
+  b.writeln('📢 *Booking*');
   b.writeln('*Gora Taxi Partner App*');
   b.writeln();
 

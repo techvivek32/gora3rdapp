@@ -46,7 +46,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         backgroundColor: AppColors.background,
         appBar: AppBar(
           title: Text(
-            'My Requirements'.tr,
+            'My Bookings'.tr,
             style: TextStyle(fontFamily: 'Poppins', fontSize: 17.sp, fontWeight: FontWeight.bold),
           ),
           backgroundColor: AppColors.primary,
@@ -74,7 +74,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
           listener: (context, state) {
             if (state is RequirementCancelled) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Requirement cancelled'), backgroundColor: AppColors.success),
+                const SnackBar(content: Text('Booking cancelled'), backgroundColor: AppColors.success),
               );
               context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
             }
@@ -83,7 +83,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
             }
             if (state is DriverAssigned) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Driver assigned & requirement booked'), backgroundColor: AppColors.success),
+                const SnackBar(content: Text('Driver assigned & booking confirmed'), backgroundColor: AppColors.success),
               );
             }
             if (state is RequirementsError) {
@@ -135,11 +135,11 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                   .toList();
               return TabBarView(
                 children: [
-                  _buildList(context, running, 'No running requirements'.tr, showMenu: true),
-                  _buildList(context, booked, 'No booked requirements'.tr),
+                  _buildList(context, running, 'No running bookings'.tr, showMenu: true),
+                  _buildList(context, booked, 'No booked bookings'.tr),
                   // Requirements OTHER people assigned to me — I'm the driver here,
                   // so no owner menu, and no BOOKED stamp obscuring a live job.
-                  _buildList(context, state.assignedToMe, 'No requirements assigned to you'.tr, isAssignedTab: true),
+                  _buildList(context, state.assignedToMe, 'No bookings assigned to you'.tr, isAssignedTab: true),
                 ],
               );
             }
@@ -527,7 +527,7 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
           SizedBox(height: 8.h),
           Center(
             child: Text(
-              'Assigning a driver marks this requirement as booked',
+              'Assigning a driver marks this booking as booked',
               style: TextStyle(fontSize: 11.sp, color: AppColors.textHint, fontFamily: 'Poppins'),
             ),
           ),
@@ -648,7 +648,7 @@ class _TripOtpDialogState extends State<_TripOtpDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'We sent a 6-digit OTP to the requirement owner.\nAsk them for it to ${_isStart ? 'start' : 'end'} this trip.',
+              'We sent a 6-digit OTP to the booking owner.\nAsk them for it to ${_isStart ? 'start' : 'end'} this trip.',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13),
             ),

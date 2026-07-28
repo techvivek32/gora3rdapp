@@ -17,7 +17,7 @@ class RequirementCardWidget extends StatelessWidget {
   final VoidCallback? onTap;
   // When provided, shown in the top-right (actions menu on My Requirements).
   final Widget? menu;
-  // True on the "My Requirements" list — treat as owner.
+  // True on the "My Bookings" list — treat as owner.
   final bool mine;
 
   /// Draw the BOOKED / ON HOLD / CANCELLED stamp (and the dimming that goes with
@@ -172,7 +172,7 @@ class RequirementCardWidget extends StatelessWidget {
                   if (isCancelled) return;
                   if (isBooked && !isCurrentUserOwner && !hasCurrentUserAccepted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: const Text('This requirement is already booked'), backgroundColor: Colors.red[700], duration: const Duration(seconds: 2)),
+                      SnackBar(content: const Text('This booking is already booked'), backgroundColor: Colors.red[700], duration: const Duration(seconds: 2)),
                     );
                     return;
                   }
@@ -766,7 +766,7 @@ class RequirementCardWidget extends StatelessWidget {
         : const <Map>[];
 
     final b = StringBuffer();
-    b.writeln('📢 *Requirement*');
+    b.writeln('📢 *Booking*');
     b.writeln('*Gora Taxi Partner App*');
     b.writeln();
 

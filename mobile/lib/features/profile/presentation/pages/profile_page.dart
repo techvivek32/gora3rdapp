@@ -383,7 +383,7 @@ class MyProfilePage extends StatelessWidget {
                 _InfoCard(
                   title: 'Activity',
                   children: [
-                    _InfoRow(Icons.post_add, 'Requirements Posted', '${user?['requirementsPosted'] ?? 0}'),
+                    _InfoRow(Icons.post_add, 'Bookings Posted', '${user?['requirementsPosted'] ?? 0}'),
                     _InfoRow(Icons.directions_car_outlined, 'Available cab Posted', '${user?['vehiclesPosted'] ?? 0}'),
                   ],
                 ),

@@ -16,7 +16,7 @@ class SupportChatPage extends StatefulWidget {
 const _quickReplies = <_QuickReply>[
   _QuickReply(Icons.payments_outlined, 'Payment', 'I need help with a payment issue.'),
   _QuickReply(Icons.workspace_premium_outlined, 'Plan', 'I have a question about my membership plan.'),
-  _QuickReply(Icons.description_outlined, 'Requirement', 'I need help with a requirement I posted.'),
+  _QuickReply(Icons.description_outlined, 'Booking', 'I need help with a booking I posted.'),
   _QuickReply(Icons.person_remove_outlined, 'Delete account', 'I want to delete my account.'),
 ];
 

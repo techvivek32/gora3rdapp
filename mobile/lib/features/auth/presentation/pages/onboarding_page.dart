@@ -19,7 +19,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final _pages = [
     _OnboardingData(
       icon: Icons.directions_car_outlined,
-      title: 'Post Vehicle Requirements',
+      title: 'Post Vehicle Bookings',
       subtitle: 'Instantly share your cab needs with hundreds of verified operators across India.',
       color: AppColors.primary,
     ),

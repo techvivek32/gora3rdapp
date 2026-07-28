@@ -50,7 +50,7 @@ export class RequirementsService {
     this.notificationsService.notifyNewRequirement(requirement).catch(() => {});
 
     return {
-      message: 'Requirement posted successfully',
+      message: 'Booking posted successfully',
       data: requirement,
     };
   }
@@ -269,7 +269,7 @@ export class RequirementsService {
     if (!requirement) throw new NotFoundException('Requirement not found');
 
     if (requirement.postedBy.toString() === userId) {
-      return { message: 'You cannot accept your own requirement' };
+      return { message: 'You cannot accept your own booking' };
     }
 
     const isAlreadyAccepted = requirement.acceptedBy.some(
@@ -277,7 +277,7 @@ export class RequirementsService {
     );
 
     if (isAlreadyAccepted) {
-      return { message: 'Already accepted this requirement' };
+      return { message: 'Already accepted this booking' };
     }
 
     await this.requirementModel.findByIdAndUpdate(id, {
@@ -289,7 +289,7 @@ export class RequirementsService {
     const user = await this.userModel.findById(userId);
     await this.notificationsService.notifyRequirementAccepted(requirement, user);
 
-    return { message: 'Requirement accepted successfully' };
+    return { message: 'Booking accepted successfully' };
   }
 
   async getAcceptedByMe(userId: string) {
@@ -302,7 +302,7 @@ export class RequirementsService {
       .populate('postedBy', 'fullName agencyName profileImage membershipType')
       .sort({ updatedAt: -1 })
       .lean();
-    return { message: 'Accepted requirements', data: requirements };
+    return { message: 'Accepted bookings', data: requirements };
   }
 
   async cancelRequirement(id: string, userId: string, reason: string) {
@@ -341,7 +341,7 @@ export class RequirementsService {
       throw new BadRequestException('This requirement is cancelled');
     }
     if (driverId === ownerId) {
-      throw new BadRequestException('You cannot assign a requirement to yourself');
+      throw new BadRequestException('You cannot assign a booking to yourself');
     }
 
     const driver = await this.userModel
@@ -486,7 +486,7 @@ export class RequirementsService {
       .populate('assignedDriver', RequirementsService.PARTY_SELECT)
       .lean();
 
-    return { message: 'Assigned requirements', data: requirements };
+    return { message: 'Assigned bookings', data: requirements };
   }
 
   async getMyRequirements(userId: string, status?: BookingStatus) {

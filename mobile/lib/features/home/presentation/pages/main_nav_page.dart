@@ -38,7 +38,7 @@ class MainNavPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(icon: Icons.home_rounded, label: 'Home'.tr, index: 0, selectedIndex: selectedIndex, onTap: () => context.go('/')),
-            _NavItem(icon: Icons.search_rounded, label: 'Requirement'.tr, index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/requirements')),
+            _NavItem(icon: Icons.search_rounded, label: 'Booking'.tr, index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/requirements')),
             const SizedBox(width: 48),
             _NavItem(icon: Icons.directions_car_rounded, label: 'Available'.tr, index: 2, selectedIndex: selectedIndex, onTap: () => context.go('/vehicles')),
             _NavItem(icon: Icons.settings_rounded, label: 'Settings'.tr, index: 3, selectedIndex: selectedIndex, onTap: () => context.go('/profile')),
@@ -68,7 +68,7 @@ class MainNavPage extends StatelessWidget {
                 Expanded(
                   child: _PostOptionCard(
                     icon: Icons.search_rounded,
-                    title: 'Requirement'.tr,
+                    title: 'Booking'.tr,
                     subtitle: 'Need a vehicle?',
                     color: AppColors.info,
                     onTap: () { Navigator.pop(ctx); context.push('/requirements/create'); },

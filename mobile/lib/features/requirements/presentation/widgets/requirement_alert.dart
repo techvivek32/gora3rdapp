@@ -98,7 +98,7 @@ class _RequirementAlert extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(20)),
                       child: Text(
-                        dateTime.isEmpty ? 'New Requirement' : dateTime,
+                        dateTime.isEmpty ? 'New Booking' : dateTime,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),

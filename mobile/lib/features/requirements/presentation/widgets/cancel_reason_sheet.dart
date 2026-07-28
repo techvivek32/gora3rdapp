@@ -26,7 +26,7 @@ class _CancelReasonSheetState extends State<CancelReasonSheet> {
   static const _reasons = [
     'Found a vehicle already',
     'Trip plan changed',
-    'Requirement posted by mistake',
+    'Booking posted by mistake',
     'Price not matching',
     'Dates changed',
     'Other',

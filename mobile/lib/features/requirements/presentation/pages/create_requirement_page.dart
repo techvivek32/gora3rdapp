@@ -329,11 +329,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_isEdit ? 'Edit Requirement' : 'Post Requirement'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Booking' : 'Post Booking'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<RequirementsBloc, RequirementsState>(
         listener: (context, state) {
           if (state is RequirementCreated || state is RequirementUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Requirement updated!' : 'Requirement posted!'), backgroundColor: AppColors.success));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Booking updated!' : 'Booking posted!'), backgroundColor: AppColors.success));
             context.pop();
           }
           if (state is RequirementsError) {
@@ -857,7 +857,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                     onPressed: (state is RequirementsLoading || _isCustomFareBelowMin) ? null : _submit,
                     child: state is RequirementsLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_isEdit ? 'Save Changes' : 'Post Requirement'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Booking'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),

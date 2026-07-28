@@ -96,8 +96,8 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
       visibility: NotificationVisibility.visibilityPublic,
       positionGravity: PositionGravity.none,
       enableDrag: true,
-      overlayTitle: 'New Requirement',
-      overlayContent: 'Tap to view the ride requirement',
+      overlayTitle: 'New Booking',
+      overlayContent: 'Tap to view the ride booking',
     );
 
     // Live channel: push the data a couple of times to beat the startup race.
@@ -242,7 +242,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final dateTime = _dateTimeLabel();
     final poster = dateTime.isNotEmpty
         ? dateTime
-        : (_s('posterName').isNotEmpty ? _s('posterName') : 'New Requirement');
+        : (_s('posterName').isNotEmpty ? _s('posterName') : 'New Booking');
     final bookingId = _s('bookingId');
     final vehicle = _cap(_s('vehicleType'));
     final trip = _cap(_s('tripType'));

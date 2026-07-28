@@ -23,8 +23,8 @@ import '../../features/requirements/presentation/widgets/requirement_alert.dart'
 const _channelId = 'gora_cabs_notifications_v2';
 const _channel = AndroidNotificationChannel(
   _channelId,
-  'New Requirements',
-  description: 'New ride requirements (loud alert ring)',
+  'New Bookings',
+  description: 'New ride bookings (loud alert ring)',
   importance: Importance.high,
   playSound: true,
   sound: RawResourceAndroidNotificationSound('gora_ring'),
@@ -117,7 +117,7 @@ class PushNotificationService {
       return;
     }
 
-    final title = n?.title ?? '🚕 New Vehicle Requirement';
+    final title = n?.title ?? '🚕 New Vehicle Booking';
     final mobile = (data['posterMobile'] ?? '').toString();
 
     // Build a detailed multi-line body from the data payload (route, vehicle,
