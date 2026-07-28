@@ -487,7 +487,7 @@ class _VehicleDetailPageState extends State<VehicleDetailPage> {
         child: ElevatedButton.icon(
           onPressed: () => context.read<VehiclesBloc>().add(AcceptVehicleEvent(widget.vehicleId)),
           icon: const Icon(Icons.handshake_outlined, color: Colors.white),
-          label: const Text('Accept Cab', style: TextStyle(color: Colors.white, fontSize: 15)),
+          label: const Text('Accept Car', style: TextStyle(color: Colors.white, fontSize: 15)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
             padding: EdgeInsets.symmetric(vertical: 14.h),

@@ -78,7 +78,7 @@ class MainNavPage extends StatelessWidget {
                 Expanded(
                   child: _PostOptionCard(
                     icon: Icons.directions_car_rounded,
-                    title: 'Available Cab'.tr,
+                    title: 'Available Car'.tr,
                     subtitle: 'Have a vehicle?',
                     color: AppColors.success,
                     onTap: () { Navigator.pop(ctx); context.push('/vehicles/create'); },

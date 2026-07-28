@@ -41,7 +41,7 @@ class _VehiclesFilterSheetState extends State<VehiclesFilterSheet> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Filter Cabs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Filter Cars', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 TextButton(
                   onPressed: () => setState(() {
                     _vehicleType = null;

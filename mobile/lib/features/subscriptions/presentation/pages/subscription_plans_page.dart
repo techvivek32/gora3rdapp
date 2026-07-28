@@ -26,7 +26,7 @@ const _planNames = ['Free', 'Active', 'Premium', 'Golden'];
 const _features = [
   [Icons.person_outline, 'View Contact Details', false, true, true, true],
   [Icons.send_outlined, 'Post Bookings', true, true, true, true],
-  [Icons.directions_car_outlined, 'Post Available Cabs', true, true, true, true],
+  [Icons.directions_car_outlined, 'Post Available Cars', true, true, true, true],
   [Icons.apartment_outlined, 'Business Cities Filter', false, true, true, true],
   [Icons.star_border, 'Featured Listings', false, false, true, true],
   [Icons.headset_mic_outlined, 'Priority Support', false, false, true, true],

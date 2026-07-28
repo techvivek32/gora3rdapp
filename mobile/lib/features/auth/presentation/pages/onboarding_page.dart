@@ -25,7 +25,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     ),
     _OnboardingData(
       icon: Icons.local_taxi_outlined,
-      title: 'List Your Available Cabs',
+      title: 'List Your Available Cars',
       subtitle: 'Have empty cabs? Post your available fleet and connect with travel agencies instantly.',
       color: AppColors.info,
     ),

@@ -112,11 +112,11 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(title: Text(_isEdit ? 'Edit Cab' : 'Post Available Cab'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
+      appBar: AppBar(title: Text(_isEdit ? 'Edit Car' : 'Post Available Car'.tr, style: TextStyle(fontFamily: 'Poppins')), centerTitle: true),
       body: BlocListener<VehiclesBloc, VehiclesState>(
         listener: (context, state) {
           if (state is VehicleCreated || state is VehicleUpdated) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Cab updated!' : 'Vehicle listed!'), backgroundColor: AppColors.success));
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Car updated!' : 'Vehicle listed!'), backgroundColor: AppColors.success));
             context.pop();
           }
           if (state is VehiclesError) {
@@ -283,7 +283,7 @@ class _CreateVehiclePageState extends State<CreateVehiclePage> {
                     onPressed: state is VehiclesLoading ? null : _submit,
                     child: state is VehiclesLoading
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text(_isEdit ? 'Save Changes' : 'Post Available Cab'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Available Car'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                   ),
                 ),
                 SizedBox(height: 32.h),

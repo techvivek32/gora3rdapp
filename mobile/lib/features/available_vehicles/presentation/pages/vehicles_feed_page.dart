@@ -186,7 +186,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
         backgroundColor: AppColors.primary,
         elevation: 4,
         automaticallyImplyLeading: false,
-        title: Text('Available Cabs'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text('Available Cars'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.history_rounded, color: Colors.white),
@@ -338,7 +338,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
               ),
               SizedBox(width: 8.w),
               Text(
-                'My Accepted Cabs',
+                'My Accepted Cars',
                 style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.green[800]),
               ),
               SizedBox(width: 8.w),
