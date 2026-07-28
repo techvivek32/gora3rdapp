@@ -44,18 +44,14 @@ class _KycPageState extends State<KycPage> {
   bool _submitting = false;
   String _status = 'none';
   String? _rejectionReason;
-  String _role = 'driver';
 
   final Map<String, _KycDoc> _docs = {
     'aadhar': _KycDoc('aadhar', 'Aadhaar Card'),
-    'pan': _KycDoc('pan', 'PAN Card'),
     'drivingLicense': _KycDoc('drivingLicense', 'Driving License'),
-    'vehicleRc': _KycDoc('vehicleRc', 'Vehicle RC'),
   };
 
-  List<String> get _visibleKeys => _role == 'driver'
-      ? ['aadhar', 'pan', 'drivingLicense', 'vehicleRc']
-      : ['aadhar', 'pan', 'drivingLicense'];
+  // Only Aadhaar and Driving License are collected (PAN and Vehicle RC removed).
+  List<String> get _visibleKeys => ['aadhar', 'drivingLicense'];
 
   // Documents can only be edited/submitted when the verification hasn't been sent
   // yet or was rejected. Pending & verified are read-only.
@@ -98,7 +94,6 @@ class _KycPageState extends State<KycPage> {
       }
       if (mounted) {
         setState(() {
-          _role = (user['role'] as String?) ?? 'driver';
           _status = (user['verificationStatus'] as String?) ?? 'none';
           _rejectionReason = user['verificationRejectionReason'] as String?;
           _loading = false;

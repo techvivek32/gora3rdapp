@@ -63,15 +63,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final Map<String, _DocField> _docs = {
     'aadhar': _DocField('aadhar', 'Aadhaar Card'),
-    'pan': _DocField('pan', 'PAN Card'),
     'drivingLicense': _DocField('drivingLicense', 'Driving License'),
-    'vehicleRc': _DocField('vehicleRc', 'Vehicle RC'),
   };
 
-  // Drivers also submit the vehicle RC; agencies do not.
-  List<String> get _visibleDocKeys => _selectedRole == 'driver'
-      ? ['aadhar', 'pan', 'drivingLicense', 'vehicleRc']
-      : ['aadhar', 'pan', 'drivingLicense'];
+  // Only Aadhaar and Driving License are collected (PAN and Vehicle RC removed).
+  List<String> get _visibleDocKeys => ['aadhar', 'drivingLicense'];
 
   @override
   void initState() {
