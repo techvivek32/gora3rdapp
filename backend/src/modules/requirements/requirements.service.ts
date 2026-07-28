@@ -122,6 +122,9 @@ export class RequirementsService {
       this.requirementModel
         .find(filter)
         .populate('postedBy', 'fullName agencyName profileImage membershipType isVerified rating lastActive mobile')
+        // Populate the assigned driver too, so a booked requirement shows the
+        // "Assigned Driver" block on the main feed card (like My Requirements does).
+        .populate('assignedDriver', RequirementsService.PARTY_SELECT)
         .sort(sort)
         .skip(skip)
         .limit(limit)
@@ -144,6 +147,10 @@ export class RequirementsService {
           // picture and agency name are public display info shown on the card.
           postedBy.mobile = undefined;
         }
+        // Same gate for the assigned driver's number — don't let the "Assigned
+        // Driver" block hand a free contact to a non-premium viewer.
+        const driver = req.assignedDriver as any;
+        if (driver) driver.mobile = undefined;
       }
       return req;
     });
