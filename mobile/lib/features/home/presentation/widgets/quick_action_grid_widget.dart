@@ -10,11 +10,11 @@ class QuickActionGridWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = [
-      _QuickAction(icon: Icons.search_rounded, label: 'Requirement'.tr, onTap: () => context.go('/requirements')),
+      _QuickAction(icon: Icons.event_available_rounded, label: 'Requirement'.tr, onTap: () => context.go('/requirements')),
       _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Cab'.tr, onTap: () => context.go('/vehicles')),
-      _QuickAction(icon: Icons.star_rounded, label: 'Premium Plans'.tr, onTap: () => context.push('/subscriptions')),
+      _QuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Recharge Plans'.tr, onTap: () => context.push('/subscriptions')),
       _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities'.tr, onTap: () => context.push('/select-city')),
-      _QuickAction(icon: Icons.person_rounded, label: 'My Account'.tr, onTap: () => context.push('/my-profile')),
+      _QuickAction(icon: Icons.person_rounded, label: 'My Profile'.tr, onTap: () => context.push('/my-profile')),
       _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
     ];
 
@@ -92,10 +92,10 @@ class _QuickActionCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon inside a glowing ring.
+            // Icon inside a glowing ring (sized to fit the larger icon).
             Container(
-              width: 62.r,
-              height: 62.r,
+              width: 64.r,
+              height: 64.r,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: textColor.withValues(alpha: 0.08),
@@ -104,7 +104,7 @@ class _QuickActionCard extends StatelessWidget {
                   BoxShadow(color: textColor.withValues(alpha: 0.15), blurRadius: 8, spreadRadius: 1),
                 ],
               ),
-              child: Icon(action.icon, color: textColor, size: 30.sp),
+              child: Icon(action.icon, color: textColor, size: 52.sp),
             ),
             SizedBox(height: 12.h),
             Text(
