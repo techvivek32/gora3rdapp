@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -55,11 +56,12 @@ export default function RequirementsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
   const [modal, setModal] = useState<{ mode: 'view' | 'edit'; r: Requirement } | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['requirements', page, search, status],
-    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status }),
+    queryKey: ['requirements', page, search, status, range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getRequirements({ page, limit: 20, search, status, dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
 
   const deleteMutation = useMutation({
@@ -132,6 +134,10 @@ export default function RequirementsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Requirements</h1>
         <p className="text-gray-500 mt-1">All posted vehicle requirements</p>
+      </div>
+
+      <div className="flex justify-end">
+        <PeriodFilter onChange={setRange} />
       </div>
 
       <FilterBar

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { MapPin, ClipboardList, UserRound, Users, TrendingUp } from 'lucide-react';
 
 interface CityRow {
@@ -29,10 +30,11 @@ const SORTS: { key: SortKey; label: string }[] = [
 export default function CitiesPage() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('total');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data, isLoading } = useQuery({
-    queryKey: ['city-insights'],
-    queryFn: () => adminApi.getCityInsights(),
+    queryKey: ['city-insights', range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getCityInsights({ dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
 
   const rows: CityRow[] = data?.data?.rows || [];
@@ -51,9 +53,12 @@ export default function CitiesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">City Insights</h1>
-        <p className="text-gray-500 mt-1">Where the demand and supply is — cities ranked by requirements, available cabs and agencies.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">City Insights</h1>
+          <p className="text-gray-500 mt-1">Where the demand and supply is — cities ranked by requirements, available cabs and agencies.</p>
+        </div>
+        <PeriodFilter onChange={setRange} />
       </div>
 
       {/* KPI summary */}

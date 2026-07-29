@@ -6,11 +6,11 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { FilterBar } from '@/components/ui/FilterBar';
 import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
 import { Trophy, Plus, Minus, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useRole } from '@/hooks/useRole';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 
 interface Row {
   rank: number;
@@ -35,25 +35,9 @@ const medalEmoji: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
  * Generated from today's date rather than hard-coded, so the list never goes stale.
  * A month is sent as "YYYY-MM" and a year as "YYYY"; the backend parses both.
  */
-const PERIODS = (() => {
-  const now = new Date();
-  const out: { value: string; label: string }[] = [{ value: 'all', label: 'All Time' }];
-
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    out.push({ value, label: d.toLocaleString('en-IN', { month: 'long', year: 'numeric' }) });
-  }
-
-  for (let y = now.getFullYear(); y >= 2025; y--) {
-    out.push({ value: String(y), label: `Year ${y}` });
-  }
-  return out;
-})();
-
 export default function ReferralsPage() {
   const [search, setSearch] = useState('');
-  const [period, setPeriod] = useState('all');
+  const [range, setRange] = useState<PeriodRange>({});
   // Franchise view: 'city' (their city, default) or 'all' (all-India). Ignored for admins.
   const [scope, setScope] = useState<'city' | 'all'>('city');
   const [modal, setModal] = useState<{ mode: 'add' | 'deduct'; userId: string; name: string } | null>(null);
@@ -62,8 +46,8 @@ export default function ReferralsPage() {
   const { isFranchise } = useRole();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-referrals', search, period, scope],
-    queryFn: () => adminApi.getReferralLeaderboard({ search, period, scope }),
+    queryKey: ['admin-referrals', search, range.dateFrom, range.dateTo, scope],
+    queryFn: () => adminApi.getReferralLeaderboard({ search, scope, dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
   const data = rawData as any;
   const rows: Row[] = data?.data || [];
@@ -177,7 +161,7 @@ export default function ReferralsPage() {
         search={search}
         onSearch={setSearch}
         searchPlaceholder="Search name, mobile, code…"
-        onClear={() => { setSearch(''); setPeriod('all'); setScope('city'); }}
+        onClear={() => { setSearch(''); setRange({}); setScope('city'); }}
       >
         {/* Franchise-only: switch between their city and the all-India leaderboard. */}
         {isFranchise && (
@@ -206,11 +190,7 @@ export default function ReferralsPage() {
             </button>
           </div>
         )}
-        <Select value={period} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setPeriod(e.target.value)}>
-          {PERIODS.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </Select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       {top3.length > 0 && (

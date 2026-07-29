@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { MapPin } from 'lucide-react';
 
-export function TopCitiesCard() {
+export function TopCitiesCard({ range }: { range?: { dateFrom?: string; dateTo?: string } }) {
   const { data } = useQuery({
-    queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
+    queryKey: ['analytics', 'month', range?.dateFrom, range?.dateTo],
+    queryFn: () => adminApi.getAnalytics({ period: 'month', dateFrom: range?.dateFrom, dateTo: range?.dateTo }),
   });
 
   const topCities = data?.data?.topCities || [];

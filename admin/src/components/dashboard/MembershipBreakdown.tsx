@@ -12,10 +12,10 @@ const MEMBERSHIP_COLORS: Record<string, string> = {
   golden: '#f59e0b',
 };
 
-export function MembershipBreakdown() {
+export function MembershipBreakdown({ range }: { range?: { dateFrom?: string; dateTo?: string } }) {
   const { data } = useQuery({
-    queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
+    queryKey: ['analytics', 'month', range?.dateFrom, range?.dateTo],
+    queryFn: () => adminApi.getAnalytics({ period: 'month', dateFrom: range?.dateFrom, dateTo: range?.dateTo }),
   });
 
   const breakdown = data?.data?.membershipBreakdown || [];

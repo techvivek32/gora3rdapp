@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { FilterBar } from '@/components/ui/FilterBar';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Banknote, Check, X, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -46,12 +47,15 @@ export default function WithdrawalsPage() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [search, setSearch] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ['withdrawals', filter, search],
+    queryKey: ['withdrawals', filter, search, range.dateFrom, range.dateTo],
     queryFn: () => adminApi.getWithdrawals({
       status: filter === 'all' ? undefined : filter,
       search: search || undefined,
+      dateFrom: range.dateFrom,
+      dateTo: range.dateTo,
     }),
     refetchInterval: 30000,
   });
@@ -88,6 +92,10 @@ export default function WithdrawalsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Withdrawal Requests</h1>
           <p className="text-sm text-gray-500">Review and process user withdrawal requests.</p>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <PeriodFilter onChange={setRange} />
       </div>
 
       {/* Filters */}

@@ -4,10 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-export function UserGrowthChart() {
+export function UserGrowthChart({ range }: { range?: { dateFrom?: string; dateTo?: string } }) {
   const { data } = useQuery({
-    queryKey: ['analytics', 'month'],
-    queryFn: () => adminApi.getAnalytics({ period: 'month' }),
+    queryKey: ['analytics', 'month', range?.dateFrom, range?.dateTo],
+    queryFn: () => adminApi.getAnalytics({ period: 'month', dateFrom: range?.dateFrom, dateTo: range?.dateTo }),
   });
 
   const userGrowth = data?.data?.userGrowth || [];

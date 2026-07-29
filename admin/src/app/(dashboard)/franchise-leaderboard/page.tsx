@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Trophy, Building2, Users, FileText, IndianRupee } from 'lucide-react';
 
 interface Row {
@@ -38,10 +39,11 @@ const medalEmoji: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 export default function FranchiseLeaderboardPage() {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('revenue');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ['franchise-leaderboard'],
-    queryFn: () => adminApi.getFranchiseLeaderboard(),
+    queryKey: ['franchise-leaderboard', range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getFranchiseLeaderboard({ dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
   const rows: Row[] = (raw as any)?.data || [];
 
@@ -76,14 +78,17 @@ export default function FranchiseLeaderboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <Trophy className="w-6 h-6 text-orange-500" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Franchise Leaderboard</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            All franchises ranked by their city&apos;s activity — switch the metric to re-rank.
-          </p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Trophy className="w-6 h-6 text-orange-500" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Franchise Leaderboard</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+              All franchises ranked by their city&apos;s activity — switch the metric to re-rank.
+            </p>
+          </div>
         </div>
+        <PeriodFilter onChange={setRange} />
       </div>
 
       {/* KPI summary */}

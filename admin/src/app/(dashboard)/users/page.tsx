@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Search, Download, Shield, Eye } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -41,6 +42,7 @@ function UsersPageInner() {
   const [membershipFilter, setMembershipFilter] = useState(params.get('membership') || '');
   // Account status: '' all | 'true' active | 'false' inactive.
   const [statusFilter, setStatusFilter] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
 
   // No dropdowns for these two any more, but the dashboard's "Verified Users" and
   // "Active Users" cards still deep-link with ?verified=true / ?active=true — keep
@@ -49,7 +51,7 @@ function UsersPageInner() {
   const activeFromUrl = params.get('active') === 'true';
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-users', page, search, roleFilter, membershipFilter, statusFilter, verifiedFromUrl, activeFromUrl],
+    queryKey: ['admin-users', page, search, roleFilter, membershipFilter, statusFilter, verifiedFromUrl, activeFromUrl, range.dateFrom, range.dateTo],
     queryFn: () =>
       adminApi.getUsers({
         page,
@@ -60,6 +62,8 @@ function UsersPageInner() {
         isActive: statusFilter || undefined,
         isVerified: verifiedFromUrl ? 'true' : undefined,
         active: activeFromUrl ? 'true' : undefined,
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
       }),
   });
   const data = rawData as any;
@@ -154,6 +158,7 @@ function UsersPageInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <PeriodFilter onChange={setRange} />
           <Button variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export

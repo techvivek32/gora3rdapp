@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,
@@ -33,9 +34,10 @@ const titleCls = 'font-semibold text-gray-900 dark:text-white mb-4';
 
 export default function AnalyticsPage() {
   const dark = useDark();
+  const [range, setRange] = useState<PeriodRange>({});
   const { data, isLoading } = useQuery({
-    queryKey: ['analytics'],
-    queryFn: () => adminApi.getAnalytics({ days: 30 }),
+    queryKey: ['analytics', range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getAnalytics({ dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
 
   const analytics = data?.data;
@@ -67,9 +69,14 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">Platform performance over the last 30 days</p>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {range.dateFrom ? 'Platform performance for the selected period' : 'Platform performance over the last 30 days'}
+          </p>
+        </div>
+        <PeriodFilter onChange={setRange} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

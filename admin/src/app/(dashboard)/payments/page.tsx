@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Select } from '@/components/ui/Select';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -82,14 +83,17 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
   const reset = () => setPage(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['payments', page, search, status],
+    queryKey: ['payments', page, search, status, range.dateFrom, range.dateTo],
     queryFn: () => adminApi.getPayments({
       page, limit: 20,
       search: search || undefined,
       status: status || undefined,
+      dateFrom: range.dateFrom,
+      dateTo: range.dateTo,
     }),
   });
 
@@ -109,6 +113,10 @@ export default function PaymentsPage() {
           <p className="text-sm text-gray-500">Page Revenue</p>
           <p className="text-2xl font-bold text-green-600">₹{(total / 100).toLocaleString('en-IN')}</p>
         </div>
+      </div>
+
+      <div className="flex justify-end">
+        <PeriodFilter onChange={setRange} />
       </div>
 
       <FilterBar

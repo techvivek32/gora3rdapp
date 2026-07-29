@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -82,10 +83,11 @@ export default function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('active');
   const [search, setSearch] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data, isLoading } = useQuery({
-    queryKey: ['subscriptions', page, status, search],
-    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status, search: search || undefined }),
+    queryKey: ['subscriptions', page, status, search, range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getSubscriptions({ page, limit: 20, status, search: search || undefined, dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
 
   return (
@@ -93,6 +95,10 @@ export default function SubscriptionsPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Subscriptions</h1>
         <p className="text-gray-500 mt-1">User membership subscriptions</p>
+      </div>
+
+      <div className="flex justify-end">
+        <PeriodFilter onChange={setRange} />
       </div>
 
       <FilterBar

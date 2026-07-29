@@ -35,7 +35,7 @@ export const adminApi = {
     apiClient.post('/auth/login', data),
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────
-  getDashboardStats: () => apiClient.get('/admin/dashboard'),
+  getDashboardStats: (params?: any) => apiClient.get('/admin/dashboard', { params }),
   getAnalytics: (params: any) => apiClient.get('/admin/analytics', { params }),
 
   // ─── Users ─────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export const adminApi = {
 
   // ─── Cities ────────────────────────────────────────────────────────────────
   getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
-  getCityInsights: () => apiClient.get('/admin/city-insights'),
+  getCityInsights: (params?: any) => apiClient.get('/admin/city-insights', { params }),
   createCity: (data: any) => apiClient.post('/admin/cities', data),
   updateCity: (id: string, data: any) => apiClient.put(`/admin/cities/${id}`, data),
   deleteCity: (id: string) => apiClient.delete(`/admin/cities/${id}`),
@@ -197,7 +197,7 @@ export const adminApi = {
   updateFranchise: (id: string, data: any) => apiClient.put(`/admin/franchises/${id}`, data),
   deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
   // All franchises ranked by their city activity/revenue (admin leaderboard page).
-  getFranchiseLeaderboard: () => apiClient.get('/admin/franchise-leaderboard'),
+  getFranchiseLeaderboard: (params?: any) => apiClient.get('/admin/franchise-leaderboard', { params }),
   // Commission earnings + settlements for a franchise (admin detail page).
   getFranchiseEarnings: (id: string) => apiClient.get(`/admin/franchise-earnings/${id}`),
   settleFranchise: (id: string, data: { amount: number; note?: string }) =>

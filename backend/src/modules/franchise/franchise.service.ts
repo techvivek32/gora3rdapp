@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
+import { dateRangeFilter } from '../../common/utils/pagination.util';
 
 // Fields the admin form may send. Password handled separately (hashed).
 const ASSIGNABLE = [
@@ -23,6 +24,8 @@ export class FranchiseService {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ name: rx }, { phone: rx }, { email: rx }, { agencyName: rx }, { city: rx }];
     }
+    // Period filter (year/month/week) → createdAt window.
+    Object.assign(filter, dateRangeFilter(query));
     // Password is select:false, so it's never returned here.
     const franchises = await this.franchiseModel.find(filter).sort({ createdAt: -1 }).lean();
     return { message: 'Franchises', data: franchises };

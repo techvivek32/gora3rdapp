@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Building2, Plus } from 'lucide-react';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { FranchiseFormModal, type Franchise } from '@/components/franchises/FranchiseFormModal';
 
 const inputCls =
@@ -14,10 +15,11 @@ export default function FranchisesPage() {
   // Add opens the create form; editing/deleting live on the detail page.
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data: raw, isLoading } = useQuery({
-    queryKey: ['franchises', search],
-    queryFn: () => adminApi.getFranchises({ search: search || undefined }),
+    queryKey: ['franchises', search, range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getFranchises({ search: search || undefined, dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
   const franchises: Franchise[] = Array.isArray((raw as any)?.data) ? (raw as any).data : [];
 
@@ -31,9 +33,12 @@ export default function FranchisesPage() {
             <p className="text-sm text-gray-500">Create &amp; manage franchise accounts, commission and payout details.</p>
           </div>
         </div>
-        <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold">
-          <Plus className="w-4 h-4" /> Add Franchise
-        </button>
+        <div className="flex items-center gap-2">
+          <PeriodFilter onChange={setRange} />
+          <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold">
+            <Plus className="w-4 h-4" /> Add Franchise
+          </button>
+        </div>
       </div>
 
       <input className={`${inputCls} max-w-sm`} placeholder="Search name / phone / email / city…" value={search} onChange={(e) => setSearch(e.target.value)} />

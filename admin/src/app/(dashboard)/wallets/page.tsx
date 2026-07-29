@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
 import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Search, Wallet } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { useRole } from '@/hooks/useRole';
@@ -27,12 +28,13 @@ export default function WalletsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [range, setRange] = useState<PeriodRange>({});
   const [target, setTarget] = useState<WalletUser | null>(null);
   const { isFranchise } = useRole();
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['admin-wallets', page, search],
-    queryFn: () => adminApi.getWallets({ page, limit: 20, search }),
+    queryKey: ['admin-wallets', page, search, range.dateFrom, range.dateTo],
+    queryFn: () => adminApi.getWallets({ page, limit: 20, search, dateFrom: range.dateFrom, dateTo: range.dateTo }),
   });
   const data = rawData as any;
   const users: WalletUser[] = data?.data?.data || [];
@@ -97,11 +99,14 @@ export default function WalletsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallet Management</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {meta?.total?.toLocaleString() ?? 0} users · add or cut wallet balance with a reason
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallet Management</h1>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {meta?.total?.toLocaleString() ?? 0} users · add or cut wallet balance with a reason
+          </p>
+        </div>
+        <PeriodFilter onChange={setRange} />
       </div>
 
       <div className="relative flex-1 min-w-[200px] max-w-xs">

@@ -16,10 +16,10 @@ interface StatCard {
   href?: string;
 }
 
-export function StatsCards() {
+export function StatsCards({ range }: { range?: { dateFrom?: string; dateTo?: string } }) {
   const { data } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: adminApi.getDashboardStats,
+    queryKey: ['dashboard-stats', range?.dateFrom, range?.dateTo],
+    queryFn: () => adminApi.getDashboardStats({ dateFrom: range?.dateFrom, dateTo: range?.dateTo }),
   });
 
   const stats = data?.data;

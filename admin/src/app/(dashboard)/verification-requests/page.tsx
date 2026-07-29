@@ -7,6 +7,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
+import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { Select } from '@/components/ui/Select';
 import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -34,15 +35,18 @@ export default function VerificationRequestsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('pending');
+  const [range, setRange] = useState<PeriodRange>({});
 
   const { data: rawData, isLoading } = useQuery({
-    queryKey: ['verification-requests', page, search, statusFilter],
+    queryKey: ['verification-requests', page, search, statusFilter, range.dateFrom, range.dateTo],
     queryFn: () =>
       adminApi.getVerificationRequests({
         page,
         limit: 20,
         search,
         status: statusFilter || 'pending',
+        dateFrom: range.dateFrom,
+        dateTo: range.dateTo,
       }),
   });
   const data = rawData as any;
@@ -124,6 +128,10 @@ export default function VerificationRequestsPage() {
         <p className="text-sm text-gray-500 mt-0.5">
           {meta?.total?.toLocaleString() ?? 0} requests
         </p>
+      </div>
+
+      <div className="flex justify-end">
+        <PeriodFilter onChange={setRange} />
       </div>
 
       {/* Filters */}

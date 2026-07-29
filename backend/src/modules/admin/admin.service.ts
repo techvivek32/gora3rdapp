@@ -90,7 +90,7 @@ export class AdminService {
    * city-keyed aggregations (not one query per franchise) so it scales. The admin
    * UI sorts by whichever metric it wants — all metrics are returned per row.
    */
-  async getFranchiseLeaderboard() {
+  async getFranchiseLeaderboard(query?: any) {
     const franchises = await this.franchiseModel
       .find()
       .select('name city state agencyName commissionPercent isActive')
@@ -99,10 +99,16 @@ export class AdminService {
     const norm = (c?: string | null) => (c || '').trim().toLowerCase();
     const cityKey = { $toLower: { $trim: { input: '$u.city' } } };
 
+    // Period filter (year/month/week): scope every metric to records created in
+    // the window. `cr` spreads into each aggregation's initial $match (empty when
+    // no period is selected).
+    const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
+    const cr: any = range.createdAt ? { createdAt: range.createdAt } : {};
+
     const [userAgg, reqAgg, vehAgg, revAgg] = await Promise.all([
       // Users / drivers / agencies grouped by their own city.
       this.userModel.aggregate([
-        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } } },
+        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] }, ...cr } },
         { $group: {
           _id: { $toLower: { $trim: { input: '$city' } } },
           users: { $sum: 1 },
@@ -112,21 +118,21 @@ export class AdminService {
       ]),
       // Requirements grouped by their poster's city.
       this.requirementModel.aggregate([
-        { $match: { isDeleted: { $ne: true } } },
+        { $match: { isDeleted: { $ne: true }, ...cr } },
         { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
         { $unwind: '$u' },
         { $group: { _id: cityKey, requirements: { $sum: 1 } } },
       ]),
       // Available cabs grouped by their poster's city.
       this.vehicleModel.aggregate([
-        { $match: { isDeleted: { $ne: true } } },
+        { $match: { isDeleted: { $ne: true }, ...cr } },
         { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
         { $unwind: '$u' },
         { $group: { _id: cityKey, vehicles: { $sum: 1 } } },
       ]),
       // Plan/subscription revenue (real Razorpay only) grouped by the payer's city.
       this.paymentModel.aggregate([
-        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId } },
+        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId, ...cr } },
         { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'u' } },
         { $unwind: '$u' },
         { $group: { _id: cityKey, paise: { $sum: '$amount' } } },
@@ -322,10 +328,18 @@ export class AdminService {
     return { message: 'Deletion request rejected', data: request };
   }
 
-  async getDashboardStats(franchiseCity?: string | null) {
+  async getDashboardStats(query?: any, franchiseCity?: string | null) {
     const now = new Date();
     const todayStart = new Date(now.setHours(0, 0, 0, 0));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    // Period filter (year/month/week): when set, the "volume" cards (total users /
+    // requirements / vehicles / revenue) count only what was created in the window.
+    // Current-state cards (active/verified/premium, pending reports/verifications,
+    // today) are left as-is — a time window doesn't change "how many are pending now".
+    const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
+    const created = range.createdAt;
+    const cr: any = created ? { createdAt: created } : {};
 
     // City scoping: users match by their own `city`; requirements/vehicles/reports
     // match by their owner being one of this city's users; revenue by those users.
@@ -343,17 +357,18 @@ export class AdminService {
       todayRegistrations, todayRequirements,
       pendingVerifications,
     ] = await Promise.all([
-      this.userModel.countDocuments({ isActive: true, ...uCity }),
+      this.userModel.countDocuments({ isActive: true, ...uCity, ...cr }),
       this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, ...uCity }),
       this.userModel.countDocuments({ isVerified: true, ...uCity }),
       this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM, ...uCity }),
       this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN, ...uCity }),
-      this.requirementModel.countDocuments({ isDeleted: false, ...owner }),
+      this.requirementModel.countDocuments({ isDeleted: false, ...owner, ...cr }),
       this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false, ...owner }),
-      this.vehicleModel.countDocuments({ isDeleted: false, ...owner }),
+      this.vehicleModel.countDocuments({ isDeleted: false, ...owner, ...cr }),
       this.vehicleModel.countDocuments({ status: 'available', isDeleted: false, ...owner }),
       // Franchise revenue = plan/subscription purchases only (no wallet top-ups).
-      this.razorpayRevenue(undefined, ids, !!franchiseCity),
+      // When a period is selected, bound revenue to that window.
+      this.razorpayRevenue(created?.$gte, ids, !!franchiseCity, created?.$lte),
       this.razorpayRevenue(monthStart, ids, !!franchiseCity),
       this.reportModel.countDocuments({ status: ReportStatus.PENDING, ...reportOwner }),
       this.notificationsService ? 0 : 0,
@@ -409,6 +424,8 @@ export class AdminService {
     }
     // Franchise: force the city filter to their own city (overrides any query.city).
     if (franchiseCity) filter.city = this.cityRx(franchiseCity);
+    // Period filter (year/month/week) → createdAt window.
+    Object.assign(filter, dateRangeFilter(query));
 
     const [users, total] = await Promise.all([
       this.userModel.find(filter).select('-password -refreshToken -fcmTokens').sort(sort).skip(skip).limit(limit).lean(),
@@ -1161,9 +1178,13 @@ export class AdminService {
    * managed cities list), grouped by a normalized city key so "Rajkot" and
    * "rajkot " collapse together, then ranked by total activity.
    */
-  async getCityInsights(franchiseCity?: string | null) {
+  async getCityInsights(query?: any, franchiseCity?: string | null) {
     // Group requirements by their clean pickup city (fallback to the raw city).
     const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
+
+    // Period filter (year/month/week) → createdAt window on both requirements + users.
+    const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
+    const cr = range.createdAt;
 
     // Franchise scoping: show ONLY the franchise's own city — requirements whose
     // PICKUP is that city (its demand), and drivers/agencies whose profile city
@@ -1175,8 +1196,10 @@ export class AdminService {
         { pickupCity: this.cityRx(franchiseCity) },
       ];
     }
+    if (cr) reqMatch.createdAt = cr;
     const userMatch: any = { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } };
     if (franchiseCity) userMatch.city = this.cityRx(franchiseCity);
+    if (cr) userMatch.createdAt = cr;
 
     const [reqAgg, userAgg] = await Promise.all([
       this.requirementModel.aggregate([
@@ -1419,9 +1442,16 @@ export class AdminService {
     };
   }
 
-  async getAnalytics(period: string, franchiseCity?: string | null) {
-    const days = period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  async getAnalytics(query: any, franchiseCity?: string | null) {
+    // Prefer an explicit period filter (dateFrom/dateTo from the page's Period
+    // filter); otherwise fall back to the legacy `period` window (used by the
+    // dashboard charts, which still pass period=month).
+    const period = (query?.period as string) || 'month';
+    const days = period === 'week' ? 7 : period === 'year' ? 365 : 30;
+    const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
+    const startDate = range.createdAt?.$gte ?? new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const endDate = range.createdAt?.$lte;
+    const createdWindow: any = endDate ? { $gte: startDate, $lte: endDate } : { $gte: startDate };
 
     // Franchise scoping: users by city, requirements/revenue by this city's users.
     const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
@@ -1430,17 +1460,17 @@ export class AdminService {
 
     const [userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown] = await Promise.all([
       this.userModel.aggregate([
-        { $match: { createdAt: { $gte: startDate }, ...uCity } },
+        { $match: { createdAt: createdWindow, ...uCity } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
       this.requirementModel.aggregate([
-        { $match: { createdAt: { $gte: startDate }, isDeleted: false, ...owner } },
+        { $match: { createdAt: createdWindow, isDeleted: false, ...owner } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
       // Franchise revenue chart = plan/subscription purchases only (matches the card).
-      this.razorpayDailyRevenue(startDate, ids, !!franchiseCity),
+      this.razorpayDailyRevenue(startDate, ids, !!franchiseCity, endDate),
       this.requirementModel.aggregate([
         { $match: { isDeleted: false, ...owner } },
         { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
@@ -1468,12 +1498,15 @@ export class AdminService {
 
   // `plansOnly` counts only plan/subscription purchases (excludes wallet top-ups).
   // Used for the franchise dashboard, whose revenue = plan buys by its city's users.
-  private async razorpayRevenue(since?: Date, userIds?: Types.ObjectId[] | null, plansOnly = false): Promise<number> {
+  private async razorpayRevenue(since?: Date, userIds?: Types.ObjectId[] | null, plansOnly = false, until?: Date): Promise<number> {
     const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId };
     const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId };
-    if (since) {
-      pMatch.createdAt = { $gte: since };
-      wMatch.createdAt = { $gte: since };
+    if (since || until) {
+      const range: any = {};
+      if (since) range.$gte = since;
+      if (until) range.$lte = until;
+      pMatch.createdAt = range;
+      wMatch.createdAt = range;
     }
     if (userIds) {
       pMatch.userId = { $in: userIds };
@@ -1490,10 +1523,12 @@ export class AdminService {
     return Math.round(planRupees + walletRupees);
   }
 
-  private async razorpayDailyRevenue(since: Date, userIds?: Types.ObjectId[] | null, plansOnly = false) {
+  private async razorpayDailyRevenue(since: Date, userIds?: Types.ObjectId[] | null, plansOnly = false, until?: Date) {
     const dateKey = { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } };
-    const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
-    const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt: { $gte: since } };
+    const createdAt: any = { $gte: since };
+    if (until) createdAt.$lte = until;
+    const pMatch: any = { status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt };
+    const wMatch: any = { type: 'credit', status: 'success', razorpayPaymentId: this._hasRazorpayId, createdAt };
     if (userIds) {
       pMatch.userId = { $in: userIds };
       wMatch.userId = { $in: userIds };

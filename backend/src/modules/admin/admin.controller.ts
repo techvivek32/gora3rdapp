@@ -29,15 +29,15 @@ export class AdminController {
   @Get('dashboard')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get dashboard statistics' })
-  getDashboard(@CurrentUser('franchiseCity') city?: string) {
-    return this.adminService.getDashboardStats(city);
+  getDashboard(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getDashboardStats(query, city);
   }
 
   @Get('analytics')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Get analytics data' })
-  getAnalytics(@Query('period') period: string, @CurrentUser('franchiseCity') city?: string) {
-    return this.adminService.getAnalytics(period || 'month', city);
+  getAnalytics(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getAnalytics(query, city);
   }
 
   // ─── Users ─────────────────────────────────────────────────────────────────
@@ -332,8 +332,8 @@ export class AdminController {
   @Get('city-insights')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'City-wise activity (requirements / cabs / users)' })
-  getCityInsights(@CurrentUser('franchiseCity') city?: string) {
-    return this.adminService.getCityInsights(city);
+  getCityInsights(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getCityInsights(query, city);
   }
 
   @Put('cities/:id')
@@ -475,8 +475,8 @@ export class AdminController {
   // ─── Franchise leaderboard (admin only) ──────────────────────────────────────
   @Get('franchise-leaderboard')
   @ApiOperation({ summary: 'All franchises ranked by their city activity/revenue' })
-  getFranchiseLeaderboard() {
-    return this.adminService.getFranchiseLeaderboard();
+  getFranchiseLeaderboard(@Query() query: any) {
+    return this.adminService.getFranchiseLeaderboard(query);
   }
 
   // ─── Franchise earnings & settlements ────────────────────────────────────────

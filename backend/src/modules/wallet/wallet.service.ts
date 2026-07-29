@@ -160,6 +160,8 @@ export class WalletService {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
       filter.$or = [{ fullName: rx }, { mobile: rx }, { email: rx }, { agencyName: rx }];
     }
+    // Period filter (year/month/week) → user account createdAt window.
+    Object.assign(filter, dateRangeFilter(query));
 
     const [users, total] = await Promise.all([
       this.userModel
