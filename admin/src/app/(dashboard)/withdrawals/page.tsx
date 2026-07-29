@@ -94,10 +94,6 @@ export default function WithdrawalsPage() {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <PeriodFilter onChange={setRange} />
-      </div>
-
       {/* Filters */}
       <FilterBar
         search={search}
@@ -115,6 +111,7 @@ export default function WithdrawalsPage() {
           <option value="rejected">Rejected</option>
           <option value="all">All</option>
         </select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       {isLoading ? (

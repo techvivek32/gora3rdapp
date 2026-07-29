@@ -97,10 +97,6 @@ export default function SubscriptionsPage() {
         <p className="text-gray-500 mt-1">User membership subscriptions</p>
       </div>
 
-      <div className="flex justify-end">
-        <PeriodFilter onChange={setRange} />
-      </div>
-
       <FilterBar
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -115,6 +111,7 @@ export default function SubscriptionsPage() {
           <option value="active">Active</option>
           <option value="expired">Expired</option>
         </select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       <DataTable

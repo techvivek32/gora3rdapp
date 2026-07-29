@@ -130,10 +130,6 @@ export default function VerificationRequestsPage() {
         </p>
       </div>
 
-      <div className="flex justify-end">
-        <PeriodFilter onChange={setRange} />
-      </div>
-
       {/* Filters */}
       <FilterBar
         search={search}
@@ -150,6 +146,7 @@ export default function VerificationRequestsPage() {
           <option value="rejected">Rejected</option>
           <option value="all">All</option>
         </Select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       {/* Table */}

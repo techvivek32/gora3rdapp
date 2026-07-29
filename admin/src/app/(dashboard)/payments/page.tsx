@@ -115,10 +115,6 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <PeriodFilter onChange={setRange} />
-      </div>
-
       <FilterBar
         search={search}
         onSearch={(v) => { setSearch(v); reset(); }}
@@ -131,6 +127,7 @@ export default function PaymentsPage() {
           <option value="failed">Failed</option>
           <option value="refunded">Refunded</option>
         </Select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       <DataTable

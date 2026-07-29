@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import {
@@ -38,6 +38,9 @@ export default function AnalyticsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['analytics', range.dateFrom, range.dateTo],
     queryFn: () => adminApi.getAnalytics({ dateFrom: range.dateFrom, dateTo: range.dateTo }),
+    // Keep the current charts on screen while a new period is fetched, instead of
+    // flashing the full-page skeleton on every filter change.
+    placeholderData: keepPreviousData,
   });
 
   const analytics = data?.data;

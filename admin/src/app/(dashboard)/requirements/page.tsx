@@ -136,10 +136,6 @@ export default function RequirementsPage() {
         <p className="text-gray-500 mt-1">All posted vehicle requirements</p>
       </div>
 
-      <div className="flex justify-end">
-        <PeriodFilter onChange={setRange} />
-      </div>
-
       <FilterBar
         search={search}
         onSearch={(v) => { setSearch(v); setPage(1); }}
@@ -156,6 +152,7 @@ export default function RequirementsPage() {
             <option key={s} value={s}>{statusLabel(s)}</option>
           ))}
         </select>
+        <PeriodFilter onChange={setRange} />
       </FilterBar>
 
       <DataTable
