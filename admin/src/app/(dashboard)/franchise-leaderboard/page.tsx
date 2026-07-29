@@ -12,6 +12,7 @@ interface Row {
   name: string;
   city: string;
   state: string;
+  coverage?: string;
   agencyName: string;
   commissionPercent: number;
   isActive: boolean;
@@ -67,6 +68,7 @@ export default function FranchiseLeaderboardPage() {
           (r) =>
             r.name.toLowerCase().includes(q) ||
             r.city.toLowerCase().includes(q) ||
+            (r.coverage || '').toLowerCase().includes(q) ||
             r.agencyName.toLowerCase().includes(q),
         )
       : rows;
@@ -163,7 +165,7 @@ export default function FranchiseLeaderboardPage() {
                         <div className="min-w-0">
                           <div className="font-medium text-gray-900 dark:text-white group-hover:underline truncate">{r.name}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {r.city || '—'}{r.agencyName ? ` · ${r.agencyName}` : ''}
+                            {r.coverage || r.city || '—'}{r.agencyName ? ` · ${r.agencyName}` : ''}
                           </div>
                           {/* Relative bar for the active metric. */}
                           <div className="mt-1 h-1 w-32 max-w-full rounded bg-gray-100 dark:bg-gray-800 overflow-hidden">

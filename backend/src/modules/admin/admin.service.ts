@@ -52,117 +52,149 @@ export class AdminService {
     private availableVehiclesService: AvailableVehiclesService,
   ) {}
 
-  // ─── Franchise city-scoping helpers ─────────────────────────────────────────
-  // Every franchise-facing method receives an optional `franchiseCity`. When it is
-  // set (i.e. the caller is a franchise, not an admin) the query is restricted to
-  // that city; when it is null/undefined the method behaves exactly as before for
-  // admins. A "Rajkot franchise" only ever sees data owned by Rajkot users.
+  // ─── Franchise scoping helpers ──────────────────────────────────────────────
+  // Every franchise-facing method receives an optional `franchiseCity` — despite
+  // the legacy name it is now a SCOPE OBJECT `{ cities: string[]; states: string[] }`
+  // (set by the JWT strategy from the franchise record). A franchise sees data for
+  // users whose city is one of `cities` OR whose state is one of `states` (so a
+  // whole-state franchise automatically covers every city in that state). It is
+  // null/undefined for admins, who see everything. An empty scope matches NOTHING.
 
-  /** Case-insensitive exact match on a city name. */
+  /** Case-insensitive exact match on a single city/state name. */
   private cityRx(city: string) {
     return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
   }
 
-  private cityMatches(a?: string | null, b?: string | null) {
-    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  /** Anchored, case-insensitive regexes for a list of city/state names (blanks dropped). */
+  private rxList(vals?: string[]): RegExp[] {
+    return (vals || [])
+      .map((v) => (v || '').trim())
+      .filter(Boolean)
+      .map((v) => this.cityRx(v));
   }
 
-  /** _ids of all users in a city — used to scope owner-referenced collections. */
-  private async cityUserIds(city: string): Promise<Types.ObjectId[]> {
-    const rows = await this.userModel.find({ city: this.cityRx(city) }).select('_id').lean();
+  /**
+   * Mongo condition matching a USER document (by its `city` or `state`) within the
+   * scope. Returns a match-nothing condition for an empty scope, or null when there
+   * is no scope at all (admin).
+   */
+  private userScopeMatch(scope?: any): Record<string, any> | null {
+    if (!scope) return null;
+    const cityRxs = this.rxList(scope.cities);
+    const stateRxs = this.rxList(scope.states);
+    const or: any[] = [];
+    if (cityRxs.length) or.push({ city: { $in: cityRxs } });
+    if (stateRxs.length) or.push({ state: { $in: stateRxs } });
+    return or.length ? { $or: or } : { _id: { $in: [] } };
+  }
+
+  /** Build a scope from a franchise record (legacy single `city` merged with the new arrays). */
+  private franchiseScope(f: any): { cities: string[]; states: string[] } {
+    return {
+      cities: [...(f?.cities || []), ...(f?.city ? [f.city] : [])].map((c: string) => (c || '').trim()).filter(Boolean),
+      states: [...(f?.states || [])].map((s: string) => (s || '').trim()).filter(Boolean),
+    };
+  }
+
+  /** Like userScopeMatch but for the `cities` collection (matches its `name`/`state`). */
+  private cityDocScopeMatch(scope?: any): Record<string, any> | null {
+    if (!scope) return null;
+    const cityRxs = this.rxList(scope.cities);
+    const stateRxs = this.rxList(scope.states);
+    const or: any[] = [];
+    if (cityRxs.length) or.push({ name: { $in: cityRxs } });
+    if (stateRxs.length) or.push({ state: { $in: stateRxs } });
+    return or.length ? { $or: or } : { _id: { $in: [] } };
+  }
+
+  /** True if a user (needs `city` + `state`) falls within the scope. Admin scope → always true. */
+  private userInScope(user: any, scope?: any): boolean {
+    if (!scope) return true;
+    const city = (user?.city || '').trim().toLowerCase();
+    const state = (user?.state || '').trim().toLowerCase();
+    const inCity = !!city && (scope.cities || []).some((c: string) => (c || '').trim().toLowerCase() === city);
+    const inState = !!state && (scope.states || []).some((s: string) => (s || '').trim().toLowerCase() === state);
+    return inCity || inState;
+  }
+
+  /** _ids of all users within the scope — used to scope owner-referenced collections. */
+  private async cityUserIds(scope?: any): Promise<Types.ObjectId[]> {
+    const cond = this.userScopeMatch(scope);
+    if (!cond) return [];
+    const rows = await this.userModel.find(cond).select('_id').lean();
     return rows.map((r) => r._id as Types.ObjectId);
   }
 
-  /** Throws NotFound unless the target user belongs to the franchise's city. No-op for admins. */
-  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+  /** Throws NotFound unless the target user belongs to the franchise's scope. No-op for admins. */
+  private async assertUserInCity(userId: string, franchiseCity?: any) {
     if (!franchiseCity) return;
     if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('Not found');
-    const u = await this.userModel.findById(userId).select('city').lean();
-    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+    const u = await this.userModel.findById(userId).select('city state').lean();
+    if (!u || !this.userInScope(u, franchiseCity)) {
       throw new NotFoundException('Not found');
     }
   }
 
   // ─── Franchise leaderboard (admin panel) ─────────────────────────────────────
   /**
-   * Ranks every franchise by the activity in its city: users, drivers, agencies,
-   * requirements, available cabs, and plan revenue. Computed with a handful of
-   * city-keyed aggregations (not one query per franchise) so it scales. The admin
-   * UI sorts by whichever metric it wants — all metrics are returned per row.
+   * Ranks every franchise by the activity across its FULL scope — all of its
+   * cities AND any whole states it covers (users, drivers, agencies, requirements,
+   * available cabs, plan revenue). Computed per franchise so multi-city / whole-
+   * state coverage is summed correctly. The admin UI sorts by any returned metric.
    */
   async getFranchiseLeaderboard(query?: any) {
     const franchises = await this.franchiseModel
       .find()
-      .select('name city state agencyName commissionPercent isActive')
+      .select('name city state cities states agencyName commissionPercent isActive')
       .lean();
 
-    const norm = (c?: string | null) => (c || '').trim().toLowerCase();
-    const cityKey = { $toLower: { $trim: { input: '$u.city' } } };
-
-    // Period filter (year/month/week): scope every metric to records created in
-    // the window. `cr` spreads into each aggregation's initial $match (empty when
-    // no period is selected).
+    // Period filter (year/month/week): scope every metric to the window (empty = all-time).
     const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
     const cr: any = range.createdAt ? { createdAt: range.createdAt } : {};
 
-    const [userAgg, reqAgg, vehAgg, revAgg] = await Promise.all([
-      // Users / drivers / agencies grouped by their own city.
-      this.userModel.aggregate([
-        { $match: { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] }, ...cr } },
-        { $group: {
-          _id: { $toLower: { $trim: { input: '$city' } } },
-          users: { $sum: 1 },
-          drivers: { $sum: { $cond: [{ $eq: ['$role', 'driver'] }, 1, 0] } },
-          agencies: { $sum: { $cond: [{ $eq: ['$role', 'travel_agency'] }, 1, 0] } },
-        } },
-      ]),
-      // Requirements grouped by their poster's city.
-      this.requirementModel.aggregate([
-        { $match: { isDeleted: { $ne: true }, ...cr } },
-        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
-        { $unwind: '$u' },
-        { $group: { _id: cityKey, requirements: { $sum: 1 } } },
-      ]),
-      // Available cabs grouped by their poster's city.
-      this.vehicleModel.aggregate([
-        { $match: { isDeleted: { $ne: true }, ...cr } },
-        { $lookup: { from: 'users', localField: 'postedBy', foreignField: '_id', as: 'u' } },
-        { $unwind: '$u' },
-        { $group: { _id: cityKey, vehicles: { $sum: 1 } } },
-      ]),
-      // Plan/subscription revenue (real Razorpay only) grouped by the payer's city.
-      this.paymentModel.aggregate([
-        { $match: { status: 'success', razorpayPaymentId: this._hasRazorpayId, ...cr } },
-        { $lookup: { from: 'users', localField: 'userId', foreignField: '_id', as: 'u' } },
-        { $unwind: '$u' },
-        { $group: { _id: cityKey, paise: { $sum: '$amount' } } },
-      ]),
-    ]);
+    const rows = await Promise.all(
+      franchises.map(async (f: any) => {
+        const scope = this.franchiseScope(f);
+        const cond = this.userScopeMatch(scope) || { _id: { $in: [] } };
+        // Users within the franchise's cities/states, with their role for the breakdown.
+        const scopedUsers = await this.userModel.find(cond).select('_id role').lean();
+        const ids = scopedUsers.map((u) => u._id);
+        const nonAdmin = scopedUsers.filter((u) => !['admin', 'super_admin'].includes((u as any).role));
+        const users = nonAdmin.length;
+        const drivers = nonAdmin.filter((u) => (u as any).role === 'driver').length;
+        const agencies = nonAdmin.filter((u) => (u as any).role === 'travel_agency').length;
 
-    const uMap = new Map<string, any>((userAgg as any[]).map((r) => [r._id, r]));
-    const reqMap = new Map<string, number>((reqAgg as any[]).map((r) => [r._id, r.requirements]));
-    const vehMap = new Map<string, number>((vehAgg as any[]).map((r) => [r._id, r.vehicles]));
-    const revMap = new Map<string, number>((revAgg as any[]).map((r) => [r._id, Math.round((r.paise || 0) / 100)]));
+        const [requirements, vehicles, revAgg] = await Promise.all([
+          this.requirementModel.countDocuments({ postedBy: { $in: ids }, isDeleted: { $ne: true }, ...cr }),
+          this.vehicleModel.countDocuments({ postedBy: { $in: ids }, isDeleted: { $ne: true }, ...cr }),
+          this.paymentModel.aggregate([
+            { $match: { userId: { $in: ids }, status: 'success', razorpayPaymentId: this._hasRazorpayId, ...cr } },
+            { $group: { _id: null, paise: { $sum: '$amount' } } },
+          ]),
+        ]);
+        const revenue = Math.round(((revAgg[0]?.paise as number) || 0) / 100);
 
-    const rows = franchises.map((f: any) => {
-      const key = norm(f.city);
-      const u = uMap.get(key) || {};
-      return {
-        _id: f._id,
-        name: f.name,
-        city: f.city || '',
-        state: f.state || '',
-        agencyName: f.agencyName || '',
-        commissionPercent: f.commissionPercent ?? 0,
-        isActive: f.isActive !== false,
-        users: u.users || 0,
-        drivers: u.drivers || 0,
-        agencies: u.agencies || 0,
-        requirements: reqMap.get(key) || 0,
-        vehicles: vehMap.get(key) || 0,
-        revenue: revMap.get(key) || 0,
-      };
-    });
+        return {
+          _id: f._id,
+          name: f.name,
+          city: f.city || '',
+          state: f.state || '',
+          cities: scope.cities,
+          states: scope.states,
+          // Human-readable coverage summary for the UI (e.g. "Rajkot, Surat, Gujarat (whole state)").
+          coverage: [...scope.cities, ...scope.states.map((s) => `${s} (whole state)`)].join(', '),
+          agencyName: f.agencyName || '',
+          commissionPercent: f.commissionPercent ?? 0,
+          isActive: f.isActive !== false,
+          users,
+          drivers,
+          agencies,
+          requirements,
+          vehicles,
+          revenue,
+        };
+      }),
+    );
 
     // Default ordering by total activity; the UI re-sorts by the chosen metric.
     rows.sort((a, b) =>
@@ -183,13 +215,12 @@ export class AdminService {
     if (!Types.ObjectId.isValid(franchiseId)) throw new NotFoundException('Franchise not found');
     const franchise = await this.franchiseModel
       .findById(franchiseId)
-      .select('name city state commissionPercent')
+      .select('name city state cities states commissionPercent')
       .lean();
     if (!franchise) throw new NotFoundException('Franchise not found');
 
     const pct = (franchise as any).commissionPercent ?? 0;
-    const city = (franchise as any).city as string | undefined;
-    const ids = city ? await this.cityUserIds(city) : [];
+    const ids = await this.cityUserIds(this.franchiseScope(franchise));
 
     // Plan revenue per month (paise → rupees), real Razorpay plan payments only.
     const monthlyAgg = ids.length
@@ -220,7 +251,7 @@ export class AdminService {
       message: 'Franchise earnings',
       data: {
         commissionPercent: pct,
-        city: city || '',
+        city: (franchise as any).city || '',
         totalRevenue,
         totalCommission,
         totalSettled,
@@ -249,7 +280,7 @@ export class AdminService {
 
   // ── Account deletion requests ───────────────────────────────────────────────
 
-  async getDeletionRequests(query: any, franchiseCity?: string | null) {
+  async getDeletionRequests(query: any, franchiseCity?: any) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = { ...dateRangeFilter(query) };
     if (query.status) filter.status = query.status;
@@ -274,7 +305,7 @@ export class AdminService {
   }
 
   /** Approving permanently removes the user and hides everything they posted. */
-  async approveDeletionRequest(id: string, adminId: string, franchiseCity?: string | null) {
+  async approveDeletionRequest(id: string, adminId: string, franchiseCity?: any) {
     const request = await this.deletionRequestModel.findById(id);
     if (!request) throw new NotFoundException('Deletion request not found');
     await this.assertUserInCity(request.userId.toString(), franchiseCity);
@@ -305,7 +336,7 @@ export class AdminService {
     return { message: 'Account deleted', data: request };
   }
 
-  async rejectDeletionRequest(id: string, adminId: string, reason?: string, franchiseCity?: string | null) {
+  async rejectDeletionRequest(id: string, adminId: string, reason?: string, franchiseCity?: any) {
     const request = await this.deletionRequestModel.findById(id);
     if (!request) throw new NotFoundException('Deletion request not found');
     await this.assertUserInCity(request.userId.toString(), franchiseCity);
@@ -328,7 +359,7 @@ export class AdminService {
     return { message: 'Deletion request rejected', data: request };
   }
 
-  async getDashboardStats(query?: any, franchiseCity?: string | null) {
+  async getDashboardStats(query?: any, franchiseCity?: any) {
     const now = new Date();
     const todayStart = new Date(now.setHours(0, 0, 0, 0));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -343,7 +374,7 @@ export class AdminService {
     // City scoping: users match by their own `city`; requirements/vehicles/reports
     // match by their owner being one of this city's users; revenue by those users.
     const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
-    const uCity: any = franchiseCity ? { city: this.cityRx(franchiseCity) } : {};
+    const uCity: any = franchiseCity ? { _id: { $in: ids } } : {};
     const owner: any = ids ? { postedBy: { $in: ids } } : {};
     const reportOwner: any = ids ? { reportedBy: { $in: ids } } : {};
 
@@ -394,7 +425,7 @@ export class AdminService {
     };
   }
 
-  async getUsers(query: any, franchiseCity?: string | null) {
+  async getUsers(query: any, franchiseCity?: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
 
@@ -422,7 +453,7 @@ export class AdminService {
       filter.lastActive = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
     }
     // Franchise: force the city filter to their own city (overrides any query.city).
-    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
+    if (franchiseCity) filter._id = { $in: await this.cityUserIds(franchiseCity) };
     // Period filter (year/month/week) → createdAt window.
     Object.assign(filter, dateRangeFilter(query));
 
@@ -435,7 +466,7 @@ export class AdminService {
   }
 
   // Single user detail for the admin user page.
-  async getUser(id: string, franchiseCity?: string | null) {
+  async getUser(id: string, franchiseCity?: any) {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('User not found');
     const user = await this.userModel
       .findById(id)
@@ -443,7 +474,7 @@ export class AdminService {
       .lean();
     if (!user) throw new NotFoundException('User not found');
     // A franchise may only open users in its own city.
-    if (franchiseCity && !this.cityMatches((user as any).city, franchiseCity)) {
+    if (franchiseCity && !this.userInScope(user, franchiseCity)) {
       throw new NotFoundException('User not found');
     }
     return { message: 'User retrieved', data: user };
@@ -508,11 +539,11 @@ export class AdminService {
     return null;
   }
 
-  async getReferralLeaderboard(query: any, franchiseCity?: string | null) {
+  async getReferralLeaderboard(query: any, franchiseCity?: any) {
     const filter: any = { role: { $nin: [UserRole.ADMIN, UserRole.SUPER_ADMIN] } };
     // A franchise defaults to its own city's leaderboard, but may switch to the
     // all-India view with ?scope=all. Admins are never city-scoped here.
-    if (franchiseCity && query.scope !== 'all') filter.city = this.cityRx(franchiseCity);
+    if (franchiseCity && query.scope !== 'all') filter._id = { $in: await this.cityUserIds(franchiseCity) };
     const search = (query.search || '').trim();
     if (search) {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -586,7 +617,7 @@ export class AdminService {
    * anything in the request body through — role, walletBalance, isVerified — and
    * a duplicate mobile/email would surface as a raw E11000 instead of a message.
    */
-  async updateUser(id: string, data: Partial<any>, franchiseCity?: string | null) {
+  async updateUser(id: string, data: Partial<any>, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const EDITABLE = [
       'fullName', 'agencyName', 'mobile', 'email',
@@ -630,21 +661,21 @@ export class AdminService {
     return { message: 'User updated', data: user };
   }
 
-  async verifyUser(id: string, franchiseCity?: string | null) {
+  async verifyUser(id: string, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isVerified: true, isAdminApproved: true }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User verified', data: user };
   }
 
-  async blockUser(id: string, reason?: string, franchiseCity?: string | null) {
+  async blockUser(id: string, reason?: string, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: true }, { new: true });
     if (!user) throw new NotFoundException('User not found');
     return { message: 'User blocked' };
   }
 
-  async unblockUser(id: string, franchiseCity?: string | null) {
+  async unblockUser(id: string, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const user = await this.userModel.findByIdAndUpdate(id, { isBlocked: false }, { new: true });
     if (!user) throw new NotFoundException('User not found');
@@ -652,10 +683,10 @@ export class AdminService {
   }
 
   // ─── Verification Requests ─────────────────────────────────────────────────
-  async getVerificationRequests(query: any, franchiseCity?: string | null) {
+  async getVerificationRequests(query: any, franchiseCity?: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
-    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
+    if (franchiseCity) filter._id = { $in: await this.cityUserIds(franchiseCity) };
 
     // Default to pending requests; allow ?status=all or a specific status.
     filter.verificationStatus = query.status && query.status !== 'all'
@@ -687,13 +718,13 @@ export class AdminService {
     return { message: 'Verification requests retrieved', data: buildPaginatedResult(users, total, page, limit) };
   }
 
-  async getVerificationRequest(id: string, franchiseCity?: string | null) {
+  async getVerificationRequest(id: string, franchiseCity?: any) {
     const user = await this.userModel
       .findById(id)
       .select('fullName email mobile agencyName role profileImage membershipType isVerified isAdminApproved verificationStatus verificationSubmittedAt verificationRejectionReason documents city state createdAt')
       .lean();
     if (!user) throw new NotFoundException('User not found');
-    if (franchiseCity && !this.cityMatches((user as any).city, franchiseCity)) {
+    if (franchiseCity && !this.userInScope(user, franchiseCity)) {
       throw new NotFoundException('User not found');
     }
     return { message: 'Verification request retrieved', data: user };
@@ -705,7 +736,7 @@ export class AdminService {
    * approved document is never overwritten, and it puts the account into PENDING
    * for review.
    */
-  async submitDocumentsFor(userId: string, documents: Record<string, any>, franchiseCity?: string | null) {
+  async submitDocumentsFor(userId: string, documents: Record<string, any>, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('documents');
     if (!user) throw new NotFoundException('User not found');
@@ -750,7 +781,7 @@ export class AdminService {
    *   any one rejected    → REJECTED (only the rejected ones need re-uploading)
    *   otherwise           → PENDING
    */
-  async reviewDocument(userId: string, docKey: string, status: 'approved' | 'rejected', reason?: string, franchiseCity?: string | null) {
+  async reviewDocument(userId: string, docKey: string, status: 'approved' | 'rejected', reason?: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     if (!DOCUMENT_KEYS.includes(docKey as any)) {
       throw new BadRequestException('Unknown document');
@@ -824,7 +855,7 @@ export class AdminService {
     return docs;
   }
 
-  async approveVerification(id: string, franchiseCity?: string | null) {
+  async approveVerification(id: string, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const existing = await this.userModel.findById(id).select('documents');
     if (!existing) throw new NotFoundException('User not found');
@@ -844,7 +875,7 @@ export class AdminService {
     return { message: 'Verification approved', data: user };
   }
 
-  async rejectVerification(id: string, reason?: string, franchiseCity?: string | null) {
+  async rejectVerification(id: string, reason?: string, franchiseCity?: any) {
     await this.assertUserInCity(id, franchiseCity);
     const existing = await this.userModel.findById(id).select('documents');
     if (!existing) throw new NotFoundException('User not found');
@@ -872,7 +903,7 @@ export class AdminService {
     membershipType: MembershipType,
     daysToAdd?: number,
     planId?: string,
-    franchiseCity?: string | null,
+    franchiseCity?: any,
   ) {
     await this.assertUserInCity(id, franchiseCity);
     const plan = planId
@@ -986,7 +1017,7 @@ export class AdminService {
     return { message: 'Plan deleted' };
   }
 
-  async getRequirements(query: any, franchiseCity?: string | null) {
+  async getRequirements(query: any, franchiseCity?: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };
 
@@ -1010,7 +1041,7 @@ export class AdminService {
     return { message: 'Requirements retrieved', data: buildPaginatedResult(requirements, total, page, limit) };
   }
 
-  async getSubscriptions(query: any, franchiseCity?: string | null) {
+  async getSubscriptions(query: any, franchiseCity?: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
@@ -1021,7 +1052,7 @@ export class AdminService {
     if (query.search) {
       const rx = new RegExp(query.search, 'i');
       const userFilter: any = { $or: [{ fullName: rx }, { mobile: rx }, { agencyName: rx }] };
-      if (franchiseCity) userFilter.city = this.cityRx(franchiseCity);
+      if (franchiseCity) userFilter._id = { $in: await this.cityUserIds(franchiseCity) };
       const matchedUsers = await this.userModel.find(userFilter).select('_id').lean();
       filter.userId = { $in: matchedUsers.map((u) => u._id) };
     } else if (franchiseCity) {
@@ -1040,7 +1071,7 @@ export class AdminService {
     return { message: 'Subscriptions retrieved', data: buildPaginatedResult(subscriptions, total, page, limit) };
   }
 
-  async getVehicles(query: any, franchiseCity?: string | null) {
+  async getVehicles(query: any, franchiseCity?: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const filter: any = { isDeleted: false };
 
@@ -1074,7 +1105,7 @@ export class AdminService {
    * the booking id, expiry and "new requirement" alerts all behave identically —
    * the only difference is who clicked the button.
    */
-  async createRequirementFor(userId: string, dto: any, franchiseCity?: string | null) {
+  async createRequirementFor(userId: string, dto: any, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('_id');
     if (!user) throw new NotFoundException('User not found');
@@ -1082,7 +1113,7 @@ export class AdminService {
   }
 
   /** Same, for an available-cab listing. */
-  async createVehicleFor(userId: string, dto: any, franchiseCity?: string | null) {
+  async createVehicleFor(userId: string, dto: any, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('_id');
     if (!user) throw new NotFoundException('User not found');
@@ -1090,20 +1121,20 @@ export class AdminService {
   }
 
   /** Guard: the requirement/vehicle's owner must be in the franchise's city. */
-  private async assertRequirementInCity(id: string, franchiseCity?: string | null) {
+  private async assertRequirementInCity(id: string, franchiseCity?: any) {
     if (!franchiseCity) return;
     const doc = await this.requirementModel.findById(id).select('postedBy').lean();
     if (!doc) throw new NotFoundException('Requirement not found');
     await this.assertUserInCity((doc as any).postedBy?.toString(), franchiseCity);
   }
-  private async assertVehicleInCity(id: string, franchiseCity?: string | null) {
+  private async assertVehicleInCity(id: string, franchiseCity?: any) {
     if (!franchiseCity) return;
     const doc = await this.vehicleModel.findById(id).select('postedBy').lean();
     if (!doc) throw new NotFoundException('Vehicle not found');
     await this.assertUserInCity((doc as any).postedBy?.toString(), franchiseCity);
   }
 
-  async updateRequirement(id: string, data: Partial<any>, franchiseCity?: string | null) {
+  async updateRequirement(id: string, data: Partial<any>, franchiseCity?: any) {
     await this.assertRequirementInCity(id, franchiseCity);
     const req = await this.requirementModel
       .findByIdAndUpdate(id, data, { new: true })
@@ -1112,7 +1143,7 @@ export class AdminService {
     return { message: 'Requirement updated', data: req };
   }
 
-  async deleteRequirement(id: string, franchiseCity?: string | null) {
+  async deleteRequirement(id: string, franchiseCity?: any) {
     await this.assertRequirementInCity(id, franchiseCity);
     const req = await this.requirementModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!req) throw new NotFoundException('Requirement not found');
@@ -1122,7 +1153,7 @@ export class AdminService {
     return { message: 'Requirement deleted' };
   }
 
-  async updateVehicle(id: string, data: Partial<any>, franchiseCity?: string | null) {
+  async updateVehicle(id: string, data: Partial<any>, franchiseCity?: any) {
     await this.assertVehicleInCity(id, franchiseCity);
     const vehicle = await this.vehicleModel
       .findByIdAndUpdate(id, data, { new: true })
@@ -1131,7 +1162,7 @@ export class AdminService {
     return { message: 'Vehicle updated', data: vehicle };
   }
 
-  async deleteVehicle(id: string, franchiseCity?: string | null) {
+  async deleteVehicle(id: string, franchiseCity?: any) {
     await this.assertVehicleInCity(id, franchiseCity);
     const vehicle = await this.vehicleModel.findByIdAndUpdate(id, { isDeleted: true }, { new: true });
     if (!vehicle) throw new NotFoundException('Vehicle not found');
@@ -1148,13 +1179,13 @@ export class AdminService {
     return { message: 'City created', data: city };
   }
 
-  async getCities(query: any, franchiseCity?: string | null) {
+  async getCities(query: any, franchiseCity?: any) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
     if (query.search) filter.name = new RegExp(query.search, 'i');
     if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
-    // A franchise only sees its own city in the Cities list.
-    if (franchiseCity) filter.name = this.cityRx(franchiseCity);
+    // A franchise only sees cities within its scope (its cities and/or whole states).
+    if (franchiseCity) Object.assign(filter, this.cityDocScopeMatch(franchiseCity) || {});
 
     const [cities, total] = await Promise.all([
       this.cityModel.find(filter).sort({ sortOrder: 1, name: 1 }).skip(skip).limit(limit).lean(),
@@ -1177,7 +1208,7 @@ export class AdminService {
    * managed cities list), grouped by a normalized city key so "Rajkot" and
    * "rajkot " collapse together, then ranked by total activity.
    */
-  async getCityInsights(query?: any, franchiseCity?: string | null) {
+  async getCityInsights(query?: any, franchiseCity?: any) {
     // Group requirements by their clean pickup city (fallback to the raw city).
     const cityKey = { $toLower: { $trim: { input: { $ifNull: ['$pickupCityName', '$pickupCity'] } } } };
 
@@ -1190,14 +1221,16 @@ export class AdminService {
     // matches. This collapses the insights to a single-city view for the franchise.
     const reqMatch: any = { isDeleted: { $ne: true } };
     if (franchiseCity) {
-      reqMatch.$or = [
-        { pickupCityName: this.cityRx(franchiseCity) },
-        { pickupCity: this.cityRx(franchiseCity) },
-      ];
+      const cityRxs = this.rxList(franchiseCity.cities);
+      const stateRxs = this.rxList(franchiseCity.states);
+      const or: any[] = [];
+      if (cityRxs.length) or.push({ pickupCityName: { $in: cityRxs } }, { pickupCity: { $in: cityRxs } });
+      if (stateRxs.length) or.push({ pickupState: { $in: stateRxs } });
+      reqMatch.$or = or.length ? or : [{ _id: null }]; // empty scope → match nothing
     }
     if (cr) reqMatch.createdAt = cr;
     const userMatch: any = { role: { $nin: ['admin', 'super_admin'] }, city: { $nin: [null, ''] } };
-    if (franchiseCity) userMatch.city = this.cityRx(franchiseCity);
+    if (franchiseCity) Object.assign(userMatch, this.userScopeMatch(franchiseCity) || {});
     if (cr) userMatch.createdAt = cr;
 
     const [reqAgg, userAgg] = await Promise.all([
@@ -1288,7 +1321,7 @@ export class AdminService {
   }
 
   // Reports
-  async getReports(query: any, franchiseCity?: string | null) {
+  async getReports(query: any, franchiseCity?: any) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
     if (query.status) filter.status = query.status;
@@ -1326,7 +1359,7 @@ export class AdminService {
     return { message: 'Reports retrieved', data: buildPaginatedResult(reports, total, page, limit) };
   }
 
-  async resolveReport(id: string, adminId: string, action: string, notes?: string, franchiseCity?: string | null) {
+  async resolveReport(id: string, adminId: string, action: string, notes?: string, franchiseCity?: any) {
     if (franchiseCity) {
       const existing = await this.reportModel.findById(id).select('reportedBy').lean();
       if (!existing) throw new NotFoundException('Report not found');
@@ -1441,7 +1474,7 @@ export class AdminService {
     };
   }
 
-  async getAnalytics(query: any, franchiseCity?: string | null) {
+  async getAnalytics(query: any, franchiseCity?: any) {
     // Prefer an explicit period filter (dateFrom/dateTo from the page's Period
     // filter); otherwise fall back to the legacy `period` window (used by the
     // dashboard charts, which still pass period=month).
@@ -1470,7 +1503,7 @@ export class AdminService {
 
     // Franchise scoping: users by city, requirements/revenue by this city's users.
     const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
-    const uCity: any = franchiseCity ? { city: this.cityRx(franchiseCity) } : {};
+    const uCity: any = franchiseCity ? { _id: { $in: ids } } : {};
     const owner: any = ids ? { postedBy: { $in: ids } } : {};
 
     const [userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown] = await Promise.all([
@@ -1574,7 +1607,7 @@ export class AdminService {
   }
 
   // Combined transaction history: subscription payments + wallet top-ups.
-  async getUserRequirements(userId: string, franchiseCity?: string | null) {
+  async getUserRequirements(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const requirements = await this.requirementModel
       .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
@@ -1584,7 +1617,7 @@ export class AdminService {
     return { message: 'User requirements retrieved', data: requirements };
   }
 
-  async getUserVehicles(userId: string, franchiseCity?: string | null) {
+  async getUserVehicles(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const vehicles = await this.vehicleModel
       .find({ postedBy: new Types.ObjectId(userId), isDeleted: false })
@@ -1594,7 +1627,7 @@ export class AdminService {
     return { message: 'User vehicles retrieved', data: vehicles };
   }
 
-  async getUserPayments(userId: string, franchiseCity?: string | null) {
+  async getUserPayments(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     // Subscription/plan payments
     const payments = await this.paymentModel
@@ -1658,7 +1691,7 @@ export class AdminService {
     return { message: 'User payments retrieved', data: unified };
   }
 
-  async getUserWithdrawals(userId: string, franchiseCity?: string | null) {
+  async getUserWithdrawals(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const withdrawals = await this.withdrawalModel
       .find({ userId: new Types.ObjectId(userId) })
@@ -1668,7 +1701,7 @@ export class AdminService {
     return { message: 'User withdrawals retrieved', data: withdrawals };
   }
 
-  async getUserReviews(userId: string, franchiseCity?: string | null) {
+  async getUserReviews(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     // Match by string form so it works whether ratedUser was stored as an ObjectId
     // or a plain string (legacy/seeded data).
@@ -1681,7 +1714,7 @@ export class AdminService {
     return { message: 'User reviews retrieved', data: reviews };
   }
 
-  async updateReview(id: string, data: { stars?: number; review?: string }, franchiseCity?: string | null) {
+  async updateReview(id: string, data: { stars?: number; review?: string }, franchiseCity?: any) {
     if (franchiseCity) {
       const existing = await this.ratingModel.findById(id).select('ratedUser').lean();
       if (!existing) throw new NotFoundException('Review not found');
@@ -1703,7 +1736,7 @@ export class AdminService {
     return { message: 'Review updated', data: rating };
   }
 
-  async deleteReview(id: string, franchiseCity?: string | null) {
+  async deleteReview(id: string, franchiseCity?: any) {
     if (franchiseCity) {
       const existing = await this.ratingModel.findById(id).select('ratedUser').lean();
       if (!existing) throw new NotFoundException('Review not found');
@@ -1723,7 +1756,7 @@ export class AdminService {
     return { message: 'Review deleted' };
   }
 
-  async getUserSubscriptions(userId: string, franchiseCity?: string | null) {
+  async getUserSubscriptions(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const subscriptions = await this.subscriptionModel
       .find({ userId: new Types.ObjectId(userId) })
@@ -1734,7 +1767,7 @@ export class AdminService {
     return { message: 'User subscriptions retrieved', data: subscriptions };
   }
 
-  async cancelSubscription(subscriptionId: string, franchiseCity?: string | null) {
+  async cancelSubscription(subscriptionId: string, franchiseCity?: any) {
     if (franchiseCity) {
       const existing = await this.subscriptionModel.findById(subscriptionId).select('userId').lean();
       if (!existing) throw new NotFoundException('Subscription not found');
@@ -1763,7 +1796,7 @@ export class AdminService {
     return { message: 'Plan expired', data: sub };
   }
 
-  async updateSubscriptionEndDate(subscriptionId: string, endDate: string, franchiseCity?: string | null) {
+  async updateSubscriptionEndDate(subscriptionId: string, endDate: string, franchiseCity?: any) {
     if (franchiseCity) {
       const existing = await this.subscriptionModel.findById(subscriptionId).select('userId').lean();
       if (!existing) throw new NotFoundException('Subscription not found');
@@ -1791,7 +1824,7 @@ export class AdminService {
     return { message: 'Subscription end date updated', data: sub };
   }
 
-  async updateUserReferralCount(userId: string, delta: number, franchiseCity?: string | null) {
+  async updateUserReferralCount(userId: string, delta: number, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
     const user = await this.userModel.findByIdAndUpdate(
@@ -1803,7 +1836,7 @@ export class AdminService {
     return { message: `Referral count updated by ${delta}`, data: user };
   }
 
-  async getPayments(query: any, franchiseCity?: string | null) {
+  async getPayments(query: any, franchiseCity?: any) {
     const { page, limit } = getPaginationParams(query);
     const search = (query.search || '').trim();
     const rx = search ? new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') : null;

@@ -67,7 +67,14 @@ export default function FranchisesPage() {
                 <tr key={f._id} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{f.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{f.phone}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{f.city || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                    {(() => {
+                      const cities: string[] = (f as any).cities?.length ? (f as any).cities : (f.city ? [f.city] : []);
+                      const states: string[] = (f as any).states || [];
+                      const parts = [...cities, ...states.map((s) => `${s} (whole state)`)];
+                      return parts.length ? parts.join(', ') : '—';
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{f.agencyName || '—'}</td>
                   <td className="px-4 py-3 text-right text-gray-900 dark:text-white">{f.commissionPercent ?? 0}%</td>
                   <td className="px-4 py-3 text-gray-500">{f.payoutAccounts?.length ?? 0}</td>

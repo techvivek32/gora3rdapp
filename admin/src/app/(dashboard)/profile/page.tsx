@@ -244,8 +244,8 @@ function FranchiseProfile() {
           <Info label="Phone" value={f.phone} mono />
           <Info label="Email" value={f.email || '—'} />
           <Info label="Date of Birth" value={dob} />
-          <Info label="City" value={f.city || '—'} />
-          <Info label="State" value={f.state || '—'} />
+          <Info label="Cities" value={((f as any).cities?.length ? (f as any).cities : (f.city ? [f.city] : [])).join(', ') || '—'} />
+          <Info label="Whole States" value={((f as any).states?.length ? (f as any).states : (f.state ? [f.state] : [])).join(', ') || '—'} />
           <Info label="Commission" value={`${f.commissionPercent ?? 0}%`} />
         </div>
       </div>

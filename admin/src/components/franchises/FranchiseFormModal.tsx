@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { X, Trash2, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { CityAutocomplete } from '@/components/ui/CityAutocomplete';
+import { CityMultiSelect } from '@/components/ui/CityMultiSelect';
 
 export interface DocEntry { number?: string; frontImage?: string; backImage?: string }
 export interface Payout {
@@ -23,6 +23,8 @@ export interface Franchise {
   dob?: string;
   city?: string;
   state?: string;
+  cities?: string[];
+  states?: string[];
   email?: string;
   phone: string;
   whatsappNumber?: string;
@@ -36,13 +38,23 @@ export interface Franchise {
 
 interface FormState {
   _id?: string;
-  name: string; dob: string; city: string; state: string; email: string;
+  name: string; dob: string; cities: string[]; states: string[]; email: string;
   phone: string; whatsappNumber: string; agencyName: string; password: string;
   commissionPercent: number;
   documents: Record<string, DocEntry>;
   payoutAccounts: Payout[];
   isActive: boolean;
 }
+
+// All Indian states + union territories, for the "whole state" picker.
+const INDIAN_STATES = [
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat',
+  'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh',
+  'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan',
+  'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi',
+  'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry',
+];
 
 export const FRANCHISE_DOCS = [
   { key: 'aadhar', label: 'Aadhaar' },
@@ -56,11 +68,14 @@ const labelCls = 'block text-xs font-medium text-gray-600 dark:text-gray-400 mb-
 
 function fromFranchise(f?: Franchise): FormState {
   if (!f) {
-    return { name: '', dob: '', city: '', state: '', email: '', phone: '', whatsappNumber: '', agencyName: '', password: '', commissionPercent: 0, documents: {}, payoutAccounts: [], isActive: true };
+    return { name: '', dob: '', cities: [], states: [], email: '', phone: '', whatsappNumber: '', agencyName: '', password: '', commissionPercent: 0, documents: {}, payoutAccounts: [], isActive: true };
   }
+  // Fall back to the legacy single city/state so existing franchises open pre-filled.
+  const cities = f.cities?.length ? f.cities : (f.city ? [f.city] : []);
+  const states = f.states?.length ? f.states : (f.state ? [f.state] : []);
   return {
     _id: f._id,
-    name: f.name, dob: f.dob ? String(f.dob).slice(0, 10) : '', city: f.city ?? '', state: f.state ?? '',
+    name: f.name, dob: f.dob ? String(f.dob).slice(0, 10) : '', cities, states,
     email: f.email ?? '', phone: f.phone, whatsappNumber: f.whatsappNumber ?? '', agencyName: f.agencyName ?? '', password: '',
     commissionPercent: f.commissionPercent ?? 0,
     documents: f.documents ?? {}, payoutAccounts: f.payoutAccounts ?? [], isActive: f.isActive,
@@ -71,11 +86,19 @@ function fromFranchise(f?: Franchise): FormState {
 export function FranchiseFormModal({ franchise, onClose, onSaved }: { franchise?: Franchise; onClose: () => void; onSaved: () => void }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<FormState>(() => fromFranchise(franchise));
+  // Coverage is either specific cities OR whole state(s). Default to whichever the
+  // franchise already uses (state mode only when it has states and no cities).
+  const [coverageMode, setCoverageMode] = useState<'city' | 'state'>(() =>
+    franchise?.states?.length && !(franchise?.cities?.length || franchise?.city) ? 'state' : 'city',
+  );
 
   const save = useMutation({
     mutationFn: () => {
       const { _id, ...rest } = form;
       const payload: any = { ...rest };
+      // Keep the legacy single city/state in sync (used for list display + fallback).
+      payload.city = form.cities[0] || '';
+      payload.state = form.states[0] || '';
       if (!payload.password) delete payload.password;
       if (!payload.dob) delete payload.dob;
       return _id ? adminApi.updateFranchise(_id, payload) : adminApi.createFranchise(payload);
@@ -95,7 +118,8 @@ export function FranchiseFormModal({ franchise, onClose, onSaved }: { franchise?
   const setPayout = (i: number, patch: Partial<Payout>) => setForm((f) => ({ ...f, payoutAccounts: f.payoutAccounts.map((p, idx) => idx === i ? { ...p, ...patch } : p) }));
   const removePayout = (i: number) => setForm((f) => ({ ...f, payoutAccounts: f.payoutAccounts.filter((_, idx) => idx !== i) }));
 
-  const canSave = form.name.trim() && form.phone.trim() && (!!form._id || form.password.trim());
+  const canSave = form.name.trim() && form.phone.trim() && (!!form._id || form.password.trim())
+    && (form.cities.length > 0 || form.states.length > 0);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -112,17 +136,73 @@ export function FranchiseFormModal({ franchise, onClose, onSaved }: { franchise?
             <div><label className={labelCls}>Phone *</label><input className={inputCls} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
             <div><label className={labelCls}>WhatsApp Number</label><input className={inputCls} value={form.whatsappNumber} onChange={(e) => setForm({ ...form, whatsappNumber: e.target.value })} placeholder="Shown to users in this city" /></div>
             <div><label className={labelCls}>Email</label><input type="email" className={inputCls} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-            <div>
-              <label className={labelCls}>City</label>
-              <CityAutocomplete
-                inputCls={inputCls}
-                value={form.city}
-                placeholder="Start typing a city…"
-                onChange={(city, state) => setForm((prev) => ({ ...prev, city, ...(state ? { state } : {}) }))}
-              />
-            </div>
-            <div><label className={labelCls}>State</label><input className={inputCls} value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} /></div>
             <div><label className={labelCls}>Agency Name</label><input className={inputCls} value={form.agencyName} onChange={(e) => setForm({ ...form, agencyName: e.target.value })} /></div>
+          </div>
+
+          {/* Coverage — choose how this franchise is scoped: specific cities OR
+              whole state(s). Switching the mode clears the other so it stays one
+              clean choice. */}
+          <div>
+            <label className={labelCls}>Coverage *</label>
+            <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 mb-3">
+              <button
+                type="button"
+                onClick={() => { setCoverageMode('city'); setForm((prev) => ({ ...prev, states: [] })); }}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${coverageMode === 'city' ? 'bg-orange-500 text-white' : 'text-gray-600 dark:text-gray-300'}`}
+              >
+                Specific Cities
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCoverageMode('state'); setForm((prev) => ({ ...prev, cities: [] })); }}
+                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${coverageMode === 'state' ? 'bg-orange-500 text-white' : 'text-gray-600 dark:text-gray-300'}`}
+              >
+                Whole State(s)
+              </button>
+            </div>
+
+            {coverageMode === 'city' ? (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Add one or more cities this franchise covers.</p>
+                <CityMultiSelect
+                  value={form.cities}
+                  placeholder="Type a city, e.g. Raj…"
+                  onChange={(cities) => setForm((prev) => ({ ...prev, cities }))}
+                />
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Pick whole state(s) — every city in them is covered automatically.</p>
+                <select
+                  className={inputCls}
+                  value=""
+                  onChange={(e) => {
+                    const s = e.target.value;
+                    if (s && !form.states.includes(s)) setForm((prev) => ({ ...prev, states: [...prev.states, s] }));
+                  }}
+                >
+                  <option value="">Add a whole state…</option>
+                  {INDIAN_STATES.filter((s) => !form.states.includes(s)).map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+                {form.states.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {form.states.map((s) => (
+                      <span key={s} className="inline-flex items-center gap-1 pl-3 pr-2 py-1 rounded-full text-sm bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-500/10 dark:text-orange-300 dark:border-orange-500/30">
+                        {s}
+                        <button type="button" onClick={() => setForm((prev) => ({ ...prev, states: prev.states.filter((x) => x !== s) }))} aria-label={`Remove ${s}`} className="hover:text-orange-900 dark:hover:text-white">
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>{form._id ? 'New Password (leave blank to keep)' : 'Password *'}</label>
               <input type="password" className={inputCls} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={form._id ? '••••••' : ''} />

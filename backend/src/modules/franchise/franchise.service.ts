@@ -7,7 +7,7 @@ import { dateRangeFilter } from '../../common/utils/pagination.util';
 
 // Fields the admin form may send. Password handled separately (hashed).
 const ASSIGNABLE = [
-  'name', 'dob', 'city', 'state', 'email', 'phone', 'whatsappNumber', 'agencyName',
+  'name', 'dob', 'city', 'state', 'cities', 'states', 'email', 'phone', 'whatsappNumber', 'agencyName',
   'commissionPercent', 'documents', 'payoutAccounts', 'isActive',
 ];
 

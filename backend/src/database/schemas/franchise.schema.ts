@@ -37,6 +37,14 @@ export class Franchise {
   @Prop({ trim: true })
   state: string;
 
+  /** Explicit cities this franchise covers (in addition to legacy single `city`). */
+  @Prop({ type: [String], default: [] })
+  cities: string[];
+
+  /** Whole states this franchise covers — every city in these states is included. */
+  @Prop({ type: [String], default: [] })
+  states: string[];
+
   @Prop({ trim: true, lowercase: true })
   email: string;
 

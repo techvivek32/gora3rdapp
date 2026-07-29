@@ -35,10 +35,21 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         email: payload.email,
         role: 'franchise',
         type: 'franchise',
-        // City the franchise is scoped to — every list/detail endpoint filters by this.
-        // A franchise with no city configured must see NOTHING (never everything), so
-        // fall back to a sentinel that matches no real city instead of an empty value.
-        franchiseCity: (franchise.city || '').trim() || '__no_city__',
+        // Scope the franchise is restricted to — every list/detail endpoint filters
+        // by this. Despite the legacy name it is a SCOPE OBJECT: the franchise's
+        // explicit cities (plus its legacy single `city`) and any whole states it
+        // covers. A franchise with an empty scope sees NOTHING (never everything).
+        franchiseCity: {
+          cities: [
+            ...((franchise as any).cities || []),
+            ...(franchise.city ? [franchise.city] : []),
+          ]
+            .map((c: string) => (c || '').trim())
+            .filter(Boolean),
+          states: [...((franchise as any).states || [])]
+            .map((s: string) => (s || '').trim())
+            .filter(Boolean),
+        },
         franchiseId: payload.sub,
       };
     }

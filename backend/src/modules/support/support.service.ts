@@ -35,23 +35,41 @@ export class SupportService {
   }
 
   // ─── Franchise city-scoping helpers (see AdminService for the rationale) ──────
+  // `franchiseCity` is a SCOPE OBJECT `{ cities, states }` (from the JWT).
   private cityRx(city: string) {
     return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
   }
-  private cityMatches(a?: string | null, b?: string | null) {
-    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  private rxList(vals?: string[]): RegExp[] {
+    return (vals || []).map((v) => (v || '').trim()).filter(Boolean).map((v) => this.cityRx(v));
   }
-  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+  private userInScope(user: any, scope?: any): boolean {
+    if (!scope) return true;
+    const city = (user?.city || '').trim().toLowerCase();
+    const state = (user?.state || '').trim().toLowerCase();
+    const inCity = !!city && (scope.cities || []).some((c: string) => (c || '').trim().toLowerCase() === city);
+    const inState = !!state && (scope.states || []).some((s: string) => (s || '').trim().toLowerCase() === state);
+    return inCity || inState;
+  }
+  /** $match on joined `user.city`/`user.state` for conversations within the scope. */
+  private convScopeMatch(scope: any): Record<string, any> {
+    const cityRxs = this.rxList(scope?.cities);
+    const stateRxs = this.rxList(scope?.states);
+    const or: any[] = [];
+    if (cityRxs.length) or.push({ 'user.city': { $in: cityRxs } });
+    if (stateRxs.length) or.push({ 'user.state': { $in: stateRxs } });
+    return or.length ? { $or: or } : { _id: null };
+  }
+  private async assertUserInCity(userId: string, franchiseCity?: any) {
     if (!franchiseCity) return;
     if (!Types.ObjectId.isValid(userId)) throw new BadRequestException('Not found');
-    const u = await this.userModel.findById(userId).select('city').lean();
-    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+    const u = await this.userModel.findById(userId).select('city state').lean();
+    if (!u || !this.userInScope(u, franchiseCity)) {
       throw new BadRequestException('Not found');
     }
   }
 
   // ─── Admin side ────────────────────────────────────────────────────────────
-  async getConversations(franchiseCity?: string | null) {
+  async getConversations(franchiseCity?: any) {
     const rows = await this.msgModel.aggregate([
       { $sort: { createdAt: -1 } },
       {
@@ -69,7 +87,7 @@ export class SupportService {
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
       { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
       // Franchise: keep only conversations with users in their city.
-      ...(franchiseCity ? [{ $match: { 'user.city': this.cityRx(franchiseCity) } }] : []),
+      ...(franchiseCity ? [{ $match: this.convScopeMatch(franchiseCity) }] : []),
       {
         $project: {
           _id: 0,
@@ -87,7 +105,7 @@ export class SupportService {
     return { message: 'Conversations retrieved', data: rows };
   }
 
-  async getConversation(userId: string, franchiseCity?: string | null) {
+  async getConversation(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const uid = new Types.ObjectId(userId);
     // Admin is viewing → mark the user's messages as read.
@@ -99,7 +117,7 @@ export class SupportService {
     return { message: 'Conversation retrieved', data: { user, messages } };
   }
 
-  async adminReply(userId: string, text: string, franchiseCity?: string | null) {
+  async adminReply(userId: string, text: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const clean = (text || '').trim();
     if (!clean) throw new BadRequestException('Reply cannot be empty');

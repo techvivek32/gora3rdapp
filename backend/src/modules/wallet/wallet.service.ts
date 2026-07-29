@@ -23,24 +23,45 @@ export class WalletService {
     private settingsService: SettingsService,
   ) {}
 
-  // ─── Franchise city-scoping helpers (see AdminService for the rationale) ──────
+  // ─── Franchise scoping helpers (see AdminService for the rationale) ──────────
+  // `franchiseCity` is a SCOPE OBJECT `{ cities, states }` (from the JWT), matching
+  // users whose city OR state falls within it. Empty scope matches nothing.
   private cityRx(city: string) {
     return new RegExp(`^${city.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
   }
-  private cityMatches(a?: string | null, b?: string | null) {
-    return (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+  private rxList(vals?: string[]): RegExp[] {
+    return (vals || []).map((v) => (v || '').trim()).filter(Boolean).map((v) => this.cityRx(v));
   }
-  /** Throws unless the target user is in the franchise's city. No-op for admins. */
-  private async assertUserInCity(userId: string, franchiseCity?: string | null) {
+  private userScopeMatch(scope?: any): Record<string, any> | null {
+    if (!scope) return null;
+    const cityRxs = this.rxList(scope.cities);
+    const stateRxs = this.rxList(scope.states);
+    const or: any[] = [];
+    if (cityRxs.length) or.push({ city: { $in: cityRxs } });
+    if (stateRxs.length) or.push({ state: { $in: stateRxs } });
+    return or.length ? { $or: or } : { _id: { $in: [] } };
+  }
+  private userInScope(user: any, scope?: any): boolean {
+    if (!scope) return true;
+    const city = (user?.city || '').trim().toLowerCase();
+    const state = (user?.state || '').trim().toLowerCase();
+    const inCity = !!city && (scope.cities || []).some((c: string) => (c || '').trim().toLowerCase() === city);
+    const inState = !!state && (scope.states || []).some((s: string) => (s || '').trim().toLowerCase() === state);
+    return inCity || inState;
+  }
+  /** Throws unless the target user is in the franchise's scope. No-op for admins. */
+  private async assertUserInCity(userId: string, franchiseCity?: any) {
     if (!franchiseCity) return;
     if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('Not found');
-    const u = await this.userModel.findById(userId).select('city').lean();
-    if (!u || !this.cityMatches((u as any).city, franchiseCity)) {
+    const u = await this.userModel.findById(userId).select('city state').lean();
+    if (!u || !this.userInScope(u, franchiseCity)) {
       throw new NotFoundException('Not found');
     }
   }
-  private async cityUserIds(city: string): Promise<Types.ObjectId[]> {
-    const rows = await this.userModel.find({ city: this.cityRx(city) }).select('_id').lean();
+  private async cityUserIds(scope?: any): Promise<Types.ObjectId[]> {
+    const cond = this.userScopeMatch(scope);
+    if (!cond) return [];
+    const rows = await this.userModel.find(cond).select('_id').lean();
     return rows.map((r) => r._id as Types.ObjectId);
   }
 
@@ -54,7 +75,7 @@ export class WalletService {
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
-  async getWallet(userId: string, franchiseCity?: string | null) {
+  async getWallet(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select('walletBalance').lean(),
@@ -148,13 +169,13 @@ export class WalletService {
   // ─── Admin ───────────────────────────────────────────────────────────────
 
   /** Paginated list of users with their wallet balance (admin wallet management). */
-  async getAllWalletsForAdmin(query: { page?: number; limit?: number; search?: string }, franchiseCity?: string | null) {
+  async getAllWalletsForAdmin(query: { page?: number; limit?: number; search?: string }, franchiseCity?: any) {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
     const skip = (page - 1) * limit;
 
     const filter: Record<string, unknown> = {};
-    if (franchiseCity) filter.city = this.cityRx(franchiseCity);
+    if (franchiseCity) filter._id = { $in: await this.cityUserIds(franchiseCity) };
     const search = (query.search || '').trim();
     if (search) {
       const rx = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
@@ -184,7 +205,7 @@ export class WalletService {
   }
 
   /** Manually add (credit) or cut (debit) a user's wallet balance with a reason. */
-  async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto, franchiseCity?: string | null) {
+  async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
     if (amount < 1) throw new BadRequestException('Enter a valid amount');
@@ -276,7 +297,7 @@ export class WalletService {
 
   /** Send money from the current user's wallet to another user, found by mobile.
    *  Fails (without moving anything) when the sender's balance is short. */
-  async transferFunds(userId: string, dto: TransferFundsDto, franchiseCity?: string | null) {
+  async transferFunds(userId: string, dto: TransferFundsDto, franchiseCity?: any) {
     // The sender (:id) must be in the franchise's city. The recipient may be anywhere.
     await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
@@ -349,7 +370,7 @@ export class WalletService {
   }
 
   /** Admin: list withdrawal requests (optionally filtered by status). */
-  async getWithdrawals(query: any = {}, franchiseCity?: string | null) {
+  async getWithdrawals(query: any = {}, franchiseCity?: any) {
     const status = typeof query === 'string' ? query : query?.status;
     const filter: any = { ...dateRangeFilter(query) };
     if (status && ['pending', 'approved', 'rejected'].includes(status)) filter.status = status;
@@ -379,7 +400,7 @@ export class WalletService {
   }
 
   /** Admin: approve a pending withdrawal (amount was already debited). */
-  async approveWithdrawal(adminId: string, id: string, franchiseCity?: string | null) {
+  async approveWithdrawal(adminId: string, id: string, franchiseCity?: any) {
     const request = await this.withdrawalModel.findById(id);
     if (!request) throw new NotFoundException('Withdrawal request not found');
     await this.assertUserInCity(request.userId.toString(), franchiseCity);
@@ -394,7 +415,7 @@ export class WalletService {
   }
 
   /** Admin: reject a pending withdrawal and refund the held amount. */
-  async rejectWithdrawal(adminId: string, id: string, dto: RejectWithdrawalDto, franchiseCity?: string | null) {
+  async rejectWithdrawal(adminId: string, id: string, dto: RejectWithdrawalDto, franchiseCity?: any) {
     const request = await this.withdrawalModel.findById(id);
     if (!request) throw new NotFoundException('Withdrawal request not found');
     await this.assertUserInCity(request.userId.toString(), franchiseCity);
