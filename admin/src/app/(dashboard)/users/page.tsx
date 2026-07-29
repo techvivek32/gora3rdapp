@@ -7,12 +7,11 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
 import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
-import { Search, Download, Shield, Eye } from 'lucide-react';
+import { Search, Shield, Eye } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface User {
@@ -159,10 +158,6 @@ function UsersPageInner() {
         </div>
         <div className="flex items-center gap-2">
           <PeriodFilter onChange={setRange} />
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
         </div>
       </div>
 

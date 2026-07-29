@@ -16,7 +16,7 @@ export function UserGrowthChart({ range }: { range?: { dateFrom?: string; dateTo
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
       <div className="mb-6">
         <h3 className="font-semibold text-gray-900 dark:text-white">User Growth</h3>
-        <p className="text-sm text-gray-500">Daily registrations (30 days)</p>
+        <p className="text-sm text-gray-500">{range?.dateFrom ? 'Daily registrations (selected period)' : 'Daily registrations (30 days)'}</p>
       </div>
       <ResponsiveContainer width="100%" height={200}>
         <BarChart data={userGrowth} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>

@@ -18,7 +18,7 @@ export function RevenueChart({ range }: { range?: { dateFrom?: string; dateTo?: 
       <div className="flex items-center justify-between mb-6">
         <div>
           <h3 className="font-semibold text-gray-900 dark:text-white">Revenue</h3>
-          <p className="text-sm text-gray-500">Last 30 days</p>
+          <p className="text-sm text-gray-500">{range?.dateFrom ? 'Selected period' : 'Last 30 days'}</p>
         </div>
         <div className="flex items-center gap-1 bg-orange-50 dark:bg-orange-900/20 text-orange-600 px-3 py-1.5 rounded-lg text-sm font-medium">
           <IndianRupee className="w-3.5 h-3.5" />

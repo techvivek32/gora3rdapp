@@ -333,10 +333,9 @@ export class AdminService {
     const todayStart = new Date(now.setHours(0, 0, 0, 0));
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Period filter (year/month/week): when set, the "volume" cards (total users /
-    // requirements / vehicles / revenue) count only what was created in the window.
-    // Current-state cards (active/verified/premium, pending reports/verifications,
-    // today) are left as-is — a time window doesn't change "how many are pending now".
+    // Period filter (year/month/week): when set, EVERY card is scoped to records
+    // created in the window, so the whole dashboard reflects the chosen period
+    // consistently. Only the explicit "today" change-labels stay pinned to today.
     const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
     const created = range.createdAt;
     const cr: any = created ? { createdAt: created } : {};
@@ -358,24 +357,24 @@ export class AdminService {
       pendingVerifications,
     ] = await Promise.all([
       this.userModel.countDocuments({ isActive: true, ...uCity, ...cr }),
-      this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, ...uCity }),
-      this.userModel.countDocuments({ isVerified: true, ...uCity }),
-      this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM, ...uCity }),
-      this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN, ...uCity }),
+      this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, ...uCity, ...cr }),
+      this.userModel.countDocuments({ isVerified: true, ...uCity, ...cr }),
+      this.userModel.countDocuments({ membershipType: MembershipType.PREMIUM, ...uCity, ...cr }),
+      this.userModel.countDocuments({ membershipType: MembershipType.GOLDEN, ...uCity, ...cr }),
       this.requirementModel.countDocuments({ isDeleted: false, ...owner, ...cr }),
-      this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false, ...owner }),
+      this.requirementModel.countDocuments({ status: BookingStatus.ACTIVE, isDeleted: false, ...owner, ...cr }),
       this.vehicleModel.countDocuments({ isDeleted: false, ...owner, ...cr }),
-      this.vehicleModel.countDocuments({ status: 'available', isDeleted: false, ...owner }),
+      this.vehicleModel.countDocuments({ status: 'available', isDeleted: false, ...owner, ...cr }),
       // Franchise revenue = plan/subscription purchases only (no wallet top-ups).
       // When a period is selected, bound revenue to that window.
       this.razorpayRevenue(created?.$gte, ids, !!franchiseCity, created?.$lte),
       this.razorpayRevenue(monthStart, ids, !!franchiseCity),
-      this.reportModel.countDocuments({ status: ReportStatus.PENDING, ...reportOwner }),
+      this.reportModel.countDocuments({ status: ReportStatus.PENDING, ...reportOwner, ...cr }),
       this.notificationsService ? 0 : 0,
       this.userModel.countDocuments({ createdAt: { $gte: todayStart }, ...uCity }),
       this.requirementModel.countDocuments({ createdAt: { $gte: todayStart }, ...owner }),
       // Matches the default filter on the Verification Requests page.
-      this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING, ...uCity }),
+      this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING, ...uCity, ...cr }),
     ]);
 
     return {
@@ -1446,12 +1445,28 @@ export class AdminService {
     // Prefer an explicit period filter (dateFrom/dateTo from the page's Period
     // filter); otherwise fall back to the legacy `period` window (used by the
     // dashboard charts, which still pass period=month).
-    const period = (query?.period as string) || 'month';
-    const days = period === 'week' ? 7 : period === 'year' ? 365 : 30;
+    // Window resolution:
+    //  - explicit dateFrom/dateTo (page Period filter) → that exact window
+    //  - legacy `period` only (dashboard charts pass period=month) → last N days
+    //  - neither (page "All time") → NO date bound, i.e. truly all-time
+    const period = query?.period as string | undefined;
+    const hasExplicit = !!(query?.dateFrom || query?.dateTo || query?.from || query?.to);
     const range = dateRangeFilter(query || {}) as { createdAt?: { $gte?: Date; $lte?: Date } };
-    const startDate = range.createdAt?.$gte ?? new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const endDate = range.createdAt?.$lte;
-    const createdWindow: any = endDate ? { $gte: startDate, $lte: endDate } : { $gte: startDate };
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+    if (hasExplicit) {
+      startDate = range.createdAt?.$gte;
+      endDate = range.createdAt?.$lte;
+    } else if (period) {
+      const days = period === 'week' ? 7 : period === 'year' ? 365 : 30;
+      startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    }
+    const createdWindow: any =
+      startDate || endDate
+        ? { ...(startDate ? { $gte: startDate } : {}), ...(endDate ? { $lte: endDate } : {}) }
+        : null;
+    // Spread into a $match to bound by creation date (empty = all-time).
+    const dateMatch: any = createdWindow ? { createdAt: createdWindow } : {};
 
     // Franchise scoping: users by city, requirements/revenue by this city's users.
     const ids = franchiseCity ? await this.cityUserIds(franchiseCity) : null;
@@ -1460,25 +1475,25 @@ export class AdminService {
 
     const [userGrowth, requirementGrowth, revenueData, topCities, membershipBreakdown] = await Promise.all([
       this.userModel.aggregate([
-        { $match: { createdAt: createdWindow, ...uCity } },
+        { $match: { ...dateMatch, ...uCity } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
       this.requirementModel.aggregate([
-        { $match: { createdAt: createdWindow, isDeleted: false, ...owner } },
+        { $match: { ...dateMatch, isDeleted: false, ...owner } },
         { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
       // Franchise revenue chart = plan/subscription purchases only (matches the card).
-      this.razorpayDailyRevenue(startDate, ids, !!franchiseCity, endDate),
+      this.razorpayDailyRevenue(startDate ?? new Date(0), ids, !!franchiseCity, endDate),
       this.requirementModel.aggregate([
-        { $match: { isDeleted: false, ...owner } },
+        { $match: { isDeleted: false, ...owner, ...dateMatch } },
         { $group: { _id: '$pickupCity', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
         { $limit: 10 },
       ]),
       this.userModel.aggregate([
-        { $match: { ...uCity } },
+        { $match: { ...uCity, ...dateMatch } },
         { $group: { _id: '$membershipType', count: { $sum: 1 } } },
       ]),
     ]);
