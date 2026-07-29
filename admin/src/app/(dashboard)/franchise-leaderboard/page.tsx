@@ -29,7 +29,6 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'revenue', label: 'Revenue' },
   { key: 'users', label: 'Users' },
   { key: 'requirements', label: 'Requirements' },
-  { key: 'vehicles', label: 'Available' },
   { key: 'drivers', label: 'Drivers' },
   { key: 'agencies', label: 'Agencies' },
 ];
@@ -141,7 +140,6 @@ export default function FranchiseLeaderboardPage() {
                 <th className="px-4 py-3 font-medium text-right">Drivers</th>
                 <th className="px-4 py-3 font-medium text-right">Agencies</th>
                 <th className="px-4 py-3 font-medium text-right">Requirements</th>
-                <th className="px-4 py-3 font-medium text-right">Available</th>
                 <th className="px-4 py-3 font-medium text-right">Revenue</th>
               </tr>
             </thead>
@@ -178,7 +176,6 @@ export default function FranchiseLeaderboardPage() {
                     <Cell value={r.drivers} active={sortKey === 'drivers'} />
                     <Cell value={r.agencies} active={sortKey === 'agencies'} />
                     <Cell value={r.requirements} active={sortKey === 'requirements'} />
-                    <Cell value={r.vehicles} active={sortKey === 'vehicles'} />
                     <td className={`px-4 py-3 text-right font-semibold ${sortKey === 'revenue' ? 'text-orange-500' : 'text-gray-900 dark:text-white'}`}>
                       ₹{r.revenue.toLocaleString('en-IN')}
                     </td>
