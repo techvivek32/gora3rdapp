@@ -1,12 +1,14 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Maximize2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import NotificationBell from './NotificationBell';
+import { useFullscreen } from './FullscreenContext';
 
 export default function Header() {
   const { data: session } = useSession();
+  const { toggleFullscreen } = useFullscreen();
   const [isDark, setIsDark] = useState(true);
 
   // Show the real role — a franchise session must not read "Super Admin".
@@ -40,6 +42,15 @@ export default function Header() {
 
       {/* Right */}
       <div className="flex items-center gap-3">
+        {/* Fullscreen Toggle — available on every page */}
+        <button
+          onClick={toggleFullscreen}
+          title="Fullscreen"
+          className="p-2 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          <Maximize2 className="w-5 h-5" />
+        </button>
+
         {/* Theme Toggle */}
         <button
           onClick={toggleTheme}

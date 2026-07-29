@@ -11,8 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { MembershipBadge } from '@/components/ui/MembershipBadge';
-import { useFullscreen } from '@/components/layout/DashboardShell';
-import { Search, Download, Shield, Eye, Maximize2, Minimize2 } from 'lucide-react';
+import { Search, Download, Shield, Eye } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface User {
@@ -34,7 +33,6 @@ interface User {
 }
 
 function UsersPageInner() {
-  const { fullscreen, toggleFullscreen } = useFullscreen();
   const params = useSearchParams();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -156,10 +154,6 @@ function UsersPageInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={toggleFullscreen}>
-            {fullscreen ? <Minimize2 className="w-4 h-4 mr-2" /> : <Maximize2 className="w-4 h-4 mr-2" />}
-            {fullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          </Button>
           <Button variant="outline" size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export

@@ -1,18 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Minimize2 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { FullscreenContext, useFullscreen } from './FullscreenContext';
 
-interface FullscreenCtx {
-  fullscreen: boolean;
-  toggleFullscreen: () => void;
-}
-
-const Ctx = createContext<FullscreenCtx>({ fullscreen: false, toggleFullscreen: () => {} });
-
-/** Lets any page hide the sidebar + header to use the full window. */
-export const useFullscreen = () => useContext(Ctx);
+// Re-exported so existing pages that import it from here keep working.
+export { useFullscreen };
 
 /**
  * Client shell around the dashboard chrome. The layout itself is a server
@@ -35,14 +30,31 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   }, [fullscreen]);
 
   return (
-    <Ctx.Provider value={{ fullscreen, toggleFullscreen }}>
+    <FullscreenContext.Provider value={{ fullscreen, toggleFullscreen }}>
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
         {!fullscreen && <Sidebar />}
         <div className="flex-1 flex flex-col overflow-hidden">
           {!fullscreen && <Header />}
+
+          {/* In fullscreen the full header is hidden; show a slim bar with just
+              the exit control. It occupies layout space (not an overlay), so it
+              never covers page buttons or table actions. Escape also works. */}
+          {fullscreen && (
+            <div className="flex-shrink-0 flex items-center justify-end h-11 px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+              <button
+                onClick={toggleFullscreen}
+                title="Exit Fullscreen (Esc)"
+                className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Minimize2 className="w-4 h-4" />
+                Exit Fullscreen
+              </button>
+            </div>
+          )}
+
           <main className="flex-1 overflow-y-auto p-6">{children}</main>
         </div>
       </div>
-    </Ctx.Provider>
+    </FullscreenContext.Provider>
   );
 }
