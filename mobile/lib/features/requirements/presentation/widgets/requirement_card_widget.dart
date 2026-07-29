@@ -303,7 +303,7 @@ class RequirementCardWidget extends StatelessWidget {
 
                               final fromCoord = requirement['pickupCoordinates'];
                               final dropCoord = requirement['dropCoordinates'];
-                              // The ROAD distance stored at creation (OSRM) is the source of
+                              // The ROAD distance stored at creation (Google Directions) is the source of
                               // truth — it matches Google Maps. Straight-line (haversine) badly
                               // underestimates (e.g. 96 vs 154 km on the road), so only fall back
                               // to it when no road distance was stored. Per-leg labels are
@@ -748,7 +748,7 @@ class RequirementCardWidget extends StatelessWidget {
   /// "154 KMs / 3 Hrs" — sums the pickup→stops→drop legs, falling back to the
   /// stored estimatedDistance when coordinates are missing.
   String? _routeSummary(dynamic from, List stops, dynamic to) {
-    // Prefer the stored road distance (OSRM, matches Google); only fall back to the
+    // Prefer the stored road distance (Google Directions); only fall back to the
     // straight-line sum when no road distance is available.
     final est = requirement['estimatedDistance'];
     final sum = (est is num && est > 0) ? est.toDouble() : _straightSumKm(from, stops, to);

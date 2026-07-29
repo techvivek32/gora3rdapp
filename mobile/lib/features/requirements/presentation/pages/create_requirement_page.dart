@@ -206,24 +206,41 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     ];
 
     double? routeKm;
+
+    // 1) Preferred: Google Directions via our backend proxy — this returns the
+    // SAME road distance Google Maps shows (OSRM routes a few % shorter, e.g.
+    // 214 vs 222 km). Points are sent as "lat,lng;lat,lng;..." in visit order.
     try {
-      // OSRM returns the total distance through all waypoints in order.
-      final coordStr = points.map((p) => '${p[1]},${p[0]}').join(';');
+      final pointsStr = points.map((p) => '${p[0]},${p[1]}').join(';');
       final res = await Dio().get(
-        // HTTPS, not HTTP: Android blocks cleartext by default, which silently made
-        // this fail and fall back to straight-line distance (e.g. 96 vs 154 km).
-        'https://router.project-osrm.org/route/v1/driving/$coordStr',
-        queryParameters: {'overview': 'false'},
-        options: Options(receiveTimeout: const Duration(seconds: 8)),
+        '${Env.apiBaseUrl}/places/route',
+        queryParameters: {'points': pointsStr},
+        options: Options(receiveTimeout: const Duration(seconds: 10)),
       );
-      final data = res.data as Map<String, dynamic>;
-      if (data['code'] == 'Ok') {
-        final routes = data['routes'] as List;
-        if (routes.isNotEmpty) {
-          routeKm = (routes[0]['distance'] as num).toDouble() / 1000.0;
-        }
-      }
+      final km = (res.data as Map<String, dynamic>)['data']?['distanceKm'];
+      if (km is num && km > 0) routeKm = km.toDouble();
     } catch (_) {}
+
+    // 2) Fallback: OSRM total distance through all waypoints in order.
+    if (routeKm == null) {
+      try {
+        final coordStr = points.map((p) => '${p[1]},${p[0]}').join(';');
+        final res = await Dio().get(
+          // HTTPS, not HTTP: Android blocks cleartext by default, which silently made
+          // this fail and fall back to straight-line distance (e.g. 96 vs 154 km).
+          'https://router.project-osrm.org/route/v1/driving/$coordStr',
+          queryParameters: {'overview': 'false'},
+          options: Options(receiveTimeout: const Duration(seconds: 8)),
+        );
+        final data = res.data as Map<String, dynamic>;
+        if (data['code'] == 'Ok') {
+          final routes = data['routes'] as List;
+          if (routes.isNotEmpty) {
+            routeKm = (routes[0]['distance'] as num).toDouble() / 1000.0;
+          }
+        }
+      } catch (_) {}
+    }
 
     // Fallback: sum straight-line distance between consecutive waypoints.
     double fallback = 0;

@@ -20,6 +20,12 @@ export class PlacesController {
     return this.placesService.autocomplete(input, '(cities)');
   }
 
+  @Get('route')
+  @ApiOperation({ summary: 'Google Directions driving distance through ordered points "lat,lng;lat,lng;..."' })
+  route(@Query('points') points: string) {
+    return this.placesService.route(points);
+  }
+
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
   @Get('details')
