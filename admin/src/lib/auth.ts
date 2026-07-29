@@ -36,6 +36,37 @@ async function refreshAccessToken(token: any) {
   }
 }
 
+// Return to the original admin session — either on explicit "Exit Login As" (with a
+// freshly minted admin token from the backend) or automatically when the
+// impersonation token expires (fall back to the stashed admin token, refreshing if
+// it too has gone stale). If nothing can be restored, flag for sign-out.
+async function restoreAdmin(token: any, exit?: { accessToken: string; user: any }) {
+  const r = token.adminRestore;
+  if (!r && !exit) return { ...token, error: 'RefreshAccessTokenError' };
+  let next: any = {
+    ...token,
+    accessToken: exit?.accessToken ?? r?.accessToken,
+    refreshToken: r?.refreshToken ?? token.refreshToken,
+    userId: exit?.user?.id ?? r?.userId,
+    role: exit?.user?.role ?? r?.role,
+    name: exit?.user?.name ?? r?.name,
+    email: exit?.user?.email ?? r?.email,
+    franchiseCity: r?.franchiseCity ?? null,
+    franchiseName: undefined,
+    isImpersonating: false,
+    impersonatedBy: undefined,
+    originalRole: undefined,
+    adminRestore: undefined,
+    accessTokenExpires: jwtExpiryMs(exit?.accessToken ?? r?.accessToken),
+    error: undefined,
+  };
+  // Fell back to the stashed (possibly stale) admin token → refresh it.
+  if (!exit && next.accessTokenExpires && Date.now() >= next.accessTokenExpires - 5 * 60 * 1000) {
+    next = await refreshAccessToken(next);
+  }
+  return next;
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -97,7 +128,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // Initial sign in.
       if (user) {
         token.accessToken = (user as any).accessToken;
@@ -110,9 +141,48 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
+      // "Login As" / "Exit Login As" — driven by useSession().update(...).
+      if (trigger === 'update' && session) {
+        const s = session as any;
+        if (s.impersonate) {
+          const imp = s.impersonate as { accessToken: string; franchise: any };
+          // Stash the admin's own session so exit / expiry can restore it.
+          (token as any).adminRestore = {
+            accessToken: token.accessToken,
+            refreshToken: token.refreshToken,
+            userId: (token as any).userId,
+            role: token.role,
+            name: token.name,
+            email: token.email,
+            franchiseCity: (token as any).franchiseCity ?? null,
+          };
+          token.accessToken = imp.accessToken;
+          (token as any).userId = imp.franchise.id;
+          token.role = 'franchise';
+          (token as any).franchiseCity = imp.franchise.city ?? null;
+          (token as any).franchiseName = imp.franchise.name;
+          (token as any).isImpersonating = true;
+          (token as any).impersonatedBy = (token as any).adminRestore.userId;
+          (token as any).originalRole = (token as any).adminRestore.role;
+          token.accessTokenExpires = jwtExpiryMs(imp.accessToken);
+          token.error = undefined;
+          return token;
+        }
+        if (s.exitImpersonation) {
+          return restoreAdmin(token, s.exitImpersonation);
+        }
+        return token;
+      }
+
       // Still valid (refresh a bit early — while >5 min remain, keep it).
       if (token.accessTokenExpires && Date.now() < (token.accessTokenExpires as number) - 5 * 60 * 1000) {
         return token;
+      }
+
+      // Near expiry. An impersonation token can't be refreshed as a franchise —
+      // gracefully restore the original admin session instead of signing out.
+      if ((token as any).isImpersonating) {
+        return await restoreAdmin(token);
       }
 
       // Access token (near) expired → refresh using the long-lived refresh token.
@@ -123,6 +193,11 @@ export const authOptions: NextAuthOptions = {
       session.user.refreshToken = token.refreshToken as string;
       session.user.role = token.role as string;
       (session.user as any).franchiseCity = (token as any).franchiseCity ?? null;
+      // "Login As" state, surfaced to the whole app.
+      (session.user as any).isImpersonating = (token as any).isImpersonating ?? false;
+      (session.user as any).impersonatedBy = (token as any).impersonatedBy ?? null;
+      (session.user as any).originalRole = (token as any).originalRole ?? null;
+      (session.user as any).franchiseName = (token as any).franchiseName ?? null;
       (session as any).error = (token as any).error;
       return session;
     },

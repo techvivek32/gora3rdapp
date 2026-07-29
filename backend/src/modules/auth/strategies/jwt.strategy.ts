@@ -51,6 +51,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             .filter(Boolean),
         },
         franchiseId: payload.sub,
+        franchiseName: (franchise as any).name,
+        // "Login As": a super-admin impersonating this franchise. Carries only
+        // franchise permissions (role stays 'franchise'); these flags let /auth/me,
+        // the banner, and BlockImpersonationGuard know the session is impersonated.
+        ...(payload.isImpersonating
+          ? {
+              isImpersonating: true,
+              impersonatedBy: payload.impersonatedBy,
+              originalRole: payload.originalRole || 'super_admin',
+            }
+          : {}),
       };
     }
 

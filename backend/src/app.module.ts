@@ -32,6 +32,7 @@ import { SupportModule } from './modules/support/support.module';
 import { GarageModule } from './modules/garage/garage.module';
 import { TrainingModule } from './modules/training/training.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
+import { ImpersonationModule } from './modules/impersonation/impersonation.module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { FranchiseModule } from './modules/franchise/franchise.module';
     GarageModule,
     TrainingModule,
     FranchiseModule,
+    ImpersonationModule,
   ],
 })
 export class AppModule {}

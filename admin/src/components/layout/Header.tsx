@@ -5,10 +5,12 @@ import { Moon, Sun, Maximize2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import NotificationBell from './NotificationBell';
 import { useFullscreen } from './FullscreenContext';
+import { useRole } from '@/hooks/useRole';
 
 export default function Header() {
   const { data: session } = useSession();
   const { toggleFullscreen } = useFullscreen();
+  const { isImpersonating } = useRole();
   const [isDark, setIsDark] = useState(true);
 
   // Show the real role — a franchise session must not read "Super Admin".
@@ -61,6 +63,13 @@ export default function Header() {
 
         {/* Notifications */}
         <NotificationBell />
+
+        {/* LOGIN AS badge — shown while impersonating a franchise. */}
+        {isImpersonating && (
+          <span className="inline-flex items-center rounded-full bg-orange-500 text-white text-[11px] font-bold tracking-wide px-2.5 py-1">
+            LOGIN AS
+          </span>
+        )}
 
         {/* User Avatar */}
         <div className="flex items-center gap-2 pl-3 border-l border-gray-200 dark:border-gray-700">

@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { BlockImpersonationGuard } from '../../common/guards/block-impersonation.guard';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
 
@@ -463,6 +464,7 @@ export class AdminController {
   }
 
   @Post('profile/change-password')
+  @UseGuards(BlockImpersonationGuard)
   @ApiOperation({ summary: "Change the logged-in admin's password (verifies the current one)" })
   changePassword(
     @CurrentUser('sub') userId: string,

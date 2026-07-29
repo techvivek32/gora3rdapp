@@ -13,6 +13,11 @@ declare module 'next-auth' {
       franchiseCity?: string | null;
       accessToken: string;
       refreshToken: string;
+      // "Login As" (super-admin impersonating a franchise).
+      isImpersonating?: boolean;
+      impersonatedBy?: string | null;
+      originalRole?: string | null;
+      franchiseName?: string | null;
     };
   }
 

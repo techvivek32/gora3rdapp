@@ -9,6 +9,7 @@ import { ArrowLeft, Pencil, Trash2, Building2, CreditCard, Landmark } from 'luci
 import toast from 'react-hot-toast';
 import { FranchiseFormModal, FRANCHISE_DOCS, type Franchise } from '@/components/franchises/FranchiseFormModal';
 import { FranchiseEarnings } from '@/components/franchises/FranchiseEarnings';
+import { LoginAsButton } from '@/components/impersonation/LoginAsButton';
 
 export default function FranchiseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -51,6 +52,7 @@ export default function FranchiseDetailPage({ params }: { params: Promise<{ id: 
           <button onClick={() => { if (confirm(`Delete "${f.name}"? This cannot be undone.`)) del.mutate(); }} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium">
             <Trash2 className="w-4 h-4" /> Delete
           </button>
+          <LoginAsButton franchiseId={id} />
         </div>
       </div>
 

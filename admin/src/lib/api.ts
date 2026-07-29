@@ -198,6 +198,9 @@ export const adminApi = {
   deleteFranchise: (id: string) => apiClient.delete(`/admin/franchises/${id}`),
   // All franchises ranked by their city activity/revenue (admin leaderboard page).
   getFranchiseLeaderboard: (params?: any) => apiClient.get('/admin/franchise-leaderboard', { params }),
+  // ─── Login As (impersonation) ────────────────────────────────────────────
+  loginAsFranchise: (id: string) => apiClient.post(`/admin/franchises/${id}/login-as`),
+  exitLoginAs: () => apiClient.post('/admin/login-as/exit'),
   // Commission earnings + settlements for a franchise (admin detail page).
   getFranchiseEarnings: (id: string) => apiClient.get(`/admin/franchise-earnings/${id}`),
   settleFranchise: (id: string, data: { amount: number; note?: string }) =>

@@ -97,7 +97,16 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current user profile' })
   getMe(@CurrentUser() user: any) {
-    return { message: 'Current user', data: user };
+    return {
+      message: 'Current user',
+      data: {
+        user,
+        role: user?.role,
+        isImpersonating: !!user?.isImpersonating,
+        impersonatedBy: user?.impersonatedBy ?? null,
+        originalRole: user?.originalRole ?? null,
+      },
+    };
   }
 
   @Get('franchise/me')

@@ -5,6 +5,7 @@ import { Minimize2 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import { FullscreenContext, useFullscreen } from './FullscreenContext';
+import { ImpersonationBanner } from '@/components/impersonation/ImpersonationBanner';
 
 // Re-exported so existing pages that import it from here keep working.
 export { useFullscreen };
@@ -31,7 +32,10 @@ export default function DashboardShell({ children }: { children: React.ReactNode
 
   return (
     <FullscreenContext.Provider value={{ fullscreen, toggleFullscreen }}>
-      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <div className="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+        {/* Permanent "Login As" banner, above all chrome, on every page. */}
+        <ImpersonationBanner />
+        <div className="flex flex-1 overflow-hidden">
         {!fullscreen && <Sidebar />}
         <div className="flex-1 flex flex-col overflow-hidden">
           {!fullscreen && <Header />}
@@ -53,6 +57,7 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           )}
 
           <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        </div>
         </div>
       </div>
     </FullscreenContext.Provider>
