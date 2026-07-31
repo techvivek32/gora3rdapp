@@ -271,8 +271,37 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
                         ),
                       const SizedBox(height: 6),
-                      const Text('Premium Members can view last location of User',
-                          style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                      Builder(builder: (_) {
+                        final ago = _lastLoginText(user['lastActive']);
+                        final addr = (user['lastLocationAddress'] as String?)?.trim();
+                        // No login time and no address → nothing captured yet.
+                        if (ago.isEmpty && (addr == null || addr.isEmpty)) {
+                          return const Text('Premium Members can view last location of User',
+                              style: TextStyle(fontSize: 11, color: AppColors.textHint));
+                        }
+                        return Column(
+                          children: [
+                            if (ago.isNotEmpty)
+                              Text('Last Login: $ago',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                            if (addr != null && addr.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(addr,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
+                              )
+                            // Address is premium-gated on the backend — prompt non-premium viewers.
+                            else if (!isPremium)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Text('Premium Members can view last location of User',
+                                    style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                              ),
+                          ],
+                        );
+                      }),
                       const SizedBox(height: 14),
                       // Action row
                       Padding(
@@ -373,6 +402,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final date = DateTime.tryParse(createdAt.toString());
     if (date == null) return '—';
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Relative "last login" label from a lastActive timestamp, e.g. "21 min ago".
+  String _lastLoginText(dynamic iso) {
+    if (iso == null) return '';
+    final dt = DateTime.tryParse(iso.toString())?.toLocal();
+    if (dt == null) return '';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hr ago';
+    if (diff.inDays < 30) return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) return '$months month${months == 1 ? '' : 's'} ago';
+    return '${(diff.inDays / 365).floor()} yr ago';
   }
 }
 

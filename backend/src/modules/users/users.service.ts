@@ -17,7 +17,11 @@ import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pa
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
+
+// Paid membership tiers (mirrors the app's `canContactPosters` gate) — used to
+// decide whether the VIEWER may see another user's last location.
+const PAID_TIERS = ['active', 'verified', 'premium', 'golden'];
 
 @Injectable()
 export class UsersService {
@@ -320,16 +324,79 @@ export class UsersService {
     return { message: 'Business cities updated', data: user };
   }
 
-  async getUserCard(userId: string) {
+  async getUserCard(userId: string, viewerId?: string) {
     if (!Types.ObjectId.isValid(userId)) throw new NotFoundException('User not found');
 
-    const targetUser = await this.userModel
+    const targetUser: any = await this.userModel
       .findById(userId)
       .select(PUBLIC_PROFILE_SELECT)
       .lean();
     if (!targetUser) throw new NotFoundException('User not found');
 
+    // The last location is premium-gated: only paid members (or the profile owner)
+    // may see where a user was. Strip it for everyone else so it never leaves the API.
+    const isOwner = viewerId && viewerId === userId;
+    const viewerPaid = isOwner || (viewerId ? await this.isPaidViewer(viewerId) : false);
+    if (!viewerPaid) {
+      delete targetUser.lastLocationAddress;
+      delete targetUser.lastLocationAt;
+    }
+
     return { message: 'User card retrieved', data: await this.withVehicles(targetUser) };
+  }
+
+  /** True if the viewer is on a paid tier (and not expired) — may see last location. */
+  private async isPaidViewer(viewerId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(viewerId)) return false;
+    const v: any = await this.userModel
+      .findById(viewerId)
+      .select('membershipType isPremium isGolden membershipExpiresAt')
+      .lean();
+    if (!v) return false;
+    if (v.membershipExpiresAt && new Date(v.membershipExpiresAt) < new Date()) return false;
+    return PAID_TIERS.includes((v.membershipType || '').toLowerCase()) || !!v.isPremium || !!v.isGolden;
+  }
+
+  /** Store the caller's last GPS location + a reverse-geocoded address. */
+  async updateLocation(userId: string, lat: number, lng: number) {
+    const la = Number(lat);
+    const ln = Number(lng);
+    if (!isFinite(la) || !isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) {
+      throw new BadRequestException('Valid lat/lng are required');
+    }
+    const address = await this.reverseGeocode(la, ln);
+    await this.userModel.findByIdAndUpdate(userId, {
+      lastLat: la,
+      lastLng: ln,
+      ...(address ? { lastLocationAddress: address } : {}),
+      lastLocationAt: new Date(),
+      lastActive: new Date(),
+    });
+    return { message: 'Location updated', data: { address: address ?? null } };
+  }
+
+  /** lat/lng → a concise address like "Raghunathpura 313001, Rajasthan" (Google Geocoding). */
+  private async reverseGeocode(lat: number, lng: number): Promise<string | null> {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (!key || key === 'your-google-maps-api-key') return null;
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}&language=en&region=in`;
+      const res = await fetch(url);
+      const body: any = await res.json();
+      if (body.status !== 'OK' || !body.results?.length) return null;
+      const comps: any[] = body.results[0].address_components || [];
+      const get = (type: string) => comps.find((c) => c.types?.includes(type))?.long_name;
+      const area =
+        get('sublocality_level_1') || get('sublocality') || get('locality') ||
+        get('neighborhood') || get('administrative_area_level_2') || '';
+      const pin = get('postal_code') || '';
+      const state = get('administrative_area_level_1') || '';
+      const line1 = [area, pin].filter(Boolean).join(' ');
+      const label = [line1, state].filter(Boolean).join(', ');
+      return label || body.results[0].formatted_address || null;
+    } catch {
+      return null;
+    }
   }
 
   async toggleNotifications(

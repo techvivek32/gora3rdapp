@@ -45,6 +45,21 @@ export class User {
   @Prop({ trim: true })
   state: string;
 
+  // ─── Last known GPS location (captured on app open; shown as "Last Login: …") ──
+  @Prop({ type: Number })
+  lastLat?: number;
+
+  @Prop({ type: Number })
+  lastLng?: number;
+
+  /** Reverse-geocoded human address of the last location (e.g. "Raghunathpura 313001, Rajasthan"). */
+  @Prop({ trim: true })
+  lastLocationAddress?: string;
+
+  /** When the last location was captured. */
+  @Prop({ type: Date })
+  lastLocationAt?: Date;
+
   @Prop()
   profileImage: string;
 

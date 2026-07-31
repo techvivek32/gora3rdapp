@@ -9,6 +9,7 @@ import '../../../../core/services/push_notification_service.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/utils/location_ping.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -41,6 +42,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     context.read<HomeBloc>().add(LoadHomeDataEvent());
     _fetchSupportContacts();
+    // Capture the user's location once on open so their profile shows "Last Login".
+    pingUserLocation();
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;

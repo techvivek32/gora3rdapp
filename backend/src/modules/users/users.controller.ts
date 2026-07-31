@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Put, Post, Delete, Body, Param, Query, UseGuards, UseInterceptors,
+  Controller, Get, Put, Post, Patch, Delete, Body, Param, Query, UseGuards, UseInterceptors,
   UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -85,10 +85,16 @@ export class UsersController {
     return this.usersService.lookupByMobile(mobile);
   }
 
+  @Patch('me/location')
+  @ApiOperation({ summary: "Update the caller's last known GPS location (captured on app open)" })
+  updateLocation(@CurrentUser('sub') userId: string, @Body() dto: { lat: number; lng: number }) {
+    return this.usersService.updateLocation(userId, dto?.lat, dto?.lng);
+  }
+
   @Get('card/:userId')
   @ApiOperation({ summary: 'Get user public profile card' })
-  getUserCard(@Param('userId') userId: string) {
-    return this.usersService.getUserCard(userId);
+  getUserCard(@Param('userId') userId: string, @CurrentUser('sub') viewerId: string) {
+    return this.usersService.getUserCard(userId, viewerId);
   }
 
   @Post(':userId/rate')
