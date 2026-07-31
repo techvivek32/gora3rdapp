@@ -131,6 +131,41 @@ export class AuthService {
     }
   }
 
+  // ─── Admin / super-admin forgot password (phone OTP) ────────────────────────
+  // Restricted to admin & super_admin accounts only — never regular users or
+  // franchises. Reuses the same OTP machinery as registration/login.
+  async adminForgotPasswordSendOtp(mobile: string) {
+    const m = (mobile || '').trim();
+    if (!m) throw new BadRequestException('Mobile number is required');
+    const user = await this.userModel
+      .findOne({ mobile: m, role: { $in: ['admin', 'super_admin'] } })
+      .select('_id')
+      .lean();
+    // Only send when it's genuinely an admin account, but never reveal whether
+    // one exists (avoids account enumeration).
+    if (user) await this.generateAndSendOtp(m);
+    return { message: 'If an admin account is registered with this number, an OTP has been sent.' };
+  }
+
+  async adminForgotPasswordReset(mobile: string, otp: string, newPassword: string) {
+    const m = (mobile || '').trim();
+    if (!m || !otp || !newPassword) {
+      throw new BadRequestException('Mobile, OTP and new password are required');
+    }
+    if (newPassword.length < 6) {
+      throw new BadRequestException('New password must be at least 6 characters');
+    }
+    const user = await this.userModel
+      .findOne({ mobile: m, role: { $in: ['admin', 'super_admin'] } })
+      .select('+password');
+    if (!user) throw new BadRequestException('No admin account found for this mobile number');
+    await this.verifyOtp(m, otp); // throws on invalid / expired / too many attempts
+    user.password = await bcrypt.hash(newPassword, 12);
+    await user.save();
+    await this.otpModel.deleteOne({ mobile: m });
+    return { message: 'Password reset successful. You can now sign in with your new password.' };
+  }
+
   async register(dto: RegisterDto) {
     // Account is only created after the OTP is verified.
     await this.verifyOtp(dto.mobile, dto.otp);

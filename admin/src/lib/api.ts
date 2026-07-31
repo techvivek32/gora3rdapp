@@ -33,6 +33,11 @@ export const adminApi = {
   // ─── Auth ──────────────────────────────────────────────────────────────────
   login: (data: { identifier: string; password: string }) =>
     apiClient.post('/auth/login', data),
+  // Admin/super-admin forgot password via phone OTP (public endpoints).
+  adminForgotSendOtp: (mobile: string) =>
+    apiClient.post('/auth/admin/forgot-password/send-otp', { mobile }),
+  adminForgotReset: (data: { mobile: string; otp: string; newPassword: string }) =>
+    apiClient.post('/auth/admin/forgot-password/reset', data),
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────
   getDashboardStats: (params?: any) => apiClient.get('/admin/dashboard', { params }),

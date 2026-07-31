@@ -43,6 +43,23 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  // ─── Admin / super-admin forgot password (phone OTP) ───────────────────────
+  @Post('admin/forgot-password/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin/super-admin: send a password-reset OTP to the registered mobile' })
+  adminForgotSendOtp(@Body() dto: { mobile: string }) {
+    return this.authService.adminForgotPasswordSendOtp(dto?.mobile);
+  }
+
+  @Post('admin/forgot-password/reset')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin/super-admin: verify the OTP and set a new password' })
+  adminForgotReset(@Body() dto: { mobile: string; otp: string; newPassword: string }) {
+    return this.authService.adminForgotPasswordReset(dto?.mobile, dto?.otp, dto?.newPassword);
+  }
+
   @Post('franchise/login')
   @Public()
   @HttpCode(HttpStatus.OK)
