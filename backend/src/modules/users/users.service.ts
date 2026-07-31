@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
+import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { Rating, RatingDocument } from '../../database/schemas/rating.schema';
 import {
   AccountDeletionRequest,
@@ -28,6 +29,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
+    @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
     @InjectModel(Rating.name) private ratingModel: Model<RatingDocument>,
     @InjectModel(AccountDeletionRequest.name)
     private deletionRequestModel: Model<AccountDeletionRequestDocument>,
@@ -342,7 +344,46 @@ export class UsersService {
       delete targetUser.lastLocationAt;
     }
 
-    return { message: 'User card retrieved', data: await this.withVehicles(targetUser) };
+    const [withVeh, stats] = await Promise.all([
+      this.withVehicles(targetUser),
+      this.userActivityStats(userId),
+    ]);
+    return { message: 'User card retrieved', data: { ...withVeh, ...stats } };
+  }
+
+  /**
+   * Booking (requirements) + availability (cabs) breakdown for a user's profile.
+   * "Expired" counts posts whose date has already passed (still open, never
+   * booked/cancelled) plus anything explicitly marked expired.
+   */
+  private async userActivityStats(userId: string) {
+    const uid = new Types.ObjectId(userId);
+    const now = new Date();
+    const [
+      bTotal, bBooked, bCancelled, bExpired,
+      vTotal, vBooked, vAvailable, vExpired,
+    ] = await Promise.all([
+      // Bookings (requirements posted by this user).
+      this.requirementModel.countDocuments({ postedBy: uid, isDeleted: false }),
+      this.requirementModel.countDocuments({ postedBy: uid, isDeleted: false, status: { $in: ['accepted', 'completed'] } }),
+      this.requirementModel.countDocuments({ postedBy: uid, isDeleted: false, status: 'cancelled' }),
+      this.requirementModel.countDocuments({
+        postedBy: uid, isDeleted: false,
+        $or: [{ status: 'expired' }, { status: { $in: ['active', 'on_hold'] }, travelDate: { $lt: now } }],
+      }),
+      // Availability (cabs posted by this user).
+      this.vehicleModel.countDocuments({ postedBy: uid, isDeleted: false }),
+      this.vehicleModel.countDocuments({ postedBy: uid, isDeleted: false, status: 'booked' }),
+      this.vehicleModel.countDocuments({ postedBy: uid, isDeleted: false, status: 'available', availableDate: { $gte: now } }),
+      this.vehicleModel.countDocuments({
+        postedBy: uid, isDeleted: false,
+        $or: [{ status: 'expired' }, { status: 'available', availableDate: { $lt: now } }],
+      }),
+    ]);
+    return {
+      bookingStats: { total: bTotal, booked: bBooked, cancelled: bCancelled, expired: bExpired },
+      availabilityStats: { total: vTotal, booked: vBooked, available: vAvailable, expired: vExpired },
+    };
   }
 
   /** True if the viewer is on a paid tier (and not expired) — may see last location. */

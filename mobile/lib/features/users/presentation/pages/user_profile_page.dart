@@ -177,8 +177,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
     final mobile = user['mobile'] as String?;
     final vehicles = (user['vehicles'] as List?) ?? const [];
-    final requirementsPosted = (user['requirementsPosted'] as num?)?.toInt() ?? 0;
-    final vehiclesPosted = (user['vehiclesPosted'] as num?)?.toInt() ?? 0;
+    // "No. Posts" is derived from the live (non-deleted) totals so it always
+    // reconciles with the Booking + Availability sections below. (The user's
+    // `requirementsPosted`/`vehiclesPosted` counters are lifetime totals that also
+    // include deleted posts, which is why they read higher.)
+    final bookingTotal = ((user['bookingStats'] as Map?)?['total'] as num?)?.toInt() ?? 0;
+    final availTotal = ((user['availabilityStats'] as Map?)?['total'] as num?)?.toInt() ?? 0;
     final walletBalance = (user['walletBalance'] as num?) ?? 0;
     final title = (agency != null && agency.isNotEmpty) ? agency : name;
     final businessCity = [city, state].where((e) => e != null && e.isNotEmpty).join(', ');
@@ -194,7 +198,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
           Container(
             width: double.infinity,
             color: Colors.white,
-            padding: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.only(bottom: 4),
             child: Column(
               children: [
                 Container(
@@ -336,7 +340,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                   ),
                 ),
                 Transform.translate(
-                  offset: const Offset(0, -30),
+                  offset: const Offset(0, -14),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
@@ -379,18 +383,43 @@ class _UserProfilePageState extends State<UserProfilePage> {
          
 
           // Stats
-          const _SectionTitle('Stats'),
+          const _SectionTitle('Statics'),
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
             child: Row(
               children: [
                 Expanded(child: _Stat(label: 'Member Since', value: _memberSince(user['createdAt']))),
-                Expanded(child: _Stat(label: 'No. Posts', value: '${requirementsPosted + vehiclesPosted}')),
+                Expanded(child: _Stat(label: 'No. Posts', value: '${bookingTotal + availTotal}')),
                 Expanded(child: _Stat(label: 'Wallet', value: '₹${walletBalance.toStringAsFixed(0)}')),
               ],
             ),
+          ),
+
+          // Booking statistics — Total / Booked / Cancelled / Expired
+          // (Expired = the travel date has already passed).
+          _StatSection(
+            title: 'Booking Statics',
+            stats: (user['bookingStats'] as Map?) ?? const {},
+            columns: const [
+              ['Total', 'total'],
+              ['Booked', 'booked'],
+              ['Cancelled', 'cancelled'],
+              ['Expired', 'expired'],
+            ],
+          ),
+
+          // Availability statistics — Total / Booked / Available / Expired
+          _StatSection(
+            title: 'Availability Statics',
+            stats: (user['availabilityStats'] as Map?) ?? const {},
+            columns: const [
+              ['Total', 'total'],
+              ['Booked', 'booked'],
+              ['Available', 'available'],
+              ['Expired', 'expired'],
+            ],
           ),
         ],
       ),
@@ -448,7 +477,7 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
       child: Center(
         child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary)),
       ),
@@ -492,6 +521,35 @@ class _VehicleCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// A titled card with a row of stat columns, driven by [label, key] pairs read
+// from a stats map (Booking / Availability statistics).
+class _StatSection extends StatelessWidget {
+  final String title;
+  final Map stats;
+  final List<List<String>> columns;
+  const _StatSection({required this.title, required this.stats, required this.columns});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _SectionTitle(title),
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          child: Row(
+            children: [
+              for (final c in columns)
+                Expanded(child: _Stat(label: c[0], value: '${stats[c[1]] ?? 0}')),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

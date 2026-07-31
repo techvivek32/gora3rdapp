@@ -6,6 +6,7 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleSchema } from '../../database/schemas/available-vehicle.schema';
 import { Rating, RatingSchema } from '../../database/schemas/rating.schema';
 import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
+import { Requirement, RequirementSchema } from '../../database/schemas/requirement.schema';
 import { StorageModule } from '../storage/storage.module';
 
 @Module({
@@ -15,6 +16,7 @@ import { StorageModule } from '../storage/storage.module';
       { name: AvailableVehicle.name, schema: AvailableVehicleSchema },
       { name: Rating.name, schema: RatingSchema },
       { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
+      { name: Requirement.name, schema: RequirementSchema },
     ]),
     StorageModule,
   ],
