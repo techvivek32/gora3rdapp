@@ -463,6 +463,16 @@ export class AdminController {
     return this.adminService.getMyProfile(userId);
   }
 
+  @Put('profile')
+  @UseGuards(BlockImpersonationGuard)
+  @ApiOperation({ summary: "Update the logged-in admin's own name / email / mobile" })
+  updateMyProfile(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: { fullName?: string; email?: string; mobile?: string },
+  ) {
+    return this.adminService.updateMyProfile(userId, dto);
+  }
+
   @Post('profile/change-password')
   @UseGuards(BlockImpersonationGuard)
   @ApiOperation({ summary: "Change the logged-in admin's password (verifies the current one)" })

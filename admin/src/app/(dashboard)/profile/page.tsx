@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Building2, CreditCard, Landmark, MapPin, ShieldCheck, Mail, Phone, User, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { Building2, CreditCard, Landmark, MapPin, ShieldCheck, Mail, Phone, User, KeyRound, Eye, EyeOff, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { FRANCHISE_DOCS, type Franchise } from '@/components/franchises/FranchiseFormModal';
 import { FranchiseEarnings } from '@/components/franchises/FranchiseEarnings';
@@ -19,11 +19,22 @@ export default function ProfilePage() {
 // ─── Admin / super-admin own profile ─────────────────────────────────────────
 function AdminProfile() {
   const { role } = useRole();
+  const qc = useQueryClient();
   const { data: raw, isLoading } = useQuery({
     queryKey: ['admin-me'],
     queryFn: () => adminApi.getAdminProfile(),
   });
   const u: any = (raw as any)?.data;
+
+  // Inline edit for the three self-service fields the admin may change.
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ fullName: '', email: '', mobile: '' });
+  const save = useMutation({
+    mutationFn: () => adminApi.updateAdminProfile(form),
+    onSuccess: () => { toast.success('Profile updated'); qc.invalidateQueries({ queryKey: ['admin-me'] }); setEditing(false); },
+    onError: (e: any) => toast.error(e?.message || 'Could not update profile'),
+  });
+  const startEdit = () => { setForm({ fullName: u?.fullName || '', email: u?.email || '', mobile: u?.mobile || '' }); setEditing(true); };
 
   if (isLoading) return <p className="p-6 text-sm text-gray-500">Loading…</p>;
   if (!u) return <p className="p-6 text-sm text-gray-500">Profile not available.</p>;
@@ -55,19 +66,42 @@ function AdminProfile() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">{u.fullName || '—'}</h2>
             <p className="text-sm text-gray-500">{u.email || '—'}</p>
           </div>
-          <span className="ml-auto inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-orange-500/15 text-orange-500">
-            <ShieldCheck className="w-3.5 h-3.5" /> {roleLabel}
-          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {!editing && (
+              <button onClick={startEdit} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
+                <Pencil className="w-4 h-4" /> Edit
+              </button>
+            )}
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-orange-500/15 text-orange-500">
+              <ShieldCheck className="w-3.5 h-3.5" /> {roleLabel}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-          <Info label="Full Name" value={u.fullName || '—'} icon={<User className="w-3.5 h-3.5" />} />
-          <Info label="Email" value={u.email || '—'} icon={<Mail className="w-3.5 h-3.5" />} />
-          <Info label="Mobile" value={u.mobile || '—'} mono icon={<Phone className="w-3.5 h-3.5" />} />
-          <Info label="Role" value={roleLabel} />
-          <Info label="City" value={u.city || '—'} />
-          <Info label="Member Since" value={joined} />
-        </div>
+        {editing ? (
+          <div className="mt-6 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Field label="Full Name" value={form.fullName} onChange={(v) => setForm({ ...form, fullName: v })} />
+              <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+              <Field label="Mobile" value={form.mobile} onChange={(v) => setForm({ ...form, mobile: v })} />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => save.mutate()} disabled={save.isPending || !form.fullName.trim()} className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-semibold">
+                {save.isPending ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+            <Info label="Full Name" value={u.fullName || '—'} icon={<User className="w-3.5 h-3.5" />} />
+            <Info label="Email" value={u.email || '—'} icon={<Mail className="w-3.5 h-3.5" />} />
+            <Info label="Mobile" value={u.mobile || '—'} mono icon={<Phone className="w-3.5 h-3.5" />} />
+            <Info label="Role" value={roleLabel} />
+            <Info label="City" value={u.city || '—'} />
+            <Info label="Member Since" value={joined} />
+          </div>
+        )}
       </div>
 
       <ChangePasswordCard />
@@ -324,6 +358,20 @@ function Info({ label, value, mono, icon }: { label: string; value: string; mono
     <div>
       <p className="text-xs text-gray-400 flex items-center gap-1">{icon}{label}</p>
       <p className={`text-sm text-gray-900 dark:text-white ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  );
+}
+
+function Field({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+      />
     </div>
   );
 }

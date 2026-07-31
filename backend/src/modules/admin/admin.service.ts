@@ -438,7 +438,10 @@ export class AdminService {
       ];
     }
 
+    // The Users list is for platform users (drivers / agencies) — never the admin
+    // accounts themselves. Respect an explicit role filter; otherwise hide admins.
     if (query.role) filter.role = query.role;
+    else filter.role = { $nin: ['admin', 'super_admin'] };
     if (query.membershipType) filter.membershipType = query.membershipType;
     if (query.isVerified !== undefined) filter.isVerified = query.isVerified === 'true';
     if (query.isBlocked !== undefined) filter.isBlocked = query.isBlocked === 'true';
@@ -488,6 +491,44 @@ export class AdminService {
       .lean();
     if (!user) throw new NotFoundException('Profile not found');
     return { message: 'Profile retrieved', data: user };
+  }
+
+  // Update the logged-in admin's own basic details (name / email / mobile only).
+  async updateMyProfile(userId: string, dto: { fullName?: string; email?: string; mobile?: string }) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    const update: any = {};
+
+    if (dto.fullName !== undefined) {
+      const name = (dto.fullName || '').trim();
+      if (!name) throw new BadRequestException('Name cannot be empty');
+      update.fullName = name;
+    }
+    if (dto.email !== undefined) {
+      const email = (dto.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new BadRequestException('Enter a valid email address');
+      }
+      const clash = await this.userModel.findOne({ email, _id: { $ne: user._id } }).select('_id').lean();
+      if (clash) throw new BadRequestException('That email is already in use');
+      update.email = email;
+    }
+    if (dto.mobile !== undefined) {
+      const mobile = (dto.mobile || '').trim();
+      if (!/^[0-9+\-\s]{7,15}$/.test(mobile)) {
+        throw new BadRequestException('Enter a valid mobile number');
+      }
+      const clash = await this.userModel.findOne({ mobile, _id: { $ne: user._id } }).select('_id').lean();
+      if (clash) throw new BadRequestException('That mobile number is already in use');
+      update.mobile = mobile;
+    }
+
+    await this.userModel.findByIdAndUpdate(user._id, update);
+    const fresh = await this.userModel
+      .findById(user._id)
+      .select('-password -refreshToken -fcmTokens')
+      .lean();
+    return { message: 'Profile updated', data: fresh };
   }
 
   // Change the logged-in admin's password: verify the current one, then set the new.
