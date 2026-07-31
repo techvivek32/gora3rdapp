@@ -43,7 +43,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     context.read<HomeBloc>().add(LoadHomeDataEvent());
     _fetchSupportContacts();
     // Capture the user's location once on open so their profile shows "Last Login".
-    pingUserLocation();
+    // Delayed so the location permission dialog doesn't collide with the
+    // notification permission request that fires on startup (Android drops a
+    // second permission request while the first is still open).
+    Future.delayed(const Duration(seconds: 3), pingUserLocation);
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;

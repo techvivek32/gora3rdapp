@@ -87,8 +87,8 @@ export class UsersController {
 
   @Patch('me/location')
   @ApiOperation({ summary: "Update the caller's last known GPS location (captured on app open)" })
-  updateLocation(@CurrentUser('sub') userId: string, @Body() dto: { lat: number; lng: number }) {
-    return this.usersService.updateLocation(userId, dto?.lat, dto?.lng);
+  updateLocation(@CurrentUser('sub') userId: string, @Body() dto: { lat: number; lng: number; address?: string }) {
+    return this.usersService.updateLocation(userId, dto?.lat, dto?.lng, dto?.address);
   }
 
   @Get('card/:userId')

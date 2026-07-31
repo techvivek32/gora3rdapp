@@ -398,14 +398,15 @@ export class UsersService {
     return PAID_TIERS.includes((v.membershipType || '').toLowerCase()) || !!v.isPremium || !!v.isGolden;
   }
 
-  /** Store the caller's last GPS location + a reverse-geocoded address. */
-  async updateLocation(userId: string, lat: number, lng: number) {
+  /** Store the caller's last GPS location + address. Prefers the client's on-device
+   *  reverse-geocode (no Google key needed); falls back to a server-side one. */
+  async updateLocation(userId: string, lat: number, lng: number, clientAddress?: string) {
     const la = Number(lat);
     const ln = Number(lng);
     if (!isFinite(la) || !isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) {
       throw new BadRequestException('Valid lat/lng are required');
     }
-    const address = await this.reverseGeocode(la, ln);
+    const address = (clientAddress || '').trim() || (await this.reverseGeocode(la, ln));
     await this.userModel.findByIdAndUpdate(userId, {
       lastLat: la,
       lastLng: ln,
