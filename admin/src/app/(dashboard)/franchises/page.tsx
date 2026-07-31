@@ -67,12 +67,16 @@ export default function FranchisesPage() {
                 <tr key={f._id} className="border-b border-gray-100 dark:border-gray-800 last:border-0">
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{f.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600 dark:text-gray-400">{f.phone}</td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top">
                     {(() => {
-                      const cities: string[] = (f as any).cities?.length ? (f as any).cities : (f.city ? [f.city] : []);
+                      const rawCities: string[] = (f as any).cities?.length ? (f as any).cities : (f.city ? [f.city] : []);
+                      // De-dup case-insensitively so a stray repeat can't clutter the cell.
+                      const seen = new Set<string>();
+                      const cities = rawCities.filter((c) => { const k = (c || '').trim().toLowerCase(); if (!c || seen.has(k)) return false; seen.add(k); return true; });
                       const states: string[] = (f as any).states || [];
                       const parts = [...cities, ...states.map((s) => `${s} (whole state)`)];
-                      return parts.length ? parts.join(', ') : '—';
+                      const label = parts.length ? parts.join(', ') : '—';
+                      return <span className="block max-w-[260px] line-clamp-2" title={label}>{label}</span>;
                     })()}
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{f.agencyName || '—'}</td>

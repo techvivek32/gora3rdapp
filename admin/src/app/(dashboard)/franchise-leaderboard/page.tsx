@@ -162,9 +162,12 @@ export default function FranchiseLeaderboardPage() {
                         <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-orange-600 dark:text-orange-400 font-semibold text-sm shrink-0">
                           {r.name?.[0]?.toUpperCase()}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 max-w-[240px] sm:max-w-[360px] lg:max-w-[520px]">
                           <div className="font-medium text-gray-900 dark:text-white group-hover:underline truncate">{r.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          <div
+                            className="text-xs text-gray-500 dark:text-gray-400 truncate"
+                            title={`${r.coverage || r.city || ''}${r.agencyName ? ` · ${r.agencyName}` : ''}`}
+                          >
                             {r.coverage || r.city || '—'}{r.agencyName ? ` · ${r.agencyName}` : ''}
                           </div>
                           {/* Relative bar for the active metric. */}
