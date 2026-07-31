@@ -283,21 +283,27 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           return const Text('Premium Members can view last location of User',
                               style: TextStyle(fontSize: 11, color: AppColors.textHint));
                         }
+                        final hasAddr = addr != null && addr.isNotEmpty;
                         return Column(
                           children: [
-                            if (ago.isNotEmpty)
-                              Text('Last Login: $ago',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-                            if (addr != null && addr.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Text(addr,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
-                              )
-                            // Address is premium-gated on the backend — prompt non-premium viewers.
-                            else if (!isPremium)
+                            // "Last Login: <time>  <address>" on one line (address is
+                            // premium-gated on the backend, so it's only present for premium viewers).
+                            Text.rich(
+                              TextSpan(children: [
+                                if (ago.isNotEmpty)
+                                  TextSpan(
+                                    text: 'Last Login: $ago',
+                                    style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                                  ),
+                                if (hasAddr)
+                                  TextSpan(
+                                    text: ago.isNotEmpty ? '  $addr' : addr,
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                  ),
+                              ]),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (!hasAddr && !isPremium)
                               const Padding(
                                 padding: EdgeInsets.only(top: 2),
                                 child: Text('Premium Members can view last location of User',
