@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { ConfigService } from '@nestjs/config';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { RequirementsService } from '../requirements/requirements.service';
+import { PlacesService } from '../places/places.service';
+import { SettingsService } from '../settings/settings.service';
 import { VehicleType, TripType } from '../../common/enums/vehicle-type.enum';
 
 const HELP = [
@@ -16,6 +18,8 @@ const HELP = [
   'Time: 09:00 PM',
   'Car: Sedan',
   'Trip: One Way',
+  'Driver Earning: 5000',
+  'Commission: 500',
 ].join('\n');
 
 @Injectable()
@@ -25,6 +29,8 @@ export class WhatsappService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly requirementsService: RequirementsService,
+    private readonly placesService: PlacesService,
+    private readonly settingsService: SettingsService,
     private readonly config: ConfigService,
   ) {}
 
@@ -77,11 +83,20 @@ export class WhatsappService {
         notes: `Booked via WhatsApp (+${from})`,
       };
 
+      // Fill in the same app-suggested distance / fare / commission / total an
+      // in-app booking would have (best-effort — skip silently if it can't be
+      // computed so the booking still posts).
+      await this.applyPricing(dto, parsed);
+
       const res = await this.requirementsService.create(user._id.toString(), dto);
       const bookingId = (res as any)?.data?.bookingId ?? '';
+      const pricingLines =
+        dto.fare > 0
+          ? `${dto.estimatedDistance ? `Distance: ${dto.estimatedDistance} km\n` : ''}Driver's Earning: ₹${dto.fare}\nCommission: ₹${dto.commission}\nTotal: ₹${dto.totalAmount}\n`
+          : '';
       await this.sendReply(
         from,
-        `✅ Booking posted!\n${bookingId ? `ID: ${bookingId}\n` : ''}${parsed.pickupCity} → ${parsed.dropCity}\n${this.fmtDate(parsed.travelDate)} ${parsed.travelTime}\n${this.vehicleLabel(parsed.vehicleType)}\n\nIt's now live in the Gora Taxi Partner app.`,
+        `✅ Booking posted!\n${bookingId ? `ID: ${bookingId}\n` : ''}${parsed.pickupCity} → ${parsed.dropCity}\n${this.fmtDate(parsed.travelDate)} ${parsed.travelTime}\n${this.vehicleLabel(parsed.vehicleType)}\n${pricingLines}\nIt's now live in the Gora Taxi Partner app.`,
       );
       this.logger.log(`WhatsApp booking created for ${user._id} from +${from} (${bookingId})`);
     } catch (e: any) {
@@ -90,15 +105,74 @@ export class WhatsappService {
     }
   }
 
+  /**
+   * Mutates `dto` with estimatedDistance / fare / commission / totalAmount +
+   * pickup/drop coordinates. Driver's Earning and Commission come from what the
+   * customer typed in the message; if they typed nothing, we fall back to the
+   * app-suggested fare (distance × the vehicle's ₹/km rate). `isAppSuggested` is
+   * false so the app shows the full Driver's Earning / Commission / Total breakdown.
+   * Best-effort throughout — the booking still posts if any step fails.
+   */
+  private async applyPricing(
+    dto: any,
+    parsed: { pickupCity: string; dropCity: string; vehicleType: VehicleType; fare?: number; commission?: number },
+  ): Promise<void> {
+    // 1) Distance + coordinates for the km display + map (best-effort).
+    let distanceKm = 0;
+    try {
+      const route = await this.placesService.routeByAddress(parsed.pickupCity, parsed.dropCity);
+      if (route?.distanceKm) {
+        distanceKm = route.distanceKm;
+        dto.estimatedDistance = Math.round(route.distanceKm);
+        if (route.pickup?.lat) {
+          dto.pickupCoordinates = { lat: route.pickup.lat, lng: route.pickup.lng, address: parsed.pickupCity };
+        }
+        if (route.drop?.lat) {
+          dto.dropCoordinates = { lat: route.drop.lat, lng: route.drop.lng, address: parsed.dropCity };
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`distance lookup skipped: ${e?.message ?? e}`);
+    }
+
+    // 2) Money: prefer the amounts the customer typed; otherwise auto-suggest.
+    try {
+      if (parsed.fare != null) {
+        const fare = parsed.fare;
+        const commission = parsed.commission ?? 0;
+        dto.fare = fare;
+        dto.commission = commission;
+        dto.totalAmount = fare + commission;
+        dto.isAppSuggested = false;
+      } else if (distanceKm > 0) {
+        const settings: any = await this.settingsService.getSettings();
+        const rate =
+          (settings?.vehiclePrices && settings.vehiclePrices[parsed.vehicleType]) ||
+          settings?.pricePerKm ||
+          20;
+        const commissionPercent = typeof settings?.commissionPercent === 'number' ? settings.commissionPercent : 10;
+        const fare = Math.round(distanceKm * rate);
+        const commission = Math.round((fare * commissionPercent) / 100);
+        dto.fare = fare;
+        dto.commission = commission;
+        dto.totalAmount = fare + commission;
+        dto.isAppSuggested = false;
+      }
+    } catch (e: any) {
+      this.logger.warn(`fare calc skipped: ${e?.message ?? e}`);
+    }
+  }
+
   // ─── Parsing (fixed format) ──────────────────────────────────────────────────
   private parseBooking(text: string): {
     pickupCity: string; dropCity: string; vehicleType: VehicleType; tripType: TripType;
-    travelDate: Date; travelTime: string;
+    travelDate: Date; travelTime: string; fare?: number; commission?: number;
   } | null {
     const fields: Record<string, string> = {};
     for (const line of text.split('\n')) {
-      const m = line.match(/^\s*([a-zA-Z ]+?)\s*[:\-]\s*(.+?)\s*$/);
-      if (m) fields[m[1].trim().toLowerCase()] = m[2].trim();
+      // Allow apostrophes in the label (e.g. "Driver's Earning"); strip them from the key.
+      const m = line.match(/^\s*([a-zA-Z'’ ]+?)\s*[:\-]\s*(.+?)\s*$/);
+      if (m) fields[m[1].trim().toLowerCase().replace(/['’]/g, '')] = m[2].trim();
     }
 
     const pickupCity = fields['from'] || fields['pickup'];
@@ -109,6 +183,13 @@ export class WhatsappService {
     if (!travelDate) return null;
     const travelTime = this.normalizeTime(fields['time'] || fields['travel time'] || '09:00 AM');
 
+    // Manually-entered money (customer types these in the message).
+    const fare = this.parseAmount(
+      fields['driver earning'] || fields['drivers earning'] || fields['earning'] ||
+      fields['earnings'] || fields['driver'] || fields['fare'],
+    );
+    const commission = this.parseAmount(fields['commission'] || fields['comm']);
+
     return {
       pickupCity,
       dropCity,
@@ -116,7 +197,16 @@ export class WhatsappService {
       tripType: this.mapTrip(fields['trip'] || fields['trip type'] || ''),
       travelDate,
       travelTime,
+      fare,
+      commission,
     };
+  }
+
+  /** Extract a whole-rupee amount from free text like "₹5,000", "5000/-", "5000". */
+  private parseAmount(raw?: string): number | undefined {
+    if (!raw) return undefined;
+    const n = parseInt(String(raw).replace(/[^\d]/g, ''), 10);
+    return isNaN(n) ? undefined : n;
   }
 
   /** Parse DD/MM/YYYY, DD-MM-YYYY, or DD/MM (year assumed). */

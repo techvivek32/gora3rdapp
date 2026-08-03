@@ -110,6 +110,58 @@ export class PlacesService {
     }
   }
 
+  /**
+   * Driving distance between two place *names* (e.g. "Jaipur" -> "Udaipur").
+   * Google Directions accepts text addresses directly and returns the resolved
+   * endpoint coordinates in the legs, so one call gives us both the road distance
+   * and the pickup/drop lat-lng. Used by the WhatsApp booking flow where only city
+   * names are known. Returns null on any failure (unknown city, key missing, etc.)
+   * so callers can degrade gracefully instead of failing the whole booking.
+   */
+  async routeByAddress(
+    origin: string,
+    destination: string,
+  ): Promise<{ distanceKm: number; pickup: { lat: number; lng: number }; drop: { lat: number; lng: number } } | null> {
+    const o = (origin || '').trim();
+    const d = (destination || '').trim();
+    if (!o || !d) return null;
+    let key: string;
+    try {
+      key = this.key;
+    } catch {
+      return null; // Google not configured — skip pricing, still create the booking.
+    }
+
+    const url = new URL('https://maps.googleapis.com/maps/api/directions/json');
+    url.searchParams.set('origin', `${o}, India`);
+    url.searchParams.set('destination', `${d}, India`);
+    url.searchParams.set('mode', 'driving');
+    url.searchParams.set('region', 'in');
+    url.searchParams.set('key', key);
+
+    try {
+      const res = await fetch(url.toString());
+      const body: any = await res.json();
+      if (body.status !== 'OK') {
+        this.logger.warn(`routeByAddress ${body.status} for "${o}"->"${d}": ${body.error_message ?? ''}`);
+        return null;
+      }
+      const legs: any[] = body.routes?.[0]?.legs ?? [];
+      if (!legs.length) return null;
+      const meters = legs.reduce((sum, l) => sum + (l.distance?.value ?? 0), 0);
+      const start = legs[0].start_location ?? {};
+      const end = legs[legs.length - 1].end_location ?? {};
+      return {
+        distanceKm: Math.round((meters / 1000) * 10) / 10,
+        pickup: { lat: start.lat ?? 0, lng: start.lng ?? 0 },
+        drop: { lat: end.lat ?? 0, lng: end.lng ?? 0 },
+      };
+    } catch (e: any) {
+      this.logger.warn(`routeByAddress failed for "${o}"->"${d}": ${e?.message ?? e}`);
+      return null;
+    }
+  }
+
   async details(placeId: string) {
     const id = (placeId || '').trim();
     if (!id) throw new BadRequestException('placeId is required');
