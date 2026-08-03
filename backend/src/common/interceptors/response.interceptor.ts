@@ -17,6 +17,11 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>
 
     return next.handle().pipe(
       map((data) => {
+        // If the handler used @Res() and already wrote the response (e.g. the
+        // WhatsApp webhook echoing Meta's raw hub.challenge), don't wrap/re-send.
+        if (response.headersSent) {
+          return data;
+        }
         // If the handler already returned a formatted response, return as-is
         if (data && typeof data === 'object' && 'success' in data) {
           return data;

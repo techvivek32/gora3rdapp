@@ -33,6 +33,7 @@ import { GarageModule } from './modules/garage/garage.module';
 import { TrainingModule } from './modules/training/training.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
 import { ImpersonationModule } from './modules/impersonation/impersonation.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { ImpersonationModule } from './modules/impersonation/impersonation.modul
     TrainingModule,
     FranchiseModule,
     ImpersonationModule,
+    WhatsappModule,
   ],
 })
 export class AppModule {}
