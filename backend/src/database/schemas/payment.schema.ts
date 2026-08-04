@@ -52,6 +52,11 @@ export class Payment {
   @Prop()
   razorpaySignature: string;
 
+  // Razorpay QR Code id (qr_xxx) for the "Pay by QR" flow. Payment is confirmed
+  // out-of-band via the qr_code.credited webhook, matched back on this id.
+  @Prop()
+  razorpayQrId: string;
+
   @Prop({ type: Object })
   metadata: Record<string, any>;
 
@@ -86,4 +91,5 @@ PaymentSchema.index({ orderId: 1 }, { unique: true });
 PaymentSchema.index({ userId: 1, status: 1, createdAt: -1 });
 PaymentSchema.index({ razorpayOrderId: 1 });
 PaymentSchema.index({ razorpayPaymentId: 1 });
+PaymentSchema.index({ razorpayQrId: 1 });
 PaymentSchema.index({ status: 1, createdAt: -1 });

@@ -139,6 +139,87 @@ export class SubscriptionsService implements OnModuleInit {
     };
   }
 
+  /**
+   * "Pay by QR": create a single-use, fixed-amount Razorpay UPI QR for the plan.
+   * The app displays the returned image; the customer scans it from any UPI app
+   * (on another device) and pays. Confirmation arrives out-of-band via the
+   * qr_code.credited webhook → handleQrCredited(). The app polls getPaymentStatus().
+   */
+  async createQrOrder(userId: string, planId: string) {
+    const plan = await this.planModel.findById(planId);
+    if (!plan) throw new NotFoundException('Plan not found');
+
+    const amountInPaise = plan.discountedPrice || plan.price;
+    const orderId = generatePaymentOrderId();
+
+    let qr: any;
+    try {
+      qr = await (await this.getRazorpay()).qrCode.create({
+        type: 'upi_qr',
+        name: 'Gora Cabs',
+        usage: 'single_use',
+        fixed_amount: true,
+        payment_amount: amountInPaise,
+        description: plan.name,
+        notes: { planId: planId.toString(), userId, orderId },
+      } as any);
+    } catch (e: any) {
+      const reason = e?.error?.description || e?.description || e?.message || 'unknown error';
+      this.logger.error(`Razorpay QR creation failed (amount=${amountInPaise}): ${reason}`);
+      throw new BadRequestException(`QR could not be created: ${reason}`);
+    }
+
+    const payment = await this.paymentModel.create({
+      orderId,
+      userId: new Types.ObjectId(userId),
+      planId: new Types.ObjectId(planId),
+      amount: amountInPaise,
+      status: PaymentStatus.PENDING,
+      razorpayQrId: qr.id,
+    });
+
+    return {
+      message: 'QR created',
+      data: {
+        qrId: qr.id,
+        imageUrl: qr.image_url,
+        amount: amountInPaise,
+        currency: 'INR',
+        paymentId: payment._id,
+        plan: {
+          name: plan.name,
+          membershipType: plan.membershipType,
+          duration: plan.duration,
+          durationDays: plan.durationDays,
+        },
+      },
+    };
+  }
+
+  /** Webhook path for qr_code.credited: match the QR back to its pending payment and activate. Idempotent. */
+  async handleQrCredited(qrId: string, razorpayPaymentId?: string) {
+    if (!qrId) return;
+    const payment = await this.paymentModel.findOne({ razorpayQrId: qrId });
+    if (!payment) {
+      this.logger.warn(`QR credited but no matching payment for qr ${qrId}`);
+      return;
+    }
+    if (payment.status === PaymentStatus.SUCCESS) return; // already handled
+    payment.status = PaymentStatus.SUCCESS;
+    if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
+    await payment.save();
+    await this.activateSubscription(payment.userId.toString(), payment.planId.toString(), payment._id.toString());
+    this.logger.log(`QR payment credited: user ${payment.userId}, qr ${qrId}, pay ${razorpayPaymentId ?? '-'}`);
+  }
+
+  /** Lightweight status for the app to poll after showing a QR. */
+  async getPaymentStatus(paymentId: string, userId: string) {
+    if (!Types.ObjectId.isValid(paymentId)) throw new NotFoundException('Payment not found');
+    const payment = await this.paymentModel.findById(paymentId).select('status userId').lean();
+    if (!payment || payment.userId?.toString() !== userId) throw new NotFoundException('Payment not found');
+    return { message: 'ok', data: { status: payment.status, paid: payment.status === PaymentStatus.SUCCESS } };
+  }
+
   async verifyPayment(userId: string | null, data: {
     razorpayOrderId: string;
     razorpayPaymentId: string;

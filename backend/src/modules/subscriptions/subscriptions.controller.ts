@@ -25,6 +25,22 @@ export class SubscriptionsController {
     return this.subscriptionsService.createPaymentOrder(userId, planId);
   }
 
+  @Post('create-qr-order/:planId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create a Razorpay UPI QR for a plan (Pay by QR)' })
+  createQrOrder(@CurrentUser('sub') userId: string, @Param('planId') planId: string) {
+    return this.subscriptionsService.createQrOrder(userId, planId);
+  }
+
+  @Get('payment-status/:paymentId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Poll a payment status (used by the QR flow)' })
+  paymentStatus(@CurrentUser('sub') userId: string, @Param('paymentId') paymentId: string) {
+    return this.subscriptionsService.getPaymentStatus(paymentId, userId);
+  }
+
   @Post('verify-payment')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

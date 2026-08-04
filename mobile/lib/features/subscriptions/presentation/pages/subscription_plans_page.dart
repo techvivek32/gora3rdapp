@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/subscription_bloc.dart';
@@ -140,9 +143,100 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
       );
       return;
     }
+    _showPaymentMethodSheet(plan);
+  }
+
+  /// Let the user pick how to pay: the in-app checkout (UPI apps / cards / etc.)
+  /// or a scannable QR they can pay from another phone.
+  void _showPaymentMethodSheet(Map<String, dynamic> plan) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+              child: Row(
+                children: [
+                  const Text('Choose Payment Method',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                  const Spacer(),
+                  IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: AppColors.primaryLight, child: Icon(Icons.account_balance_wallet, color: AppColors.primary)),
+              title: const Text('Pay in App', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+              subtitle: const Text('UPI apps, Cards, Netbanking, Wallet', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _payInApp(plan);
+              },
+            ),
+            ListTile(
+              leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.qr_code_2, color: Color(0xFF25D366))),
+              title: const Text('Pay by QR', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+              subtitle: const Text('Scan & pay with any UPI app (BHIM/GPay/PhonePe/Paytm)', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+              onTap: () {
+                Navigator.pop(ctx);
+                _startQrPayment(plan);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Existing native Razorpay checkout.
+  void _payInApp(Map<String, dynamic> plan) {
     final bloc = context.read<SubscriptionBloc>();
     _pendingPlanId = plan['_id'] as String;
     bloc.add(CreateOrderEvent(_pendingPlanId!));
+  }
+
+  /// QR flow: create a Razorpay UPI QR on the backend, show it, and poll until paid.
+  Future<void> _startQrPayment(Map<String, dynamic> plan) async {
+    final planId = plan['_id'] as String;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+    );
+    Map<String, dynamic> data;
+    try {
+      final res = await getIt<ApiClient>().post('/subscriptions/create-qr-order/$planId');
+      data = Map<String, dynamic>.from(res.data['data'] as Map);
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // close loader
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not create QR. Please try again.'), backgroundColor: AppColors.error),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    Navigator.pop(context); // close loader
+
+    final paid = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _QrPaymentDialog(data: data),
+    );
+
+    if (paid == true && mounted) {
+      context.read<AuthBloc>().add(const AuthReloadProfileEvent());
+      context.read<SubscriptionBloc>().add(LoadPlansEvent());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🎉 Membership activated!'), backgroundColor: AppColors.success),
+      );
+      Navigator.pop(context); // leave the plans page, same as the in-app flow
+    }
   }
 
   void _openRazorpay(Map<String, dynamic> order) {
@@ -698,5 +792,149 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     final d = DateTime.tryParse(v.toString());
     if (d == null) return null;
     return '${d.day} ${_months[d.month - 1]} ${d.year}';
+  }
+}
+
+/// Shows a Razorpay UPI QR and polls the backend until the payment is credited
+/// (confirmed out-of-band by the qr_code.credited webhook). Pops `true` when paid.
+class _QrPaymentDialog extends StatefulWidget {
+  final Map<String, dynamic> data;
+  const _QrPaymentDialog({required this.data});
+
+  @override
+  State<_QrPaymentDialog> createState() => _QrPaymentDialogState();
+}
+
+class _QrPaymentDialogState extends State<_QrPaymentDialog> {
+  Timer? _timer;
+  bool _checking = false;
+  bool _expired = false;
+  int _elapsed = 0; // seconds
+  static const _timeoutSeconds = 600; // stop polling after 10 min
+
+  String get _paymentId => '${widget.data['paymentId']}';
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _poll() async {
+    if (_checking) return;
+    _elapsed += 4;
+    if (_elapsed >= _timeoutSeconds) {
+      _timer?.cancel();
+      if (mounted) setState(() => _expired = true);
+      return;
+    }
+    _checking = true;
+    try {
+      final res = await getIt<ApiClient>().get('/subscriptions/payment-status/$_paymentId');
+      final paid = res.data['data']?['paid'] == true;
+      if (paid && mounted) {
+        _timer?.cancel();
+        Navigator.pop(context, true);
+        return;
+      }
+    } catch (_) {
+      // transient (offline / server blip) — keep polling
+    } finally {
+      _checking = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = widget.data['imageUrl'] as String?;
+    final amountPaise = (widget.data['amount'] as num?)?.toDouble() ?? 0;
+    final amount = (amountPaise / 100).round();
+    final planName = (widget.data['plan'] as Map?)?['name']?.toString() ?? 'Membership';
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Scan & Pay  ₹$amount',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(planName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                      imageUrl,
+                      width: 220,
+                      height: 220,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (c, w, p) => p == null
+                          ? w
+                          : const SizedBox(width: 220, height: 220, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
+                      errorBuilder: (c, e, s) => const SizedBox(width: 220, height: 220, child: Center(child: Text('Could not load QR'))),
+                    )
+                  : const SizedBox(width: 220, height: 220, child: Center(child: Text('QR unavailable'))),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Open any UPI app (BHIM / GPay / PhonePe / Paytm) and scan this QR to pay. On the same phone, scan it from another device.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+            ),
+            const SizedBox(height: 14),
+            if (_expired)
+              const Text('QR expired. Please close and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w600, fontFamily: 'Poppins'))
+            else
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                  SizedBox(width: 10),
+                  Text('Waiting for payment…', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                ],
+              ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

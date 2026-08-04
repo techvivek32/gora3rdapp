@@ -39,13 +39,25 @@ export class PaymentsController {
     const event = body?.event;
     if (event === 'payment.captured') {
       const payment = body?.payload?.payment?.entity;
-      if (payment) {
+      // QR payments arrive as payment.captured too but have no order_id — those are
+      // handled by the qr_code.credited branch below, so skip them here.
+      if (payment && payment.order_id) {
         try {
           await this.subscriptionsService.verifyPayment(null, {
             razorpayOrderId: payment.order_id,
             razorpayPaymentId: payment.id,
             razorpaySignature: signature,
           });
+        } catch (_) {}
+      }
+    } else if (event === 'qr_code.credited') {
+      // Someone scanned a "Pay by QR" code and paid. Match it back to its pending
+      // payment via the QR id and activate the membership.
+      const qr = body?.payload?.qr_code?.entity;
+      const payment = body?.payload?.payment?.entity;
+      if (qr?.id) {
+        try {
+          await this.subscriptionsService.handleQrCredited(qr.id, payment?.id);
         } catch (_) {}
       }
     }
