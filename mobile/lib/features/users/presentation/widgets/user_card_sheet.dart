@@ -61,9 +61,11 @@ class _UserCardSheetState extends State<_UserCardSheet> {
     super.initState();
     _user = Map<String, dynamic>.from(widget.user);
     // Passed-in data (e.g. a requirement's postedBy) can be partial and miss the
-    // phone number — fetch the full profile so contact actions work.
+    // phone number or the account-state flags — fetch the full profile so contact
+    // actions work and the Blocked/Inactive badge can render.
     final mobile = _user['mobile'];
-    if ((mobile == null || (mobile is String && mobile.isEmpty)) && _user['_id'] != null) {
+    final missingContact = mobile == null || (mobile is String && mobile.isEmpty);
+    if ((missingContact || !_user.containsKey('isBlocked')) && _user['_id'] != null) {
       _enrich();
     }
   }
@@ -85,6 +87,8 @@ class _UserCardSheetState extends State<_UserCardSheet> {
     final state = user['state'] as String?;
     final profileImage = user['profileImage'] as String?;
     final isVerified = user['isVerified'] == true;
+    final isBlocked = user['isBlocked'] == true;
+    final isInactive = user['isActive'] == false;
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
     final totalRatings = (user['totalRatings'] as num?)?.toInt() ?? 0;
     final mobile = user['mobile'] as String?;
@@ -109,6 +113,26 @@ class _UserCardSheetState extends State<_UserCardSheet> {
             children: [
               Text(membershipLabel(user),
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              // Admin-set state badge (block takes precedence over inactive).
+              if (isBlocked || isInactive)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(isBlocked ? Icons.block : Icons.pause_circle_filled, size: 12, color: Colors.red),
+                      const SizedBox(width: 4),
+                      Text(isBlocked ? 'Blocked' : 'Inactive',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.red)),
+                    ],
+                  ),
+                ),
               const Spacer(),
               IconButton(
                 onPressed: () => Navigator.pop(context),

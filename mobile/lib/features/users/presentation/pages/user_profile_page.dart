@@ -174,6 +174,10 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final profileImage = user['profileImage'] as String?;
     final coverImage = user['coverImage'] as String?;
     final isVerified = user['isVerified'] == true;
+    // Account state set by admin. `isActive` defaults true, so treat a missing
+    // value as active (older/partial payloads shouldn't read as inactive).
+    final isBlocked = user['isBlocked'] == true;
+    final isInactive = user['isActive'] == false;
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
     final mobile = user['mobile'] as String?;
     final vehicles = (user['vehicles'] as List?) ?? const [];
@@ -266,6 +270,29 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ],
                         ),
                       ),
+                      // Admin-set account state — shown only when the account is
+                      // blocked or deactivated (block takes precedence).
+                      if (isBlocked || isInactive)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.error.withValues(alpha: 0.5)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(isBlocked ? Icons.block : Icons.pause_circle_filled, size: 14, color: AppColors.error),
+                                const SizedBox(width: 5),
+                                Text(isBlocked ? 'Blocked' : 'Inactive',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.error)),
+                              ],
+                            ),
+                          ),
+                        ),
                       if (agency != null && agency.isNotEmpty && name.isNotEmpty)
                         Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.primaryDark)),
                       if (businessCity.isNotEmpty)

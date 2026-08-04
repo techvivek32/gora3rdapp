@@ -440,6 +440,13 @@ export class AuthService {
     const isTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!isTokenValid) throw new UnauthorizedException('Invalid refresh token');
 
+    // A blocked / deactivated account must not be able to renew its session.
+    // Without this the app refreshes forever (access token 401s, refresh succeeds,
+    // repeat) and the user is never actually logged out. Throwing here makes the
+    // client's refresh call fail with 401 → it signs the user out immediately.
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+    if (!user.isActive) throw new UnauthorizedException('Account is inactive');
+
     // Issue only a fresh access token and KEEP the same refresh token (no rotation).
     // Rotating here caused logouts: on a page reload NextAuth fires the refresh from
     // both the server (getServerSession) and the client at once with the same token —

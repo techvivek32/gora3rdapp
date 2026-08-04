@@ -18,7 +18,7 @@ import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pa
 
 // Public-facing profile fields (no credentials / private data).
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus isActive isBlocked rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
 
 // Paid membership tiers (mirrors the app's `canContactPosters` gate) — used to
 // decide whether the VIEWER may see another user's last location.
