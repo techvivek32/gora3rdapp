@@ -223,8 +223,10 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
     if (!mounted) return;
     Navigator.pop(context); // close loader
 
-    final paid = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(fullscreenDialog: true, builder: (_) => _QrPaymentPage(data: data)),
+    final paid = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _QrPaymentDialog(data: data),
     );
 
     if (paid == true && mounted) {
@@ -793,22 +795,22 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
   }
 }
 
-/// Full-screen Razorpay UPI QR — shows only the QR card image. Polls the backend
-/// until the payment is credited (confirmed out-of-band by the qr_code.credited
-/// webhook), stops after 15 minutes. Pops `true` when paid; close (✕) = cancel.
-class _QrPaymentPage extends StatefulWidget {
+/// Shows a Razorpay UPI QR and polls the backend until the payment is credited
+/// (confirmed out-of-band by the qr_code.credited webhook). Pops `true` when paid.
+class _QrPaymentDialog extends StatefulWidget {
   final Map<String, dynamic> data;
-  const _QrPaymentPage({required this.data});
+  const _QrPaymentDialog({required this.data});
 
   @override
-  State<_QrPaymentPage> createState() => _QrPaymentPageState();
+  State<_QrPaymentDialog> createState() => _QrPaymentDialogState();
 }
 
-class _QrPaymentPageState extends State<_QrPaymentPage> {
+class _QrPaymentDialogState extends State<_QrPaymentDialog> {
   Timer? _timer;
   bool _checking = false;
+  bool _expired = false;
   int _elapsed = 0; // seconds
-  static const _timeoutSeconds = 15 * 60; // stop polling after 15 min
+  static const _timeoutSeconds = 600; // stop polling after 10 min
 
   String get _paymentId => '${widget.data['paymentId']}';
 
@@ -828,13 +830,15 @@ class _QrPaymentPageState extends State<_QrPaymentPage> {
     if (_checking) return;
     _elapsed += 4;
     if (_elapsed >= _timeoutSeconds) {
-      _timer?.cancel(); // QR window elapsed — stop checking
+      _timer?.cancel();
+      if (mounted) setState(() => _expired = true);
       return;
     }
     _checking = true;
     try {
       final res = await getIt<ApiClient>().get('/subscriptions/payment-status/$_paymentId');
-      if ((res.data['data']?['paid'] == true) && mounted) {
+      final paid = res.data['data']?['paid'] == true;
+      if (paid && mounted) {
         _timer?.cancel();
         Navigator.pop(context, true);
         return;
@@ -849,38 +853,83 @@ class _QrPaymentPageState extends State<_QrPaymentPage> {
   @override
   Widget build(BuildContext context) {
     final imageUrl = widget.data['imageUrl'] as String?;
+    final amountPaise = (widget.data['amount'] as num?)?.toDouble() ?? 0;
+    final amount = (amountPaise / 100).round();
+    final planName = (widget.data['plan'] as Map?)?['name']?.toString() ?? 'Membership';
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Stack(
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Only the Razorpay QR card image, as large as it fits.
-            Positioned.fill(
-              child: Padding(
-                padding: EdgeInsets.all(12.w),
-                child: (imageUrl != null && imageUrl.isNotEmpty)
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        loadingBuilder: (c, w, p) =>
-                            p == null ? w : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                        errorBuilder: (c, e, s) => const Center(child: Text('Could not load QR')),
-                      )
-                    : const Center(child: Text('QR unavailable')),
-              ),
-            ),
-            // Close (cancel) button.
-            Positioned(
-              top: 4,
-              left: 4,
-              child: Material(
-                color: Colors.black.withValues(alpha: 0.06),
-                shape: const CircleBorder(),
-                child: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.black87),
-                  onPressed: () => Navigator.pop(context, false), // close = cancel
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Scan & Pay  ₹$amount',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                 ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(planName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black12),
+              ),
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                      imageUrl,
+                      width: 220,
+                      height: 220,
+                      fit: BoxFit.contain,
+                      loadingBuilder: (c, w, p) => p == null
+                          ? w
+                          : const SizedBox(width: 220, height: 220, child: Center(child: CircularProgressIndicator(color: AppColors.primary))),
+                      errorBuilder: (c, e, s) => const SizedBox(width: 220, height: 220, child: Center(child: Text('Could not load QR'))),
+                    )
+                  : const SizedBox(width: 220, height: 220, child: Center(child: Text('QR unavailable'))),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Open any UPI app (BHIM / GPay / PhonePe / Paytm) and scan this QR to pay. On the same phone, scan it from another device.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+            ),
+            const SizedBox(height: 14),
+            if (_expired)
+              const Text('QR expired. Please close and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppColors.error, fontWeight: FontWeight.w600, fontFamily: 'Poppins'))
+            else
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                  SizedBox(width: 10),
+                  Text('Waiting for payment…', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                ],
+              ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
             ),
           ],

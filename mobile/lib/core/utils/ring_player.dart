@@ -4,13 +4,8 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The ring tone asset — played ONCE when a new requirement arrives.
-const _kRingAsset = 'audio/ring-1.mp4';
-
-/// Safety cap only: how long the background isolate will wait for the clip's
-/// "complete" event before giving up (in case some device never fires it). The
-/// tone itself plays once and normally finishes well before this.
-const _kRingSafetyCap = Duration(seconds: 30);
+/// How long the ring keeps sounding when a new requirement arrives.
+const _kRingDuration = Duration(seconds: 10);
 
 // The ring played by the FCM **background isolate** lives in that isolate's own
 // `_player`, which the overlay (a separate Flutter engine/isolate) cannot touch.
@@ -20,7 +15,7 @@ const _kRingSafetyCap = Duration(seconds: 30);
 const _kRingStopKey = 'gora_ring_stop_requested';
 
 AudioPlayer? _player;
-StreamSubscription<void>? _completeSub;
+Timer? _stopTimer;
 
 /// Ask whichever isolate is currently ringing to stop — sets the shared flag AND
 /// stops any player in the CURRENT isolate. Call this from every "dismiss" path
@@ -50,45 +45,43 @@ Future<void> _clearStopFlag() async {
   } catch (_) {}
 }
 
-/// Plays the ring tone bundled at assets/[_kRingAsset] ONCE when a new requirement
-/// arrives (no looping — it stops on its own when the clip ends). Best-effort:
+/// Plays the ring tone bundled at assets/audio/ring.mpeg when a new requirement
+/// arrives, for [duration] (looping if the clip is shorter). Best-effort —
 /// silently ignores failures (no audio focus / codec, etc).
 ///
 /// Calling it again restarts the ring rather than layering a second one.
 ///
 /// Set [awaitEnd] when calling from the FCM background isolate: that isolate is
-/// torn down once the handler returns, taking the player with it. Awaiting the
-/// clip's completion keeps it alive so the tone actually plays through once (and
-/// stops early if the user dismisses the popup).
-Future<void> playRequirementRing({bool awaitEnd = false}) async {
+/// torn down once the handler returns, taking the stop timer (and the player)
+/// with it. Awaiting the full duration keeps it alive so the ring actually lasts
+/// [duration] and then stops cleanly.
+Future<void> playRequirementRing({
+  Duration duration = _kRingDuration,
+  bool awaitEnd = false,
+}) async {
   await stopRequirementRing();
   await _clearStopFlag(); // fresh start — forget any earlier dismiss request
   try {
     final player = AudioPlayer();
     _player = player;
-    // Play ONCE — release (not loop) so the tone ends by itself after one play.
-    await player.setReleaseMode(ReleaseMode.release);
-    await player.play(AssetSource(_kRingAsset));
+    // Loop so a short clip still fills the full window; we end it below.
+    await player.setReleaseMode(ReleaseMode.loop);
+    await player.play(AssetSource('audio/ring.mpeg'));
 
     if (awaitEnd) {
-      // Background isolate: keep it alive until the clip finishes OR the user
-      // dismisses the popup (shared stop flag). The cap is only a hang-guard.
-      final completer = Completer<void>();
-      final sub = player.onPlayerComplete.listen((_) {
-        if (!completer.isCompleted) completer.complete();
-      });
-      final end = DateTime.now().add(_kRingSafetyCap);
-      while (!completer.isCompleted && DateTime.now().isBefore(end)) {
+      // Background isolate: poll the shared stop flag so the overlay (a different
+      // isolate) can cut the ring short the moment the user dismisses the popup.
+      final end = DateTime.now().add(duration);
+      while (DateTime.now().isBefore(end)) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         if (await _stopRequested()) break;
       }
-      await sub.cancel();
       await stopRequirementRing();
       await _clearStopFlag();
     } else {
-      // Foreground: the tone plays once; clean up the player when it completes.
-      // The popup's close handler also calls stopRequirementRing directly.
-      _completeSub = player.onPlayerComplete.listen((_) => stopRequirementRing());
+      // Foreground: the popup lives in this same isolate, so its close handler's
+      // stopRequirementRing stops this player directly. The 10s timer is the cap.
+      _stopTimer = Timer(duration, stopRequirementRing);
     }
   } catch (e) {
     debugPrint('Ring play error: $e');
@@ -96,11 +89,11 @@ Future<void> playRequirementRing({bool awaitEnd = false}) async {
   }
 }
 
-/// Stops the ring immediately (when the clip completes, or when the user dismisses
+/// Stops the ring immediately (used by the 10s timer, and when the user dismisses
 /// the popup so the tone doesn't keep playing over them).
 Future<void> stopRequirementRing() async {
-  await _completeSub?.cancel();
-  _completeSub = null;
+  _stopTimer?.cancel();
+  _stopTimer = null;
 
   final player = _player;
   _player = null;
