@@ -100,10 +100,14 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
       overlayContent: 'Tap to view the ride booking',
     );
 
-    // Live channel: push the data a couple of times to beat the startup race.
-    await FlutterOverlayWindow.shareData(payload);
-    await Future.delayed(const Duration(milliseconds: 700));
-    await FlutterOverlayWindow.shareData(payload);
+    // Live channel: push the data a few times over a wider window to beat the
+    // overlay-engine startup race (the prefs read is the reliable fallback).
+    for (final ms in [0, 500, 1200, 2200]) {
+      await Future.delayed(Duration(milliseconds: ms));
+      try {
+        await FlutterOverlayWindow.shareData(payload);
+      } catch (_) {}
+    }
   } catch (_) {
     // Overlay is best-effort; the system notification is the fallback.
   }
@@ -134,9 +138,23 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
   Future<void> _loadFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kOverlayPayloadKey);
-      final parsed = _parse(raw);
-      if (parsed.isNotEmpty && mounted) setState(() => _data = parsed);
+
+      // The payload is written by a DIFFERENT isolate (the FCM background handler)
+      // right before this overlay engine boots. This isolate's SharedPreferences
+      // is cached, so a plain read can miss that write — and the live `shareData`
+      // broadcast can fire before this widget's listener attaches. So reload from
+      // disk and retry for a short window until the payload actually arrives; this
+      // is what makes the card show its details instead of empty placeholders.
+      for (var i = 0; i < 15; i++) {
+        await prefs.reload();
+        final parsed = _parse(prefs.getString(_kOverlayPayloadKey));
+        if (parsed.isNotEmpty) {
+          if (mounted) setState(() => _data = parsed);
+          break;
+        }
+        if (_data.isNotEmpty) break; // shareData already delivered it
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
 
       // Whether this user may contact posters. The overlay runs in its own engine
       // with no access to the app's blocs, so the main app mirrors the answer here
