@@ -83,8 +83,14 @@ export class WhatsappService {
       }
 
       // Contact for the Call / WhatsApp buttons: the number written INSIDE the
-      // message (the original customer) wins; otherwise the sender's own number.
-      const contactMobile = this.normalizeMobile(parsed.contactNumber) || this.normalizeMobile(from) || '';
+      // message (the original customer) wins — AI-extracted first, then a plain
+      // regex scan of the text as a backstop; only if none is found do we fall
+      // back to the sender's own number.
+      const contactMobile =
+        this.normalizeMobile(parsed.contactNumber) ||
+        this.extractNumberFromText(text) ||
+        this.normalizeMobile(from) ||
+        '';
 
       const dto: any = {
         pickupCity: parsed.pickupCity,
@@ -220,6 +226,21 @@ export class WhatsappService {
   private normalizeMobile(raw?: string): string {
     const digits = (raw || '').replace(/\D/g, '').slice(-10);
     return /^[6-9]\d{9}$/.test(digits) ? digits : '';
+  }
+
+  /**
+   * Pull the first Indian mobile number written in the message text (e.g.
+   * "...contact 8888844444"). Handles an optional +91 / 91 prefix. Returns the
+   * clean 10-digit number, or '' if none — so a forwarded booking's customer
+   * number lands on the Call / WhatsApp buttons even when AI isn't running.
+   */
+  private extractNumberFromText(text: string): string {
+    const matches = (text || '').match(/(?:\+?91[\s-]?)?[6-9]\d{9}/g) || [];
+    for (const m of matches) {
+      const n = this.normalizeMobile(m);
+      if (n) return n;
+    }
+    return '';
   }
 
   // ─── Parsing (fixed format) ──────────────────────────────────────────────────
