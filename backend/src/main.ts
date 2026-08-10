@@ -14,6 +14,12 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Keep the raw request body so webhook signature checks (Razorpay
+    // qr_code.credited / payment.captured) can HMAC the exact bytes Razorpay
+    // signed. Without this req.rawBody is undefined, the check falls back to a
+    // re-serialized body that never matches, and every webhook is rejected —
+    // which silently blocked QR-paid membership activations.
+    rawBody: true,
     // In production keep only errors/warnings — 'log'/'debug' floods the CPU & disk.
     logger: process.env.NODE_ENV === 'production'
         ? ['error', 'warn']
