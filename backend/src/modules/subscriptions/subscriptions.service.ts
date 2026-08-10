@@ -59,6 +59,47 @@ export class SubscriptionsService implements OnModuleInit {
     }
   }
 
+  /**
+   * Safety net for "Pay by QR": every 2 minutes, take any pending QR payment
+   * (1 min–24 h old) and ask Razorpay directly whether the QR was paid. If it
+   * was, activate the membership. This catches payments where the user paid but
+   * closed the screen, or the qr_code.credited webhook was missed/misconfigured.
+   */
+  @Cron('*/2 * * * *') // every 2 minutes
+  async reconcilePendingQrPayments() {
+    const now = Date.now();
+    const pendings = await this.paymentModel
+      .find({
+        status: PaymentStatus.PENDING,
+        razorpayQrId: { $exists: true, $nin: [null, ''] },
+        createdAt: { $gt: new Date(now - 24 * 60 * 60 * 1000), $lt: new Date(now - 60 * 1000) },
+      })
+      .select('razorpayQrId amount')
+      .limit(50)
+      .lean();
+    if (!pendings.length) return;
+
+    let razorpay: any;
+    try {
+      razorpay = await this.getRazorpay();
+    } catch {
+      return; // Razorpay not configured
+    }
+
+    for (const p of pendings) {
+      try {
+        const qr: any = await razorpay.qrCode.fetch((p as any).razorpayQrId);
+        const count = Number(qr?.payments_count_received || 0);
+        const received = Number(qr?.payments_amount_received || 0);
+        if (count > 0 || (received > 0 && received >= Number((p as any).amount || 0))) {
+          await this.handleQrCredited((p as any).razorpayQrId);
+        }
+      } catch (e: any) {
+        this.logger.warn(`QR reconcile fetch failed for ${(p as any).razorpayQrId}: ${e?.message ?? e}`);
+      }
+    }
+  }
+
   constructor(
     @InjectModel(SubscriptionPlan.name) private planModel: Model<SubscriptionPlanDocument>,
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
@@ -215,8 +256,31 @@ export class SubscriptionsService implements OnModuleInit {
   /** Lightweight status for the app to poll after showing a QR. */
   async getPaymentStatus(paymentId: string, userId: string) {
     if (!Types.ObjectId.isValid(paymentId)) throw new NotFoundException('Payment not found');
-    const payment = await this.paymentModel.findById(paymentId).select('status userId').lean();
+    const payment = await this.paymentModel
+      .findById(paymentId)
+      .select('status userId razorpayQrId amount')
+      .lean();
     if (!payment || payment.userId?.toString() !== userId) throw new NotFoundException('Payment not found');
+
+    // Active reconcile: don't rely only on the qr_code.credited webhook. If this
+    // is a still-pending QR payment, ask Razorpay directly whether the QR has been
+    // paid — and if so, activate the membership right here. This makes the QR flow
+    // work even when the webhook isn't configured or was missed.
+    if (payment.status === PaymentStatus.PENDING && (payment as any).razorpayQrId) {
+      try {
+        const qr: any = await (await this.getRazorpay()).qrCode.fetch((payment as any).razorpayQrId);
+        const received = Number(qr?.payments_amount_received || 0);
+        const count = Number(qr?.payments_count_received || 0);
+        if (count > 0 || (received > 0 && received >= Number(payment.amount || 0))) {
+          await this.handleQrCredited((payment as any).razorpayQrId);
+          const fresh = await this.paymentModel.findById(paymentId).select('status').lean();
+          return { message: 'ok', data: { status: fresh?.status, paid: fresh?.status === PaymentStatus.SUCCESS } };
+        }
+      } catch (e: any) {
+        this.logger.warn(`QR status reconcile failed for ${paymentId}: ${e?.message ?? e}`);
+      }
+    }
+
     return { message: 'ok', data: { status: payment.status, paid: payment.status === PaymentStatus.SUCCESS } };
   }
 
