@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
+import { WhatsappAiService } from './whatsapp-ai.service';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { RequirementsModule } from '../requirements/requirements.module';
 import { PlacesModule } from '../places/places.module';
@@ -19,6 +20,6 @@ import { SettingsModule } from '../settings/settings.module';
     SettingsModule,
   ],
   controllers: [WhatsappController],
-  providers: [WhatsappService],
+  providers: [WhatsappService, WhatsappAiService],
 })
 export class WhatsappModule {}

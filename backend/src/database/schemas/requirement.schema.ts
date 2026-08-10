@@ -97,6 +97,17 @@ export class Requirement {
   @Prop({ trim: true })
   notes: string;
 
+  // Where the booking came from: 'app' (posted in-app) or 'whatsapp' (parsed from
+  // a WhatsApp message). Drives the Booking / WhatsApp tabs in the app feed.
+  @Prop({ type: String, enum: ['app', 'whatsapp'], default: 'app', index: true })
+  source: string;
+
+  // Contact number to show on the Call / WhatsApp buttons when it differs from the
+  // poster — e.g. a WhatsApp booking forwarded by an agent carries the original
+  // customer's number here. Falls back to the poster's mobile when empty.
+  @Prop({ trim: true })
+  contactMobile: string;
+
   @Prop({ type: String, enum: BookingStatus, default: BookingStatus.ACTIVE })
   status: BookingStatus;
 

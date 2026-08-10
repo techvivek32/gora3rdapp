@@ -134,7 +134,10 @@ export class NotificationsService {
       }
     };
 
-    await sendToTokens(premiumTokens, `${poster?.mobile ?? ''}`);
+    // WhatsApp-imported bookings carry the customer's number in contactMobile;
+    // use it for the popup/notification Call & WhatsApp buttons, else the poster's.
+    const contactNumber = `${requirement.contactMobile || poster?.mobile || ''}`;
+    await sendToTokens(premiumTokens, contactNumber);
     await sendToTokens(basicTokens, ''); // non-premium: no contact number
   }
 

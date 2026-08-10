@@ -6,6 +6,7 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { RequirementsService } from '../requirements/requirements.service';
 import { PlacesService } from '../places/places.service';
 import { SettingsService } from '../settings/settings.service';
+import { WhatsappAiService } from './whatsapp-ai.service';
 import { VehicleType, TripType } from '../../common/enums/vehicle-type.enum';
 
 const HELP = [
@@ -31,6 +32,7 @@ export class WhatsappService {
     private readonly requirementsService: RequirementsService,
     private readonly placesService: PlacesService,
     private readonly settingsService: SettingsService,
+    private readonly aiService: WhatsappAiService,
     private readonly config: ConfigService,
   ) {}
 
@@ -53,13 +55,24 @@ export class WhatsappService {
       const text: string = (msg.text?.body ?? '').trim();
       if (!text) return;
 
-      const parsed = this.parseBooking(text);
+      // 1) Try AI parsing (understands any free-form / Hindi-English message).
+      // Falls back to the strict fixed-format parser when AI is unavailable.
+      let parsed: any = await this.aiParse(text);
+      if (parsed?.kind === 'available') {
+        await this.sendReply(
+          from,
+          '🚕 This looks like an *available car* post. Auto-posting availability from WhatsApp is coming soon — please post it in the Gora app for now.',
+        );
+        return;
+      }
+      if (!parsed) parsed = this.parseBooking(text) as any;
       if (!parsed) {
         await this.sendReply(from, `Sorry, I couldn't read that. ${HELP}`);
         return;
       }
 
-      // Map the sender's WhatsApp number to a registered Gora member.
+      // Map the sender's WhatsApp number to a registered Gora member (the agent
+      // forwarding the booking, or the customer messaging directly).
       const user = await this.findUserByPhone(from);
       if (!user) {
         await this.sendReply(
@@ -68,6 +81,10 @@ export class WhatsappService {
         );
         return;
       }
+
+      // Contact for the Call / WhatsApp buttons: the number written INSIDE the
+      // message (the original customer) wins; otherwise the sender's own number.
+      const contactMobile = this.normalizeMobile(parsed.contactNumber) || this.normalizeMobile(from) || '';
 
       const dto: any = {
         pickupCity: parsed.pickupCity,
@@ -80,7 +97,9 @@ export class WhatsappService {
         travelDate: parsed.travelDate,
         travelTime: parsed.travelTime,
         numberOfVehicles: 1,
-        notes: `Booked via WhatsApp (+${from})`,
+        source: 'whatsapp',
+        contactMobile: contactMobile || undefined,
+        notes: parsed.notes ? `${parsed.notes} (via WhatsApp)` : `Booked via WhatsApp (+${from})`,
       };
 
       // Fill in the same app-suggested distance / fare / commission / total an
@@ -161,6 +180,46 @@ export class WhatsappService {
     } catch (e: any) {
       this.logger.warn(`fare calc skipped: ${e?.message ?? e}`);
     }
+  }
+
+  // ─── AI parsing (free-form) ──────────────────────────────────────────────────
+  /**
+   * Parse any free-form WhatsApp message via Claude, mapping its free-text fields
+   * onto our enums/date types. Returns { kind: 'available' } for availability posts
+   * (not auto-created yet), a full requirement object for bookings, or null to fall
+   * back to the fixed-format parser.
+   */
+  private async aiParse(text: string): Promise<any | null> {
+    if (!this.aiService.enabled) return null;
+    const ai = await this.aiService.parse(text);
+    if (!ai) return null;
+    if (ai.kind === 'available') return { kind: 'available' };
+    if (ai.kind !== 'requirement' || !ai.pickupCity || !ai.dropCity) return null;
+    return {
+      kind: 'requirement',
+      pickupCity: ai.pickupCity,
+      dropCity: ai.dropCity,
+      vehicleType: this.mapVehicle(ai.vehicle || ''),
+      tripType: this.mapTrip(ai.tripType || ''),
+      travelDate: this.parseDate(ai.date) || this.defaultTravelDate(),
+      travelTime: this.normalizeTime(ai.time || '09:00 AM'),
+      fare: this.parseAmount(ai.driverEarning),
+      commission: this.parseAmount(ai.commission),
+      contactNumber: ai.contactNumber || '',
+      notes: ai.notes || '',
+    };
+  }
+
+  private defaultTravelDate(): Date {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+
+  /** Keep a valid 10-digit Indian mobile from any messy input, else ''. */
+  private normalizeMobile(raw?: string): string {
+    const digits = (raw || '').replace(/\D/g, '').slice(-10);
+    return /^[6-9]\d{9}$/.test(digits) ? digits : '';
   }
 
   // ─── Parsing (fixed format) ──────────────────────────────────────────────────

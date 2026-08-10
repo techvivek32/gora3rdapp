@@ -103,6 +103,11 @@ export class RequirementsService {
     if (query.tripType) filter.tripType = query.tripType;
     if (query.bookingId) filter.bookingId = query.bookingId;
 
+    // Booking / WhatsApp tabs. 'app' shows everything that isn't a WhatsApp import
+    // (legacy rows have no `source` field, so $ne keeps them in the Booking tab).
+    if (query.source === 'whatsapp') filter.source = 'whatsapp';
+    else if (query.source === 'app') filter.source = { $ne: 'whatsapp' };
+
     if (query.dateFrom || query.dateTo) {
       filter.travelDate = {};
       if (query.dateFrom) filter.travelDate.$gte = new Date(query.dateFrom);

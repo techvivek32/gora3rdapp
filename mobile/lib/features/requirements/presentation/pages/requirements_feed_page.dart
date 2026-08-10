@@ -28,6 +28,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
   final _apiClient = getIt<ApiClient>();
   String _searchQuery = '';
+  String _source = 'app'; // 'app' = Booking tab, 'whatsapp' = WhatsApp tab
   final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
   bool _lastHasMore = false;
@@ -43,7 +44,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   @override
   void initState() {
     super.initState();
-    context.read<RequirementsBloc>().add(LoadRequirementsEvent());
+    context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source}));
     _scrollController.addListener(_onScroll);
     _loadBanners();
     // Poll in the background so new posts / status changes appear live.
@@ -126,8 +127,14 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(50.h),
-          child: _buildVehicleFilterBar(),
+          preferredSize: Size.fromHeight(98.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSourceTabs(),
+              _buildVehicleFilterBar(),
+            ],
+          ),
         ),
       ),
       body: BlocConsumer<RequirementsBloc, RequirementsState>(
@@ -175,7 +182,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           if (requirements.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [SizedBox(height: MediaQuery.of(context).size.height * 0.35), _buildEmptyState()],
@@ -184,7 +191,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           }
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+            onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
             child: ListView.separated(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -225,7 +232,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           if (state is RequirementsError) {
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
@@ -238,7 +245,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                       Text(state.message, style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
                       SizedBox(height: 16.h),
                       ElevatedButton(
-                        onPressed: () => context.read<RequirementsBloc>().add(LoadRequirementsEvent()),
+                        onPressed: () => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
                         child: const Text('Retry'),
                       ),
                     ],
@@ -271,21 +278,87 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   }
 
   Widget _buildEmptyState() {
+    final isWhatsapp = _source == 'whatsapp';
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off_rounded, size: 64.sp, color: AppColors.textHint),
+          Icon(isWhatsapp ? Icons.chat_bubble_outline_rounded : Icons.search_off_rounded,
+              size: 64.sp, color: AppColors.textHint),
           SizedBox(height: 16.h),
-          Text('No bookings found', style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+          Text(isWhatsapp ? 'No WhatsApp bookings yet' : 'No bookings found',
+              style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
           SizedBox(height: 8.h),
-          Text('Be the first to post a booking!', style: TextStyle(fontSize: 13.sp, color: AppColors.textHint)),
-          SizedBox(height: 24.h),
-          ElevatedButton.icon(
-            onPressed: () => context.push('/requirements/create'),
-            icon: const Icon(Icons.add),
-            label: const Text('Post Booking'),
+          Text(
+            isWhatsapp
+                ? 'Bookings sent to the Gora WhatsApp number appear here.'
+                : 'Be the first to post a booking!',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13.sp, color: AppColors.textHint),
           ),
+          if (!isWhatsapp) ...[
+            SizedBox(height: 24.h),
+            ElevatedButton.icon(
+              onPressed: () => context.push('/requirements/create'),
+              icon: const Icon(Icons.add),
+              label: const Text('Post Booking'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _selectSource(String s) {
+    if (_source == s) return;
+    setState(() {
+      _source = s;
+      _lastLoadedRequirements = [];
+      _vehicleFilters.clear();
+    });
+    context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': s}));
+  }
+
+  // Two top tabs: Booking (app-posted) and WhatsApp (parsed from WhatsApp).
+  Widget _buildSourceTabs() {
+    Widget tab(String value, String label, IconData icon) {
+      final selected = _source == value;
+      return Expanded(
+        child: GestureDetector(
+          onTap: () => _selectSource(value),
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 5.w),
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            decoration: BoxDecoration(
+              color: selected ? Colors.white : Colors.white24,
+              borderRadius: BorderRadius.circular(20.r),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16.sp, color: selected ? AppColors.primary : Colors.white),
+                SizedBox(width: 6.w),
+                Text(label,
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      fontFamily: 'Poppins',
+                      color: selected ? AppColors.primary : Colors.white,
+                    )),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      color: AppColors.primary,
+      padding: EdgeInsets.fromLTRB(6.w, 4.h, 6.w, 8.h),
+      child: Row(
+        children: [
+          tab('app', 'Booking'.tr, Icons.event_note_rounded),
+          tab('whatsapp', 'WhatsApp', Icons.chat_rounded),
         ],
       ),
     );

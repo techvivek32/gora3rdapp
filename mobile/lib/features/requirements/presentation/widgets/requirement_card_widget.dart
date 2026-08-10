@@ -160,7 +160,13 @@ class RequirementCardWidget extends StatelessWidget {
         final notes = (requirement['notes'] as String?)?.trim() ?? '';
         final rating = (postedBy?['rating'] as num?)?.toDouble() ?? 0;
         final canContact = isCurrentUserPremium || isCurrentUserOwner;
-        final mobile = postedBy?['mobile'] as String?;
+        // WhatsApp-imported bookings carry the original customer's number in
+        // `contactMobile`; the Call / WhatsApp buttons should reach that number.
+        // Normal in-app bookings fall back to the poster's own mobile.
+        final contactMobile = (requirement['contactMobile'] as String?)?.trim();
+        final mobile = (contactMobile != null && contactMobile.isNotEmpty)
+            ? contactMobile
+            : postedBy?['mobile'] as String?;
         void openSheet() {
           if (postedBy != null) showUserCardSheet(context, Map<String, dynamic>.from(postedBy));
         }

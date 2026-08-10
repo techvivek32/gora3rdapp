@@ -9,6 +9,9 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   final RequirementsRepository repository;
   int _currentPage = 1;
   bool _hasMore = true;
+  // The active feed filter (e.g. {'source': 'whatsapp'} for the WhatsApp tab).
+  // Persisted so background refresh and load-more keep the same tab's results.
+  Map<String, dynamic>? _filters;
 
   RequirementsBloc(this.repository) : super(RequirementsInitial()) {
     on<LoadRequirementsEvent>(_onLoad);
@@ -59,6 +62,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     _currentPage = 1;
     _hasMore = true;
+    _filters = event.filters;
 
     final result = await repository.getRequirements(page: 1, filters: event.filters);
     final myAcceptedResult = await repository.getAcceptedByMe();
@@ -87,7 +91,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     // (the initial load handles the empty case).
     if (current is! RequirementsLoaded) return;
 
-    final result = await repository.getRequirements(page: 1, filters: null);
+    final result = await repository.getRequirements(page: 1, filters: _filters);
     final myAcceptedResult = await repository.getAcceptedByMe();
 
     result.fold(
@@ -133,7 +137,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(current.copyWith(isLoadingMore: true));
     _currentPage++;
 
-    final result = await repository.getRequirements(page: _currentPage);
+    final result = await repository.getRequirements(page: _currentPage, filters: _filters);
     result.fold(
       (f) => emit(current.copyWith(isLoadingMore: false)),
       (data) {

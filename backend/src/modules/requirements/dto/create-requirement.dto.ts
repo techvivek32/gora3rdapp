@@ -118,6 +118,18 @@ export class CreateRequirementDto {
   @IsString()
   notes?: string;
 
+  // 'app' (default) or 'whatsapp'. Set by the WhatsApp intake, not by clients.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  // Customer's contact number for a forwarded WhatsApp booking.
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  contactMobile?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   pickupCoordinates?: { lat: number; lng: number; address?: string };

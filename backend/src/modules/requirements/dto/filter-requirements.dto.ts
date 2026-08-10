@@ -9,6 +9,8 @@ export class FilterRequirementsDto {
   @ApiPropertyOptional({ enum: VehicleType }) @IsOptional() @IsEnum(VehicleType) vehicleType?: VehicleType;
   @ApiPropertyOptional({ enum: TripType }) @IsOptional() @IsEnum(TripType) tripType?: TripType;
   @ApiPropertyOptional() @IsOptional() @IsString() bookingId?: string;
+  // 'app' → in-app bookings (Booking tab); 'whatsapp' → WhatsApp-sourced (WhatsApp tab).
+  @ApiPropertyOptional() @IsOptional() @IsString() source?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateFrom?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dateTo?: string;
   @ApiPropertyOptional({ enum: MembershipType }) @IsOptional() @IsEnum(MembershipType) membershipType?: MembershipType;
