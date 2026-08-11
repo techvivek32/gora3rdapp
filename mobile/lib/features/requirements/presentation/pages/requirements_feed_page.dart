@@ -358,7 +358,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
       child: Row(
         children: [
           tab('app', 'Booking'.tr, Icons.event_note_rounded),
-          tab('whatsapp', 'WhatsApp', Icons.chat_rounded),
+          tab('whatsapp', 'Duty', Icons.chat_rounded),
         ],
       ),
     );
