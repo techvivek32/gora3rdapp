@@ -84,7 +84,9 @@ export class RequirementsService {
     // Filter by user's business cities if they have set them. Match leniently:
     // a requirement counts if any business city appears in its clean city name or
     // its detailed pickup/drop address (case-insensitive).
-    if (user?.businessCities?.length > 0 && !query.pickupCity) {
+    // WhatsApp bookings are a separate channel (any city) — never city-filter them,
+    // otherwise a forwarded booking outside the user's cities silently disappears.
+    if (user?.businessCities?.length > 0 && !query.pickupCity && query.source !== 'whatsapp') {
       const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const cityRegexes = user.businessCities
         .filter((c) => c && c.trim())

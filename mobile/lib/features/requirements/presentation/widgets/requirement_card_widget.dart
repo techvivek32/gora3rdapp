@@ -167,6 +167,9 @@ class RequirementCardWidget extends StatelessWidget {
         final mobile = (contactMobile != null && contactMobile.isNotEmpty)
             ? contactMobile
             : postedBy?['mobile'] as String?;
+        // WhatsApp-imported bookings have no real member profile (the customer
+        // isn't a Gora user), so we hide the poster profile on those cards.
+        final isWhatsapp = requirement['source'] == 'whatsapp';
         void openSheet() {
           if (postedBy != null) showUserCardSheet(context, Map<String, dynamic>.from(postedBy));
         }
@@ -445,6 +448,14 @@ class RequirementCardWidget extends StatelessWidget {
                             if (canContact) ...[
                               Row(
                                 children: [
+                                  if (isWhatsapp) ...[
+                                    FaIcon(FontAwesomeIcons.whatsapp, color: const Color(0xFF25D366), size: 22.sp),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: Text('WhatsApp Booking',
+                                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
+                                    ),
+                                  ] else ...[
                                   GestureDetector(
                                     onTap: postedBy == null ? null : openSheet,
                                     child: CircleAvatar(
@@ -491,6 +502,7 @@ class RequirementCardWidget extends StatelessWidget {
                                       }),
                                     ),
                                   ),
+                                  ],
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
@@ -539,13 +551,17 @@ class RequirementCardWidget extends StatelessWidget {
                                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
                                     }
                                   }),
-                                  _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
-                                      () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
-                                  _ratingAction(rating),
-                                  _action(Icon(Icons.report, color: Colors.red.shade400, size: 28), 'Report',
-                                      postedBy?['_id'] == null
-                                          ? null
-                                          : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
+                                  // WhatsApp bookings have no member profile, so only
+                                  // Call + WhatsApp make sense — skip Advice/Rating/Report.
+                                  if (!isWhatsapp) ...[
+                                    _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
+                                        () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
+                                    _ratingAction(rating),
+                                    _action(Icon(Icons.report, color: Colors.red.shade400, size: 28), 'Report',
+                                        postedBy?['_id'] == null
+                                            ? null
+                                            : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
+                                  ],
                                 ],
                               )
                             else
