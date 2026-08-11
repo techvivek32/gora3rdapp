@@ -395,8 +395,9 @@ class RequirementCardWidget extends StatelessWidget {
                               ],
                             ),
 
-                            // 5. notes
-                            if (notes.isNotEmpty) ...[
+                            // 5. notes — hidden on WhatsApp cards (the "Booked via
+                            // WhatsApp (+number)" note is noise there).
+                            if (notes.isNotEmpty && !isWhatsapp) ...[
                               SizedBox(height: 10.h),
                               Divider(height: 1, color: Colors.black26),
                               SizedBox(height: 10.h),
@@ -512,11 +513,14 @@ class RequirementCardWidget extends StatelessWidget {
                                           child: Text(_timeAgo(requirement['createdAt']),
                                               style: TextStyle(fontSize: 9.sp, color: Colors.grey[600])),
                                         ),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                        decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
-                                        child: Text(badgeText.tr, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
-                                      ),
+                                      // Member badge (ACTIVE USER etc.) — hidden on
+                                      // WhatsApp cards; the poster isn't the customer.
+                                      if (!isWhatsapp)
+                                        Container(
+                                          padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
+                                          child: Text(badgeText.tr, style: TextStyle(fontSize: 8.sp, color: badgeColor, fontWeight: FontWeight.w600)),
+                                        ),
                                     ],
                                   ),
                                 ],

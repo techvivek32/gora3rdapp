@@ -24,8 +24,18 @@ class ApiClient {
 
     _dio.interceptors.addAll([
       _AuthInterceptor(_storage, _dio),
+      // Dev-only request/response logging. Bodies are NOT printed: response
+      // bodies can contain styled multi-byte Unicode (e.g. a booking note with
+      // 𝗕𝗢𝗟𝗗 text / emoji), and pretty_dio_logger's line-wrapping splits a
+      // multi-byte char mid-sequence — that emits invalid UTF-8 to stdout and
+      // crashes `flutter run` with "Bad UTF-8 encoding". Method/URL/status only.
       if (const bool.fromEnvironment('dart.vm.product') == false)
-        PrettyDioLogger(requestHeader: false, requestBody: true, responseBody: true),
+        PrettyDioLogger(
+          requestHeader: false,
+          requestBody: false,
+          responseBody: false,
+          error: true,
+        ),
     ]);
   }
 

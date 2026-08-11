@@ -115,9 +115,12 @@ export class WhatsappService {
 
       const res = await this.requirementsService.create(user._id.toString(), dto);
       const bookingId = (res as any)?.data?.bookingId ?? '';
+      const distanceLine = dto.estimatedDistance ? `Distance: ${dto.estimatedDistance} km\n` : '';
       const pricingLines =
         dto.fare > 0
-          ? `${dto.estimatedDistance ? `Distance: ${dto.estimatedDistance} km\n` : ''}Driver's Earning: ₹${dto.fare}\nCommission: ₹${dto.commission}\nTotal: ₹${dto.totalAmount}\n`
+          ? dto.isAppSuggested
+            ? `${distanceLine}App Suggested Fare: ₹${dto.totalAmount}\n`
+            : `${distanceLine}Driver's Earning: ₹${dto.fare}\nCommission: ₹${dto.commission}\nTotal: ₹${dto.totalAmount}\n`
           : '';
       await this.sendReply(
         from,
@@ -170,18 +173,19 @@ export class WhatsappService {
         dto.totalAmount = fare + commission;
         dto.isAppSuggested = false;
       } else if (distanceKm > 0) {
+        // No price/commission written in the message → show it as the single
+        // "App Suggested Fare" line (distance × ₹/km), exactly like an in-app
+        // app-suggested booking — not the Driver's Earning / Commission breakdown.
         const settings: any = await this.settingsService.getSettings();
         const rate =
           (settings?.vehiclePrices && settings.vehiclePrices[parsed.vehicleType]) ||
           settings?.pricePerKm ||
           20;
-        const commissionPercent = typeof settings?.commissionPercent === 'number' ? settings.commissionPercent : 10;
         const fare = Math.round(distanceKm * rate);
-        const commission = Math.round((fare * commissionPercent) / 100);
         dto.fare = fare;
-        dto.commission = commission;
-        dto.totalAmount = fare + commission;
-        dto.isAppSuggested = false;
+        dto.commission = 0;
+        dto.totalAmount = fare;
+        dto.isAppSuggested = true;
       }
     } catch (e: any) {
       this.logger.warn(`fare calc skipped: ${e?.message ?? e}`);
