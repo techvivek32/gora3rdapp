@@ -324,14 +324,39 @@ export class WhatsappService {
     return isNaN(fallback.getTime()) ? null : fallback;
   }
 
-  /** Keep the user's time text but tidy it, e.g. "9pm" → "09:00 PM". */
+  /**
+   * Normalise free-form time text to "HH:MM AM/PM".
+   * Handles colon/dot/space separators ("6.30", "6 30", "6:30"), am/pm written
+   * anywhere, and Hindi period words. When only a period word is given (no
+   * digits) it maps to that slot's default: subah→09:00 AM, dopahar→12:00 PM,
+   * shaam→06:00 PM, raat→09:00 PM. Example: "6.30 pm" → "06:30 PM".
+   */
   private normalizeTime(raw: string): string {
-    const m = (raw || '').match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
-    if (!m) return raw || '09:00 AM';
+    const s = (raw || '').toLowerCase();
+
+    // Detect the period word, if any — drives both AM/PM and the wordless default.
+    let ap = '';
+    let periodDefault = ''; // used only when no numeric time is present
+    if (/\b(raat|night)\b/.test(s)) { ap = 'PM'; periodDefault = '09:00 PM'; }
+    else if (/\b(shaam|sham|evening)\b/.test(s)) { ap = 'PM'; periodDefault = '06:00 PM'; }
+    else if (/\b(dopahar|afternoon|noon)\b/.test(s)) { ap = 'PM'; periodDefault = '12:00 PM'; }
+    else if (/\b(subah|subha|savere|sabah|morning)\b/.test(s)) { ap = 'AM'; periodDefault = '09:00 AM'; }
+    // "pm"/"am" may be stuck to the digit ("9pm"): allow a digit/space/dot before.
+    else if (/(?:^|[\s\d.])pm\b/.test(s)) ap = 'PM';
+    else if (/(?:^|[\s\d.])am\b/.test(s)) ap = 'AM';
+
+    // Hour + optional minutes with any separator (":", ".", or space).
+    const m = s.match(/(\d{1,2})\s*[:.\s]?\s*(\d{2})?/);
+    if (!m) {
+      // No numeric time at all — use the period's default slot.
+      return periodDefault || '09:00 AM';
+    }
+
     let h = parseInt(m[1], 10);
     const min = m[2] ? m[2] : '00';
-    let ap = (m[3] || '').toUpperCase();
-    if (!ap) { ap = h >= 12 ? 'PM' : 'AM'; if (h > 12) h -= 12; }
+    if (!ap) ap = h >= 12 ? 'PM' : 'AM';
+    if (h > 12) h -= 12;
+    if (h === 0) h = 12;
     return `${String(h).padStart(2, '0')}:${min} ${ap}`;
   }
 

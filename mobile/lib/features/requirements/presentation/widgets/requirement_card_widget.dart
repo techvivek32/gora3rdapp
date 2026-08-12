@@ -450,10 +450,8 @@ class RequirementCardWidget extends StatelessWidget {
                               Row(
                                 children: [
                                   if (isWhatsapp) ...[
-                                    FaIcon(FontAwesomeIcons.whatsapp, color: const Color(0xFF25D366), size: 22.sp),
-                                    SizedBox(width: 8.w),
                                     Expanded(
-                                      child: Text('WhatsApp Booking',
+                                      child: Text('Duty Booking',
                                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                                     ),
                                   ] else ...[
