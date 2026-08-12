@@ -870,7 +870,9 @@ class RequirementCardWidget extends StatelessWidget {
       b.writeln();
     }
 
-    if (postedBy != null) {
+    // WhatsApp/Duty bookings have no real poster profile (the customer isn't a
+    // Gora member), so skip the "Posted By" section for them.
+    if (postedBy != null && requirement['source'] != 'whatsapp') {
       b.writeln('📞 *Posted By*');
       final agency = (postedBy['agencyName'] as String?)?.trim() ?? '';
       final name = (postedBy['fullName'] as String?)?.trim() ?? '';
