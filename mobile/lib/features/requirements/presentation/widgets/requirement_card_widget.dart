@@ -538,36 +538,56 @@ class RequirementCardWidget extends StatelessWidget {
 
                             // 8. actions (gated)
                             if (canContact)
-                              Row(
-                                children: [
-                                  _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 28), 'Phone', () {
-                                    if (mobile != null && mobile.isNotEmpty) {
-                                      callNumber(mobile);
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
-                                    }
-                                  }),
-                                  _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
-                                    if (mobile != null && mobile.isNotEmpty) {
-                                      // Pre-fill the chat with the full requirement details.
-                                      openWhatsApp(mobile, message: _buildWhatsAppMessage());
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
-                                    }
-                                  }),
-                                  // WhatsApp bookings have no member profile, so only
-                                  // Call + WhatsApp make sense — skip Advice/Rating/Report.
-                                  if (!isWhatsapp) ...[
-                                    _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
-                                        () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
-                                    _ratingAction(rating),
-                                    _action(Icon(Icons.report, color: Colors.red.shade400, size: 28), 'Report',
-                                        postedBy?['_id'] == null
-                                            ? null
-                                            : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
-                                  ],
-                                ],
-                              )
+                              isWhatsapp
+                                  // Duty/WhatsApp cards: big filled Call + WhatsApp buttons.
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: _filledContactButton(
+                                            const Icon(Icons.call, color: Colors.white, size: 20),
+                                            'Call',
+                                            topBarColor,
+                                            (mobile != null && mobile.isNotEmpty) ? () => callNumber(mobile) : null,
+                                          ),
+                                        ),
+                                        SizedBox(width: 10.w),
+                                        Expanded(
+                                          child: _filledContactButton(
+                                            const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.white, size: 20),
+                                            'WhatsApp',
+                                            topBarColor,
+                                            (mobile != null && mobile.isNotEmpty)
+                                                ? () => openWhatsApp(mobile, message: _buildWhatsAppMessage())
+                                                : null,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                  : Row(
+                                      children: [
+                                        _action(const Icon(Icons.call, color: Color(0xFF2196F3), size: 28), 'Phone', () {
+                                          if (mobile != null && mobile.isNotEmpty) {
+                                            callNumber(mobile);
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
+                                          }
+                                        }),
+                                        _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
+                                          if (mobile != null && mobile.isNotEmpty) {
+                                            openWhatsApp(mobile, message: _buildWhatsAppMessage());
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
+                                          }
+                                        }),
+                                        _action(Icon(Icons.notifications_active, color: Colors.amber.shade700, size: 28), 'Advice',
+                                            () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Don't pay without reference!")))),
+                                        _ratingAction(rating),
+                                        _action(Icon(Icons.report, color: Colors.red.shade400, size: 28), 'Report',
+                                            postedBy?['_id'] == null
+                                                ? null
+                                                : () => context.push('/users/${postedBy!['_id']}', extra: {...postedBy, '__openReport': true})),
+                                      ],
+                                    )
                             else
                               GestureDetector(
                                 behavior: HitTestBehavior.opaque,
@@ -644,6 +664,23 @@ class RequirementCardWidget extends StatelessWidget {
         SizedBox(height: 2.h),
         Text(label.tr, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
       ],
+    );
+  }
+
+  // Big filled Call / WhatsApp button used on Duty (WhatsApp) cards.
+  Widget _filledContactButton(Widget icon, String label, Color bg, VoidCallback? onTap) {
+    return ElevatedButton.icon(
+      onPressed: onTap,
+      icon: icon,
+      label: Text(label,
+          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: Colors.white, fontFamily: 'Poppins')),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: onTap == null ? Colors.grey : bg,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        padding: EdgeInsets.symmetric(vertical: 11.h),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+      ),
     );
   }
 
