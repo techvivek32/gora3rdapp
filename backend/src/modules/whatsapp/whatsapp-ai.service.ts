@@ -96,8 +96,9 @@ export class WhatsappAiService {
         model,
         max_tokens: 1024,
         system: SYSTEM_PROMPT,
-        // Constrain the reply to our JSON shape; low effort keeps it fast + cheap.
-        output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
+        // Constrain the reply to our JSON shape. NOTE: no `effort` here — the
+        // effort param is rejected (400) on Haiku 4.5, which broke every parse.
+        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
         messages: [{ role: 'user', content: body.slice(0, 4000) }],
       } as any);
 
