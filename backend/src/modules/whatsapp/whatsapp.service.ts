@@ -293,10 +293,22 @@ export class WhatsappService {
     return isNaN(n) ? undefined : n;
   }
 
-  /** Parse DD/MM/YYYY, DD-MM-YYYY, or DD/MM (year assumed). */
+  /** Parse DD/MM/YYYY, DD-MM-YYYY, DD/MM, or natural words (today/kal/tomorrow). */
   private parseDate(raw: string): Date | null {
     const s = (raw || '').trim();
     if (!s) return null;
+
+    // Natural date words common in group messages.
+    const l = s.toLowerCase();
+    const addDays = (n: number) => {
+      const d = this.defaultTravelDate();
+      d.setDate(d.getDate() + n);
+      return d;
+    };
+    if (/\b(today|aaj|abhi|aj)\b/.test(l)) return addDays(0);
+    if (/\b(tomorrow|tmrw|tmw|kal|kl)\b/.test(l)) return addDays(1);
+    if (/\b(day after|parso|parson|parsu)\b/.test(l)) return addDays(2);
+
     const parts = s.split(/[/\-.]/).map((p) => p.trim());
     if (parts.length >= 2) {
       const dd = parseInt(parts[0], 10);
@@ -337,6 +349,7 @@ export class WhatsappService {
     if (/urbania/.test(v)) return VehicleType.URBANIA;
     if (/trax|cruiser/.test(v)) return VehicleType.TRAX_CRUISER;
     if (/suv/.test(v)) return VehicleType.ERTIGA; // generic SUV → closest
+    if (/small|mini|wagon|alto|swift|celerio|santro|i10|i20|kwid/.test(v)) return VehicleType.HATCHBACK;
     return VehicleType.SEDAN; // sedan / dzire / etios / unknown
   }
 
