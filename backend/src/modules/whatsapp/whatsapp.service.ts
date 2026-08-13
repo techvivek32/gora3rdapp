@@ -54,10 +54,13 @@ export class WhatsappService {
       const from: string = msg.from; // e.g. "919587090620"
       const text: string = (msg.text?.body ?? '').trim();
       if (!text) return;
+      // When the message omits a date/time we fall back to the moment it was
+      // sent (subah/urgent/blank time → the send time; no date → the send date).
+      const msgDate = this.messageDate(msg);
 
       // 1) Try AI parsing (understands any free-form / Hindi-English message).
       // Falls back to the strict fixed-format parser when AI is unavailable.
-      let parsed: any = await this.aiParse(text);
+      let parsed: any = await this.aiParse(text, msgDate);
       if (parsed?.kind === 'available') {
         await this.sendReply(
           from,
@@ -65,7 +68,7 @@ export class WhatsappService {
         );
         return;
       }
-      if (!parsed) parsed = this.parseBooking(text) as any;
+      if (!parsed) parsed = this.parseBooking(text, msgDate) as any;
       if (!parsed) {
         await this.sendReply(from, `Sorry, I couldn't read that. ${HELP}`);
         return;
@@ -200,7 +203,7 @@ export class WhatsappService {
    * (not auto-created yet), a full requirement object for bookings, or null to fall
    * back to the fixed-format parser.
    */
-  private async aiParse(text: string): Promise<any | null> {
+  private async aiParse(text: string, msgDate: Date): Promise<any | null> {
     if (!this.aiService.enabled) return null;
     const ai = await this.aiService.parse(text);
     if (!ai) return null;
@@ -212,8 +215,11 @@ export class WhatsappService {
       dropCity: ai.dropCity,
       vehicleType: this.mapVehicle(ai.vehicle || ''),
       tripType: this.mapTrip(ai.tripType || ''),
-      travelDate: this.parseDate(ai.date) || this.defaultTravelDate(),
-      travelTime: this.normalizeTime(ai.time || '09:00 AM'),
+      // No date given → the day the message was sent.
+      travelDate: this.parseDate(ai.date) || this.istTravelDate(msgDate),
+      // A clock time OR a period word (subah/shaam/dopahar/raat) is honoured;
+      // only when there's no time info at all do we use the message's send time.
+      travelTime: this.hasTimeInfo(ai.time) ? this.normalizeTime(ai.time) : this.istTravelTime(msgDate),
       fare: this.parseAmount(ai.driverEarning),
       commission: this.parseAmount(ai.commission),
       contactNumber: ai.contactNumber || '',
@@ -225,6 +231,40 @@ export class WhatsappService {
     const d = new Date();
     d.setHours(12, 0, 0, 0);
     return d;
+  }
+
+  /**
+   * True when the time text carries usable info: a digit (a real clock time) or
+   * a period word (subah/shaam/dopahar/raat…). False for blank / "urgent" /
+   * anything else — in which case the caller uses the message's send time.
+   */
+  private hasTimeInfo(raw?: string): boolean {
+    const t = (raw || '').toLowerCase();
+    if (/\d/.test(t)) return true;
+    return /\b(subah|subha|savere|sabah|morning|dopahar|afternoon|noon|shaam|sham|evening|raat|night|am|pm)\b/.test(t);
+  }
+
+  /** The instant the WhatsApp message was sent (epoch seconds → Date). */
+  private messageDate(msg: any): Date {
+    const ts = Number(msg?.timestamp);
+    return ts && !isNaN(ts) ? new Date(ts * 1000) : new Date();
+  }
+
+  /** IST calendar date (noon) for an instant — used when no date was written. */
+  private istTravelDate(d: Date): Date {
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000); // UTC+5:30
+    return new Date(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), 12, 0, 0, 0);
+  }
+
+  /** IST clock time "hh:MM AM/PM" for an instant — used when no time was written. */
+  private istTravelTime(d: Date): string {
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000); // UTC+5:30
+    let h = ist.getUTCHours();
+    const min = ist.getUTCMinutes();
+    const ap = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    if (h === 0) h = 12;
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')} ${ap}`;
   }
 
   /** Keep a valid 10-digit Indian mobile from any messy input, else ''. */
@@ -249,7 +289,7 @@ export class WhatsappService {
   }
 
   // ─── Parsing (fixed format) ──────────────────────────────────────────────────
-  private parseBooking(text: string): {
+  private parseBooking(text: string, msgDate: Date): {
     pickupCity: string; dropCity: string; vehicleType: VehicleType; tripType: TripType;
     travelDate: Date; travelTime: string; fare?: number; commission?: number;
   } | null {
@@ -264,9 +304,11 @@ export class WhatsappService {
     const dropCity = fields['to'] || fields['drop'];
     if (!pickupCity || !dropCity) return null;
 
-    const travelDate = this.parseDate(fields['date'] || fields['travel date'] || '');
-    if (!travelDate) return null;
-    const travelTime = this.normalizeTime(fields['time'] || fields['travel time'] || '09:00 AM');
+    // No date written → the day the message was sent (don't reject the booking).
+    const travelDate = this.parseDate(fields['date'] || fields['travel date'] || '') || this.istTravelDate(msgDate);
+    // Specific clock time used as-is; vague/blank → the message's send time.
+    const rawTime = fields['time'] || fields['travel time'] || '';
+    const travelTime = this.hasTimeInfo(rawTime) ? this.normalizeTime(rawTime) : this.istTravelTime(msgDate);
 
     // Manually-entered money (customer types these in the message).
     const fare = this.parseAmount(
