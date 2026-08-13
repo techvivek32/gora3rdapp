@@ -122,6 +122,11 @@ export class Requirement {
   @Prop({ default: 0 })
   viewCount: number;
 
+  // Distinct users who have seen this booking in their feed. `viewCount` is kept
+  // in sync as this list grows so admin/list queries need no aggregation.
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  viewedBy: Types.ObjectId[];
+
   @Prop({ default: 0 })
   contactViewCount: number;
 

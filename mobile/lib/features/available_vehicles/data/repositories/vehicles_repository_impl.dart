@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/network/api_client.dart';
@@ -7,13 +8,35 @@ class VehiclesRepositoryImpl implements VehiclesRepository {
   final ApiClient apiClient;
   VehiclesRepositoryImpl(this.apiClient);
 
+  // Listings already reported as "seen" this session — dedupe across refreshes.
+  static final Set<String> _reportedViews = {};
+
   @override
   Future<Either<Failure, Map<String, dynamic>>> getVehicles({int page = 1, Map<String, dynamic>? filters}) async {
     try {
       final res = await apiClient.get('/available-vehicles', params: {'page': page, ...?filters});
-      return Right(res.data as Map<String, dynamic>);
+      final data = res.data as Map<String, dynamic>;
+      unawaited(_reportViews(data['data']));
+      return Right(data);
     } catch (e) {
       return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  /// Reports which listings appeared in the user's feed so the admin "Views"
+  /// count is real. Fire-and-forget — never affects the feed result.
+  Future<void> _reportViews(dynamic list) async {
+    if (list is! List) return;
+    final ids = <String>[];
+    for (final item in list) {
+      final id = (item is Map ? item['_id'] : null)?.toString() ?? '';
+      if (id.isNotEmpty && _reportedViews.add(id)) ids.add(id);
+    }
+    if (ids.isEmpty) return;
+    try {
+      await apiClient.post('/available-vehicles/mark-views', data: {'ids': ids});
+    } catch (_) {
+      _reportedViews.removeAll(ids);
     }
   }
 

@@ -628,7 +628,22 @@ class VehicleCard extends StatelessWidget {
                                   ),
                                 ),
                                 SizedBox(width: 8.w),
-                                Text(_timeAgo(vehicle['createdAt']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(_timeAgo(vehicle['createdAt']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
+                                    SizedBox(height: 3.h),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.remove_red_eye, size: 12.sp, color: Colors.grey[600]),
+                                        SizedBox(width: 4.w),
+                                        Text('${vehicle['viewCount'] ?? 0} views',
+                                            style: TextStyle(fontSize: 10.sp, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                             SizedBox(height: 12.h),

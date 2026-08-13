@@ -34,6 +34,25 @@ export class AvailableVehiclesService {
     return { message: 'Vehicle listing posted successfully', data: listing };
   }
 
+  /**
+   * Records that a user has seen these listings in their feed. Each (user,
+   * listing) pair counts once; the poster's own views are ignored.
+   */
+  async markViewed(userId: string, ids: string[]): Promise<{ updated: number }> {
+    const uid = new Types.ObjectId(userId);
+    const valid = (ids || [])
+      .filter((id) => Types.ObjectId.isValid(id))
+      .slice(0, 500)
+      .map((id) => new Types.ObjectId(id));
+    if (valid.length === 0) return { updated: 0 };
+
+    const res = await this.vehicleModel.updateMany(
+      { _id: { $in: valid }, postedBy: { $ne: uid }, viewedBy: { $ne: uid } },
+      { $addToSet: { viewedBy: uid }, $inc: { viewCount: 1 } },
+    );
+    return { updated: res.modifiedCount ?? 0 };
+  }
+
   async findAll(userId: string, query: any) {
     const { page, limit, skip, sort } = getPaginationParams(query);
     const user = await this.userModel.findById(userId);

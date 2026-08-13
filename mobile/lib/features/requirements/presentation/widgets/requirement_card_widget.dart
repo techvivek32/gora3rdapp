@@ -441,7 +441,23 @@ class RequirementCardWidget extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                            SizedBox(height: 10.h),
+                            SizedBox(height: 6.h),
+                            Divider(height: 1, color: Colors.black26),
+                            SizedBox(height: 2.h),
+
+                            // 6b. Views — how many distinct users have seen this booking.
+                            Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.remove_red_eye, size: 15.sp, color: Colors.grey[700]),
+                                  SizedBox(width: 6.w),
+                                  Text('${requirement['viewCount'] ?? 0} views',
+                                      style: TextStyle(fontSize: 12.sp, color: Colors.grey[700], fontWeight: FontWeight.w600)),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 10.h),
 

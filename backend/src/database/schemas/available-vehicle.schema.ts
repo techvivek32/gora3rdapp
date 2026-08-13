@@ -57,6 +57,10 @@ export class AvailableVehicle {
   @Prop({ default: 0 })
   viewCount: number;
 
+  // Distinct users who have seen this listing in their feed; viewCount mirrors it.
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  viewedBy: Types.ObjectId[];
+
   @Prop({ default: 0 })
   contactViewCount: number;
 

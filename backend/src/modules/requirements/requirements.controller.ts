@@ -30,6 +30,13 @@ export class RequirementsController {
     return this.requirementsService.findAll(userId, query);
   }
 
+  @Post('mark-views')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record that the current user has seen these bookings (unique views)' })
+  markViews(@CurrentUser('sub') userId: string, @Body('ids') ids: string[]) {
+    return this.requirementsService.markViewed(userId, ids ?? []);
+  }
+
   @Get('my')
   @ApiOperation({ summary: 'Get my posted requirements' })
   getMyRequirements(

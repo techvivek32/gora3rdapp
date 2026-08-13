@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AvailableVehiclesService } from './available-vehicles.service';
 import { CreateAvailableVehicleDto } from './dto/create-available-vehicle.dto';
@@ -22,6 +22,13 @@ export class AvailableVehiclesController {
   @ApiOperation({ summary: 'Get available vehicles feed' })
   findAll(@CurrentUser('sub') userId: string, @Query() query: any) {
     return this.service.findAll(userId, query);
+  }
+
+  @Post('mark-views')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record that the current user has seen these listings (unique views)' })
+  markViews(@CurrentUser('sub') userId: string, @Body('ids') ids: string[]) {
+    return this.service.markViewed(userId, ids ?? []);
   }
 
   @Get('my')

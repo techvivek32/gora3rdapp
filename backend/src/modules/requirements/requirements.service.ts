@@ -75,6 +75,26 @@ export class RequirementsService {
     };
   }
 
+  /**
+   * Records that a user has seen these bookings in their feed. Counts each
+   * (user, booking) pair once — a viewer re-scrolling never inflates the number,
+   * and the poster's own views are ignored. `viewCount` mirrors viewedBy.length.
+   */
+  async markViewed(userId: string, ids: string[]): Promise<{ updated: number }> {
+    const uid = new Types.ObjectId(userId);
+    const valid = (ids || [])
+      .filter((id) => Types.ObjectId.isValid(id))
+      .slice(0, 500)
+      .map((id) => new Types.ObjectId(id));
+    if (valid.length === 0) return { updated: 0 };
+
+    const res = await this.requirementModel.updateMany(
+      { _id: { $in: valid }, postedBy: { $ne: uid }, viewedBy: { $ne: uid } },
+      { $addToSet: { viewedBy: uid }, $inc: { viewCount: 1 } },
+    );
+    return { updated: res.modifiedCount ?? 0 };
+  }
+
   /** Window (ms) inside which an identical re-post is treated as a duplicate. */
   private static readonly DUP_WINDOW_MS = 90_000;
 

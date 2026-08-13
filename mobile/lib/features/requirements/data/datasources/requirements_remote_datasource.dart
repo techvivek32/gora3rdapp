@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../../core/network/api_client.dart';
 
 abstract class RequirementsRemoteDataSource {
@@ -20,10 +21,34 @@ class RequirementsRemoteDataSourceImpl implements RequirementsRemoteDataSource {
   final ApiClient apiClient;
   RequirementsRemoteDataSourceImpl(this.apiClient);
 
+  // Bookings already reported as "seen" this app session — avoids re-posting the
+  // same ids on every refresh/scroll (the server also counts each user once).
+  static final Set<String> _reportedViews = {};
+
   @override
   Future<Map<String, dynamic>> getRequirements(Map<String, dynamic> params) async {
     final res = await apiClient.get('/requirements', params: params);
-    return res.data as Map<String, dynamic>;
+    final data = res.data as Map<String, dynamic>;
+    unawaited(_reportViews(data['data']));
+    return data;
+  }
+
+  /// Tells the server which bookings appeared in the user's feed so the admin
+  /// "Views" count reflects real reach. Fire-and-forget — never breaks the feed.
+  Future<void> _reportViews(dynamic list) async {
+    if (list is! List) return;
+    final ids = <String>[];
+    for (final item in list) {
+      final id = (item is Map ? item['_id'] : null)?.toString() ?? '';
+      if (id.isNotEmpty && _reportedViews.add(id)) ids.add(id);
+    }
+    if (ids.isEmpty) return;
+    try {
+      await apiClient.post('/requirements/mark-views', data: {'ids': ids});
+    } catch (_) {
+      // A failed view report is harmless; drop the ids so a later load retries.
+      _reportedViews.removeAll(ids);
+    }
   }
 
   @override
