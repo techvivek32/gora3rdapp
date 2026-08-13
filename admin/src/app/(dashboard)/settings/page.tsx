@@ -21,6 +21,13 @@ export default function SettingsPage() {
   const [contactSaved, setContactSaved] = useState(false);
   const [contactError, setContactError] = useState('');
 
+  const [minDeposit, setMinDeposit] = useState('');
+  const [minWithdrawal, setMinWithdrawal] = useState('');
+  const [minTransfer, setMinTransfer] = useState('');
+  const [walletSaving, setWalletSaving] = useState(false);
+  const [walletSaved, setWalletSaved] = useState(false);
+  const [walletError, setWalletError] = useState('');
+
   const [loading, setLoading] = useState(true);
 
   // Wait for the session before fetching. SessionSync feeds the access token to
@@ -40,6 +47,9 @@ export default function SettingsPage() {
         setSupportPhone2(s.supportPhone2 ?? '');
         setSupportWhatsapp(s.supportWhatsapp ?? '');
         setSupportEmail(s.supportEmail ?? '');
+        setMinDeposit(String(s.minDeposit ?? 1));
+        setMinWithdrawal(String(s.minWithdrawal ?? 1));
+        setMinTransfer(String(s.minTransfer ?? 1));
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -64,6 +74,26 @@ export default function SettingsPage() {
       setContactError(e.message || 'Failed to save');
     } finally {
       setContactSaving(false);
+    }
+  };
+
+  const handleSaveWallet = async () => {
+    const dep = Math.round(Number(minDeposit));
+    const wd = Math.round(Number(minWithdrawal));
+    const tr = Math.round(Number(minTransfer));
+    if ([dep, wd, tr].some((n) => !Number.isFinite(n) || n < 1)) {
+      return setWalletError('Enter valid amounts (₹1 or more)');
+    }
+    setWalletError('');
+    setWalletSaving(true);
+    try {
+      await adminApi.updateSettings({ minDeposit: dep, minWithdrawal: wd, minTransfer: tr });
+      setWalletSaved(true);
+      setTimeout(() => setWalletSaved(false), 3000);
+    } catch (e: any) {
+      setWalletError(e.message || 'Failed to save');
+    } finally {
+      setWalletSaving(false);
     }
   };
 
@@ -204,6 +234,63 @@ export default function SettingsPage() {
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {saving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : saved ? '✓ Saved!' : 'Save Razorpay Keys'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Wallet Limits */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Wallet Limits</h2>
+          <p className="text-gray-500 text-sm mb-5">Minimum amounts (₹) a user must enter in the app to add money, withdraw, or transfer.</p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Minimum Deposit (Add Money)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={minDeposit}
+                  onChange={(e) => { setMinDeposit(e.target.value); setWalletSaved(false); }}
+                  placeholder="100"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Minimum Withdrawal</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={minWithdrawal}
+                  onChange={(e) => { setMinWithdrawal(e.target.value); setWalletSaved(false); }}
+                  placeholder="500"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Minimum Transfer</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={minTransfer}
+                  onChange={(e) => { setMinTransfer(e.target.value); setWalletSaved(false); }}
+                  placeholder="100"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">These limits are enforced by the app and the server.</p>
+              </div>
+              {walletError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{walletError}</p>}
+              <button
+                onClick={handleSaveWallet}
+                disabled={walletSaving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {walletSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : walletSaved ? '✓ Saved!' : 'Save Wallet Limits'}
               </button>
             </div>
           )}

@@ -188,6 +188,9 @@ export const adminApi = {
     supportPhone2?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
+    minDeposit?: number;
+    minWithdrawal?: number;
+    minTransfer?: number;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

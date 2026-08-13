@@ -58,6 +58,19 @@ export class PlatformSettings {
   /** Shown on the app's About Us page alongside supportPhone. */
   @Prop({ default: '', trim: true, lowercase: true })
   supportEmail: string;
+
+  // ─── Wallet limits (₹) — enforced on the wallet actions, shown in the app ───
+  /** Minimum amount a user can add to their wallet in one go. */
+  @Prop({ default: 1, min: 0 })
+  minDeposit: number;
+
+  /** Minimum amount a user can request to withdraw. */
+  @Prop({ default: 1, min: 0 })
+  minWithdrawal: number;
+
+  /** Minimum amount a user can transfer to another wallet. */
+  @Prop({ default: 1, min: 0 })
+  minTransfer: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

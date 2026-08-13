@@ -51,6 +51,9 @@ export class SettingsController {
     supportPhone2?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
+    minDeposit?: number;
+    minWithdrawal?: number;
+    minTransfer?: number;
   }) {
     return this.settingsService.updateSettings(body);
   }

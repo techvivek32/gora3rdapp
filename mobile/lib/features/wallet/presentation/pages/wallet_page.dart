@@ -27,6 +27,12 @@ class _WalletPageState extends State<WalletPage> {
   bool _loading = true;
   bool _processing = false;
 
+  // Wallet minimums (₹), configured by admin in Settings; fetched from /settings.
+  int _minDeposit = 1;
+  int _minWithdrawal = 1;
+  int _minTransfer = 1;
+  String? _addError; // shown inline under the Add Money field
+
   static const _presets = [100, 500, 1000, 2000];
 
   @override
@@ -49,6 +55,9 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
+    // Fetch the admin-configured wallet minimums alongside the wallet. Failures
+    // here are non-fatal — the minimums simply keep their last/default value.
+    _loadLimits();
     try {
       final res = await _api.get('/wallet');
       final data = res.data['data'] as Map<String, dynamic>;
@@ -62,6 +71,25 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
+  Future<void> _loadLimits() async {
+    try {
+      final res = await _api.get('/settings');
+      final s = (res.data['data'] ?? res.data) as Map<String, dynamic>;
+      int pick(dynamic v) {
+        final n = (v as num?)?.round() ?? 1;
+        return n < 1 ? 1 : n;
+      }
+      if (!mounted) return;
+      setState(() {
+        _minDeposit = pick(s['minDeposit']);
+        _minWithdrawal = pick(s['minWithdrawal']);
+        _minTransfer = pick(s['minTransfer']);
+      });
+    } catch (_) {
+      // keep defaults
+    }
+  }
+
   void _snack(String msg, {bool error = true}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -69,16 +97,29 @@ class _WalletPageState extends State<WalletPage> {
     );
   }
 
+  /// Amount issue for the Add Money field. `force` treats an empty field as an
+  /// error (on tap of the button); live typing (`force:false`) leaves it blank.
+  String? _addAmountIssue({required bool force}) {
+    final t = _amountCtrl.text.trim();
+    if (t.isEmpty) return force ? 'Enter an amount' : null;
+    final amt = int.tryParse(t) ?? 0;
+    if (amt < _minDeposit) return 'Minimum amount to add is ₹$_minDeposit';
+    return null;
+  }
+
   Future<void> _addMoney(int amount) async {
-    if (amount < 1) {
-      _snack('Enter a valid amount');
+    if (amount < _minDeposit) {
+      setState(() => _addError = 'Minimum amount to add is ₹$_minDeposit');
       return;
     }
     if (kIsWeb) {
       _snack('Payments are only supported on the mobile app.');
       return;
     }
-    setState(() => _processing = true);
+    setState(() {
+      _addError = null;
+      _processing = true;
+    });
     try {
       final res = await _api.post('/wallet/create-order', data: {'amount': amount});
       final order = res.data['data'] as Map<String, dynamic>;
@@ -177,6 +218,8 @@ class _WalletPageState extends State<WalletPage> {
     final upiCtrl = TextEditingController();
     String method = 'bank'; // 'bank' | 'upi'
     bool submitting = false;
+    String? amountError; // shown inline under the amount field
+    String? formError; // shown above the submit button (non-amount issues)
 
     InputDecoration dec(String label, IconData icon) => InputDecoration(
           labelText: label,
@@ -194,24 +237,37 @@ class _WalletPageState extends State<WalletPage> {
         builder: (ctx, setSheet) {
           final isBank = method == 'bank';
 
-          Future<void> submit() async {
-            final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
-            if (amt < 1) return _snack('Enter a valid amount');
-            if (amt > _balance) return _snack('You can withdraw at most ₹${_balance.toStringAsFixed(0)}');
-            if (nameCtrl.text.trim().isEmpty) return _snack('Enter the account holder name');
+          // Validate the amount for live (onChanged) and submit (force) use.
+          String? amountIssue({required bool force}) {
+            final t = amountCtrl.text.trim();
+            if (t.isEmpty) return force ? 'Enter an amount' : null;
+            final amt = int.tryParse(t) ?? 0;
+            if (amt < _minWithdrawal) return 'Minimum withdrawal is ₹$_minWithdrawal';
+            if (amt > _balance) return 'You can withdraw at most ₹${_balance.toStringAsFixed(0)}';
+            return null;
+          }
 
-            if (isBank) {
-              if (bankCtrl.text.trim().isEmpty || accCtrl.text.trim().isEmpty || ifscCtrl.text.trim().isEmpty) {
-                return _snack('Please fill all bank details');
-              }
-            } else {
-              final upi = upiCtrl.text.trim();
-              if (!RegExp(r'^[\w.\-]{2,}@[a-zA-Z]{2,}$').hasMatch(upi)) {
-                return _snack('Enter a valid UPI ID (e.g. name@bank)');
+          Future<void> submit() async {
+            final amtErr = amountIssue(force: true);
+            String? fErr;
+            if (amtErr == null) {
+              if (nameCtrl.text.trim().isEmpty) {
+                fErr = 'Enter the account holder name';
+              } else if (isBank) {
+                if (bankCtrl.text.trim().isEmpty || accCtrl.text.trim().isEmpty || ifscCtrl.text.trim().isEmpty) {
+                  fErr = 'Please fill all bank details';
+                }
+              } else if (!RegExp(r'^[\w.\-]{2,}@[a-zA-Z]{2,}$').hasMatch(upiCtrl.text.trim())) {
+                fErr = 'Enter a valid UPI ID (e.g. name@bank)';
               }
             }
+            if (amtErr != null || fErr != null) {
+              setSheet(() { amountError = amtErr; formError = fErr; });
+              return;
+            }
 
-            setSheet(() => submitting = true);
+            setSheet(() { amountError = null; formError = null; submitting = true; });
+            final amt = int.parse(amountCtrl.text.trim());
             try {
               await _api.post('/wallet/withdraw', data: {
                 'amount': amt,
@@ -252,6 +308,9 @@ class _WalletPageState extends State<WalletPage> {
                   const SizedBox(height: 4),
                   Text('Available balance: ₹${_balance.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  if (_minWithdrawal > 1)
+                    Text('Minimum withdrawal: ₹$_minWithdrawal',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                   const SizedBox(height: 16),
 
                   // Payout method: bank transfer or UPI.
@@ -282,7 +341,8 @@ class _WalletPageState extends State<WalletPage> {
                     controller: amountCtrl,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: dec('Amount (₹)', Icons.currency_rupee),
+                    onChanged: (_) => setSheet(() => amountError = amountIssue(force: false)),
+                    decoration: dec('Amount (₹)', Icons.currency_rupee).copyWith(errorText: amountError),
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -310,6 +370,10 @@ class _WalletPageState extends State<WalletPage> {
                       decoration: dec('UPI ID (e.g. name@bank)', Icons.alternate_email),
                     ),
 
+                  if (formError != null) ...[
+                    const SizedBox(height: 12),
+                    Text(formError!, style: const TextStyle(fontSize: 12.5, color: AppColors.error, fontWeight: FontWeight.w600)),
+                  ],
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -351,6 +415,8 @@ class _WalletPageState extends State<WalletPage> {
     Map<String, dynamic>? recipient; // resolved user, null until found
     bool searching = false;
     bool submitting = false;
+    String? amountError; // shown inline under the amount field
+    String? formError; // shown above the submit button (non-amount issues)
 
     InputDecoration dec(String label, IconData icon) => InputDecoration(
           labelText: label,
@@ -366,6 +432,16 @@ class _WalletPageState extends State<WalletPage> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
+          // Validate the amount for live (onChanged) and submit (force) use.
+          String? amountIssue({required bool force}) {
+            final t = amountCtrl.text.trim();
+            if (t.isEmpty) return force ? 'Enter an amount' : null;
+            final amt = int.tryParse(t) ?? 0;
+            if (amt < _minTransfer) return 'Minimum transfer is ₹$_minTransfer';
+            if (amt > _balance) return 'Insufficient balance. You have ₹${_balance.toStringAsFixed(0)}';
+            return null;
+          }
+
           Future<void> search() async {
             final phone = phoneCtrl.text.trim();
             if (phone.length < 10) return _snack('Enter a valid 10-digit mobile number');
@@ -387,14 +463,14 @@ class _WalletPageState extends State<WalletPage> {
           }
 
           Future<void> submit() async {
-            if (recipient == null) return _snack('Search and select a user first');
-            final amt = int.tryParse(amountCtrl.text.trim()) ?? 0;
-            if (amt < 1) return _snack('Enter a valid amount');
-            // Server re-checks this, but fail fast so we never even attempt it.
-            if (amt > _balance) {
-              return _snack('Insufficient balance. You have ₹${_balance.toStringAsFixed(0)}');
+            final amtErr = amountIssue(force: true);
+            final fErr = recipient == null ? 'Search and select a user first' : null;
+            if (amtErr != null || fErr != null) {
+              setSheet(() { amountError = amtErr; formError = fErr; });
+              return;
             }
-            setSheet(() => submitting = true);
+            setSheet(() { amountError = null; formError = null; submitting = true; });
+            final amt = int.parse(amountCtrl.text.trim());
             try {
               await _api.post('/wallet/transfer', data: {
                 'mobile': phoneCtrl.text.trim(),
@@ -515,14 +591,24 @@ class _WalletPageState extends State<WalletPage> {
                       controller: amountCtrl,
                       keyboardType: TextInputType.number,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      decoration: dec('Amount (₹)', Icons.currency_rupee),
+                      onChanged: (_) => setSheet(() => amountError = amountIssue(force: false)),
+                      decoration: dec('Amount (₹)', Icons.currency_rupee).copyWith(errorText: amountError),
                     ),
+                    if (_minTransfer > 1 && amountError == null) ...[
+                      const SizedBox(height: 6),
+                      Text('Minimum transfer: ₹$_minTransfer',
+                          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    ],
                     const SizedBox(height: 12),
                     TextField(
                       controller: noteCtrl,
                       maxLength: 120,
                       decoration: dec('Note (optional)', Icons.notes).copyWith(counterText: ''),
                     ),
+                    if (formError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(formError!, style: const TextStyle(fontSize: 12.5, color: AppColors.error, fontWeight: FontWeight.w600)),
+                    ],
                     const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
@@ -585,19 +671,32 @@ class _WalletPageState extends State<WalletPage> {
                     controller: _amountCtrl,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
+                    onChanged: (_) => setState(() => _addError = _addAmountIssue(force: false)),
+                    decoration: InputDecoration(
                       labelText: 'Enter amount (₹)',
-                      prefixIcon: Icon(Icons.currency_rupee),
+                      prefixIcon: const Icon(Icons.currency_rupee),
+                      errorText: _addError,
                     ),
                   ),
+                  if (_minDeposit > 1 && _addError == null) ...[
+                    const SizedBox(height: 6),
+                    Text('Minimum add amount: ₹$_minDeposit',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: _processing
                           ? null
-                          : () => _addMoney(int.tryParse(_amountCtrl.text.trim()) ?? 0),
+                          : () {
+                              final issue = _addAmountIssue(force: true);
+                              if (issue != null) {
+                                setState(() => _addError = issue);
+                                return;
+                              }
+                              _addMoney(int.parse(_amountCtrl.text.trim()));
+                            },
                       style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
                       child: _processing
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

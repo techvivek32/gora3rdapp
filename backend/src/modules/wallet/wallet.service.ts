@@ -96,7 +96,8 @@ export class WalletService {
 
   async createTopUpOrder(userId: string, dto: CreateTopUpDto) {
     const amount = Math.round(dto.amount);
-    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+    const { minDeposit } = await this.settingsService.getWalletLimits();
+    if (amount < minDeposit) throw new BadRequestException(`Minimum amount to add is ₹${minDeposit}`);
 
     let order;
     try {
@@ -251,7 +252,8 @@ export class WalletService {
    *  admin approves (kept) or rejects (refunded). */
   async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
     const amount = Math.round(dto.amount);
-    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+    const { minWithdrawal } = await this.settingsService.getWalletLimits();
+    if (amount < minWithdrawal) throw new BadRequestException(`Minimum withdrawal is ₹${minWithdrawal}`);
 
     const user = await this.userModel.findById(userId).select('walletBalance');
     if (!user) throw new NotFoundException('User not found');
@@ -301,7 +303,8 @@ export class WalletService {
     // The sender (:id) must be in the franchise's city. The recipient may be anywhere.
     await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
-    if (amount < 1) throw new BadRequestException('Enter a valid amount');
+    const { minTransfer } = await this.settingsService.getWalletLimits();
+    if (amount < minTransfer) throw new BadRequestException(`Minimum transfer is ₹${minTransfer}`);
 
     // Resolve the recipient by the last 10 digits, same as the user lookup does.
     const digits = (dto.mobile || '').replace(/\D/g, '');

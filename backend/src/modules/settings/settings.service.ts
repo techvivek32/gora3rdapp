@@ -104,6 +104,9 @@ export class SettingsService {
     supportPhone2?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
+    minDeposit?: number;
+    minWithdrawal?: number;
+    minTransfer?: number;
   }): Promise<PlatformSettings> {
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },
@@ -111,5 +114,15 @@ export class SettingsService {
       { new: true, upsert: true },
     ).lean();
     return settings;
+  }
+
+  /** Wallet minimums (₹) used to validate deposit/withdraw/transfer amounts. */
+  async getWalletLimits(): Promise<{ minDeposit: number; minWithdrawal: number; minTransfer: number }> {
+    const s = await this.getSettings();
+    return {
+      minDeposit: Math.max(1, s.minDeposit ?? 1),
+      minWithdrawal: Math.max(1, s.minWithdrawal ?? 1),
+      minTransfer: Math.max(1, s.minTransfer ?? 1),
+    };
   }
 }
