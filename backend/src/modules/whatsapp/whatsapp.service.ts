@@ -104,6 +104,7 @@ export class WhatsappService {
         travelTime: parsed.travelTime,
         numberOfVehicles: 1,
         source: 'whatsapp',
+        whatsappMessageId: msg.id, // wamid — idempotency key against redelivery
         contactMobile: contactMobile || undefined,
         notes: parsed.notes ? `${parsed.notes} (via WhatsApp)` : `Booked via WhatsApp (+${from})`,
       };

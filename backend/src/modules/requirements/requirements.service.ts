@@ -27,20 +27,40 @@ export class RequirementsService {
   ) {}
 
   async create(userId: string, dto: CreateRequirementDto) {
+    // ── Duplicate-post guard ────────────────────────────────────────────────
+    // Protects against double-tap on the Post button, an auth-refresh/network
+    // retry re-sending the same POST, a franchise operator double-submitting,
+    // and a redelivered WhatsApp webhook — none of which should create a copy.
+    const existing = await this.findRecentDuplicate(userId, dto as any);
+    if (existing) {
+      return { message: 'Booking posted successfully', data: existing };
+    }
+
     const bookingId = generateBookingId();
     const requirementId = generateRequirementId();
 
     const expiresAt = new Date(dto.travelDate);
     expiresAt.setDate(expiresAt.getDate() + 1);
 
-    const requirement = await this.requirementModel.create({
-      ...dto,
-      bookingId,
-      requirementId,
-      postedBy: new Types.ObjectId(userId),
-      status: BookingStatus.ACTIVE,
-      expiresAt,
-    });
+    let requirement;
+    try {
+      requirement = await this.requirementModel.create({
+        ...dto,
+        bookingId,
+        requirementId,
+        postedBy: new Types.ObjectId(userId),
+        status: BookingStatus.ACTIVE,
+        expiresAt,
+      });
+    } catch (e: any) {
+      // Two identical requests racing can both pass the check above; the unique
+      // whatsappMessageId index then rejects the loser — return the winner.
+      if (e?.code === 11000) {
+        const dup = await this.findRecentDuplicate(userId, dto as any);
+        if (dup) return { message: 'Booking posted successfully', data: dup };
+      }
+      throw e;
+    }
 
     await this.userModel.findByIdAndUpdate(userId, { $inc: { requirementsPosted: 1 } });
 
@@ -53,6 +73,37 @@ export class RequirementsService {
       message: 'Booking posted successfully',
       data: requirement,
     };
+  }
+
+  /** Window (ms) inside which an identical re-post is treated as a duplicate. */
+  private static readonly DUP_WINDOW_MS = 90_000;
+
+  /**
+   * Finds an already-created booking that this new one would duplicate.
+   * WhatsApp messages match exactly on their message id (idempotent across
+   * redeliveries); everything else matches on poster + route + date + vehicle
+   * posted within the last DUP_WINDOW_MS.
+   */
+  private async findRecentDuplicate(userId: string, dto: any) {
+    // Exact idempotency for WhatsApp — same inbound message can never duplicate.
+    if (dto?.whatsappMessageId) {
+      const byMsg = await this.requirementModel.findOne({ whatsappMessageId: dto.whatsappMessageId });
+      if (byMsg) return byMsg;
+    }
+
+    const filter: any = {
+      postedBy: new Types.ObjectId(userId),
+      source: dto?.source ?? 'app',
+      createdAt: { $gte: new Date(Date.now() - RequirementsService.DUP_WINDOW_MS) },
+    };
+    if (dto?.pickupCity != null) filter.pickupCity = dto.pickupCity;
+    if (dto?.dropCity != null) filter.dropCity = dto.dropCity;
+    if (dto?.vehicleType != null) filter.vehicleType = dto.vehicleType;
+    if (dto?.travelDate != null) filter.travelDate = new Date(dto.travelDate);
+    // Two different WhatsApp customers can share a route/date — keep them apart.
+    if (dto?.contactMobile) filter.contactMobile = dto.contactMobile;
+
+    return this.requirementModel.findOne(filter).sort({ createdAt: -1 });
   }
 
   /**

@@ -108,6 +108,11 @@ export class Requirement {
   @Prop({ trim: true })
   contactMobile: string;
 
+  // WhatsApp message id (wamid) that created this booking. Unique+sparse so a
+  // redelivered webhook for the same message can never insert a second copy.
+  @Prop({ type: String, index: { unique: true, sparse: true } })
+  whatsappMessageId?: string;
+
   @Prop({ type: String, enum: BookingStatus, default: BookingStatus.ACTIVE })
   status: BookingStatus;
 

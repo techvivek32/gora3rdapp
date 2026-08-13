@@ -37,6 +37,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   DateTime? _returnDate;
   TimeOfDay? _returnTime;
   bool _useCustomFare = false;
+  bool _submitting = false; // blocks a double-tap from posting twice
 
   // Location lat/lng from map picker
   double? _pickupLat, _pickupLng;
@@ -293,6 +294,9 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   }
 
   Future<void> _submit() async {
+    // Guard against a fast double-tap dispatching two create events in the same
+    // frame (before the button rebuilds disabled) → duplicate bookings.
+    if (_submitting) return;
     if (!_formKey.currentState!.validate()) return;
     if (_travelDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'.tr), backgroundColor: AppColors.error));
@@ -337,6 +341,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       bloc.add(UpdateRequirementEvent(id: widget.requirementId!, data: data));
       return;
     }
+    setState(() => _submitting = true);
     bloc.add(CreateRequirementEvent(data: data));
   }
 
@@ -354,6 +359,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
             context.pop();
           }
           if (state is RequirementsError) {
+            if (_submitting) setState(() => _submitting = false);
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message), backgroundColor: AppColors.error));
           }
         },
@@ -870,12 +876,15 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                 ),
                 SizedBox(height: 24.h),
                 BlocBuilder<RequirementsBloc, RequirementsState>(
-                  builder: (context, state) => ElevatedButton(
-                    onPressed: (state is RequirementsLoading || _isCustomFareBelowMin) ? null : _submit,
-                    child: state is RequirementsLoading
+                  builder: (context, state) {
+                    final busy = state is RequirementsLoading || _submitting;
+                    return ElevatedButton(
+                    onPressed: (busy || _isCustomFareBelowMin) ? null : _submit,
+                    child: busy
                         ? SizedBox(width: 20.w, height: 20.h, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : Text(_isEdit ? 'Save Changes' : 'Post Booking'.tr, style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
-                  ),
+                    );
+                  },
                 ),
                 SizedBox(height: 32.h),
               ],

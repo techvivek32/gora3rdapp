@@ -179,6 +179,9 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   }
 
   Future<void> _onCreate(CreateRequirementEvent event, Emitter<RequirementsState> emit) async {
+    // Emit loading first so the Post button disables while the POST is in flight
+    // — without this a fast double-tap fired two creates (duplicate bookings).
+    emit(RequirementsLoading());
     final result = await repository.createRequirement(event.data);
     result.fold(
       (f) => emit(RequirementsError(message: f.message)),
