@@ -8,7 +8,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
   RequirementsRepositoryImpl(this.remote);
 
   @override
-  Future<Either<Failure, Map<String, dynamic>>> getRequirements({int page = 1, int limit = 200, String? search, Map<String, dynamic>? filters}) async {
+  Future<Either<Failure, Map<String, dynamic>>> getRequirements({int page = 1, int limit = 2000, String? search, Map<String, dynamic>? filters}) async {
     try {
       final params = {'page': page, 'limit': limit, if (search != null) 'search': search, ...?filters};
       final result = await remote.getRequirements(params.map((k, v) => MapEntry(k, v.toString())));

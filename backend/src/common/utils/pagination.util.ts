@@ -19,10 +19,10 @@ export interface PaginatedResult<T> {
 
 export function getPaginationParams(query: PaginationQuery) {
   const page = Math.max(1, Number(query.page) || 1);
-  // Cap raised to 500 so the app's requirement feed can request a large page
-  // (e.g. 200) in one go instead of being stuck at ~20; other endpoints still
-  // default to 20 when they don't pass a limit.
-  const limit = Math.min(500, Math.max(1, Number(query.limit) || 20));
+  // Cap raised to 2000 so the app's requirement feed can request a large page
+  // in one go instead of being stuck at ~20; other endpoints still default to
+  // 20 when they don't pass a limit.
+  const limit = Math.min(2000, Math.max(1, Number(query.limit) || 20));
   const skip = (page - 1) * limit;
   const sort: Record<string, 1 | -1> = {
     [query.sortBy || 'createdAt']: query.sortOrder === 'asc' ? 1 : -1,
