@@ -14,7 +14,7 @@ class VehiclesRepositoryImpl implements VehiclesRepository {
   @override
   Future<Either<Failure, Map<String, dynamic>>> getVehicles({int page = 1, Map<String, dynamic>? filters}) async {
     try {
-      final res = await apiClient.get('/available-vehicles', params: {'page': page, ...?filters});
+      final res = await apiClient.get('/available-vehicles', params: {'page': page, 'limit': 2000, ...?filters});
       final data = res.data as Map<String, dynamic>;
       unawaited(_reportViews(data['data']));
       return Right(data);
