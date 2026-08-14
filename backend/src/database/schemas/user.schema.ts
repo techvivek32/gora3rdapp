@@ -96,7 +96,9 @@ export class User {
   @Prop({ type: [String], default: [] })
   fcmTokens: string[];
 
-  @Prop({ default: true })
+  // Off by default — booking alerts (ring + pop-up) are opt-in. The user turns
+  // them on from the home screen; only then does the server push new bookings.
+  @Prop({ default: false })
   notificationsEnabled: boolean;
 
   // Alert filters: only notify this user for requirements matching these vehicle

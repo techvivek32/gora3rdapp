@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/location_ping.dart';
 import '../../../../core/utils/app_update_check.dart';
+import '../../../../core/utils/ring_player.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -57,6 +58,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;
+    // Mirror the server value into the local flag every isolate reads, so the
+    // FCM background handler / overlay ring respect it too.
+    setAlertsEnabled(_alertsOn);
     _alertVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     _alertTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     PushNotificationService.instance.registerToken();
@@ -106,10 +110,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _toggleAlerts(bool value) async {
     if (!value) {
       setState(() => _alertsOn = false);
+      await setAlertsEnabled(false); // silence rings immediately (all isolates)
       try {
         await getIt<ApiClient>().put('/users/notifications', data: {'enabled': false});
       } catch (_) {
         if (mounted) setState(() => _alertsOn = true);
+        await setAlertsEnabled(true);
       }
       return;
     }
@@ -124,6 +130,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _alertVehicles = savedVehicles;
       _alertTrips = savedTrips;
     });
+    await setAlertsEnabled(true); // let the ring/overlay fire from every isolate
     try {
       await getIt<ApiClient>().put('/users/notifications', data: {
         'enabled': true,

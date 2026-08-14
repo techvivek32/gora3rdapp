@@ -19,6 +19,29 @@ const _kRingSafetyCap = Duration(seconds: 30);
 // isolates (unlike the top-level `_player`).
 const _kRingStopKey = 'gora_ring_stop_requested';
 
+/// Whether the user has enabled booking alerts (ring + pop-up). Stored in
+/// SharedPreferences so EVERY isolate — the UI, the FCM background handler and
+/// the overlay engine — reads the same value. Default OFF: nothing rings until
+/// the user turns it on from the home screen.
+const _kAlertsEnabledKey = 'gora_alerts_enabled';
+
+Future<bool> alertsEnabled() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // pick up a toggle made in the UI isolate
+    return prefs.getBool(_kAlertsEnabledKey) ?? false;
+  } catch (_) {
+    return false; // fail closed — silence beats an unwanted ring
+  }
+}
+
+Future<void> setAlertsEnabled(bool on) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kAlertsEnabledKey, on);
+  } catch (_) {}
+}
+
 AudioPlayer? _player;
 StreamSubscription<void>? _completeSub;
 

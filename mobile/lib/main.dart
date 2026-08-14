@@ -41,6 +41,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // trip OTP and trip start/end pushes also carry a requirementId, so gate on the
     // type — otherwise the popup + ring fired for all of them.
     if ((data['type'] ?? '').toString() == 'new_requirement') {
+      // Respect the user's alert toggle even from the background/terminated
+      // isolate — no overlay, no ring when alerts are off.
+      if (!await alertsEnabled()) return;
       // Overlay first so it appears immediately, then hold this isolate open for
       // the ring — it is killed as soon as this handler returns.
       await showRequirementOverlay(Map<String, dynamic>.from(data));

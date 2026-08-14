@@ -110,6 +110,9 @@ class PushNotificationService {
     // Everything else (driver assigned, trip OTP, trip started/ended, admin
     // messages) is just a quiet notification — no ring, no popup.
     final isNewRequirement = (data['type'] ?? '').toString() == 'new_requirement';
+    // Booking alerts are opt-in: if the user hasn't turned them on, no ring and
+    // no pop-up — not even the loud notification below.
+    if (isNewRequirement && !(await alertsEnabled())) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isNewRequirement) {
       playRequirementRing();
