@@ -18,16 +18,16 @@ import '../../features/requirements/presentation/widgets/requirement_alert.dart'
 // to existing installs REQUIRES a new channel id. Bump it again if the sound
 // changes.
 //
-// The sound is res/raw/gora_ring.mp3 (a raw resource, referenced without the
+// The sound is res/raw/gora_ring2.mp4 (a raw resource, referenced without the
 // extension) — Android cannot play a Flutter asset as a notification tone.
-const _channelId = 'gora_cabs_notifications_v2';
+const _channelId = 'gora_cabs_notifications_v3';
 const _channel = AndroidNotificationChannel(
   _channelId,
   'New Bookings',
   description: 'New ride bookings (loud alert ring)',
   importance: Importance.high,
   playSound: true,
-  sound: RawResourceAndroidNotificationSound('gora_ring'),
+  sound: RawResourceAndroidNotificationSound('gora_ring2'),
 );
 
 // Everything that is NOT a new requirement (driver assigned, trip OTP, trip
@@ -151,11 +151,11 @@ class PushNotificationService {
           importance: Importance.high,
           priority: Priority.high,
           // Only new requirements pop over the lock screen like a call and use the
-          // loud gora_ring; other updates are a normal notification.
+          // loud gora_ring2; other updates are a normal notification.
           fullScreenIntent: isNewRequirement,
           category: isNewRequirement ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
           playSound: true,
-          sound: isNewRequirement ? const RawResourceAndroidNotificationSound('gora_ring') : null,
+          sound: isNewRequirement ? const RawResourceAndroidNotificationSound('gora_ring2') : null,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
               ? const []

@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// The ring tone asset — played ONCE when a new requirement arrives.
-const _kRingAsset = 'audio/ring-1.mp4';
+const _kRingAsset = 'audio/ring-2.mp4';
 
 /// Safety cap only: how long the background isolate will wait for the clip's
 /// "complete" event before giving up (in case some device never fires it). The
