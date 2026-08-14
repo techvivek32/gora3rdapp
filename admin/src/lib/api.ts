@@ -191,6 +191,7 @@ export const adminApi = {
     minDeposit?: number;
     minWithdrawal?: number;
     minTransfer?: number;
+    whatsappAutoBookMinutes?: number;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

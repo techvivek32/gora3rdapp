@@ -71,6 +71,13 @@ export class PlatformSettings {
   /** Minimum amount a user can transfer to another wallet. */
   @Prop({ default: 1, min: 0 })
   minTransfer: number;
+
+  /**
+   * Auto-mark a WhatsApp booking as "Booked" this many minutes after it was
+   * posted. 0 = disabled (never auto-book). Applies to WhatsApp posts only.
+   */
+  @Prop({ default: 0, min: 0 })
+  whatsappAutoBookMinutes: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

@@ -6,6 +6,7 @@ import { Requirement, RequirementSchema } from '../../database/schemas/requireme
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Notification.name, schema: NotificationSchema },
     ]),
     NotificationsModule,
+    SettingsModule,
   ],
   controllers: [RequirementsController],
   providers: [RequirementsService],

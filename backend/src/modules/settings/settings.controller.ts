@@ -54,6 +54,7 @@ export class SettingsController {
     minDeposit?: number;
     minWithdrawal?: number;
     minTransfer?: number;
+    whatsappAutoBookMinutes?: number;
   }) {
     return this.settingsService.updateSettings(body);
   }

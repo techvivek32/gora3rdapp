@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Cron } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateRequirementDto } from './dto/create-requirement.dto';
 import { UpdateRequirementDto } from './dto/update-requirement.dto';
 import { FilterRequirementsDto } from './dto/filter-requirements.dto';
@@ -20,11 +22,47 @@ import {
 
 @Injectable()
 export class RequirementsService {
+  private readonly logger = new Logger(RequirementsService.name);
+
   constructor(
     @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private notificationsService: NotificationsService,
+    private settingsService: SettingsService,
   ) {}
+
+  /**
+   * Every minute, mark WhatsApp bookings as "Booked" once they're older than the
+   * admin-configured window (Settings → WhatsApp auto-book minutes). 0 disables
+   * it. Only WhatsApp-source, still-active bookings are touched — app posts are
+   * never auto-booked.
+   */
+  @Cron('* * * * *')
+  async autoBookWhatsappBookings(): Promise<void> {
+    try {
+      const settings = await this.settingsService.getSettings();
+      const mins = settings?.whatsappAutoBookMinutes ?? 0;
+      if (!mins || mins <= 0) return; // feature disabled
+
+      const cutoff = new Date(Date.now() - mins * 60 * 1000);
+      // "Booked" in the app/admin is the ACCEPTED status (same as the owner's
+      // manual "mark booked"); only active WhatsApp posts are auto-booked.
+      const res = await this.requirementModel.updateMany(
+        {
+          source: 'whatsapp',
+          status: BookingStatus.ACTIVE,
+          isDeleted: { $ne: true },
+          createdAt: { $lte: cutoff },
+        },
+        { $set: { status: BookingStatus.ACCEPTED } },
+      );
+      if (res.modifiedCount) {
+        this.logger.log(`Auto-booked ${res.modifiedCount} WhatsApp booking(s) older than ${mins}m`);
+      }
+    } catch (e: any) {
+      this.logger.warn(`autoBookWhatsappBookings failed: ${e?.message ?? e}`);
+    }
+  }
 
   async create(userId: string, dto: CreateRequirementDto) {
     // ── Duplicate-post guard ────────────────────────────────────────────────

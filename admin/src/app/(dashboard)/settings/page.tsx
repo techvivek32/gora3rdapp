@@ -28,6 +28,11 @@ export default function SettingsPage() {
   const [walletSaved, setWalletSaved] = useState(false);
   const [walletError, setWalletError] = useState('');
 
+  const [autoBookMins, setAutoBookMins] = useState('');
+  const [waSaving, setWaSaving] = useState(false);
+  const [waSaved, setWaSaved] = useState(false);
+  const [waError, setWaError] = useState('');
+
   const [loading, setLoading] = useState(true);
 
   // Wait for the session before fetching. SessionSync feeds the access token to
@@ -50,6 +55,7 @@ export default function SettingsPage() {
         setMinDeposit(String(s.minDeposit ?? 1));
         setMinWithdrawal(String(s.minWithdrawal ?? 1));
         setMinTransfer(String(s.minTransfer ?? 1));
+        setAutoBookMins(String(s.whatsappAutoBookMinutes ?? 0));
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -94,6 +100,22 @@ export default function SettingsPage() {
       setWalletError(e.message || 'Failed to save');
     } finally {
       setWalletSaving(false);
+    }
+  };
+
+  const handleSaveAutoBook = async () => {
+    const mins = Math.round(Number(autoBookMins));
+    if (!Number.isFinite(mins) || mins < 0) return setWaError('Enter a valid number of minutes (0 to disable)');
+    setWaError('');
+    setWaSaving(true);
+    try {
+      await adminApi.updateSettings({ whatsappAutoBookMinutes: mins });
+      setWaSaved(true);
+      setTimeout(() => setWaSaved(false), 3000);
+    } catch (e: any) {
+      setWaError(e.message || 'Failed to save');
+    } finally {
+      setWaSaving(false);
     }
   };
 
@@ -191,53 +213,7 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Razorpay Keys */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Razorpay Configuration</h2>
-          <p className="text-gray-500 text-sm mb-5">Payment gateway credentials. Key Secret is cleared after saving for security.</p>
-          {loading ? (
-            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
-              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
-              Loading...
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Key ID</label>
-                <input
-                  type="text"
-                  value={rzKeyId}
-                  onChange={(e) => { setRzKeyId(e.target.value); setSaved(false); }}
-                  placeholder="rzp_live_xxxxxxxxxxxx"
-                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Key Secret</label>
-                <div className="relative">
-                  <input
-                    type={showSecret ? 'text' : 'password'}
-                    value={rzKeySecret}
-                    onChange={(e) => { setRzKeySecret(e.target.value); setSaved(false); }}
-                    placeholder="Enter secret to update"
-                    className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
-                  />
-                  <button type="button" onClick={() => setShowSecret((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
-                    {showSecret ? 'Hide' : 'Show'}
-                  </button>
-                </div>
-              </div>
-              {error && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
-              <button
-                onClick={handleSaveRazorpay}
-                disabled={saving}
-                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
-              >
-                {saving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : saved ? '✓ Saved!' : 'Save Razorpay Keys'}
-              </button>
-            </div>
-          )}
-        </div>
+        
 
         {/* Wallet Limits */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
@@ -291,6 +267,89 @@ export default function SettingsPage() {
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {walletSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : walletSaved ? '✓ Saved!' : 'Save Wallet Limits'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Razorpay Keys */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Razorpay Configuration</h2>
+          <p className="text-gray-500 text-sm mb-5">Payment gateway credentials. Key Secret is cleared after saving for security.</p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Key ID</label>
+                <input
+                  type="text"
+                  value={rzKeyId}
+                  onChange={(e) => { setRzKeyId(e.target.value); setSaved(false); }}
+                  placeholder="rzp_live_xxxxxxxxxxxx"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Key Secret</label>
+                <div className="relative">
+                  <input
+                    type={showSecret ? 'text' : 'password'}
+                    value={rzKeySecret}
+                    onChange={(e) => { setRzKeySecret(e.target.value); setSaved(false); }}
+                    placeholder="Enter secret to update"
+                    className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                  <button type="button" onClick={() => setShowSecret((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                    {showSecret ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+              {error && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+              <button
+                onClick={handleSaveRazorpay}
+                disabled={saving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {saving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : saved ? '✓ Saved!' : 'Save Razorpay Keys'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* WhatsApp Bookings */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">WhatsApp Bookings</h2>
+          <p className="text-gray-500 text-sm mb-5">Auto-mark a WhatsApp booking as &quot;Booked&quot; this many minutes after it is posted. Only WhatsApp posts are affected.</p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Auto-book after (minutes)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={autoBookMins}
+                  onChange={(e) => { setAutoBookMins(e.target.value); setWaSaved(false); }}
+                  placeholder="10"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">Set 0 to disable auto-booking. E.g. 10 = a WhatsApp booking becomes Booked 10 minutes after posting.</p>
+              </div>
+              {waError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{waError}</p>}
+              <button
+                onClick={handleSaveAutoBook}
+                disabled={waSaving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {waSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : waSaved ? '✓ Saved!' : 'Save WhatsApp Settings'}
               </button>
             </div>
           )}

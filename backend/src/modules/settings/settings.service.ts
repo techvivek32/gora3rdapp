@@ -107,6 +107,7 @@ export class SettingsService {
     minDeposit?: number;
     minWithdrawal?: number;
     minTransfer?: number;
+    whatsappAutoBookMinutes?: number;
   }): Promise<PlatformSettings> {
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },
