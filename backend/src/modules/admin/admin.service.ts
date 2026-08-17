@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
@@ -491,6 +491,36 @@ export class AdminService {
       .lean();
     if (!user) throw new NotFoundException('Profile not found');
     return { message: 'Profile retrieved', data: user };
+  }
+
+  /**
+   * Grants the logged-in admin/super-admin a free lifetime Golden membership.
+   * Admins aren't in the Users list, so they can't be given a plan the usual way
+   * — this lets them self-activate premium access from their Profile page.
+   * `membershipExpiresAt: null` = never expires (immune to the downgrade cron).
+   */
+  async activateGoldenForSelf(userId: string) {
+    const user = await this.userModel.findById(userId).select('role');
+    if (!user) throw new NotFoundException('User not found');
+    if (![UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role as UserRole)) {
+      throw new ForbiddenException('Only admins can activate the free plan here');
+    }
+    const updated = await this.userModel
+      .findByIdAndUpdate(
+        userId,
+        {
+          $set: {
+            membershipType: MembershipType.GOLDEN,
+            isPremium: true,
+            isGolden: true,
+            membershipExpiresAt: null,
+          },
+        },
+        { new: true },
+      )
+      .select('-password -refreshToken -fcmTokens')
+      .lean();
+    return { message: 'Golden plan activated (lifetime)', data: updated };
   }
 
   // Update the logged-in admin's own basic details (name / email / mobile only).

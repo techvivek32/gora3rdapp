@@ -104,7 +104,57 @@ function AdminProfile() {
         )}
       </div>
 
+      <MembershipCard u={u} />
+
       <ChangePasswordCard />
+    </div>
+  );
+}
+
+// ─── Membership: admins aren't in the Users list, so they self-activate a free
+// lifetime Golden plan here (gives them premium access in the mobile app). ─────
+function MembershipCard({ u }: { u: any }) {
+  const qc = useQueryClient();
+  const isGolden = u?.isGolden === true || u?.membershipType === 'golden';
+  const activate = useMutation({
+    mutationFn: () => adminApi.activateGoldenPlan(),
+    onSuccess: () => {
+      toast.success('Golden plan activated — lifetime premium access');
+      qc.invalidateQueries({ queryKey: ['admin-me'] });
+    },
+    onError: (e: any) => toast.error(e?.message || 'Could not activate plan'),
+  });
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <CreditCard className="w-5 h-5 text-orange-500" />
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">Membership</h2>
+            <p className="text-xs text-gray-500">
+              {isGolden
+                ? 'Golden Plan · Lifetime — you have full premium access in the app.'
+                : 'Activate a free lifetime Golden plan for full premium access in the app.'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {isGolden && (
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-400/15 text-amber-500">
+              ★ Golden · Lifetime
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => activate.mutate()}
+            disabled={activate.isPending}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white"
+          >
+            {activate.isPending ? 'Activating…' : isGolden ? 'Re-activate Golden' : 'Activate Golden Plan (Free)'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

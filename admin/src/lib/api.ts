@@ -224,6 +224,7 @@ export const adminApi = {
     apiClient.post('/admin/profile/change-password', data),
   updateAdminProfile: (data: { fullName?: string; email?: string; mobile?: string }) =>
     apiClient.put('/admin/profile', data),
+  activateGoldenPlan: () => apiClient.post('/admin/profile/activate-golden'),
   // Google Places city suggestions (same source the app's register page uses).
   getCitySuggestions: (input: string) => apiClient.get('/places/cities', { params: { input } }),
 

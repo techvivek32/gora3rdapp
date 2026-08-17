@@ -473,6 +473,13 @@ export class AdminController {
     return this.adminService.updateMyProfile(userId, dto);
   }
 
+  @Post('profile/activate-golden')
+  @UseGuards(BlockImpersonationGuard)
+  @ApiOperation({ summary: 'Give the logged-in admin a free lifetime Golden membership' })
+  activateGolden(@CurrentUser('sub') userId: string) {
+    return this.adminService.activateGoldenForSelf(userId);
+  }
+
   @Post('profile/change-password')
   @UseGuards(BlockImpersonationGuard)
   @ApiOperation({ summary: "Change the logged-in admin's password (verifies the current one)" })
