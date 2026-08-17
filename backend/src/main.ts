@@ -31,14 +31,22 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api/v1');
   const corsOrigins = configService.get<string>('app.corsOrigins', '').split(',');
 
-  // Serve locally-uploaded files as static assets (CORS headers for Flutter web / admin)
-  app.useStaticAssets(path.join(process.cwd(), 'uploads'), {
-    prefix: '/uploads',
-    setHeaders: (res) => {
+  // Serve locally-uploaded files as static assets (CORS headers for Flutter web / admin).
+  // Mounted at BOTH /uploads and /<apiPrefix>/uploads: the API-prefixed path is
+  // guaranteed to be routed by the reverse proxy (same as the API), while /uploads
+  // keeps older stored URLs working.
+  const staticOpts = {
+    setHeaders: (res: any, filePath: string) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      // Express serves .mp4/.m4a as video/mp4, which <audio> and the app's audio
+      // player won't play — force audio/mp4 so ringtones are playable.
+      if (/\.(mp4|m4a)$/i.test(filePath)) res.setHeader('Content-Type', 'audio/mp4');
     },
-  });
+  };
+  const uploadsPath = path.join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsPath, { prefix: '/uploads', ...staticOpts });
+  app.useStaticAssets(uploadsPath, { prefix: `/${apiPrefix.replace(/^\/+|\/+$/g, '')}/uploads`, ...staticOpts });
 
   // Security middleware (disable CORP so images load cross-origin)
   app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));

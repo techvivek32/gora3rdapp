@@ -16,8 +16,12 @@ export class StorageService {
   private publicUrl: string;
   private readonly useLocal: boolean;
   private readonly uploadsDir: string;
+  // The API prefix (e.g. "api/v1") — local upload URLs go under it so they hit
+  // the same reverse-proxy route the API uses (guaranteed reachable).
+  private readonly apiPrefix: string;
 
   constructor(private configService: ConfigService) {
+    this.apiPrefix = (configService.get<string>('app.apiPrefix', 'api/v1') || 'api/v1').replace(/^\/+|\/+$/g, '');
     this.bucketName = configService.get<string>('storage.bucketName');
     this.publicUrl = configService.get<string>('storage.publicUrl');
 
@@ -69,12 +73,16 @@ export class StorageService {
     return `http://localhost:${port}`;
   }
 
-  private async saveLocally(buffer: Buffer, folder: string, ext: string): Promise<string> {
+  private async saveLocally(buffer: Buffer, folder: string, ext: string, baseUrl?: string): Promise<string> {
     const dir = path.join(this.uploadsDir, folder);
     fs.mkdirSync(dir, { recursive: true });
     const filename = `${uuidv4()}.${ext}`;
     fs.writeFileSync(path.join(dir, filename), buffer);
-    return `${this.getLocalBaseUrl()}/uploads/${folder}/${filename}`;
+    // Prefer the caller-supplied public origin (the request host, e.g.
+    // https://backend.goracabs.com) over the auto-detected LAN IP, which is
+    // unreachable from browsers/phones outside the server's network. Path is
+    // under the API prefix so it hits the same proxied route as the API.
+    return `${baseUrl || this.getLocalBaseUrl()}/${this.apiPrefix}/uploads/${folder}/${filename}`;
   }
 
   private deleteLocally(url: string): void {
@@ -92,7 +100,7 @@ export class StorageService {
   async uploadFile(
     file: Express.Multer.File,
     folder: string = 'uploads',
-    options?: { resize?: { width: number; height: number }; quality?: number },
+    options?: { resize?: { width: number; height: number }; quality?: number; contentType?: string; baseUrl?: string },
   ): Promise<string> {
     let buffer = file.buffer;
     let ext = file.originalname.split('.').pop() || 'jpg';
@@ -106,11 +114,11 @@ export class StorageService {
     }
 
     if (this.useLocal) {
-      return this.saveLocally(buffer, folder, ext);
+      return this.saveLocally(buffer, folder, ext, options?.baseUrl);
     }
 
     const key = `${folder}/${uuidv4()}.${ext}`;
-    const contentType = ext === 'webp' ? 'image/webp' : file.mimetype;
+    const contentType = ext === 'webp' ? 'image/webp' : (options?.contentType || file.mimetype);
     await this.s3Client.send(
       new PutObjectCommand({
         Bucket: this.bucketName,
@@ -123,27 +131,36 @@ export class StorageService {
     return `${this.publicUrl}/${key}`;
   }
 
-  async uploadProfileImage(file: Express.Multer.File): Promise<string> {
-    return this.uploadFile(file, 'profiles', { resize: { width: 400, height: 400 }, quality: 85 });
+  async uploadProfileImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
+    return this.uploadFile(file, 'profiles', { resize: { width: 400, height: 400 }, quality: 85, baseUrl });
   }
 
-  async uploadBannerImage(file: Express.Multer.File): Promise<string> {
+  async uploadBannerImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
     // 1080×528 keeps the exact aspect ratio the mobile app renders banners at
     // (the home + requirement-feed banner box is 358×175 pt ≈ 2.05:1). Matching it
     // here means the app shows the image with no extra cropping. 3× the display box
     // for crisp rendering on high-DPI screens.
-    return this.uploadFile(file, 'banners', { resize: { width: 1080, height: 528 }, quality: 90 });
+    return this.uploadFile(file, 'banners', { resize: { width: 1080, height: 528 }, quality: 90, baseUrl });
   }
 
-  async uploadNotificationImage(file: Express.Multer.File): Promise<string> {
+  async uploadNotificationImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
     // 1024×512 (2:1) is the aspect ratio Android's "big picture" notification style
     // and the iOS attachment preview both render at, so it lands uncropped.
-    return this.uploadFile(file, 'notifications', { resize: { width: 1024, height: 512 }, quality: 85 });
+    return this.uploadFile(file, 'notifications', { resize: { width: 1024, height: 512 }, quality: 85, baseUrl });
   }
 
-  async uploadRingtone(file: Express.Multer.File): Promise<string> {
-    // Audio — stored as-is (no image resize path runs for audio mimetypes).
-    return this.uploadFile(file, 'ringtones');
+  async uploadRingtone(file: Express.Multer.File, baseUrl?: string): Promise<string> {
+    // Force a real AUDIO content-type based on the extension. An .mp4/.m4a
+    // ringtone reports as video/mp4, which browsers (and the app's audio player)
+    // won't play in an <audio> element — serving it as audio/mp4 fixes playback.
+    const ext = (file.originalname.split('.').pop() || '').toLowerCase();
+    const audioTypes: Record<string, string> = {
+      mp3: 'audio/mpeg', mp4: 'audio/mp4', m4a: 'audio/mp4', aac: 'audio/aac',
+      ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', wav: 'audio/wav',
+      weba: 'audio/webm', '3gp': 'audio/3gpp',
+    };
+    const contentType = audioTypes[ext];
+    return this.uploadFile(file, 'ringtones', { contentType, baseUrl });
   }
 
   async deleteFile(url: string): Promise<void> {

@@ -55,7 +55,7 @@ export default function RingtonesPage() {
 
   const handleFile = async (file?: File | null) => {
     if (!file) return;
-    if (!file.type.startsWith('audio/')) return toast.error('Please choose an audio file');
+    // Accept any file — mp4/m4a ringtones report as video/*, so no type filter.
     setUploading(true);
     try {
       const res: any = await adminApi.uploadRingtone(file);
@@ -96,8 +96,8 @@ export default function RingtonesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Audio file</label>
-            <input ref={fileRef} type="file" accept="audio/*" className="hidden"
+            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ringtone file (mp3, mp4, m4a, wav…)</label>
+            <input ref={fileRef} type="file" accept="audio/*,video/*,.mp3,.mp4,.m4a,.aac,.ogg,.wav,.opus,.3gp" className="hidden"
               onChange={(e) => handleFile(e.target.files?.[0])} />
             <button
               type="button"
@@ -106,12 +106,16 @@ export default function RingtonesPage() {
               className="w-full inline-flex items-center justify-center gap-2 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-60"
             >
               <Upload className="w-4 h-4" />
-              {uploading ? 'Uploading…' : audioUrl ? 'Change file' : 'Choose audio file'}
+              {uploading ? 'Uploading…' : audioUrl ? 'Change file' : 'Choose file'}
             </button>
           </div>
         </div>
         {audioUrl && (
-          <audio controls src={audioUrl} className="w-full h-10" />
+          <div className="flex items-center gap-3">
+            <audio controls src={audioUrl} preload="metadata" className="w-full h-10"
+              onError={() => toast.error('Could not load the audio. Open the file link to check the URL.')} />
+            <a href={audioUrl} target="_blank" rel="noreferrer" className="text-xs text-orange-500 whitespace-nowrap">Open ↗</a>
+          </div>
         )}
         <button
           onClick={() => create.mutate()}
@@ -142,7 +146,8 @@ export default function RingtonesPage() {
                     </span>
                   )}
                 </div>
-                <audio controls src={r.audioUrl} className="h-9 ml-auto" />
+                <audio controls src={r.audioUrl} preload="metadata" className="h-9 ml-auto" />
+                <a href={r.audioUrl} target="_blank" rel="noreferrer" className="text-xs text-orange-500 whitespace-nowrap">Open ↗</a>
                 <div className="flex items-center gap-2">
                   {!r.isActive && (
                     <button
