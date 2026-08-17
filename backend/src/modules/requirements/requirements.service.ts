@@ -138,9 +138,9 @@ export class RequirementsService {
 
   /**
    * Finds an already-created booking that this new one would duplicate.
-   * WhatsApp messages match exactly on their message id (idempotent across
-   * redeliveries); everything else matches on poster + route + date + vehicle
-   * posted within the last DUP_WINDOW_MS.
+   * WhatsApp messages are de-duplicated SOLELY by their message id (wamid) —
+   * idempotent across Meta redeliveries. App posts additionally match on poster
+   * + route + date + vehicle within DUP_WINDOW_MS to absorb double-taps/retries.
    */
   private async findRecentDuplicate(userId: string, dto: any) {
     // Exact idempotency for WhatsApp — same inbound message can never duplicate.
@@ -148,6 +148,10 @@ export class RequirementsService {
       const byMsg = await this.requirementModel.findOne({ whatsappMessageId: dto.whatsappMessageId });
       if (byMsg) return byMsg;
     }
+    // Don't content-match WhatsApp posts: an agent forwarding several different
+    // customer bookings back-to-back (same route/date, no distinct number) would
+    // otherwise be wrongly collapsed into one — the "sometimes not posting" bug.
+    if ((dto?.source ?? 'app') === 'whatsapp') return null;
 
     const filter: any = {
       postedBy: new Types.ObjectId(userId),

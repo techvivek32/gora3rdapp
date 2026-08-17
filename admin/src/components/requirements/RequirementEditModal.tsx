@@ -208,11 +208,7 @@ export function RequirementEditModal({
             <input type="date" value={form.travelDate} onChange={(e) => set({ travelDate: e.target.value })}
               className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm" />
           </div>
-          <div>
-            <label className="text-xs font-medium text-gray-500 mb-1 block">Travel Time</label>
-            <input type="time" value={form.travelTime} onChange={(e) => set({ travelTime: e.target.value })}
-              className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm" />
-          </div>
+          <Time12Field label="Travel Time" value={form.travelTime} onChange={(v) => set({ travelTime: v })} />
         </div>
 
         {form.tripType === 'round_trip' && (
@@ -222,11 +218,7 @@ export function RequirementEditModal({
               <input type="date" value={form.returnDate} min={form.travelDate || undefined} onChange={(e) => set({ returnDate: e.target.value })}
                 className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm" />
             </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 mb-1 block">Return Time</label>
-              <input type="time" value={form.returnTime} onChange={(e) => set({ returnTime: e.target.value })}
-                className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm" />
-            </div>
+            <Time12Field label="Return Time" value={form.returnTime} onChange={(v) => set({ returnTime: v })} />
           </div>
         )}
 
@@ -316,6 +308,57 @@ function SelectField({ label, value, onChange, options }: { label: string; value
         className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm capitalize">
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
+    </div>
+  );
+}
+
+/**
+ * 12-hour time picker (Hour 1–12 · Minute · AM/PM). Stores the value as 24-hour
+ * "HH:MM" — the format the mobile app creates and displays — while showing a
+ * friendly AM/PM UI. Accepts an existing "HH:MM" or "hh:MM AM/PM" value.
+ */
+function Time12Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const parse = (s: string) => {
+    const m = (s || '').trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (!m) return { h: '', min: '', ap: 'AM' };
+    let h = parseInt(m[1], 10);
+    const min = m[2];
+    const explicit = (m[3] || '').toUpperCase();
+    if (explicit) return { h: String(h), min, ap: explicit }; // already 12h
+    const ap = h >= 12 ? 'PM' : 'AM';                          // 24h → 12h
+    h = h % 12; if (h === 0) h = 12;
+    return { h: String(h), min, ap };
+  };
+  const { h, min, ap } = parse(value);
+
+  const emit = (nh: string, nm: string, nap: string) => {
+    if (!nh || nm === '') { onChange(''); return; }
+    let h24 = parseInt(nh, 10) % 12;
+    if (nap === 'PM') h24 += 12;
+    onChange(`${String(h24).padStart(2, '0')}:${nm.padStart(2, '0')}`);
+  };
+
+  const cls = 'border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-2 py-2 text-sm';
+  const hours = Array.from({ length: 12 }, (_, i) => i + 1);
+  const mins = Array.from({ length: 60 }, (_, i) => i);
+
+  return (
+    <div>
+      <label className="text-xs font-medium text-gray-500 mb-1 block">{label}</label>
+      <div className="flex gap-2">
+        <select value={h} onChange={(e) => emit(e.target.value, min, ap)} className={cls}>
+          <option value="">HH</option>
+          {hours.map((n) => <option key={n} value={n}>{String(n).padStart(2, '0')}</option>)}
+        </select>
+        <select value={min} onChange={(e) => emit(h, e.target.value, ap)} className={cls}>
+          <option value="">MM</option>
+          {mins.map((n) => <option key={n} value={String(n).padStart(2, '0')}>{String(n).padStart(2, '0')}</option>)}
+        </select>
+        <select value={ap} onChange={(e) => emit(h, min, e.target.value)} className={cls}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
     </div>
   );
 }

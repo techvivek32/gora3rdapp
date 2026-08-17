@@ -85,6 +85,16 @@ export class WhatsappService {
         return;
       }
 
+      // Don't post a booking whose date has already passed (a mis-read or a
+      // genuinely old/forwarded message). Same-day is still allowed.
+      if (this.isPastBooking(parsed.travelDate)) {
+        await this.sendReply(
+          from,
+          "⚠️ This booking's date has already passed, so it wasn't posted. Please resend it with today's or a future date.",
+        );
+        return;
+      }
+
       // Contact for the Call / WhatsApp buttons: the number written INSIDE the
       // message (the original customer) wins — AI-extracted first, then a plain
       // regex scan of the text as a backstop; only if none is found do we fall
@@ -228,9 +238,24 @@ export class WhatsappService {
   }
 
   private defaultTravelDate(): Date {
-    const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    return d;
+    // "Today" in IST at noon. Using the server-local `new Date()` here made
+    // late-night IST messages (server is UTC) resolve aaj/kal to the PREVIOUS
+    // day — the "back date" the client reported.
+    return this.istTravelDate(new Date());
+  }
+
+  /** YYYYMMDD for a date; `istOffset` shifts the instant into IST first. */
+  private dayNumber(d: Date, istOffset: boolean): number {
+    const x = istOffset ? new Date(d.getTime() + 5.5 * 60 * 60 * 1000) : d;
+    return x.getUTCFullYear() * 10000 + (x.getUTCMonth() + 1) * 100 + x.getUTCDate();
+  }
+
+  /** True when the booking's calendar day is before today (IST). */
+  private isPastBooking(travelDate: any): boolean {
+    const d = new Date(travelDate);
+    if (isNaN(d.getTime())) return false; // unknown date → don't block
+    // travelDate is stored at noon of its day, so its UTC day == the intended day.
+    return this.dayNumber(d, false) < this.dayNumber(new Date(), true);
   }
 
   /**
