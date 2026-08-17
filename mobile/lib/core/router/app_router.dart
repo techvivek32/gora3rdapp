@@ -20,6 +20,7 @@ import '../../features/available_vehicles/presentation/pages/vehicle_detail_page
 import '../../features/available_vehicles/presentation/pages/my_vehicles_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/profile/presentation/pages/kyc_page.dart';
+import '../../features/profile/presentation/pages/sound_settings_page.dart';
 import '../../features/info/presentation/pages/policy_page.dart';
 import '../../features/wallet/presentation/pages/wallet_page.dart';
 import '../../features/referral/presentation/pages/invite_page.dart';
@@ -166,6 +167,10 @@ class AppRouter {
       GoRoute(
         path: '/kyc',
         builder: (_, __) => const KycPage(),
+      ),
+      GoRoute(
+        path: '/sound-settings',
+        builder: (_, __) => const SoundSettingsPage(),
       ),
       GoRoute(
         path: '/policy/:id',

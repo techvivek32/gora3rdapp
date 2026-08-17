@@ -45,9 +45,10 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // isolate — no overlay, no ring when alerts are off.
       if (!await alertsEnabled()) return;
       // Overlay first so it appears immediately, then hold this isolate open for
-      // the ring — it is killed as soon as this handler returns.
+      // the ring — it is killed as soon as this handler returns. Uses the user's
+      // chosen NOTIFICATION tone (the tray channel is silent, app plays the sound).
       await showRequirementOverlay(Map<String, dynamic>.from(data));
-      await playRequirementRing(awaitEnd: true);
+      await playRequirementRing(awaitEnd: true, kind: RingKind.notification);
     }
   } catch (e) {
     debugPrint('Firebase background handler error: $e');

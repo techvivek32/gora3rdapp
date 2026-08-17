@@ -13,21 +13,18 @@ import '../../features/requirements/presentation/widgets/requirement_alert.dart'
 
 // Must match the channelId the backend sets on the FCM android payload.
 //
-// The id carries a version suffix on purpose: Android freezes a channel's sound
-// when it's first created and ignores every later change, so shipping a new tone
-// to existing installs REQUIRES a new channel id. Bump it again if the sound
-// changes.
-//
-// The sound is res/raw/gora_ring2.mp4 (a raw resource, referenced without the
-// extension) — Android cannot play a Flutter asset as a notification tone.
-const _channelId = 'gora_cabs_notifications_v3';
+// SILENT channel: the app now plays the user's chosen NOTIFICATION ringtone
+// itself (via audioplayers, so it can be any admin-uploaded tone) — so the
+// system channel must NOT also play a sound, or you'd hear two. Android freezes
+// a channel's sound at creation, so switching to silent needs a NEW channel id
+// (v4) on both the app and the backend.
+const _channelId = 'gora_cabs_notifications_v4';
 const _channel = AndroidNotificationChannel(
   _channelId,
   'New Bookings',
-  description: 'New ride bookings (loud alert ring)',
+  description: 'New ride bookings',
   importance: Importance.high,
-  playSound: true,
-  sound: RawResourceAndroidNotificationSound('gora_ring2'),
+  playSound: false,
 );
 
 // Everything that is NOT a new requirement (driver assigned, trip OTP, trip
@@ -115,7 +112,7 @@ class PushNotificationService {
     if (isNewRequirement && !(await alertsEnabled())) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isNewRequirement) {
-      playRequirementRing();
+      playRequirementRing(kind: RingKind.popup);
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
     }
@@ -150,12 +147,13 @@ class PushNotificationService {
           channelDescription: isNewRequirement ? _channel.description : _updatesChannel.description,
           importance: Importance.high,
           priority: Priority.high,
-          // Only new requirements pop over the lock screen like a call and use the
-          // loud gora_ring2; other updates are a normal notification.
+          // New requirements pop over the lock screen like a call but stay SILENT
+          // here — the app plays the chosen notification tone itself. Other updates
+          // use the normal system sound.
           fullScreenIntent: isNewRequirement,
           category: isNewRequirement ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
-          playSound: true,
-          sound: isNewRequirement ? const RawResourceAndroidNotificationSound('gora_ring2') : null,
+          playSound: !isNewRequirement,
+          sound: null,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
               ? const []

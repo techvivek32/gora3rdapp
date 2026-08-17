@@ -64,12 +64,10 @@ export class FirebaseService implements OnModuleInit {
         priority: 'high',
         notification: {
           // Must match _channelId in the app's push_notification_service.dart.
-          // The suffix is versioned because Android freezes a channel's sound at
-          // creation — a new tone needs a new channel id on both sides.
-          channelId: 'gora_cabs_notifications_v3',
+          // v4 is a SILENT channel — the app plays the user's chosen notification
+          // ringtone itself, so the system channel must not also play a sound.
+          channelId: 'gora_cabs_notifications_v4',
           priority: 'high',
-          // res/raw/gora_ring2.mp4 in the app, named without its extension.
-          sound: 'gora_ring2',
         },
       },
       apns: {

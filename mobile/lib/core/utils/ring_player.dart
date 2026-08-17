@@ -4,8 +4,11 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The ring tone asset — played ONCE when a new requirement arrives.
-const _kRingAsset = 'audio/ring-2.mp4';
+/// Built-in default tones (used when the user hasn't picked a custom ringtone).
+/// Kept per-kind so each default matches what it was before this feature.
+const _kRingAsset = 'audio/ring-2.mp4'; // popup default
+String _defaultAsset(RingKind kind) =>
+    kind == RingKind.notification ? 'audio/gora_ring2.mp4' : 'audio/ring-2.mp4';
 
 /// Safety cap only: how long the background isolate will wait for the clip's
 /// "complete" event before giving up (in case some device never fires it). The
@@ -42,8 +45,81 @@ Future<void> setAlertsEnabled(bool on) async {
   } catch (_) {}
 }
 
+// ─── User-chosen ringtones (popup vs notification, stored per kind) ───────────
+// Each kind stores the chosen ringtone's URL + title. Empty URL = use the bundled
+// default. Stored in SharedPreferences so every isolate (UI, FCM background,
+// overlay) reads the same choice.
+enum RingKind { popup, notification }
+
+String _ringUrlKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_url' : 'ringtone_notification_url';
+String _ringTitleKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_title' : 'ringtone_notification_title';
+
+Future<String> getRingtoneUrl(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_ringUrlKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+Future<String> getRingtoneTitle(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_ringTitleKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Save a choice for [kind]. Pass an empty [url] to reset to the default tone.
+Future<void> setRingtone(RingKind kind, {required String url, required String title}) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    if (url.isEmpty) {
+      await prefs.remove(_ringUrlKey(kind));
+      await prefs.remove(_ringTitleKey(kind));
+    } else {
+      await prefs.setString(_ringUrlKey(kind), url);
+      await prefs.setString(_ringTitleKey(kind), title);
+    }
+  } catch (_) {}
+}
+
 AudioPlayer? _player;
 StreamSubscription<void>? _completeSub;
+AudioPlayer? _previewPlayer;
+
+/// Preview a ringtone in the settings screen. Empty [url] previews the default.
+Future<void> playPreview({String url = ''}) async {
+  await stopPreview();
+  try {
+    final player = AudioPlayer();
+    _previewPlayer = player;
+    await player.setReleaseMode(ReleaseMode.release);
+    if (url.isNotEmpty) {
+      try {
+        await player.play(UrlSource(url));
+      } catch (_) {
+        await player.play(AssetSource(_kRingAsset));
+      }
+    } else {
+      await player.play(AssetSource(_kRingAsset));
+    }
+  } catch (_) {}
+}
+
+Future<void> stopPreview() async {
+  final p = _previewPlayer;
+  _previewPlayer = null;
+  if (p == null) return;
+  try {
+    await p.stop();
+    await p.dispose();
+  } catch (_) {}
+}
 
 /// Ask whichever isolate is currently ringing to stop — sets the shared flag AND
 /// stops any player in the CURRENT isolate. Call this from every "dismiss" path
@@ -83,7 +159,7 @@ Future<void> _clearStopFlag() async {
 /// torn down once the handler returns, taking the player with it. Awaiting the
 /// clip's completion keeps it alive so the tone actually plays through once (and
 /// stops early if the user dismisses the popup).
-Future<void> playRequirementRing({bool awaitEnd = false}) async {
+Future<void> playRequirementRing({bool awaitEnd = false, RingKind kind = RingKind.popup}) async {
   await stopRequirementRing();
   await _clearStopFlag(); // fresh start — forget any earlier dismiss request
   try {
@@ -91,7 +167,18 @@ Future<void> playRequirementRing({bool awaitEnd = false}) async {
     _player = player;
     // Play ONCE — release (not loop) so the tone ends by itself after one play.
     await player.setReleaseMode(ReleaseMode.release);
-    await player.play(AssetSource(_kRingAsset));
+    // The user's chosen tone for this kind (popup vs notification); empty → the
+    // bundled default. Fall back to the default if the URL can't be played.
+    final url = await getRingtoneUrl(kind);
+    try {
+      if (url.isNotEmpty) {
+        await player.play(UrlSource(url));
+      } else {
+        await player.play(AssetSource(_defaultAsset(kind)));
+      }
+    } catch (_) {
+      await player.play(AssetSource(_defaultAsset(kind)));
+    }
 
     if (awaitEnd) {
       // Background isolate: keep it alive until the clip finishes OR the user
