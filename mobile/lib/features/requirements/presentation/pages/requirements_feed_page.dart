@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/constants/vehicle_types.dart';
@@ -47,6 +48,8 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source}));
     _scrollController.addListener(_onScroll);
     _loadBanners();
+    // Refresh the App-Suggested-Fare toggle, then rebuild so cards reflect it.
+    AppConfig.refresh(getIt<ApiClient>()).then((_) { if (mounted) setState(() {}); });
     // Poll in the background so new posts / status changes appear live.
     _pollTimer = Timer.periodic(const Duration(seconds: 300), (_) => _silentRefresh());
   }

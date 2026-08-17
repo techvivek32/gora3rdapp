@@ -78,6 +78,14 @@ export class PlatformSettings {
    */
   @Prop({ default: 0, min: 0 })
   whatsappAutoBookMinutes: number;
+
+  /**
+   * When true the app shows the "App Suggested Fare" on booking cards. When
+   * false that line is hidden — cards show a fare only if the poster entered a
+   * manual driver-earning + commission.
+   */
+  @Prop({ default: true })
+  appSuggestedFareEnabled: boolean;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

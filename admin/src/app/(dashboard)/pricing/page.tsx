@@ -30,6 +30,7 @@ const DEFAULT_PRICES: Record<string, number> = {
 
 export default function PricingPage() {
   const [vehiclePrices, setVehiclePrices] = useState<Record<string, number>>(DEFAULT_PRICES);
+  const [appSuggestedFare, setAppSuggestedFare] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,6 +41,7 @@ export default function PricingPage() {
       .then((data: any) => {
         const s = data?.data ?? data;
         setVehiclePrices({ ...DEFAULT_PRICES, ...(s.vehiclePrices ?? {}) });
+        setAppSuggestedFare(s.appSuggestedFareEnabled !== false);
       })
       .catch(() => setError('Failed to load pricing'))
       .finally(() => setLoading(false));
@@ -53,7 +55,7 @@ export default function PricingPage() {
     setError('');
     setSaving(true);
     try {
-      await adminApi.updateSettings({ vehiclePrices });
+      await adminApi.updateSettings({ vehiclePrices, appSuggestedFareEnabled: appSuggestedFare });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
@@ -86,6 +88,22 @@ export default function PricingPage() {
           </div>
         ) : (
           <div className="space-y-5">
+            {/* App Suggested Fare toggle */}
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Show &quot;App Suggested Fare&quot; in the app</p>
+                <p className="text-xs text-gray-500">When off, booking cards hide the suggested fare — a fare shows only if the poster entered a manual driver-earning + commission.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setAppSuggestedFare((v) => !v); setSaved(false); }}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${appSuggestedFare ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                aria-pressed={appSuggestedFare}
+              >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${appSuggestedFare ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               {[0, 1].map((col) => (
                 <div key={col} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">

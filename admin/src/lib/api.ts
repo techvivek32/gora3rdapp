@@ -207,6 +207,7 @@ export const adminApi = {
     minWithdrawal?: number;
     minTransfer?: number;
     whatsappAutoBookMinutes?: number;
+    appSuggestedFareEnabled?: boolean;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

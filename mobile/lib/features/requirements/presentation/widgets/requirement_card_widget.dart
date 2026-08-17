@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -157,6 +158,9 @@ class RequirementCardWidget extends StatelessWidget {
         final num driverEarning = (requirement['fare'] as num?) ?? 0;
         final num commission = (requirement['commission'] as num?) ?? 0;
         final bool isAppSuggested = requirement['isAppSuggested'] == true;
+        // Hide the fare block for app-suggested cards when the admin turned the
+        // "App Suggested Fare" toggle off. Manual (driver-earning) fares still show.
+        final bool hideFare = isAppSuggested && !AppConfig.appSuggestedFareEnabled;
         final notes = (requirement['notes'] as String?)?.trim() ?? '';
         final rating = (postedBy?['rating'] as num?)?.toDouble() ?? 0;
         final canContact = isCurrentUserPremium || isCurrentUserOwner;
@@ -414,6 +418,9 @@ class RequirementCardWidget extends StatelessWidget {
 
                             // 6. pricing — app-suggested shows a single fare line;
                             // a custom fare shows the full 3-column breakdown.
+                            // The whole block is hidden when the admin turned off
+                            // "App Suggested Fare" and this is an app-suggested card.
+                            if (!hideFare) ...[
                             if (isAppSuggested)
                               Padding(
                                 padding: EdgeInsets.symmetric(vertical: 2.h),
@@ -444,6 +451,7 @@ class RequirementCardWidget extends StatelessWidget {
                             SizedBox(height: 6.h),
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 2.h),
+                            ],
 
                             // 6b. Views — how many distinct users have seen this booking.
                             Center(

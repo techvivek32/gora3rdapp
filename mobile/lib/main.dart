@@ -9,6 +9,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:go_router/go_router.dart';
+import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/localization/app_translations.dart';
 import 'core/localization/locale_controller.dart';
@@ -82,6 +83,10 @@ void main() async {
 
   // Restore the saved app language before the first frame.
   await LocaleController.instance.load();
+
+  // Seed cached platform settings (e.g. App Suggested Fare toggle) from disk so
+  // cards render correctly on first paint; refreshed from the server on load.
+  await AppConfig.initFromPrefs();
 
   // If this install came from an invite link, grab the referral code Play passed
   // along. Not awaited — it must never delay first paint.
