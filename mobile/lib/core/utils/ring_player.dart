@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Built-in default tones (used when the user hasn't picked a custom ringtone).
@@ -53,6 +56,50 @@ enum RingKind { popup, notification }
 
 String _ringUrlKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_url' : 'ringtone_notification_url';
 String _ringTitleKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_title' : 'ringtone_notification_title';
+String _ringPathKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_path' : 'ringtone_notification_path';
+
+/// Local cached file path for the chosen ringtone (downloaded once). Empty if
+/// none/uncached — playback then falls back to the URL, then the default tone.
+Future<String> getRingtonePath(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_ringPathKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Downloads [url] into the app's support dir so the tone plays from disk every
+/// time (no network on each alert, works in the background). Returns the local
+/// path, or null if the download failed.
+Future<String?> _downloadRingtone(RingKind kind, String url) async {
+  try {
+    final dir = await getApplicationSupportDirectory();
+    final ringDir = Directory('${dir.path}/ringtones');
+    if (!ringDir.existsSync()) ringDir.createSync(recursive: true);
+    final rawExt = url.split('?').first.split('.').last.toLowerCase();
+    final ext = (rawExt.isNotEmpty && rawExt.length <= 4) ? rawExt : 'mp3';
+    final file = File('${ringDir.path}/${kind.name}.$ext');
+    await Dio().download(url, file.path);
+    return file.existsSync() ? file.path : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Persist a ringtone choice for [kind] AND cache the audio to disk. Pass an
+/// empty [url] to reset to the built-in default. Returns true on success.
+Future<bool> saveRingtoneChoice(RingKind kind, {required String url, required String title}) async {
+  if (url.isEmpty) {
+    await setRingtone(kind, url: '', title: '', path: '');
+    return true;
+  }
+  final path = await _downloadRingtone(kind, url);
+  // Even if the download failed, store the URL so playback can stream it.
+  await setRingtone(kind, url: url, title: title, path: path ?? '');
+  return path != null;
+}
 
 Future<String> getRingtoneUrl(RingKind kind) async {
   try {
@@ -75,15 +122,21 @@ Future<String> getRingtoneTitle(RingKind kind) async {
 }
 
 /// Save a choice for [kind]. Pass an empty [url] to reset to the default tone.
-Future<void> setRingtone(RingKind kind, {required String url, required String title}) async {
+Future<void> setRingtone(RingKind kind, {required String url, required String title, String path = ''}) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     if (url.isEmpty) {
       await prefs.remove(_ringUrlKey(kind));
       await prefs.remove(_ringTitleKey(kind));
+      await prefs.remove(_ringPathKey(kind));
     } else {
       await prefs.setString(_ringUrlKey(kind), url);
       await prefs.setString(_ringTitleKey(kind), title);
+      if (path.isNotEmpty) {
+        await prefs.setString(_ringPathKey(kind), path);
+      } else {
+        await prefs.remove(_ringPathKey(kind));
+      }
     }
   } catch (_) {}
 }
@@ -169,9 +222,12 @@ Future<void> playRequirementRing({bool awaitEnd = false, RingKind kind = RingKin
     await player.setReleaseMode(ReleaseMode.release);
     // The user's chosen tone for this kind (popup vs notification); empty → the
     // bundled default. Fall back to the default if the URL can't be played.
+    final cachedPath = await getRingtonePath(kind);
     final url = await getRingtoneUrl(kind);
     try {
-      if (url.isNotEmpty) {
+      if (cachedPath.isNotEmpty && File(cachedPath).existsSync()) {
+        await player.play(DeviceFileSource(cachedPath)); // from disk — no network
+      } else if (url.isNotEmpty) {
         await player.play(UrlSource(url));
       } else {
         await player.play(AssetSource(_defaultAsset(kind)));

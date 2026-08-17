@@ -28,6 +28,7 @@ dependencies:
   # Local Storage
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.3.2
+  path_provider: ^2.1.5
   hive_flutter: ^1.1.0
   hive: ^2.2.3
 
