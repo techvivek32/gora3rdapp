@@ -141,6 +141,11 @@ export class StorageService {
     return this.uploadFile(file, 'notifications', { resize: { width: 1024, height: 512 }, quality: 85 });
   }
 
+  async uploadRingtone(file: Express.Multer.File): Promise<string> {
+    // Audio — stored as-is (no image resize path runs for audio mimetypes).
+    return this.uploadFile(file, 'ringtones');
+  }
+
   async deleteFile(url: string): Promise<void> {
     if (this.useLocal) {
       this.deleteLocally(url);

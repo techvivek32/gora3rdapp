@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, Bell, CreditCard,
   BarChart3, Flag, Image, Settings, LogOut, PlayCircle, Building2,
-  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle
+  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle, Music
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 
@@ -53,6 +53,7 @@ const navigation = [
     items: [
       { href: '/cities', label: 'Cities', icon: Map },
       { href: '/banners', label: 'Banners', icon: Image },
+      { href: '/ringtones', label: 'Ringtones', icon: Music },
       { href: '/training-videos', label: 'Training Videos', icon: PlayCircle },
       { href: '/notifications', label: 'Notifications', icon: Bell },
       { href: '/pricing', label: 'Pricing Config', icon: DollarSign },

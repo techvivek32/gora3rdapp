@@ -138,6 +138,21 @@ export const adminApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  // ─── Ringtones (admin only) ──────────────────────────────────────────────────
+  getRingtones: () => apiClient.get('/admin/ringtones'),
+  createRingtone: (data: { title: string; audioUrl: string; sortOrder?: number }) =>
+    apiClient.post('/admin/ringtones', data),
+  updateRingtone: (id: string, data: { title?: string; sortOrder?: number; isActive?: boolean }) =>
+    apiClient.put(`/admin/ringtones/${id}`, data),
+  deleteRingtone: (id: string) => apiClient.delete(`/admin/ringtones/${id}`),
+  uploadRingtone: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/ringtone', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   // Upload KYC documents for a user who can't do it themselves; sends for review.
   submitDocumentsFor: (id: string, documents: Record<string, any>) =>
     apiClient.post(`/admin/users/${id}/documents`, documents),

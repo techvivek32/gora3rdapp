@@ -31,6 +31,7 @@ import { PlacesModule } from './modules/places/places.module';
 import { SupportModule } from './modules/support/support.module';
 import { GarageModule } from './modules/garage/garage.module';
 import { TrainingModule } from './modules/training/training.module';
+import { RingtonesModule } from './modules/ringtones/ringtones.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
 import { ImpersonationModule } from './modules/impersonation/impersonation.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
@@ -100,6 +101,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     SupportModule,
     GarageModule,
     TrainingModule,
+    RingtonesModule,
     FranchiseModule,
     ImpersonationModule,
     WhatsappModule,

@@ -46,4 +46,12 @@ export class StorageController {
     const url = await this.storageService.uploadNotificationImage(file);
     return { url };
   }
+
+  @Post('upload/ringtone')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload a ringtone audio file' })
+  async uploadRingtone(@UploadedFile() file: Express.Multer.File) {
+    const url = await this.storageService.uploadRingtone(file);
+    return { url };
+  }
 }
