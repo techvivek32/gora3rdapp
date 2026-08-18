@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_url.dart';
 import '../../../../core/widgets/banner_popup.dart';
 
 class BannerSliderWidget extends StatefulWidget {
@@ -111,7 +112,9 @@ class _BannerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = banner['imageUrl'] as String?;
+    // Skip private/local-IP URLs (an unreachable upload host) — they hang the
+    // image loader for minutes; show the gradient fallback instantly instead.
+    final imageUrl = safeImageUrl(banner['imageUrl'] as String?);
     final title = banner['title'] as String?;
     final subtitle = banner['subtitle'] as String?;
 
