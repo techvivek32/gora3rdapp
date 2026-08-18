@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -88,8 +89,14 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
       await FlutterOverlayWindow.closeOverlay();
     }
 
+    // Size the window to ~60% of the screen height (physical px) instead of full
+    // screen, so it doesn't cover/lock the whole screen — the phone stays usable
+    // above and below the card. (This plugin version has no wrapContent.)
+    final view = ui.PlatformDispatcher.instance.views.first;
+    final overlayHeightPx = (view.physicalSize.height * 0.6).round();
+
     await FlutterOverlayWindow.showOverlay(
-      height: WindowSize.matchParent,
+      height: overlayHeightPx,
       width: WindowSize.matchParent,
       alignment: OverlayAlignment.center,
       flag: OverlayFlag.defaultFlag,
@@ -198,8 +205,13 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     // requestStopRing flips a shared-prefs flag the background isolate (which is
     // actually playing the ring) polls — a plain stopRequirementRing here only
     // touches THIS overlay isolate's player, which never played anything.
-    await requestStopRing();
-    await FlutterOverlayWindow.closeOverlay();
+    // Each step is guarded so a failure in one never blocks the actual close.
+    try {
+      await requestStopRing();
+    } catch (_) {}
+    try {
+      await FlutterOverlayWindow.closeOverlay();
+    } catch (_) {}
   }
 
   Future<void> _call() async {
@@ -273,22 +285,14 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Material(
-        // Dim the rest of the screen; tapping outside the card dismisses it AND
-        // stops the ring.
-        color: Colors.black45,
-        child: GestureDetector(
-          onTap: _close,
-          child: Center(
-            child: GestureDetector(
-              onTap: () {}, // absorb taps on the card so it doesn't dismiss
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width - 24,
-                    maxHeight: MediaQuery.of(context).size.height * 0.8,
-                  ),
-                  child: Container(
+        // Compact overlay: the card IS the window (transparent background). No
+        // full-screen dim / tap-catcher — those nested GestureDetectors stole taps
+        // from the buttons, which is why Close sometimes did nothing.
+        color: Colors.transparent,
+        child: Center(
+          child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
@@ -346,6 +350,16 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                                         overflow: TextOverflow.ellipsis),
                                   ),
                                 ],
+                                const SizedBox(width: 4),
+                                // Header X — a second, always-reliable close path.
+                                InkWell(
+                                  onTap: _close,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: const Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(Icons.close, size: 20, color: Colors.black54),
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -468,12 +482,9 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                     ],
                     ),
                   ), // SingleChildScrollView
-                  ), // Container
-                ), // ConstrainedBox
-              ), // Padding (horizontal)
-            ), // inner GestureDetector (absorb taps)
-          ), // Center
-        ), // outer GestureDetector (tap outside to dismiss)
+                ), // Container
+              ), // Padding
+        ), // Center
       ), // Material
     );
   }
