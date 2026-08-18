@@ -219,17 +219,17 @@ export class WhatsappService {
     if (!ai) return null;
     if (ai.kind === 'available') return { kind: 'available' };
     if (ai.kind !== 'requirement' || !ai.pickupCity || !ai.dropCity) return null;
+    // A clock time OR a period word (subah/shaam/dopahar/raat) is honoured;
+    // only when there's no time info at all do we use the message's send time.
+    const travelTime = this.hasTimeInfo(ai.time) ? this.normalizeTime(ai.time) : this.istTravelTime(msgDate);
     return {
       kind: 'requirement',
       pickupCity: ai.pickupCity,
       dropCity: ai.dropCity,
       vehicleType: this.mapVehicle(ai.vehicle || ''),
       tripType: this.mapTrip(ai.tripType || ''),
-      // No date given → the day the message was sent.
-      travelDate: this.parseDate(ai.date) || this.istTravelDate(msgDate),
-      // A clock time OR a period word (subah/shaam/dopahar/raat) is honoured;
-      // only when there's no time info at all do we use the message's send time.
-      travelTime: this.hasTimeInfo(ai.time) ? this.normalizeTime(ai.time) : this.istTravelTime(msgDate),
+      travelDate: this.resolveTravelDate(ai.date, travelTime, msgDate),
+      travelTime,
       fare: this.parseAmount(ai.driverEarning),
       commission: this.parseAmount(ai.commission),
       contactNumber: ai.contactNumber || '',
@@ -248,6 +248,40 @@ export class WhatsappService {
   private dayNumber(d: Date, istOffset: boolean): number {
     const x = istOffset ? new Date(d.getTime() + 5.5 * 60 * 60 * 1000) : d;
     return x.getUTCFullYear() * 10000 + (x.getUTCMonth() + 1) * 100 + x.getUTCDate();
+  }
+
+  /** Minutes since midnight for a "hh:MM AM/PM" string, or null. */
+  private timeToMinutes(t: string): number | null {
+    const m = (t || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const min = parseInt(m[2], 10);
+    const ap = (m[3] || '').toUpperCase();
+    if (ap === 'PM' && h < 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    return h * 60 + min;
+  }
+
+  /** The message's own time-of-day in IST, minutes since midnight. */
+  private istMinutes(d: Date): number {
+    const ist = new Date(d.getTime() + 5.5 * 60 * 60 * 1000);
+    return ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  }
+
+  /**
+   * Travel date for a message. Uses the written date if any; otherwise the day
+   * the message was sent — rolled to the NEXT day when the requested clock time
+   * has already passed today (e.g. "6 AM" sent at 9:32 PM means tomorrow 6 AM).
+   */
+  private resolveTravelDate(rawDate: string, travelTime: string, msgDate: Date): Date {
+    const parsed = this.parseDate(rawDate);
+    if (parsed) return parsed;
+    const base = this.istTravelDate(msgDate);
+    const tMin = this.timeToMinutes(travelTime);
+    if (tMin != null && tMin < this.istMinutes(msgDate)) {
+      base.setDate(base.getDate() + 1); // that time already passed today → tomorrow
+    }
+    return base;
   }
 
   /** True when the booking's calendar day is before today (IST). */
@@ -329,11 +363,11 @@ export class WhatsappService {
     const dropCity = fields['to'] || fields['drop'];
     if (!pickupCity || !dropCity) return null;
 
-    // No date written → the day the message was sent (don't reject the booking).
-    const travelDate = this.parseDate(fields['date'] || fields['travel date'] || '') || this.istTravelDate(msgDate);
     // Specific clock time used as-is; vague/blank → the message's send time.
     const rawTime = fields['time'] || fields['travel time'] || '';
     const travelTime = this.hasTimeInfo(rawTime) ? this.normalizeTime(rawTime) : this.istTravelTime(msgDate);
+    // No date written → message day, rolled to tomorrow if the time already passed.
+    const travelDate = this.resolveTravelDate(fields['date'] || fields['travel date'] || '', travelTime, msgDate);
 
     // Manually-entered money (customer types these in the message).
     const fare = this.parseAmount(
