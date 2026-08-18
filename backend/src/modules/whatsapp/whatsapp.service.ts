@@ -219,7 +219,7 @@ export class WhatsappService {
     if (!ai) return null;
     if (ai.kind === 'available') return { kind: 'available' };
     if (ai.kind !== 'requirement' || !ai.pickupCity || !ai.dropCity) return null;
-    const { travelDate, travelTime } = this.resolveDateTime(ai.date, ai.time || '', msgDate);
+    const { travelDate, travelTime } = this.resolveDateTime(ai.date, ai.time || '', msgDate, text);
     return {
       kind: 'requirement',
       pickupCity: ai.pickupCity,
@@ -292,11 +292,22 @@ export class WhatsappService {
    * Everything else keeps the existing behaviour (explicit am/pm, subah/shaam,
    * written dates, or no time → message time).
    */
-  private resolveDateTime(rawDate: string, rawTime: string, msgDate: Date): { travelDate: Date; travelTime: string } {
-    const t = rawTime || '';
+  private resolveDateTime(rawDate: string, rawTime: string, msgDate: Date, fullText = ''): { travelDate: Date; travelTime: string } {
+    const periodRe = /\b(subah|subha|savere|sabah|morning|dopahar|afternoon|noon|shaam|sham|evening|raat|night)\b/i;
+    let t = rawTime || '';
     const hasDigit = /\d/.test(t);
     const hasAmPm = /(?:^|[\s\d.])(am|pm)\b/i.test(t);
-    const hasPeriod = /\b(subah|subha|savere|sabah|morning|dopahar|afternoon|noon|shaam|sham|evening|raat|night)\b/i.test(t);
+    let hasPeriod = periodRe.test(t);
+
+    // The AI sometimes drops the period word ("Sham 7 baje" → time "7"), losing
+    // the AM/PM. Recover it from the full message text so "shaam 7" stays 7 PM.
+    if (hasDigit && !hasAmPm && !hasPeriod && fullText) {
+      const m = fullText.match(periodRe);
+      if (m) {
+        t = `${t} ${m[0]}`;
+        hasPeriod = true;
+      }
+    }
 
     if (hasDigit && !hasAmPm && !hasPeriod && !this.parseDate(rawDate)) {
       return this.nextOccurrenceOfBareHour(t, msgDate);
@@ -414,6 +425,7 @@ export class WhatsappService {
       fields['date'] || fields['travel date'] || '',
       fields['time'] || fields['travel time'] || '',
       msgDate,
+      text,
     );
 
     // Manually-entered money (customer types these in the message).
