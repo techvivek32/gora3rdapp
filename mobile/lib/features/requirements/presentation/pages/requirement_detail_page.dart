@@ -72,8 +72,16 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
     }
     if (_requirement?['travelTime'] != null) {
       try {
-        final parts = (_requirement!['travelTime'] as String).split(':');
-        _travelTime = TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+        // Handles "HH:MM" (24h) and "hh:MM AM/PM" (12h, WhatsApp) alike.
+        final m = RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)?', caseSensitive: false)
+            .firstMatch(_requirement!['travelTime'] as String);
+        if (m != null) {
+          int h = int.parse(m.group(1)!);
+          final ap = (m.group(3) ?? '').toUpperCase();
+          if (ap == 'PM' && h < 12) h += 12;
+          if (ap == 'AM' && h == 12) h = 0;
+          _travelTime = TimeOfDay(hour: h, minute: int.parse(m.group(2)!));
+        }
       } catch (_) {}
     }
   }

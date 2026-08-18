@@ -809,11 +809,17 @@ class VehicleCard extends StatelessWidget {
   }
 
   String _formatTime12(String? t) {
-    if (t == null || t.isEmpty) return '';
-    final parts = t.split(':');
-    if (parts.length < 2) return t;
-    int h = int.tryParse(parts[0]) ?? 0;
-    final m = int.tryParse(parts[1]) ?? 0;
+    final s = t?.trim() ?? '';
+    if (s.isEmpty) return '';
+    // Handles both "HH:MM" (24h) and "hh:MM AM/PM" (12h) so a PM time isn't
+    // shown as am.
+    final match = RegExp(r'(\d{1,2}):(\d{2})\s*(AM|PM)?', caseSensitive: false).firstMatch(s);
+    if (match == null) return s;
+    int h = int.tryParse(match.group(1)!) ?? 0;
+    final m = int.tryParse(match.group(2)!) ?? 0;
+    final ap = (match.group(3) ?? '').toUpperCase();
+    if (ap == 'PM' && h < 12) h += 12;
+    if (ap == 'AM' && h == 12) h = 0;
     final period = h >= 12 ? 'pm' : 'am';
     int h12 = h % 12;
     if (h12 == 0) h12 = 12;
