@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/tab_refresh.dart';
 
 class MainNavPage extends StatelessWidget {
   final Widget child;
@@ -38,9 +39,14 @@ class MainNavPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(icon: Icons.home_rounded, label: 'Home'.tr, index: 0, selectedIndex: selectedIndex, onTap: () => context.go('/')),
-            _NavItem(icon: Icons.search_rounded, label: 'Booking'.tr, index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/requirements')),
+            _NavItem(icon: Icons.search_rounded, label: 'Booking'.tr, index: 1, selectedIndex: selectedIndex, onTap: () {
+              // Already on Booking → refresh; otherwise navigate.
+              if (selectedIndex == 1) { TabRefresh.requirements.value++; } else { context.go('/requirements'); }
+            }),
             const SizedBox(width: 48),
-            _NavItem(icon: Icons.directions_car_rounded, label: 'Available'.tr, index: 2, selectedIndex: selectedIndex, onTap: () => context.go('/vehicles')),
+            _NavItem(icon: Icons.directions_car_rounded, label: 'Available'.tr, index: 2, selectedIndex: selectedIndex, onTap: () {
+              if (selectedIndex == 2) { TabRefresh.vehicles.value++; } else { context.go('/vehicles'); }
+            }),
             _NavItem(icon: Icons.settings_rounded, label: 'Settings'.tr, index: 3, selectedIndex: selectedIndex, onTap: () => context.go('/profile')),
           ],
         ),

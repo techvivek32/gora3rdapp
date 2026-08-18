@@ -8,6 +8,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/tab_refresh.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -49,6 +50,16 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     _scrollController.addListener(_onScroll);
     _loadBanners();
     _pollTimer = Timer.periodic(const Duration(seconds: 300), (_) => _silentRefresh());
+    // Tapping the already-active "Available" bottom-nav tab reloads this feed.
+    TabRefresh.vehicles.addListener(_onTabReTap);
+  }
+
+  void _onTabReTap() {
+    if (!mounted) return;
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
+    context.read<VehiclesBloc>().add(const LoadVehiclesEvent());
   }
 
   void _silentRefresh() {
@@ -173,6 +184,7 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    TabRefresh.vehicles.removeListener(_onTabReTap);
     _scrollController.dispose();
     _searchCtrl.dispose();
     super.dispose();
