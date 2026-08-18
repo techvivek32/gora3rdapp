@@ -90,10 +90,16 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
     }
 
     // Size the window to ~60% of the screen height (physical px) instead of full
-    // screen, so it doesn't cover/lock the whole screen — the phone stays usable
-    // above and below the card. (This plugin version has no wrapContent.)
-    final view = ui.PlatformDispatcher.instance.views.first;
-    final overlayHeightPx = (view.physicalSize.height * 0.6).round();
+    // screen, so it doesn't cover/lock the whole screen. Guarded: this runs in the
+    // FCM background isolate where `views` is often EMPTY — `.first` there threw
+    // and the whole overlay silently failed to show. Fall back to a fixed height.
+    double screenH = 0;
+    try {
+      final views = ui.PlatformDispatcher.instance.views;
+      if (views.isNotEmpty) screenH = views.first.physicalSize.height;
+      screenH = screenH > 0 ? screenH : (ui.PlatformDispatcher.instance.implicitView?.physicalSize.height ?? 0);
+    } catch (_) {}
+    final overlayHeightPx = screenH > 0 ? (screenH * 0.6).round() : 1500;
 
     await FlutterOverlayWindow.showOverlay(
       height: overlayHeightPx,
