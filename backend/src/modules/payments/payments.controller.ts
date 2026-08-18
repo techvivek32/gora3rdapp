@@ -43,11 +43,12 @@ export class PaymentsController {
       // handled by the qr_code.credited branch below, so skip them here.
       if (payment && payment.order_id) {
         try {
-          await this.subscriptionsService.verifyPayment(null, {
-            razorpayOrderId: payment.order_id,
-            razorpayPaymentId: payment.id,
-            razorpaySignature: signature,
-          });
+          // The webhook body HMAC was already verified above, so this order is
+          // authentic — activate directly. (Do NOT call verifyPayment here: it
+          // re-checks the CHECKOUT signature HMAC(orderId|paymentId, keySecret),
+          // which the webhook signature never matches — that path always failed
+          // and even flipped paid orders to FAILED.)
+          await this.subscriptionsService.markOrderPaidAndActivate(payment.order_id, payment.id);
         } catch (_) {}
       }
     } else if (event === 'qr_code.credited') {

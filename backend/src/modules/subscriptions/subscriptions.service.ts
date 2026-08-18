@@ -323,6 +323,71 @@ export class SubscriptionsService implements OnModuleInit {
     return { message: 'Payment verified and subscription activated' };
   }
 
+  /**
+   * Mark a subscription order as paid and activate it — from a source we've
+   * ALREADY authenticated (the Razorpay webhook, whose body HMAC we verified, or
+   * our own server-side poll). There is no checkout signature to re-check here.
+   * Idempotent: a second call for an already-activated order is a no-op.
+   */
+  async markOrderPaidAndActivate(razorpayOrderId: string, razorpayPaymentId?: string): Promise<void> {
+    const payment = await this.paymentModel.findOne({ razorpayOrderId });
+    if (!payment) return; // unknown / not a subscription order
+    if (payment.status === PaymentStatus.SUCCESS) return; // already done
+    if (!payment.planId || !payment.userId) return; // not a plan purchase
+
+    await this.paymentModel.updateOne(
+      { _id: payment._id },
+      { $set: { status: PaymentStatus.SUCCESS, ...(razorpayPaymentId ? { razorpayPaymentId } : {}) } },
+    );
+    await this.activateSubscription(payment.userId.toString(), payment.planId.toString(), payment._id.toString());
+    this.logger.log(`Order ${razorpayOrderId} activated for user ${payment.userId}`);
+  }
+
+  /**
+   * Safety net for in-app (card/UPI) membership orders: every 2 minutes, take any
+   * pending order payment (1 min–24 h old) and ask Razorpay whether it was
+   * captured. If it was, activate — covering the very common case where the app
+   * was killed/backgrounded during the UPI bank redirect so its success callback
+   * never fired, and no webhook was configured/received.
+   */
+  @Cron('*/2 * * * *') // every 2 minutes
+  async reconcilePendingOrderPayments() {
+    const now = Date.now();
+    const pendings = await this.paymentModel
+      .find({
+        // PENDING (callback missed) OR FAILED (wrongly failed by the old webhook
+        // bug) — we activate only after Razorpay confirms the order was captured.
+        status: { $in: [PaymentStatus.PENDING, PaymentStatus.FAILED] },
+        razorpayOrderId: { $exists: true, $nin: [null, ''] },
+        razorpayQrId: { $in: [null, undefined, ''] }, // QR orders handled separately
+        planId: { $exists: true, $ne: null },
+        createdAt: { $gt: new Date(now - 24 * 60 * 60 * 1000), $lt: new Date(now - 60 * 1000) },
+      })
+      .select('razorpayOrderId')
+      .limit(50)
+      .lean();
+    if (!pendings.length) return;
+
+    let razorpay: any;
+    try {
+      razorpay = await this.getRazorpay();
+    } catch {
+      return; // Razorpay not configured
+    }
+
+    for (const p of pendings) {
+      try {
+        const res: any = await razorpay.orders.fetchPayments((p as any).razorpayOrderId);
+        const captured = (res?.items || []).find((x: any) => x?.status === 'captured');
+        if (captured) {
+          await this.markOrderPaidAndActivate((p as any).razorpayOrderId, captured.id);
+        }
+      } catch (e: any) {
+        this.logger.warn(`Order reconcile failed for ${(p as any).razorpayOrderId}: ${e?.message ?? e}`);
+      }
+    }
+  }
+
   private readonly TIER_RANK: Record<string, number> = {
     new: 0, active: 1, verified: 2, premium: 3, golden: 4,
   };
