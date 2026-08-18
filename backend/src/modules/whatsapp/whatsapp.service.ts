@@ -219,16 +219,14 @@ export class WhatsappService {
     if (!ai) return null;
     if (ai.kind === 'available') return { kind: 'available' };
     if (ai.kind !== 'requirement' || !ai.pickupCity || !ai.dropCity) return null;
-    // A clock time OR a period word (subah/shaam/dopahar/raat) is honoured;
-    // only when there's no time info at all do we use the message's send time.
-    const travelTime = this.hasTimeInfo(ai.time) ? this.normalizeTime(ai.time) : this.istTravelTime(msgDate);
+    const { travelDate, travelTime } = this.resolveDateTime(ai.date, ai.time || '', msgDate);
     return {
       kind: 'requirement',
       pickupCity: ai.pickupCity,
       dropCity: ai.dropCity,
       vehicleType: this.mapVehicle(ai.vehicle || ''),
       tripType: this.mapTrip(ai.tripType || ''),
-      travelDate: this.resolveTravelDate(ai.date, travelTime, msgDate),
+      travelDate,
       travelTime,
       fare: this.parseAmount(ai.driverEarning),
       commission: this.parseAmount(ai.commission),
@@ -282,6 +280,55 @@ export class WhatsappService {
       base.setDate(base.getDate() + 1); // that time already passed today → tomorrow
     }
     return base;
+  }
+
+  /**
+   * Resolve BOTH the travel date and time from a message's raw date/time text.
+   *
+   * Special case — a bare hour with NO am/pm, NO period word and NO written date
+   * (e.g. "3 bje"): we pick the SOONEST upcoming "3 o'clock" after the message,
+   * which decides both am/pm and the date. Examples (bare "3"):
+   *   now 1 PM → today 3 PM · now 4 PM → tomorrow 3 AM · now 6 AM → today 3 PM.
+   * Everything else keeps the existing behaviour (explicit am/pm, subah/shaam,
+   * written dates, or no time → message time).
+   */
+  private resolveDateTime(rawDate: string, rawTime: string, msgDate: Date): { travelDate: Date; travelTime: string } {
+    const t = rawTime || '';
+    const hasDigit = /\d/.test(t);
+    const hasAmPm = /(?:^|[\s\d.])(am|pm)\b/i.test(t);
+    const hasPeriod = /\b(subah|subha|savere|sabah|morning|dopahar|afternoon|noon|shaam|sham|evening|raat|night)\b/i.test(t);
+
+    if (hasDigit && !hasAmPm && !hasPeriod && !this.parseDate(rawDate)) {
+      return this.nextOccurrenceOfBareHour(t, msgDate);
+    }
+
+    const travelTime = this.hasTimeInfo(t) ? this.normalizeTime(t) : this.istTravelTime(msgDate);
+    return { travelDate: this.resolveTravelDate(rawDate, travelTime, msgDate), travelTime };
+  }
+
+  /** For a bare "H[:MM]" with no am/pm, find the next H AM or H PM after the message. */
+  private nextOccurrenceOfBareHour(rawTime: string, msgDate: Date): { travelDate: Date; travelTime: string } {
+    const m = rawTime.match(/(\d{1,2})\s*[:.\s]?\s*(\d{2})?/);
+    const hRaw = m ? parseInt(m[1], 10) : 0;
+    const min = m && m[2] ? parseInt(m[2], 10) : 0;
+    const h12 = hRaw % 12; // 0..11 (12 → 0)
+    const nowMin = this.istMinutes(msgDate);
+    const amMin = h12 * 60 + min;        // e.g. 3 → 03:00
+    const pmMin = (h12 + 12) * 60 + min; // e.g. 3 → 15:00
+
+    // Each candidate: today if still ahead, else tomorrow. Pick the soonest.
+    const candidates = [
+      { min: amMin, addDay: amMin > nowMin ? 0 : 1, ap: 'AM' as const },
+      { min: pmMin, addDay: pmMin > nowMin ? 0 : 1, ap: 'PM' as const },
+    ].sort((a, b) => a.addDay - b.addDay || a.min - b.min);
+    const pick = candidates[0];
+
+    const base = this.istTravelDate(msgDate);
+    if (pick.addDay === 1) base.setDate(base.getDate() + 1);
+
+    const hh = h12 === 0 ? 12 : h12;
+    const travelTime = `${String(hh).padStart(2, '0')}:${String(min).padStart(2, '0')} ${pick.ap}`;
+    return { travelDate: base, travelTime };
   }
 
   /** True when the booking's calendar day is before today (IST). */
@@ -363,11 +410,11 @@ export class WhatsappService {
     const dropCity = fields['to'] || fields['drop'];
     if (!pickupCity || !dropCity) return null;
 
-    // Specific clock time used as-is; vague/blank → the message's send time.
-    const rawTime = fields['time'] || fields['travel time'] || '';
-    const travelTime = this.hasTimeInfo(rawTime) ? this.normalizeTime(rawTime) : this.istTravelTime(msgDate);
-    // No date written → message day, rolled to tomorrow if the time already passed.
-    const travelDate = this.resolveTravelDate(fields['date'] || fields['travel date'] || '', travelTime, msgDate);
+    const { travelDate, travelTime } = this.resolveDateTime(
+      fields['date'] || fields['travel date'] || '',
+      fields['time'] || fields['travel time'] || '',
+      msgDate,
+    );
 
     // Manually-entered money (customer types these in the message).
     const fare = this.parseAmount(
