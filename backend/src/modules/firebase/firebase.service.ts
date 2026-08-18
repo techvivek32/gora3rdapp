@@ -47,6 +47,7 @@ export class FirebaseService implements OnModuleInit {
     body: string;
     data?: Record<string, string>;
     imageUrl?: string;
+    channelId?: string;
   }): Promise<admin.messaging.BatchResponse> {
     if (!tokens || tokens.length === 0) {
       return { successCount: 0, failureCount: 0, responses: [] };
@@ -63,10 +64,10 @@ export class FirebaseService implements OnModuleInit {
       android: {
         priority: 'high',
         notification: {
-          // Must match _channelId in the app's push_notification_service.dart.
-          // v4 is a SILENT channel — the app plays the user's chosen notification
-          // ringtone itself, so the system channel must not also play a sound.
-          channelId: 'gora_cabs_notifications_v4',
+          // Default to the normal "updates" channel (plays a sound) — admin
+          // broadcasts, wallet, chat, trip updates, etc. Only the new-booking push
+          // passes the SILENT v4 channel (the app plays the chosen ring itself).
+          channelId: notification.channelId || 'gora_cabs_updates',
           priority: 'high',
         },
       },

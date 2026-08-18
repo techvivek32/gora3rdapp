@@ -127,6 +127,8 @@ export class NotificationsService {
             title,
             body,
             data: { ...baseData, posterMobile },
+            // Silent booking channel — the app plays the user's chosen ring itself.
+            channelId: 'gora_cabs_notifications_v4',
           });
         } catch (error) {
           this.logger.error('FCM batch send failed:', error.message);
@@ -362,10 +364,11 @@ export class NotificationsService {
       })),
     );
 
-    // Push only to users who still want push (and have a device token). Everyone
-    // matched above already has the in-app row regardless.
+    // Push to every matched user who has a device token. NOTE: this is NOT gated
+    // by notificationsEnabled — that flag is the booking-alert (ring/popup) opt-in,
+    // which is off by default for everyone; gating admin broadcasts on it silently
+    // stopped ALL admin push. Admin announcements go to the whole audience.
     const allTokens = users
-      .filter((u) => u.notificationsEnabled !== false)
       .flatMap((u) => u.fcmTokens ?? [])
       .filter(Boolean);
     const batchSize = 500;
