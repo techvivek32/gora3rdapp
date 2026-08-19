@@ -86,6 +86,10 @@ export class PlatformSettings {
    */
   @Prop({ default: true })
   appSuggestedFareEnabled: boolean;
+
+  /** When true the app shows the "N views" count on booking/available cards. */
+  @Prop({ default: true })
+  viewsEnabled: boolean;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

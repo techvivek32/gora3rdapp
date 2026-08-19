@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/localization/app_translations.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/utils/tab_refresh.dart';
 import '../../../../core/network/api_client.dart';
@@ -52,6 +53,8 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
     _pollTimer = Timer.periodic(const Duration(seconds: 300), (_) => _silentRefresh());
     // Tapping the already-active "Available" bottom-nav tab reloads this feed.
     TabRefresh.vehicles.addListener(_onTabReTap);
+    // Refresh the views toggle, then rebuild so cards reflect it.
+    AppConfig.refresh(getIt<ApiClient>()).then((_) { if (mounted) setState(() {}); });
   }
 
   void _onTabReTap() {
@@ -644,16 +647,18 @@ class VehicleCard extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(_timeAgo(vehicle['createdAt']), style: TextStyle(fontSize: 11.sp, color: Colors.grey[600])),
-                                    SizedBox(height: 3.h),
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.remove_red_eye, size: 12.sp, color: Colors.grey[600]),
-                                        SizedBox(width: 4.w),
-                                        Text('${vehicle['viewCount'] ?? 0} views',
-                                            style: TextStyle(fontSize: 10.sp, color: Colors.grey[600], fontWeight: FontWeight.w500)),
-                                      ],
-                                    ),
+                                    if (AppConfig.viewsEnabled) ...[
+                                      SizedBox(height: 3.h),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.remove_red_eye, size: 12.sp, color: Colors.grey[600]),
+                                          SizedBox(width: 4.w),
+                                          Text('${vehicle['viewCount'] ?? 0} views',
+                                              style: TextStyle(fontSize: 10.sp, color: Colors.grey[600], fontWeight: FontWeight.w500)),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ],

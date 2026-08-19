@@ -10,13 +10,18 @@ class AppConfig {
   /// Whether the app shows the "App Suggested Fare" line on booking cards.
   static bool appSuggestedFareEnabled = true;
 
+  /// Whether the app shows the "N views" count on cards.
+  static bool viewsEnabled = true;
+
   static const _kFareKey = 'cfg_app_suggested_fare';
+  static const _kViewsKey = 'cfg_views_enabled';
 
   /// Read the last-known values from disk. Call once early in main().
   static Future<void> initFromPrefs() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       appSuggestedFareEnabled = prefs.getBool(_kFareKey) ?? true;
+      viewsEnabled = prefs.getBool(_kViewsKey) ?? true;
     } catch (_) {}
   }
 
@@ -26,8 +31,10 @@ class AppConfig {
       final res = await api.get('/settings');
       final s = (res.data['data'] ?? res.data) as Map<String, dynamic>;
       appSuggestedFareEnabled = s['appSuggestedFareEnabled'] != false; // default true
+      viewsEnabled = s['viewsEnabled'] != false; // default true
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kFareKey, appSuggestedFareEnabled);
+      await prefs.setBool(_kViewsKey, viewsEnabled);
     } catch (_) {}
   }
 }

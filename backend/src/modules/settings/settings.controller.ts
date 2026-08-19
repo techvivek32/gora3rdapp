@@ -56,6 +56,7 @@ export class SettingsController {
     minTransfer?: number;
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
+    viewsEnabled?: boolean;
   }) {
     return this.settingsService.updateSettings(body);
   }
