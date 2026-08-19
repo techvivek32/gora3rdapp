@@ -118,6 +118,7 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
   late final GoRouter _router;
   StreamSubscription<AuthState>? _authSub;
   Timer? _sessionHeartbeat;
+  bool _sessionReplacedShowing = false; // guards against stacking the popup
 
   /// Ping a cheap authed endpoint. If the account was deleted/blocked, the request
   /// 401s and the ApiClient interceptor forces sign-out — so a logged-out admin
@@ -144,6 +145,37 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
     // deactivated) → sign out. The router redirects to login on AuthUnauthenticated.
     ApiClient.onSessionExpired = () {
       if (mounted) _authBloc.add(AuthLogoutEvent());
+    };
+
+    // This device was signed out because the same account logged in on another
+    // phone. Show the popup FIRST (so the user knows why), and only log out when
+    // they tap OK — logging out first navigated to /login and hid the popup.
+    ApiClient.onSessionReplaced = () {
+      if (!mounted || _sessionReplacedShowing) return;
+      final ctx = AppRouter.rootNavigatorKey.currentContext;
+      if (ctx == null) {
+        _authBloc.add(AuthLogoutEvent()); // no UI context — just sign out
+        return;
+      }
+      _sessionReplacedShowing = true;
+      showDialog(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (dctx) => AlertDialog(
+          title: const Text('Logged out'),
+          content: const Text('This account was just logged in on another device.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dctx).pop();
+                _sessionReplacedShowing = false;
+                _authBloc.add(AuthLogoutEvent()); // log out AFTER OK
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ).then((_) => _sessionReplacedShowing = false);
     };
 
     // The floating overlay runs in a separate Flutter engine and can't reach the
@@ -179,6 +211,7 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _sessionHeartbeat?.cancel();
     ApiClient.onSessionExpired = null;
+    ApiClient.onSessionReplaced = null;
     _authSub?.cancel();
     _authBloc.close();
     super.dispose();

@@ -9,7 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { randomInt } from 'crypto';
+import { randomInt, randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
@@ -81,8 +81,9 @@ export class AuthService {
     if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
     if (!user.isActive) throw new UnauthorizedException('Account is inactive');
 
-    const tokens = await this.generateTokens(user);
-    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
     await this.userModel.findByIdAndUpdate(user._id, {
       lastActive: new Date(),
       ...(dto.fcmToken ? { $addToSet: { fcmTokens: dto.fcmToken } } : {}),
@@ -200,8 +201,9 @@ export class AuthService {
       await this.userModel.findByIdAndUpdate(referredBy, { $inc: { referralCount: 1 } });
     }
 
-    const tokens = await this.generateTokens(user);
-    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
 
     // OTP consumed — remove it so it can't be reused.
     await this.otpModel.deleteOne({ mobile: dto.mobile });
@@ -267,8 +269,9 @@ export class AuthService {
       lastActive: new Date(),
     });
 
-    const tokens = await this.generateTokens(user);
-    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
 
     // Update FCM token if provided
     if (dto.fcmToken) {
@@ -313,8 +316,9 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateTokens(user);
-    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken);
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
 
     return {
       message: 'OTP verified successfully',
@@ -437,6 +441,16 @@ export class AuthService {
     }
     if (!user.refreshToken) throw new UnauthorizedException('Access denied');
 
+    // Single-device: a newer login on another phone rotated user.sessionId, so a
+    // refresh carrying the old session belongs to a replaced device — reject with
+    // a clear marker so the app can show "logged in on another device". Admins /
+    // super-admins are exempt (they legitimately use several devices/browsers).
+    const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPER_ADMIN;
+    const decodedRefresh: any = this.jwtService.decode(refreshToken);
+    if (!isAdmin && decodedRefresh?.sessionId && user.sessionId && decodedRefresh.sessionId !== user.sessionId) {
+      throw new UnauthorizedException('SESSION_REPLACED');
+    }
+
     const isTokenValid = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!isTokenValid) throw new UnauthorizedException('Invalid refresh token');
 
@@ -460,6 +474,7 @@ export class AuthService {
         mobile: user.mobile,
         role: user.role,
         membershipType: user.membershipType,
+        ...(user.sessionId ? { sessionId: user.sessionId } : {}),
       },
       {
         secret: this.configService.get<string>('jwt.secret'),
@@ -481,13 +496,15 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  private async generateTokens(user: UserDocument) {
+  private async generateTokens(user: UserDocument, sessionId?: string) {
     const payload = {
       sub: user._id.toString(),
       email: user.email,
       mobile: user.mobile,
       role: user.role,
       membershipType: user.membershipType,
+      // Single-device: this login's session. Rotated on every new login.
+      ...(sessionId ? { sessionId } : {}),
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -504,9 +521,12 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private async saveRefreshToken(userId: string, refreshToken: string) {
+  private async saveRefreshToken(userId: string, refreshToken: string, sessionId?: string) {
     const hashedToken = await bcrypt.hash(refreshToken, 10);
-    await this.userModel.findByIdAndUpdate(userId, { refreshToken: hashedToken });
+    await this.userModel.findByIdAndUpdate(userId, {
+      refreshToken: hashedToken,
+      ...(sessionId ? { sessionId } : {}),
+    });
   }
 
   private async handleFailedLogin(user: UserDocument) {

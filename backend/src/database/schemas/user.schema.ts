@@ -179,6 +179,11 @@ export class User {
   @Prop({ type: String })
   refreshToken: string;
 
+  // Current active login session. Every login rotates this; tokens carry it and
+  // are rejected once it changes — enforces single-device login for app users.
+  @Prop({ type: String })
+  sessionId: string;
+
   @Prop({ default: 0 })
   loginAttempts: number;
 

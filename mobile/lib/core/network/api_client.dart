@@ -11,6 +11,11 @@ class ApiClient {
   /// main.dart wires this up to sign the user out and send them to the login page.
   static void Function()? onSessionExpired;
 
+  /// Called when this device was logged out because the SAME account signed in on
+  /// another phone. main.dart shows a "logged in on another device" popup, then
+  /// signs out. (Storage is already cleared by the time this fires.)
+  static void Function()? onSessionReplaced;
+
   late final Dio _dio;
   final FlutterSecureStorage _storage;
 
@@ -65,13 +70,24 @@ class _AuthInterceptor extends Interceptor {
 
   _AuthInterceptor(this._storage, this._dio);
 
-  Future<void> _forceSignOut() async {
+  Future<void> _forceSignOut({bool replaced = false}) async {
     if (_signingOut) return;
     _signingOut = true;
     await _storage.deleteAll();
-    ApiClient.onSessionExpired?.call();
+    if (replaced) {
+      ApiClient.onSessionReplaced?.call();
+    } else {
+      ApiClient.onSessionExpired?.call();
+    }
     // Allow a future session to expire again after this one is handled.
     Future.delayed(const Duration(seconds: 3), () => _signingOut = false);
+  }
+
+  /// True when a 401 body carries the SESSION_REPLACED marker (another device).
+  bool _isSessionReplaced(Response? r) {
+    final data = r?.data;
+    final msg = (data is Map ? (data['message'] ?? data['error'] ?? '') : data)?.toString() ?? '';
+    return msg.contains('SESSION_REPLACED');
   }
 
   @override
@@ -90,7 +106,7 @@ class _AuthInterceptor extends Interceptor {
       // or deactivated. Never try to refresh a refresh (that recurses forever) —
       // sign out immediately.
       if (err.requestOptions.path.contains('/auth/refresh')) {
-        await _forceSignOut();
+        await _forceSignOut(replaced: _isSessionReplaced(err.response));
         return handler.next(err);
       }
 
@@ -139,7 +155,7 @@ class _AuthInterceptor extends Interceptor {
           // the session intact; the next request simply retries the refresh.
           final code = e.response?.statusCode;
           if (code == 401 || code == 403) {
-            await _forceSignOut();
+            await _forceSignOut(replaced: _isSessionReplaced(e.response));
           }
           // else: transient — fall through and propagate the original error only.
         } catch (_) {

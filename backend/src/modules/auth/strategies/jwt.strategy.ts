@@ -70,6 +70,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('User not found or inactive');
     }
 
+    // Single-device login: a newer login on another phone rotated user.sessionId,
+    // so this token's session is stale → reject with a marker the app shows as
+    // "logged in on another device". Admins/super-admins are exempt (multi-device).
+    const isAdmin = payload.role === 'admin' || payload.role === 'super_admin';
+    if (!isAdmin && payload.sessionId && user.sessionId && payload.sessionId !== user.sessionId) {
+      throw new UnauthorizedException('SESSION_REPLACED');
+    }
+
     // Update last active
     await this.userModel.findByIdAndUpdate(payload.sub, { lastActive: new Date() });
 
