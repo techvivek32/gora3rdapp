@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  // Let the reverse proxy (nginx) do gzip. Next.js compressing too caused
+  // double-encoded responses that rendered as binary garbage in the browser.
+  compress: false,
   experimental: { serverActions: { allowedOrigins: ['*'] } },
   images: {
     remotePatterns: [
