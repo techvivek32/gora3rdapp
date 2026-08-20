@@ -66,4 +66,12 @@ export class StorageController {
     const url = await this.storageService.uploadRingtone(file, this.baseUrl(req));
     return { url };
   }
+
+  @Post('upload/ad')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload a popup-ad image (any aspect ratio)' })
+  async uploadAd(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+    const url = await this.storageService.uploadAd(file, this.baseUrl(req));
+    return { url };
+  }
 }

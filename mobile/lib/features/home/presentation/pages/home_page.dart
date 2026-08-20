@@ -12,6 +12,7 @@ import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/location_ping.dart';
 import '../../../../core/utils/app_update_check.dart';
 import '../../../../core/utils/ring_player.dart';
+import '../widgets/ad_popup.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -61,6 +62,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // Mirror the server value into the local flag every isolate reads, so the
     // FCM background handler / overlay ring respect it too.
     setAlertsEnabled(_alertsOn);
+    // Show the admin popup ad once per app launch, after the first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowAdPopup(context, getIt<ApiClient>());
+    });
     _alertVehicles = ((user?['alertVehicleTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     _alertTrips = ((user?['alertTripTypes'] as List?) ?? []).map((e) => e.toString()).toList();
     PushNotificationService.instance.registerToken();

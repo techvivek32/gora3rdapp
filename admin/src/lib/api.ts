@@ -153,6 +153,21 @@ export const adminApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+
+  // ─── Popup Ads (admin only) ─────────────────────────────────────────────────
+  getPopupAds: () => apiClient.get('/admin/popup-ads'),
+  createPopupAd: (data: { imageUrl: string; linkUrl?: string }) =>
+    apiClient.post('/admin/popup-ads', data),
+  updatePopupAd: (id: string, data: { linkUrl?: string; isActive?: boolean }) =>
+    apiClient.put(`/admin/popup-ads/${id}`, data),
+  deletePopupAd: (id: string) => apiClient.delete(`/admin/popup-ads/${id}`),
+  uploadAdImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/ad', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   // Upload KYC documents for a user who can't do it themselves; sends for review.
   submitDocumentsFor: (id: string, documents: Record<string, any>) =>
     apiClient.post(`/admin/users/${id}/documents`, documents),

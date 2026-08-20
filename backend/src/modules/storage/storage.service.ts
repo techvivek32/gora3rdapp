@@ -149,6 +149,12 @@ export class StorageService {
     return this.uploadFile(file, 'notifications', { resize: { width: 1024, height: 512 }, quality: 85, baseUrl });
   }
 
+  async uploadAd(file: Express.Multer.File, baseUrl?: string): Promise<string> {
+    // Stored as-is — no resize/crop. The admin uploads at the recommended 4:5
+    // size; the app shows it at its natural aspect.
+    return this.uploadFile(file, 'ads', { baseUrl });
+  }
+
   async uploadRingtone(file: Express.Multer.File, baseUrl?: string): Promise<string> {
     // Force a real AUDIO content-type based on the extension. An .mp4/.m4a
     // ringtone reports as video/mp4, which browsers (and the app's audio player)
