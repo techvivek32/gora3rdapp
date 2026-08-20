@@ -102,8 +102,11 @@ export class UsersService {
       throw new BadRequestException('Enter a valid mobile number');
     }
     const last10 = digits.slice(-10);
+    // Don't filter out inactive users — return them so the app shows their
+    // profile with an "Inactive" badge (same as blocked users show "Blocked"),
+    // instead of a misleading "No user found".
     const user = await this.userModel
-      .findOne({ mobile: new RegExp(`${last10}$`), isActive: true })
+      .findOne({ mobile: new RegExp(`${last10}$`) })
       .select(PUBLIC_PROFILE_SELECT)
       .lean();
     if (!user) throw new NotFoundException('No user found with this number');
