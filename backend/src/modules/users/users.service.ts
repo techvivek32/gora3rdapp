@@ -180,10 +180,11 @@ export class UsersService {
     const notAdmin = { role: { $nin: ['admin', 'super_admin'] } };
     const range = this.periodRange(period);
 
-    // All time: the stored lifetime counter. No limit — the whole board is shown.
+    // All time: the stored lifetime counter. Only users who actually invited
+    // someone (referralCount > 0) — a board full of 0s is noise.
     if (!range) {
       const users = await this.userModel
-        .find(notAdmin)
+        .find({ ...notAdmin, referralCount: { $gt: 0 } })
         .select(select)
         .sort({ referralCount: -1, createdAt: 1 })
         .lean();
