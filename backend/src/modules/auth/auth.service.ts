@@ -425,6 +425,35 @@ export class AuthService {
     return { message: 'Tokens refreshed', data: { accessToken, refreshToken } };
   }
 
+  /**
+   * Switch the logged-in user between app-user roles (Customer / Driver /
+   * Travel Agency / Fleet Owner) — "Profile → Change Role". Never allows admin/
+   * super_admin/franchise. Re-issues tokens (role lives in the JWT) so the new
+   * mode takes effect immediately, and rotates the single-device session.
+   */
+  async changeRole(userId: string, role: string) {
+    const allowed = [
+      UserRole.CUSTOMER,
+      UserRole.DRIVER,
+      UserRole.TRAVEL_AGENCY,
+      UserRole.FLEET_OWNER,
+    ];
+    if (!allowed.includes(role as UserRole)) {
+      throw new BadRequestException('Invalid role');
+    }
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+
+    user.role = role as UserRole;
+    await user.save();
+
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
+    return { message: 'Role updated', data: { role: user.role, ...tokens } };
+  }
+
   async refreshTokens(userId: string, refreshToken: string) {
     // A refresh may belong to either a normal user/admin OR a franchise; both
     // share the /auth/refresh endpoint. Try the franchise space first only when

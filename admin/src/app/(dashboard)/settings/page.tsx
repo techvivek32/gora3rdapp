@@ -33,6 +33,14 @@ export default function SettingsPage() {
   const [waSaved, setWaSaved] = useState(false);
   const [waError, setWaError] = useState('');
 
+  // Customer Bookings config
+  const [commitPercent, setCommitPercent] = useState('');
+  const [cancelPenalty, setCancelPenalty] = useState('');
+  const [cancelPolicy, setCancelPolicy] = useState('');
+  const [cbSaving, setCbSaving] = useState(false);
+  const [cbSaved, setCbSaved] = useState(false);
+  const [cbError, setCbError] = useState('');
+
   const [loading, setLoading] = useState(true);
 
   // Wait for the session before fetching. SessionSync feeds the access token to
@@ -56,6 +64,9 @@ export default function SettingsPage() {
         setMinWithdrawal(String(s.minWithdrawal ?? 1));
         setMinTransfer(String(s.minTransfer ?? 1));
         setAutoBookMins(String(s.whatsappAutoBookMinutes ?? 0));
+        setCommitPercent(String(s.bookingCommitmentPercent ?? 5));
+        setCancelPenalty(String(s.driverCancelPenaltyPercent ?? 100));
+        setCancelPolicy(s.bookingCancellationPolicy ?? '');
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -116,6 +127,28 @@ export default function SettingsPage() {
       setWaError(e.message || 'Failed to save');
     } finally {
       setWaSaving(false);
+    }
+  };
+
+  const handleSaveCustomerBookings = async () => {
+    const commit = Math.round(Number(commitPercent));
+    const penalty = Math.round(Number(cancelPenalty));
+    if (!Number.isFinite(commit) || commit < 0 || commit > 100) return setCbError('Commitment % must be 0–100');
+    if (!Number.isFinite(penalty) || penalty < 0 || penalty > 100) return setCbError('Penalty % must be 0–100');
+    setCbError('');
+    setCbSaving(true);
+    try {
+      await adminApi.updateSettings({
+        bookingCommitmentPercent: commit,
+        driverCancelPenaltyPercent: penalty,
+        bookingCancellationPolicy: cancelPolicy.trim(),
+      });
+      setCbSaved(true);
+      setTimeout(() => setCbSaved(false), 3000);
+    } catch (e: any) {
+      setCbError(e.message || 'Failed to save');
+    } finally {
+      setCbSaving(false);
     }
   };
 
@@ -350,6 +383,63 @@ export default function SettingsPage() {
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {waSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : waSaved ? '✓ Saved!' : 'Save WhatsApp Settings'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Customer Bookings */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Customer Bookings</h2>
+          <p className="text-gray-500 text-sm mb-5">Wallet commitment, cancellation policy and driver-cancel penalty for the Customer Mode booking flow.</p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Booking Commitment %</label>
+                  <input
+                    type="number" min={0} max={100}
+                    value={commitPercent}
+                    onChange={(e) => { setCommitPercent(e.target.value); setCbSaved(false); }}
+                    placeholder="5"
+                    className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">% of fare a driver must HOLD to apply. E.g. 5 → ₹500 on ₹10,000.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Driver-Cancel Penalty %</label>
+                  <input
+                    type="number" min={0} max={100}
+                    value={cancelPenalty}
+                    onChange={(e) => { setCancelPenalty(e.target.value); setCbSaved(false); }}
+                    placeholder="100"
+                    className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">% of the commitment kept if a selected driver cancels. 100 = full forfeit, 0 = full refund.</p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cancellation Policy (shown to customers)</label>
+                <textarea
+                  rows={3}
+                  value={cancelPolicy}
+                  onChange={(e) => { setCancelPolicy(e.target.value); setCbSaved(false); }}
+                  placeholder="Free cancellation before the driver starts the trip…"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              {cbError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{cbError}</p>}
+              <button
+                onClick={handleSaveCustomerBookings}
+                disabled={cbSaving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {cbSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : cbSaved ? '✓ Saved!' : 'Save Customer Booking Settings'}
               </button>
             </div>
           )}

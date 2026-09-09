@@ -78,7 +78,7 @@ export class WalletService {
   async getWallet(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const [user, transactions] = await Promise.all([
-      this.userModel.findById(userId).select('walletBalance').lean(),
+      this.userModel.findById(userId).select('walletBalance heldBalance').lean(),
       // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
       // Transfers carry the other party so the app can show their name/number.
       this.txModel
@@ -90,7 +90,7 @@ export class WalletService {
     ]);
     return {
       message: 'Wallet retrieved',
-      data: { balance: user?.walletBalance ?? 0, transactions },
+      data: { balance: user?.walletBalance ?? 0, heldBalance: (user as any)?.heldBalance ?? 0, transactions },
     };
   }
 

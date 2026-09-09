@@ -33,12 +33,20 @@ export class WalletTransaction {
   // 'razorpay' (top-up), 'admin' (manual adjustment), 'withdrawal' (debit for a
   // withdrawal request), 'refund' (credit back on a rejected withdrawal) or
   // 'transfer' (wallet-to-wallet between users).
-  @Prop({ type: String, enum: ['razorpay', 'admin', 'withdrawal', 'refund', 'transfer'], default: 'razorpay' })
+  @Prop({
+    type: String,
+    enum: ['razorpay', 'admin', 'withdrawal', 'refund', 'transfer', 'hold', 'release', 'settle'],
+    default: 'razorpay',
+  })
   source: string;
 
   /** The other user in a wallet-to-wallet transfer (sender on a credit, recipient on a debit). */
   @Prop({ type: Types.ObjectId, ref: 'User' })
   counterpartyId: Types.ObjectId;
+
+  /** The customer booking a hold/release/settle relates to (ledger audit trail). */
+  @Prop({ type: Types.ObjectId, ref: 'CustomerBooking' })
+  bookingRef: Types.ObjectId;
 }
 
 export const WalletTransactionSchema = SchemaFactory.createForClass(WalletTransaction);

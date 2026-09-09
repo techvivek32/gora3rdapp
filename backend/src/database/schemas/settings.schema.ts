@@ -90,6 +90,28 @@ export class PlatformSettings {
   /** When true the app shows the "N views" count on booking/available cards. */
   @Prop({ default: true })
   viewsEnabled: boolean;
+
+  /**
+   * Customer-booking commitment: the % of the fare a driver/vendor must HOLD in
+   * their wallet to apply for a customer booking (e.g. 5 → ₹500 hold on ₹10,000).
+   */
+  @Prop({ default: 5, min: 0, max: 100 })
+  bookingCommitmentPercent: number;
+
+  /**
+   * Customer-facing cancellation policy text, shown on offers and booking
+   * details so the customer knows the terms before selecting a driver.
+   */
+  @Prop({ default: 'Free cancellation before the driver starts the trip. After the trip starts, charges may apply as per driver terms.' })
+  bookingCancellationPolicy: string;
+
+  /**
+   * When a driver cancels AFTER being selected, this % of their settled
+   * commitment is kept as a penalty (not refunded). 100 = full forfeit (default),
+   * 0 = fully refunded.
+   */
+  @Prop({ default: 100, min: 0, max: 100 })
+  driverCancelPenaltyPercent: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

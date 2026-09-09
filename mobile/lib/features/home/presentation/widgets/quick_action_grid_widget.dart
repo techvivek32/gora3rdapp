@@ -12,30 +12,16 @@ class QuickActionGridWidget extends StatelessWidget {
     final actions = [
       _QuickAction(icon: Icons.event_available_rounded, label: 'Booking'.tr, onTap: () => context.go('/requirements')),
       _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Car'.tr, onTap: () => context.go('/vehicles')),
+      _QuickAction(icon: Icons.emoji_people_rounded, label: 'Customer Rides'.tr, onTap: () => context.push('/customer-requests')),
       _QuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Recharge Plans'.tr, onTap: () => context.push('/subscriptions')),
       _QuickAction(icon: Icons.location_city_rounded, label: 'My Cities'.tr, onTap: () => context.push('/select-city')),
-      _QuickAction(icon: Icons.person_rounded, label: 'My Profile'.tr, onTap: () => context.push('/my-profile')),
       _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
     ];
 
+    // Alternate the two brand tones by position so the grid works at any length.
     const navy = Color(0xFF111827);
-    final colors = [
-      AppColors.primary,
-      navy,
-      AppColors.primary,
-      navy,
-      AppColors.primary,
-      navy,
-    ];
-
-    final textColors = [
-      Colors.white,
-      AppColors.primary,
-      Colors.white,
-      AppColors.primary,
-      Colors.white,
-      AppColors.primary,
-    ];
+    Color bgFor(int i) => i.isEven ? AppColors.primary : navy;
+    Color textFor(int i) => i.isEven ? Colors.white : AppColors.primary;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -53,8 +39,8 @@ class QuickActionGridWidget extends StatelessWidget {
         children: List.generate(actions.length, (index) {
           return _QuickActionCard(
             action: actions[index],
-            bgColor: colors[index],
-            textColor: textColors[index],
+            bgColor: bgFor(index),
+            textColor: textFor(index),
           );
         }),
       ),

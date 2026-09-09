@@ -207,6 +207,18 @@ class PushNotificationService {
       return;
     }
 
+    // Customer Mode: a new customer booking for drivers/vendors → Customer Rides.
+    final type = (data['type'] ?? '').toString();
+    if (type == 'customer_booking_new') {
+      ctx.push('/customer-requests');
+      return;
+    }
+    // Other customer-booking events (offer / confirmed / trip / arriving / cancel) → My Rides.
+    if (type.startsWith('customer_booking') || type.startsWith('customer_trip') || type.startsWith('customer_driver')) {
+      ctx.push('/customer/bookings');
+      return;
+    }
+
     // Show the rich popup card only for NEW requirements, else open the feed/inbox.
     if ((data['type'] ?? '').toString() == 'new_requirement') {
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));

@@ -109,8 +109,14 @@ export class User {
   @Prop({ type: [String], default: [] })
   alertTripTypes: string[];
 
+  // Wallet ledger. walletBalance = AVAILABLE (spendable). heldBalance = locked
+  // against pending customer-booking applications. Total value = available + held.
+  // "Settled" money leaves the wallet entirely and lives only as transactions.
   @Prop({ default: 0, min: 0 })
   walletBalance: number;
+
+  @Prop({ default: 0, min: 0 })
+  heldBalance: number;
 
   @Prop({ default: 0, min: 0, max: 5 })
   rating: number;

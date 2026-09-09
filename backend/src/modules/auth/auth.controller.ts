@@ -109,6 +109,15 @@ export class AuthController {
     return this.authService.logout(userId, fcmToken);
   }
 
+  @Post('change-role')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch app-user role (Customer/Driver/Vendor) — returns new tokens' })
+  changeRole(@CurrentUser('sub') userId: string, @Body('role') role: string) {
+    return this.authService.changeRole(userId, role);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

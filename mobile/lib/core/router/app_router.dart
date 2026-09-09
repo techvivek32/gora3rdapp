@@ -36,6 +36,18 @@ import '../../features/chat/presentation/pages/chat_room_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/subscriptions/presentation/pages/subscription_plans_page.dart';
 import '../../features/home/presentation/pages/main_nav_page.dart';
+import '../../features/customer/presentation/pages/role_select_page.dart';
+import '../../features/customer/presentation/pages/customer_login_page.dart';
+import '../../features/customer/presentation/pages/customer_register_page.dart';
+import '../../features/customer/presentation/pages/customer_nav_page.dart';
+import '../../features/customer/presentation/pages/customer_home_page.dart';
+import '../../features/customer/presentation/pages/customer_booking_form_page.dart';
+import '../../features/customer/presentation/pages/customer_my_bookings_page.dart';
+import '../../features/customer/presentation/pages/customer_booking_detail_page.dart';
+import '../../features/customer/presentation/pages/customer_profile_page.dart';
+import '../../features/customer/presentation/pages/customer_support_page.dart';
+import '../../features/customer/presentation/pages/customer_saved_locations_page.dart';
+import '../../features/customer/presentation/pages/driver_customer_requests_page.dart';
 
 class _GoRouterRefreshStream extends ChangeNotifier {
   _GoRouterRefreshStream(Stream<dynamic> stream) {
@@ -53,6 +65,12 @@ class _GoRouterRefreshStream extends ChangeNotifier {
 class AppRouter {
   static final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+  /// Role lives in the JWT and is mirrored on the loaded profile map.
+  static String _roleOf(AuthAuthenticated s) {
+    final u = s.user;
+    return (u is Map && u['role'] != null) ? u['role'].toString() : '';
+  }
+
   static GoRouter createRouter(AuthBloc authBloc) => GoRouter(
     navigatorKey: rootNavigatorKey,
     debugLogDiagnostics: true,
@@ -60,17 +78,27 @@ class AppRouter {
     refreshListenable: _GoRouterRefreshStream(authBloc.stream),
     redirect: (context, state) {
       final authState = authBloc.state;
-      final isAuthRoute = state.matchedLocation.startsWith('/auth');
-      final isSplash = state.matchedLocation == '/splash';
-      final isWelcome = state.matchedLocation == '/welcome';
+      final loc = state.matchedLocation;
+      // Auth screens reachable while logged out: driver/agency (/auth/*) and the
+      // dedicated customer login/register pages.
+      final isCustomerAuth = loc == '/customer/login' || loc == '/customer/register';
+      final isAuthRoute = loc.startsWith('/auth') || isCustomerAuth;
+      final isSplash = loc == '/splash';
+      final isWelcome = loc == '/welcome';
 
       if (isSplash) return null;
       if (authState is AuthAuthenticated) {
-        if (isAuthRoute || isWelcome) return '/';
+        final isCustomer = _roleOf(authState) == 'customer';
+        // Coming from auth/welcome → land on the role's home.
+        if (isAuthRoute || isWelcome) return isCustomer ? '/customer' : '/';
+        // Keep each role on its own home root; shared detail routes are untouched.
+        if (isCustomer && loc == '/') return '/customer';
+        if (!isCustomer && loc == '/customer') return '/';
         return null;
       }
       if (authState is AuthUnauthenticated) {
-        if (!isAuthRoute && !isWelcome) return '/welcome';
+        // Role selection + the auth screens are reachable while logged out.
+        if (!isAuthRoute && !isWelcome && loc != '/role-select') return '/welcome';
         return null;
       }
       return null;
@@ -103,6 +131,48 @@ class AppRouter {
           GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
         ],
+      ),
+
+      // Role selection (first-open choice + Profile → Change Role)
+      GoRoute(path: '/role-select', builder: (_, __) => const RoleSelectPage()),
+
+      // Dedicated Customer auth (separate from the driver/agency /auth flow)
+      GoRoute(path: '/customer/login', builder: (_, __) => const CustomerLoginPage()),
+      GoRoute(
+        path: '/customer/register',
+        builder: (_, state) => CustomerRegisterPage(initialMobile: state.uri.queryParameters['mobile']),
+      ),
+
+      // Customer Mode Shell (bottom nav: Book · My Rides · Profile)
+      ShellRoute(
+        builder: (context, state, child) => CustomerNavPage(child: child),
+        routes: [
+          GoRoute(path: '/customer', builder: (_, __) => const CustomerHomePage()),
+          GoRoute(path: '/customer/bookings', builder: (_, __) => const CustomerMyBookingsPage()),
+          GoRoute(path: '/customer/profile', builder: (_, __) => const CustomerProfilePage()),
+        ],
+      ),
+      // Customer detail routes (pushed above the shell)
+      GoRoute(
+        path: '/customer/book/:serviceType',
+        builder: (_, state) => CustomerBookingFormPage(serviceType: state.pathParameters['serviceType']!),
+      ),
+      GoRoute(
+        path: '/customer/bookings/:id',
+        builder: (_, state) => CustomerBookingDetailPage(bookingId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/customer/support',
+        builder: (_, __) => const CustomerSupportPage(),
+      ),
+      GoRoute(
+        path: '/customer/saved-locations',
+        builder: (_, __) => const CustomerSavedLocationsPage(),
+      ),
+      // Driver / vendor side of Customer Mode
+      GoRoute(
+        path: '/customer-requests',
+        builder: (_, __) => const DriverCustomerRequestsPage(),
       ),
 
       // Detail Routes

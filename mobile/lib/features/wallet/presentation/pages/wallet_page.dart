@@ -23,6 +23,7 @@ class _WalletPageState extends State<WalletPage> {
   Razorpay? _razorpay;
 
   num _balance = 0;
+  num _held = 0;
   List<Map<String, dynamic>> _transactions = [];
   bool _loading = true;
   bool _processing = false;
@@ -63,6 +64,7 @@ class _WalletPageState extends State<WalletPage> {
       final data = res.data['data'] as Map<String, dynamic>;
       setState(() {
         _balance = (data['balance'] as num?) ?? 0;
+        _held = (data['heldBalance'] as num?) ?? 0;
         _transactions = ((data['transactions'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
         _loading = false;
       });
@@ -769,8 +771,29 @@ class _WalletPageState extends State<WalletPage> {
           const SizedBox(height: 10),
           Text('₹${_balance.toStringAsFixed(0)}',
               style: const TextStyle(color: Colors.white, fontSize: 34, fontWeight: FontWeight.w800)),
+          const Text('Available', style: TextStyle(color: Colors.white70, fontSize: 11)),
+          if (_held > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(10)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.lock_clock_rounded, color: Colors.white, size: 16),
+                  const SizedBox(width: 6),
+                  Text('On hold: ₹${_held.toStringAsFixed(0)}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 8),
+                  Text('• Total ₹${(_balance + _held).toStringAsFixed(0)}',
+                      style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 6),
-          const Text('Keep a minimum balance to use call, WhatsApp & booking features.',
+          const SizedBox(height: 4),
+          const Text('Held amount is your booking commitments — released back when not selected.',
               style: TextStyle(color: Colors.white70, fontSize: 11)),
         ],
       ),

@@ -110,6 +110,9 @@ export class SettingsService {
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
+    bookingCommitmentPercent?: number;
+    bookingCancellationPolicy?: string;
+    driverCancelPenaltyPercent?: number;
   }): Promise<PlatformSettings> {
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },

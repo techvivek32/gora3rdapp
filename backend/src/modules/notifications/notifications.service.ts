@@ -16,6 +16,25 @@ export class NotificationsService {
     private firebaseService: FirebaseService,
   ) {}
 
+  /** Generic single-user notification (in-app row + push). Used by the customer
+   *  booking flow (offer received, booking confirmed, trip started/completed…). */
+  async notifyUser(userId: string | Types.ObjectId, title: string, body: string, data: Record<string, string> = {}) {
+    try {
+      const uid = new Types.ObjectId(userId as any);
+      await this.notificationModel.create({
+        userId: uid, title, body, type: NotificationType.SYSTEM,
+        data, isSent: true, sentAt: new Date(),
+      });
+      const user = await this.userModel.findById(uid).select('fcmTokens').lean();
+      const tokens = ((user as any)?.fcmTokens ?? []).filter(Boolean);
+      if (tokens.length) {
+        await this.firebaseService.sendPushNotification(tokens, { title, body, data });
+      }
+    } catch (e: any) {
+      this.logger.warn(`notifyUser failed: ${e?.message ?? e}`);
+    }
+  }
+
   async notifyNewRequirement(requirement: any) {
     // Match on the clean city names first (e.g. "Rajkot"), falling back to the
     // detailed addresses, so a user who selected only "Rajkot" is notified.

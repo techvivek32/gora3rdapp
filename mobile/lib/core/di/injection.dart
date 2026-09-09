@@ -13,6 +13,7 @@ import '../../features/auth/presentation/bloc/auth_bloc.dart';
 
 import '../../features/requirements/data/datasources/requirements_remote_datasource.dart';
 import '../../features/requirements/data/repositories/requirements_repository_impl.dart';
+import '../../features/customer/data/customer_repository.dart';
 import '../../features/requirements/domain/repositories/requirements_repository.dart';
 import '../../features/requirements/presentation/bloc/requirements_bloc.dart';
 
@@ -64,6 +65,10 @@ Future<void> configureDependencies() async {
   getIt.registerLazySingleton<VehiclesRepository>(
       () => VehiclesRepositoryImpl(getIt<ApiClient>()));
   getIt.registerFactory(() => VehiclesBloc(getIt<VehiclesRepository>()));
+
+  // Customer Mode
+  getIt.registerLazySingleton<CustomerRepository>(
+      () => CustomerRepository(getIt<ApiClient>(), getIt<FlutterSecureStorage>()));
 
   // Other BLoCs
   getIt.registerFactory(() => HomeBloc(getIt<ApiClient>(), getIt<SharedPreferences>()));

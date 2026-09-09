@@ -204,6 +204,11 @@ export const adminApi = {
   getReports: (params?: any) => apiClient.get('/admin/reports', { params }),
   resolveReport: (id: string, data: any) => apiClient.post(`/admin/reports/${id}/resolve`, data),
 
+  // ─── Customer Complaints ───────────────────────────────────────────────────
+  getCustomerComplaints: (params?: any) => apiClient.get('/customer-complaints', { params }),
+  updateCustomerComplaint: (id: string, data: { status?: string; adminNote?: string }) =>
+    apiClient.put(`/customer-complaints/${id}`, data),
+
   // ─── Platform Settings ─────────────────────────────────────────────────────
   getSettings: () => apiClient.get('/settings'),
   getAdminSettings: () => apiClient.get('/settings/admin'),
@@ -224,6 +229,9 @@ export const adminApi = {
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
+    bookingCommitmentPercent?: number;
+    driverCancelPenaltyPercent?: number;
+    bookingCancellationPolicy?: string;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

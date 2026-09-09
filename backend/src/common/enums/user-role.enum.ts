@@ -2,6 +2,9 @@ export enum UserRole {
   DRIVER = 'driver',
   TRAVEL_AGENCY = 'travel_agency',
   FLEET_OWNER = 'fleet_owner',
+  // A rider who books services (Cabs / Hire Driver / Luxury / Car Pool). Same
+  // account/app as drivers/vendors — just a different mode selected in-app.
+  CUSTOMER = 'customer',
   ADMIN = 'admin',
   SUPER_ADMIN = 'super_admin',
   // A city-scoped operator. Sees/acts on only their own city's data (enforced in

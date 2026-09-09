@@ -11,7 +11,9 @@ class SplashPage extends StatelessWidget {
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is AuthAuthenticated) {
-          context.go('/');
+          final u = state.user;
+          final isCustomer = u is Map && u['role']?.toString() == 'customer';
+          context.go(isCustomer ? '/customer' : '/');
         } else if (state is AuthUnauthenticated) {
           context.go('/welcome');
         }

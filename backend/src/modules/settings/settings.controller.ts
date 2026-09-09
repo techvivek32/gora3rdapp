@@ -57,6 +57,9 @@ export class SettingsController {
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
+    bookingCommitmentPercent?: number;
+    bookingCancellationPolicy?: string;
+    driverCancelPenaltyPercent?: number;
   }) {
     return this.settingsService.updateSettings(body);
   }
