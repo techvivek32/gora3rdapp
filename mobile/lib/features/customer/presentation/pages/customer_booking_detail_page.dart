@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/customer_repository.dart';
+import '../widgets/booking_card_ui.dart';
 
 /// The heart of Customer Mode: watch offers arrive, pick a driver, follow the
 /// trip, and rate at the end. Customer NEVER sees a driver's wallet — only the
@@ -147,7 +148,7 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     final status = (b['status'] ?? '').toString();
     final offers = ((b['offers'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     final snapshot = b['driverSnapshot'] as Map?;
-    final date = DateTime.tryParse((b['travelDate'] ?? '').toString());
+    final date = tripDate(b['travelDate']);
 
     final tripOtp = (b['tripOtp'] ?? '').toString();
     final otpAction = (b['tripOtpAction'] ?? '').toString();
@@ -319,6 +320,19 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
 
   Widget _actions(String status, Map<String, dynamic> b) {
     final children = <Widget>[];
+    // Edit — only while still OPEN (no driver selected yet).
+    if (status == 'open') {
+      children.add(ElevatedButton.icon(
+        onPressed: _acting ? null : () {
+          final svc = (b['serviceType'] ?? 'cab').toString();
+          context.push('/customer/book/$svc', extra: b).then((_) => _load());
+        },
+        icon: const Icon(Icons.edit_rounded, size: 18),
+        label: const Text('Edit Booking'),
+        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(48)),
+      ));
+      children.add(const SizedBox(height: 10));
+    }
     if (status == 'open' || status == 'confirmed') {
       children.add(OutlinedButton.icon(
         onPressed: _acting ? null : _cancel,

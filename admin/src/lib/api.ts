@@ -209,6 +209,9 @@ export const adminApi = {
   updateCustomerComplaint: (id: string, data: { status?: string; adminNote?: string }) =>
     apiClient.put(`/customer-complaints/${id}`, data),
 
+  // ─── Customer Bookings (rides) ─────────────────────────────────────────────
+  getCustomerBookings: (params?: any) => apiClient.get('/customer-bookings/admin/all', { params }),
+
   // ─── Platform Settings ─────────────────────────────────────────────────────
   getSettings: () => apiClient.get('/settings'),
   getAdminSettings: () => apiClient.get('/settings/admin'),

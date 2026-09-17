@@ -155,7 +155,15 @@ class AppRouter {
       // Customer detail routes (pushed above the shell)
       GoRoute(
         path: '/customer/book/:serviceType',
-        builder: (_, state) => CustomerBookingFormPage(serviceType: state.pathParameters['serviceType']!),
+        // `extra` carries an existing booking Map when editing (from the detail page).
+        builder: (_, state) {
+          final existing = state.extra is Map ? Map<String, dynamic>.from(state.extra as Map) : null;
+          return CustomerBookingFormPage(
+            serviceType: state.pathParameters['serviceType']!,
+            bookingId: existing == null ? null : (existing['_id'] ?? existing['id'])?.toString(),
+            existing: existing,
+          );
+        },
       ),
       GoRoute(
         path: '/customer/bookings/:id',

@@ -25,6 +25,13 @@ class CustomerRepository {
     return Map<String, dynamic>.from(res.data['data'] as Map);
   }
 
+  /// Edit an OPEN booking. Existing offers are released server-side and drivers
+  /// re-notified for the updated request.
+  Future<Map<String, dynamic>> updateBooking(String id, Map<String, dynamic> data) async {
+    final res = await _api.put('/customer-bookings/$id', data: data);
+    return Map<String, dynamic>.from(res.data['data'] as Map);
+  }
+
   Future<void> selectOffer(String id, String offerId) async {
     await _api.post('/customer-bookings/$id/select', data: {'offerId': offerId});
   }

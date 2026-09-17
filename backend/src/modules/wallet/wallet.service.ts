@@ -80,9 +80,13 @@ export class WalletService {
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select('walletBalance heldBalance').lean(),
       // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
+      // Also hide the intermediate booking 'hold' and 'release' ledger rows: a
+      // commitment shows to the user only once, as the final 'settle' (commission)
+      // if the driver won, or not at all if it was released (net-zero). The amount
+      // currently locked is already shown as the wallet's Held balance.
       // Transfers carry the other party so the app can show their name/number.
       this.txModel
-        .find({ userId: new Types.ObjectId(userId), status: 'success' })
+        .find({ userId: new Types.ObjectId(userId), status: 'success', source: { $nin: ['hold', 'release'] } })
         .populate('counterpartyId', 'fullName agencyName mobile')
         .sort({ createdAt: -1 })
         .limit(20)

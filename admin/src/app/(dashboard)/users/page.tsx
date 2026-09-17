@@ -176,6 +176,7 @@ function UsersPageInner() {
           <option value="">All Roles</option>
           <option value="driver">Driver</option>
           <option value="travel_agency">Travel Agency</option>
+          <option value="customer">Customer</option>
         </Select>
         <Select value={membershipFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { setMembershipFilter(e.target.value); setPage(1); }}>
           <option value="">All Memberships</option>

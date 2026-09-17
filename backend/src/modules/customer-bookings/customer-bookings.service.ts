@@ -14,6 +14,7 @@ import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import {
   CreateCustomerBookingDto,
+  UpdateCustomerBookingDto,
   ApplyBookingDto,
   RateBookingDto,
 } from './dto/customer-booking.dto';
@@ -91,8 +92,17 @@ export class CustomerBookingsService {
       .find({ status: CustomerBookingStatus.OPEN, expiresAt: { $lte: now } })
       .limit(200);
     if (!stale.length) return;
+    let expired = 0;
     for (const booking of stale) {
       try {
+        // Atomically claim OPEN → EXPIRED so overlapping cron runs (or a
+        // simultaneous select/cancel) can't release the same holds twice.
+        const claimed = await this.bookingModel.findOneAndUpdate(
+          { _id: booking._id, status: CustomerBookingStatus.OPEN },
+          { $set: { status: CustomerBookingStatus.EXPIRED } },
+        );
+        if (!claimed) continue; // another process already handled it
+        expired++;
         for (const o of booking.offers as any[]) {
           if (o.status === 'applied') {
             await this.releaseHold(o.driverId, o.holdAmount, booking._id);
@@ -108,7 +118,24 @@ export class CustomerBookingsService {
         this.logger.warn(`expireStaleBookings ${booking.bookingId}: ${e?.message}`);
       }
     }
-    this.logger.log(`Expired ${stale.length} stale customer bookings (holds released)`);
+    if (expired) this.logger.log(`Expired ${expired} stale customer bookings (holds released)`);
+  }
+
+  // ─── Admin ─────────────────────────────────────────────────────────────────
+
+  /** Read-only list of all customer bookings for the admin panel. */
+  async listAllForAdmin(filters: { status?: string; serviceType?: string }) {
+    const q: any = {};
+    if (filters.status) q.status = filters.status;
+    if (filters.serviceType) q.serviceType = filters.serviceType;
+    const data = await this.bookingModel
+      .find(q)
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .populate('customerId', 'fullName mobile city')
+      .populate('selectedDriverId', 'fullName mobile')
+      .lean();
+    return { message: 'All customer bookings', data };
   }
 
   // ─── Customer side ─────────────────────────────────────────────────────────
@@ -116,7 +143,11 @@ export class CustomerBookingsService {
   async create(customerId: string, dto: CreateCustomerBookingDto) {
     const commitmentPercent = (await this.settings.getSettings())?.bookingCommitmentPercent ?? 5;
     const travelDate = dto.travelDate ? new Date(dto.travelDate) : undefined;
-    const expiresAt = travelDate ? new Date(travelDate.getTime() + 24 * 60 * 60 * 1000) : undefined;
+    // Always set an expiry so the auto-release cron can never leave holds stuck:
+    // 24h after travel if known, else 7 days from creation as a safety net.
+    const expiresAt = travelDate
+        ? new Date(travelDate.getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const booking = await this.bookingModel.create({
       bookingId: this.genBookingId(),
@@ -261,6 +292,14 @@ export class CustomerBookingsService {
     const chosen: any = booking.offers.find((o: any) => o._id.toString() === offerId);
     if (!chosen) throw new NotFoundException('Offer not found');
 
+    // Atomically claim the OPEN → CONFIRMED transition so only ONE select (and
+    // not a concurrent cancel/expiry) can settle/release these holds.
+    const claimed = await this.bookingModel.findOneAndUpdate(
+      { _id: booking._id, status: CustomerBookingStatus.OPEN },
+      { $set: { status: CustomerBookingStatus.CONFIRMED } },
+    );
+    if (!claimed) throw new BadRequestException('This booking is no longer open');
+
     // Selected driver's hold → settlement; every other applicant's hold → released.
     await this.settleHold(chosen.driverId, chosen.holdAmount, booking._id);
     chosen.status = 'selected';
@@ -299,13 +338,68 @@ export class CustomerBookingsService {
     return { message: 'Driver selected — booking confirmed', data: booking };
   }
 
+  /**
+   * Customer edits an OPEN booking. Because drivers quoted against the OLD trip
+   * details, every existing hold is released and their offers cleared, so they
+   * can re-apply for the updated request.
+   */
+  async updateByCustomer(customerId: string, id: string, dto: UpdateCustomerBookingDto) {
+    const booking = await this.bookingModel.findById(id);
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
+    if (booking.status !== CustomerBookingStatus.OPEN) {
+      throw new BadRequestException('Only an open booking (no driver selected yet) can be edited');
+    }
+
+    // Release every current applicant — their quote was for the old details.
+    for (const o of booking.offers as any[]) {
+      if (o.status === 'applied') {
+        await this.releaseHold(o.driverId, o.holdAmount, booking._id);
+        this.notifications.notifyUser(o.driverId, 'Booking Updated',
+          `Booking ${booking.bookingId} was edited by the customer. Your hold is released — review and re-apply.`,
+          { type: 'customer_booking_updated', bookingId: booking.bookingId }).catch(() => {});
+      }
+    }
+    booking.offers = [] as any;
+
+    // Apply the editable fields (serviceType stays fixed).
+    if (dto.subType !== undefined) booking.subType = dto.subType;
+    if (dto.pickup !== undefined) booking.pickup = dto.pickup as any;
+    if (dto.drop !== undefined) booking.drop = dto.drop as any;
+    if (dto.stops !== undefined) booking.stops = dto.stops as any;
+    if (dto.pickupCity !== undefined) booking.pickupCity = dto.pickupCity;
+    if (dto.dropCity !== undefined) booking.dropCity = dto.dropCity;
+    if (dto.travelTime !== undefined) booking.travelTime = dto.travelTime;
+    if (dto.passengers !== undefined) booking.passengers = dto.passengers;
+    if (dto.vehicleType !== undefined) booking.vehicleType = dto.vehicleType;
+    if (dto.durationHours !== undefined) booking.durationHours = dto.durationHours;
+    if (dto.notes !== undefined) booking.notes = dto.notes;
+    if (dto.estimatedFare !== undefined) booking.estimatedFare = dto.estimatedFare;
+    if (dto.estimatedDistance !== undefined) booking.estimatedDistance = dto.estimatedDistance;
+    if (dto.travelDate !== undefined) {
+      const td = dto.travelDate ? new Date(dto.travelDate) : undefined;
+      booking.travelDate = td as any;
+      booking.expiresAt = td
+        ? new Date(td.getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    }
+    await booking.save();
+
+    // Re-notify eligible drivers about the refreshed request.
+    this.notifyEligibleDrivers(booking).catch(() => {});
+    return { message: 'Booking updated', data: booking };
+  }
+
   async cancelByCustomer(customerId: string, id: string, reason?: string) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
-    if ([CustomerBookingStatus.COMPLETED, CustomerBookingStatus.CANCELLED].includes(booking.status)) {
-      throw new BadRequestException('Booking already closed');
-    }
+    // Atomically claim the cancel so a concurrent select/expiry can't also run.
+    const claimed = await this.bookingModel.findOneAndUpdate(
+      { _id: booking._id, status: { $in: [CustomerBookingStatus.OPEN, CustomerBookingStatus.CONFIRMED, CustomerBookingStatus.ONGOING] } },
+      { $set: { status: CustomerBookingStatus.CANCELLED } },
+    );
+    if (!claimed) throw new BadRequestException('Booking already closed');
 
     // Release every still-held application (not yet in final settlement).
     for (const o of booking.offers) {
@@ -318,6 +412,10 @@ export class CustomerBookingsService {
     booking.cancelledAt = new Date();
     booking.cancelledBy = 'customer';
     booking.cancelReason = reason || '';
+    // Invalidate any outstanding trip OTP so a cancelled booking can't be revived.
+    booking.tripOtp = undefined as any;
+    booking.tripOtpAction = undefined as any;
+    booking.tripOtpExpiresAt = undefined as any;
     await booking.save();
 
     if (booking.selectedDriverId) {
@@ -334,6 +432,9 @@ export class CustomerBookingsService {
     if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('You can rate only after the trip is completed');
+    }
+    if (booking.rating && booking.rating > 0) {
+      throw new BadRequestException('You have already rated this trip');
     }
     booking.rating = Math.max(0, Math.min(5, dto.rating));
     booking.review = dto.review || '';
@@ -523,6 +624,14 @@ export class CustomerBookingsService {
       .select('+tripOtp +tripOtpAction +tripOtpExpiresAt');
     if (!booking) throw new NotFoundException('Booking not found');
     this.assertSelectedDriver(booking, driverId);
+    // Status precondition — a cancelled/expired/completed booking can never be
+    // revived by an old OTP.
+    const required = action === 'start' ? CustomerBookingStatus.CONFIRMED : CustomerBookingStatus.ONGOING;
+    if (booking.status !== required) {
+      throw new BadRequestException(
+        action === 'start' ? 'This booking is not ready to start' : 'Start the trip first',
+      );
+    }
     if (!booking.tripOtp || booking.tripOtpAction !== action) {
       throw new BadRequestException('No OTP requested. Tap the button again.');
     }

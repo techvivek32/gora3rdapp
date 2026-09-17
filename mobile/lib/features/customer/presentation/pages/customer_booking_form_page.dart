@@ -6,12 +6,16 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
 import '../../data/customer_repository.dart';
+import '../widgets/booking_card_ui.dart';
 
 /// One generic booking form that adapts to the chosen service. New services
 /// only need an entry in [_meta] — the form fields switch on flags there.
 class CustomerBookingFormPage extends StatefulWidget {
   final String serviceType; // cab | hire_driver | luxury | car_pool
-  const CustomerBookingFormPage({super.key, required this.serviceType});
+  /// When set, the form edits this OPEN booking instead of creating a new one.
+  final String? bookingId;
+  final Map<String, dynamic>? existing;
+  const CustomerBookingFormPage({super.key, required this.serviceType, this.bookingId, this.existing});
 
   @override
   State<CustomerBookingFormPage> createState() => _CustomerBookingFormPageState();
@@ -59,11 +63,35 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
 
   _ServiceMeta get _m => _meta[widget.serviceType] ?? const _ServiceMeta('Booking', '', Icons.directions_car_rounded);
 
+  bool get _isEdit => widget.bookingId != null;
+
   @override
   void initState() {
     super.initState();
     if (_m.subTypes.isNotEmpty) _subType = _m.subTypes.first;
     if (_m.vehicles.isNotEmpty) _vehicle = _m.vehicles.first;
+    // Pre-fill from the existing booking when editing.
+    final e = widget.existing;
+    if (e != null) {
+      _pickupCtrl.text = ((e['pickup'] as Map?)?['address'] ?? '').toString();
+      _pickupLat = ((e['pickup'] as Map?)?['lat'] as num?)?.toDouble();
+      _pickupLng = ((e['pickup'] as Map?)?['lng'] as num?)?.toDouble();
+      _pickupCity = (e['pickupCity'] ?? '').toString();
+      _dropCtrl.text = ((e['drop'] as Map?)?['address'] ?? '').toString();
+      _dropLat = ((e['drop'] as Map?)?['lat'] as num?)?.toDouble();
+      _dropLng = ((e['drop'] as Map?)?['lng'] as num?)?.toDouble();
+      _dropCity = (e['dropCity'] ?? '').toString();
+      final st = (e['subType'] ?? '').toString();
+      if (st.isNotEmpty && _m.subTypes.contains(st)) _subType = st;
+      final vt = (e['vehicleType'] ?? '').toString();
+      if (vt.isNotEmpty && _m.vehicles.contains(vt)) _vehicle = vt;
+      _passengers = (e['passengers'] as num?)?.toInt() ?? _passengers;
+      _durationHours = (e['durationHours'] as num?)?.toInt() ?? _durationHours;
+      if ((e['estimatedFare'] ?? 0) != 0) _fareCtrl.text = e['estimatedFare'].toString();
+      _notesCtrl.text = (e['notes'] ?? '').toString();
+      final d = tripDate(e['travelDate']);
+      if (d != null) _date = d;
+    }
   }
 
   @override
@@ -109,7 +137,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       'pickupCity': _pickupCity,
       if (_m.needsDrop) 'drop': {'address': _dropCtrl.text.trim(), 'lat': _dropLat ?? 0, 'lng': _dropLng ?? 0},
       if (_m.needsDrop) 'dropCity': _dropCity,
-      'travelDate': _date.toIso8601String(),
+      'travelDate': ymdString(_date),
       'travelTime': _time.format(context),
       if (_m.needsPassengers) 'passengers': _passengers,
       if (_m.needsDuration) 'durationHours': _durationHours,
@@ -117,15 +145,18 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_notesCtrl.text.trim().isNotEmpty) 'notes': _notesCtrl.text.trim(),
     };
     try {
-      final booking = await getIt<CustomerRepository>().createBooking(body);
+      final repo = getIt<CustomerRepository>();
+      final booking = _isEdit
+          ? await repo.updateBooking(widget.bookingId!, body)
+          : await repo.createBooking(body);
       if (!mounted) return;
-      final id = (booking['_id'] ?? booking['id'] ?? '').toString();
-      _snack('Request posted — drivers will start sending offers', ok: true);
+      final id = (booking['_id'] ?? booking['id'] ?? widget.bookingId ?? '').toString();
+      _snack(_isEdit ? 'Booking updated — drivers will re-send offers' : 'Request posted — drivers will start sending offers', ok: true);
       context.go('/customer/bookings/$id');
     } catch (e) {
       if (mounted) {
         setState(() => _busy = false);
-        _snack('Could not post request: $e');
+        _snack(_isEdit ? 'Could not update: $e' : 'Could not post request: $e');
       }
     }
   }
@@ -138,7 +169,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(_m.title, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17.sp)),
+        title: Text(_isEdit ? 'Edit Booking' : _m.title, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17.sp)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -416,7 +447,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                     icon: _busy ? const SizedBox.shrink() : Icon(Icons.send_rounded, size: 18.sp),
                     label: _busy
                         ? SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text('Post Request', style: TextStyle(fontSize: 15.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                        : Text(_isEdit ? 'Save Changes' : 'Post Request', style: TextStyle(fontSize: 15.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                   ),
                 ),
               ),

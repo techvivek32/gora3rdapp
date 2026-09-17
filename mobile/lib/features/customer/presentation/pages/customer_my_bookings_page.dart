@@ -136,12 +136,15 @@ class _BookingCard extends StatelessWidget {
     final service = kServiceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
     final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
     final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
-    final date = DateTime.tryParse((b['travelDate'] ?? '').toString());
+    final date = tripDate(b['travelDate']);
     final (barColor, statusLabel) = bookingStatusInfo(status);
+    final stamp = bookingStamp(status);
 
     return brandCard(
       color: barColor,
       onTap: onTap,
+      stamp: stamp?.$1,
+      stampColor: stamp?.$2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -1,10 +1,14 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CustomerBookingsService } from './customer-bookings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   CreateCustomerBookingDto,
+  UpdateCustomerBookingDto,
   ApplyBookingDto,
   SelectOfferDto,
   CancelBookingDto,
@@ -38,6 +42,14 @@ export class CustomerBookingsController {
     return this.service.getMyApplications(userId);
   }
 
+  @Get('admin/all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Admin: list all customer bookings (read-only)' })
+  adminListAll(@Query('status') status?: string, @Query('serviceType') serviceType?: string) {
+    return this.service.listAllForAdmin({ status, serviceType });
+  }
+
   // ── Customer actions ──
 
   @Post()
@@ -57,6 +69,12 @@ export class CustomerBookingsController {
   @ApiOperation({ summary: 'Customer: select a driver/vendor offer' })
   select(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: SelectOfferDto) {
     return this.service.selectDriver(userId, id, dto.offerId);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Customer: edit an OPEN booking (releases stale offers)' })
+  update(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: UpdateCustomerBookingDto) {
+    return this.service.updateByCustomer(userId, id, dto);
   }
 
   @Post(':id/cancel')

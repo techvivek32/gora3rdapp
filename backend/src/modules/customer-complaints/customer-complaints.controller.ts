@@ -31,7 +31,7 @@ export class CustomerComplaintsController {
   // ── Admin ──
   @Get()
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: list all complaints' })
   listAll(@Query('status') status?: string) {
     return this.service.listAll(status);
@@ -39,7 +39,7 @@ export class CustomerComplaintsController {
 
   @Put(':id')
   @UseGuards(RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Admin: update complaint status / note' })
   update(@Param('id') id: string, @Body() dto: UpdateComplaintDto) {
     return this.service.update(id, dto);

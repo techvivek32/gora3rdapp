@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
+import '../widgets/booking_card_ui.dart';
 
 /// Driver / vendor side of Customer Mode: browse customer requests in your
 /// city, quote a fare (which places a small wallet commitment hold), and manage
@@ -288,93 +289,6 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
       ]);
 }
 
-const _serviceNames = {
-  'cab': 'Cabs Booking', 'hire_driver': 'Hire a Driver', 'luxury': 'Luxury Car', 'car_pool': 'Car Pooling',
-};
-
-// ── Shared card styling (matches the Requirement / Available-Car cards) ──────
-
-/// Colored top bar + tinted body wrapper, exactly like the requirement card.
-Widget _brandCard({required Widget child, Color color = AppColors.primary}) => Container(
-      margin: EdgeInsets.symmetric(horizontal: 2.w, vertical: 6.h),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10.r),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 1))],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10.r),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(height: 4.h, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.vertical(top: Radius.circular(10.r)))),
-            Padding(padding: EdgeInsets.all(12.r), child: child),
-          ],
-        ),
-      ),
-    );
-
-Widget _filledChip(String text, Color color) => Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6.r)),
-      child: Text(text, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white)),
-    );
-
-const _monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-/// Colored date/time box (big date + time below), exactly like the requirement
-/// card's departure box.
-Widget _dateTimeBox(DateTime? date, String time, Color color) => Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8.r)),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(date != null ? '${date.day} ${_monthNames[date.month]}' : '—',
-              style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.bold, color: Colors.white, height: 1.1)),
-          if (time.isNotEmpty)
-            Text(time, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white)),
-        ],
-      ),
-    );
-
-/// Vertical FROM → TO route with the connecting line (requirement-card style).
-Widget _routeTimeline(String from, String to) {
-  Widget point(IconData icon, Color color, String label, String text, {required bool showLine}) => IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Column(children: [
-              Icon(icon, size: 14.sp, color: color),
-              if (showLine) Expanded(child: Container(width: 2, margin: EdgeInsets.symmetric(vertical: 2.h), color: Colors.grey.shade400)),
-            ]),
-            SizedBox(width: 10.w),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(bottom: showLine ? 10.h : 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: TextStyle(fontSize: 9.sp, color: Colors.grey[600], fontWeight: FontWeight.w600)),
-                    Text(text, maxLines: 2, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.black)),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      point(Icons.trip_origin, Colors.green, 'FROM', from, showLine: to.isNotEmpty),
-      if (to.isNotEmpty) point(Icons.location_on, Colors.red, 'TO', to, showLine: false),
-    ],
-  );
-}
 
 class _RequestCard extends StatelessWidget {
   final Map<String, dynamic> b;
@@ -383,15 +297,15 @@ class _RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final service = _serviceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
+    final service = kServiceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
     final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
     final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
-    final date = DateTime.tryParse((b['travelDate'] ?? '').toString());
+    final date = tripDate(b['travelDate']);
     final fare = b['estimatedFare'] ?? 0;
     final applied = b['alreadyApplied'] == true;
     final subType = (b['subType'] ?? '').toString();
 
-    return _brandCard(
+    return brandCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -410,7 +324,7 @@ class _RequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (subType.isNotEmpty) _filledChip(subType.toUpperCase(), AppColors.primary),
+              if (subType.isNotEmpty) filledChip(subType.toUpperCase(), AppColors.primary),
             ],
           ),
           SizedBox(height: 10.h),
@@ -420,9 +334,9 @@ class _RequestCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: _routeTimeline(pickup, drop)),
+              Expanded(child: routeTimeline(pickup, drop)),
               SizedBox(width: 10.w),
-              _dateTimeBox(date, (b['travelTime'] ?? '').toString(), AppColors.primary),
+              dateTimeBox(date, (b['travelTime'] ?? '').toString(), AppColors.primary),
             ],
           ),
           SizedBox(height: 4.h),
@@ -470,7 +384,7 @@ class _MyOfferCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
-    final service = _serviceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
+    final service = kServiceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
     final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
     final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
     final status = (b['status'] ?? '').toString();
@@ -479,12 +393,27 @@ class _MyOfferCard extends StatelessWidget {
     final quoted = myOffer['quotedFare'] ?? b['finalFare'] ?? 0;
     final hold = myOffer['holdAmount'] ?? 0;
     final offerStatus = (myOffer['status'] ?? '').toString();
-    final won = status != 'open' && (offerStatus == 'selected' || (b['selectedDriverId'] != null));
+    // Won ONLY if THIS driver's offer was the selected one — not merely because
+    // some driver was selected (that would light up losing drivers' cards too).
+    final won = offerStatus == 'selected';
     final (chipColor, chipLabel) = _statusInfo(status, offerStatus);
     final barColor = won ? AppColors.primary : (status == 'completed' ? AppColors.success : AppColors.info);
+    // Stamp overlay from the driver's own perspective.
+    final lost = !won && status != 'open';
+    final (String, Color)? stamp = lost
+        ? ('NOT SELECTED', Colors.grey.shade600)
+        : won && status == 'completed'
+            ? ('COMPLETED', Colors.green.shade700)
+            : won && status == 'cancelled'
+                ? ('CANCELLED', Colors.red.shade700)
+                : won && status == 'expired'
+                    ? ('EXPIRED', Colors.grey.shade600)
+                    : null;
 
-    return _brandCard(
+    return brandCard(
       color: barColor,
+      stamp: stamp?.$1,
+      stampColor: stamp?.$2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -502,7 +431,7 @@ class _MyOfferCard extends StatelessWidget {
                   ],
                 ),
               ),
-              _filledChip('₹$quoted', barColor),
+              filledChip('₹$quoted', barColor),
             ],
           ),
           SizedBox(height: 10.h),
@@ -512,9 +441,9 @@ class _MyOfferCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: _routeTimeline(pickup, drop)),
+              Expanded(child: routeTimeline(pickup, drop)),
               SizedBox(width: 10.w),
-              _dateTimeBox(DateTime.tryParse((b['travelDate'] ?? '').toString()), (b['travelTime'] ?? '').toString(), barColor),
+              dateTimeBox(tripDate(b['travelDate']), (b['travelTime'] ?? '').toString(), barColor),
             ],
           ),
           SizedBox(height: 4.h),
