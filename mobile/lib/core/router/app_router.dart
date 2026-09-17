@@ -48,6 +48,12 @@ import '../../features/customer/presentation/pages/customer_profile_page.dart';
 import '../../features/customer/presentation/pages/customer_support_page.dart';
 import '../../features/customer/presentation/pages/customer_saved_locations_page.dart';
 import '../../features/customer/presentation/pages/driver_customer_requests_page.dart';
+import '../../features/car_pool/presentation/pages/post_ride_page.dart';
+import '../../features/car_pool/presentation/pages/my_pool_rides_page.dart';
+import '../../features/car_pool/presentation/pages/pool_ride_detail_page.dart';
+import '../../features/car_pool/presentation/pages/pool_earnings_page.dart';
+import '../../features/car_pool/presentation/pages/search_pool_rides_page.dart';
+import '../../features/car_pool/presentation/pages/my_pool_bookings_page.dart';
 
 class _GoRouterRefreshStream extends ChangeNotifier {
   _GoRouterRefreshStream(Stream<dynamic> stream) {
@@ -153,6 +159,23 @@ class AppRouter {
         ],
       ),
       // Customer detail routes (pushed above the shell)
+      // ── Car Pooling (Gora Pool) ──
+      GoRoute(
+        path: '/car-pool/post',
+        builder: (_, state) {
+          final existing = state.extra is Map ? Map<String, dynamic>.from(state.extra as Map) : null;
+          return PostRidePage(
+            rideId: existing == null ? null : (existing['_id'] ?? existing['id'])?.toString(),
+            existing: existing,
+          );
+        },
+      ),
+      GoRoute(path: '/car-pool/my-rides', builder: (_, __) => const MyPoolRidesPage()),
+      GoRoute(path: '/car-pool/earnings', builder: (_, __) => const PoolEarningsPage()),
+      GoRoute(path: '/car-pool/search', builder: (_, __) => const SearchPoolRidesPage()),
+      GoRoute(path: '/car-pool/my-bookings', builder: (_, __) => const MyPoolBookingsPage()),
+      GoRoute(path: '/car-pool/ride/:id', builder: (_, state) => PoolRideDetailPage(rideId: state.pathParameters['id']!)),
+
       GoRoute(
         path: '/customer/book/:serviceType',
         // `extra` carries an existing booking Map when editing (from the detail page).

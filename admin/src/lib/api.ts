@@ -212,6 +212,9 @@ export const adminApi = {
   // ─── Customer Bookings (rides) ─────────────────────────────────────────────
   getCustomerBookings: (params?: any) => apiClient.get('/customer-bookings/admin/all', { params }),
 
+  // ─── Car Pool (pool rides) ─────────────────────────────────────────────────
+  getCarPoolRides: (status?: string) => apiClient.get('/car-pool/admin/all', { params: { status: status || undefined } }),
+
   // ─── Platform Settings ─────────────────────────────────────────────────────
   getSettings: () => apiClient.get('/settings'),
   getAdminSettings: () => apiClient.get('/settings/admin'),

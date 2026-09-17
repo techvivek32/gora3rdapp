@@ -37,6 +37,7 @@ const navigation = [
       { href: '/vehicles', label: 'Available Vehicles', icon: Car },
       { href: '/reports', label: 'Reports', icon: Flag },
       { href: '/customer-bookings', label: 'Customer Bookings', icon: CarTaxiFront },
+      { href: '/car-pool', label: 'Car Pool', icon: Car },
       { href: '/complaints', label: 'Customer Complaints', icon: MessageSquareWarning },
     ],
   },

@@ -218,6 +218,16 @@ class PushNotificationService {
       ctx.push('/customer/bookings');
       return;
     }
+    // Car Pooling: a new seat booking / cancellation → driver's Pool Rides.
+    if (type == 'pool_seat_booked' || type == 'pool_seat_cancelled') {
+      ctx.push('/car-pool/my-rides');
+      return;
+    }
+    // Other pool events (started / picked / completed / cancelled / updated) → passenger's bookings.
+    if (type.startsWith('pool_')) {
+      ctx.push('/car-pool/my-bookings');
+      return;
+    }
 
     // Show the rich popup card only for NEW requirements, else open the feed/inbox.
     if ((data['type'] ?? '').toString() == 'new_requirement') {

@@ -15,6 +15,8 @@ import '../../../../core/widgets/marquee_text.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/banner_card_widget.dart';
 import '../widgets/requirement_card_widget.dart';
+import '../../../customer/data/customer_repository.dart';
+import '../../../customer/presentation/widgets/customer_request_card.dart';
 
 const _kCaution =
     'सावधान: बिना रेफरेंस किसी भी अनजान व्यक्ति को एडवांस पेमेंट न करें।   Caution: Do not make advance payments to any unknown person without a trusted reference.';
@@ -29,11 +31,11 @@ class RequirementsFeedPage extends StatefulWidget {
 class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _scrollController = ScrollController();
   final _apiClient = getIt<ApiClient>();
-  String _searchQuery = '';
-  String _source = 'app'; // 'app' = Booking tab, 'whatsapp' = WhatsApp tab
   final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
-  bool _lastHasMore = false;
+  // Customer-mode bookings (from the customer side) merged into this feed so
+  // drivers can send offers here too.
+  List<Map<String, dynamic>> _customerBookings = [];
   List<Map<String, dynamic>> _banners = [];
 
   // Silent auto-refresh (no spinner, keeps scroll position).
@@ -46,7 +48,8 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   @override
   void initState() {
     super.initState();
-    context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source}));
+    context.read<RequirementsBloc>().add(const LoadRequirementsEvent(filters: {}));
+    _loadCustomerBookings();
     _scrollController.addListener(_onScroll);
     _loadBanners();
     // Refresh the App-Suggested-Fare toggle, then rebuild so cards reflect it.
@@ -62,7 +65,35 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
-    context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source}));
+    context.read<RequirementsBloc>().add(const LoadRequirementsEvent(filters: {}));
+    _loadCustomerBookings();
+  }
+
+  Future<void> _loadCustomerBookings() async {
+    try {
+      final d = await getIt<CustomerRepository>().available();
+      if (mounted) setState(() => _customerBookings = d);
+    } catch (_) {}
+  }
+
+  void _reloadAll() {
+    context.read<RequirementsBloc>().add(const LoadRequirementsEvent(filters: {}));
+    _loadCustomerBookings();
+  }
+
+  Future<void> _applyCustomer(Map<String, dynamic> b) async {
+    final id = (b['_id'] ?? b['id'] ?? '').toString();
+    final result = await showCustomerApplySheet(context, b);
+    if (result == null) return;
+    try {
+      await getIt<CustomerRepository>().apply(id, result);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer sent! A commitment hold is placed on your wallet.'), backgroundColor: AppColors.success));
+      _loadCustomerBookings();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not apply: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppColors.error));
+    }
   }
 
   void _silentRefresh() {
@@ -114,6 +145,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     return _banners[Random().nextInt(_banners.length)];
   }
 
+  int _createdMs(dynamic m) {
+    final s = (m is Map ? (m['createdAt'] ?? '') : '').toString();
+    return DateTime.tryParse(s)?.millisecondsSinceEpoch ?? 0;
+  }
+
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       context.read<RequirementsBloc>().add(LoadMoreRequirementsEvent());
@@ -141,14 +177,8 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(98.h),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSourceTabs(),
-              _buildVehicleFilterBar(),
-            ],
-          ),
+          preferredSize: Size.fromHeight(50.h),
+          child: _buildVehicleFilterBar(),
         ),
       ),
       body: BlocConsumer<RequirementsBloc, RequirementsState>(
@@ -157,7 +187,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
         builder: (context, state) {
           if (state is RequirementsLoaded) {
             _lastLoadedRequirements = state.requirements;
-            _lastHasMore = state.hasMore;
           }
 
 
@@ -177,26 +206,34 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
             isLoadingMore = false;
           }
 
-          // Apply the top vehicle-type filter (empty = All).
+          // Apply the top vehicle-type filter (empty = All) to both feeds.
+          List<Map<String, dynamic>> customerBookings = List<Map<String, dynamic>>.from(_customerBookings);
           if (_vehicleFilters.isNotEmpty) {
             requirements = requirements.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
+            customerBookings = customerBookings.where((r) => _vehicleFilters.contains(r['vehicleType'])).toList();
           }
 
-          // Build flat mixed list: requirements interleaved with banners
+          // Merge requirements (app + WhatsApp) with customer-side bookings, newest first.
+          final List<Map<String, dynamic>> merged = [
+            ...requirements.map((r) => {'_kind': 'req', 'data': r}),
+            ...customerBookings.map((c) => {'_kind': 'cust', 'data': c}),
+          ];
+          merged.sort((a, b) => _createdMs(b['data']).compareTo(_createdMs(a['data'])));
+
+          // Build flat mixed list: cards interleaved with banners.
           final List<dynamic> items = [];
-          for (int i = 0; i < requirements.length; i++) {
-            items.add(requirements[i]);
-            // After every card insert a random banner
+          for (int i = 0; i < merged.length; i++) {
+            items.add(merged[i]);
             if (_banners.isNotEmpty && (i + 1) % _bannerEvery == 0) {
               items.add({'_type': 'banner', 'banner': _randomBanner()!});
             }
           }
           if (isLoadingMore) items.add('loading');
 
-          if (requirements.isEmpty) {
+          if (merged.isEmpty) {
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
+              onRefresh: () async => _reloadAll(),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [SizedBox(height: MediaQuery.of(context).size.height * 0.35), _buildEmptyState()],
@@ -205,7 +242,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           }
           return RefreshIndicator(
             color: AppColors.primary,
-            onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
+            onRefresh: () async => _reloadAll(),
             child: ListView.separated(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -223,8 +260,13 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 if (item is Map && item['_type'] == 'banner') {
                   return BannerCardWidget(banner: item['banner'] as Map<String, dynamic>, apiClient: _apiClient);
                 }
-                final req = item as Map<String, dynamic>;
-                // Cards are display-only here — no navigation to the detail screen.
+                final entry = item as Map<String, dynamic>;
+                final data = entry['data'] as Map<String, dynamic>;
+                // Customer-side booking → offer/apply card.
+                if (entry['_kind'] == 'cust') {
+                  return CustomerRequestCard(data, onApply: () => _applyCustomer(data));
+                }
+                // Requirement card with the caution marquee above it.
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -236,17 +278,18 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                       ),
                     ),
                     SizedBox(height: 6.h),
-                    RequirementCardWidget(requirement: req),
+                    RequirementCardWidget(requirement: data),
                   ],
                 );
               },
             ),
           );
 
+          // ignore: dead_code
           if (state is RequirementsError) {
             return RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
+              onRefresh: () async => _reloadAll(),
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
@@ -259,7 +302,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                       Text(state.message, style: TextStyle(color: AppColors.textSecondary), textAlign: TextAlign.center),
                       SizedBox(height: 16.h),
                       ElevatedButton(
-                        onPressed: () => context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': _source})),
+                        onPressed: _reloadAll,
                         child: const Text('Retry'),
                       ),
                     ],
@@ -292,87 +335,26 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   }
 
   Widget _buildEmptyState() {
-    final isWhatsapp = _source == 'whatsapp';
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(isWhatsapp ? Icons.chat_bubble_outline_rounded : Icons.search_off_rounded,
-              size: 64.sp, color: AppColors.textHint),
+          Icon(Icons.search_off_rounded, size: 64.sp, color: AppColors.textHint),
           SizedBox(height: 16.h),
-          Text(isWhatsapp ? 'No WhatsApp bookings yet' : 'No bookings found',
+          Text('No bookings found',
               style: TextStyle(fontSize: 16.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
           SizedBox(height: 8.h),
           Text(
-            isWhatsapp
-                ? 'Bookings sent to the Gora WhatsApp number appear here.'
-                : 'Be the first to post a booking!',
+            'Be the first to post a booking!',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13.sp, color: AppColors.textHint),
           ),
-          if (!isWhatsapp) ...[
-            SizedBox(height: 24.h),
-            ElevatedButton.icon(
-              onPressed: () => context.push('/requirements/create'),
-              icon: const Icon(Icons.add),
-              label: const Text('Post Booking'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  void _selectSource(String s) {
-    if (_source == s) return;
-    setState(() {
-      _source = s;
-      _lastLoadedRequirements = [];
-      _vehicleFilters.clear();
-    });
-    context.read<RequirementsBloc>().add(LoadRequirementsEvent(filters: {'source': s}));
-  }
-
-  // Two top tabs: Booking (app-posted) and WhatsApp (parsed from WhatsApp).
-  Widget _buildSourceTabs() {
-    Widget tab(String value, String label, IconData icon) {
-      final selected = _source == value;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => _selectSource(value),
-          child: Container(
-            margin: EdgeInsets.symmetric(horizontal: 5.w),
-            padding: EdgeInsets.symmetric(vertical: 8.h),
-            decoration: BoxDecoration(
-              color: selected ? Colors.white : Colors.white24,
-              borderRadius: BorderRadius.circular(20.r),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: 16.sp, color: selected ? AppColors.primary : Colors.white),
-                SizedBox(width: 6.w),
-                Text(label,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w700,
-                      fontFamily: 'Poppins',
-                      color: selected ? AppColors.primary : Colors.white,
-                    )),
-              ],
-            ),
+          SizedBox(height: 24.h),
+          ElevatedButton.icon(
+            onPressed: () => context.push('/requirements/create'),
+            icon: const Icon(Icons.add),
+            label: const Text('Post Booking'),
           ),
-        ),
-      );
-    }
-
-    return Container(
-      color: AppColors.primary,
-      padding: EdgeInsets.fromLTRB(6.w, 4.h, 6.w, 8.h),
-      child: Row(
-        children: [
-          tab('app', 'Booking'.tr, Icons.event_note_rounded),
-          tab('whatsapp', 'Duty', Icons.chat_rounded),
         ],
       ),
     );
