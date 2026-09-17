@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 /** Structured result of parsing a free-form WhatsApp taxi message. Empty strings for missing fields. */
 export interface ParsedWhatsappBooking {
@@ -66,17 +66,17 @@ Return ONLY the JSON object.`;
 @Injectable()
 export class WhatsappAiService {
   private readonly logger = new Logger(WhatsappAiService.name);
-  private client: Anthropic | null = null;
+  private client: OpenAI | null = null;
 
   /** Whether AI parsing is configured (an API key is present). */
   get enabled(): boolean {
-    return !!process.env.ANTHROPIC_API_KEY;
+    return !!process.env.OPENAI_API_KEY;
   }
 
-  private get anthropic(): Anthropic | null {
-    const key = process.env.ANTHROPIC_API_KEY;
+  private get openai(): OpenAI | null {
+    const key = process.env.OPENAI_API_KEY;
     if (!key) return null;
-    if (!this.client) this.client = new Anthropic({ apiKey: key });
+    if (!this.client) this.client = new OpenAI({ apiKey: key });
     return this.client;
   }
 
@@ -86,25 +86,29 @@ export class WhatsappAiService {
    * fall back to the fixed-format parser.
    */
   async parse(text: string): Promise<ParsedWhatsappBooking | null> {
-    const client = this.anthropic;
+    const client = this.openai;
     const body = (text || '').trim();
     if (!client || !body) return null;
 
-    const model = process.env.WHATSAPP_AI_MODEL || 'claude-opus-5';
+    const model = process.env.WHATSAPP_AI_MODEL || 'gpt-4.1-nano';
     try {
-      const res: any = await client.messages.create({
+      const res = await client.chat.completions.create({
         model,
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        // Constrain the reply to our JSON shape. NOTE: no `effort` here — the
-        // effort param is rejected (400) on Haiku 4.5, which broke every parse.
-        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
-        messages: [{ role: 'user', content: body.slice(0, 4000) }],
-      } as any);
+        // Constrain the reply to our JSON shape via OpenAI structured outputs.
+        response_format: {
+          type: 'json_schema',
+          json_schema: { name: 'whatsapp_booking', schema: SCHEMA, strict: true },
+        },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: body.slice(0, 4000) },
+        ],
+      });
 
-      const textBlock = (res?.content || []).find((b: any) => b?.type === 'text');
-      if (!textBlock?.text) return null;
-      const parsed = JSON.parse(textBlock.text);
+      const content = res?.choices?.[0]?.message?.content;
+      if (!content) return null;
+      const parsed = JSON.parse(content);
       return { ...EMPTY, ...parsed };
     } catch (e: any) {
       this.logger.warn(`WhatsApp AI parse failed (${model}): ${e?.message ?? e}`);

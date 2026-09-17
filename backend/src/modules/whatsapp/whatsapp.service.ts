@@ -208,7 +208,7 @@ export class WhatsappService {
 
   // ─── AI parsing (free-form) ──────────────────────────────────────────────────
   /**
-   * Parse any free-form WhatsApp message via Claude, mapping its free-text fields
+   * Parse any free-form WhatsApp message via ChatGPT, mapping its free-text fields
    * onto our enums/date types. Returns { kind: 'available' } for availability posts
    * (not auto-created yet), a full requirement object for bookings, or null to fall
    * back to the fixed-format parser.
