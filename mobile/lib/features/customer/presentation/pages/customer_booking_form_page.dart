@@ -72,7 +72,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   DateTime? _returnDate; // round-trip return (cab layout)
   bool _busy = false;
 
-  static const _teal = Color(0xFF2AA9E0);
+  // Accent colour for the cab layout (orange to match the app brand).
+  static const _teal = AppColors.primary;
 
   _ServiceMeta get _m => _meta[widget.serviceType] ?? const _ServiceMeta('Booking', '', Icons.directions_car_rounded);
 
@@ -531,17 +532,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   // Dedicated "Outstation Cabs" layout (cab service, new bookings)
   // ══════════════════════════════════════════════════════════════════════════
 
-  String get _cabTitle {
-    switch (_subType) {
-      case 'Local':
-        return 'Local Cabs';
-      case 'Airport':
-        return 'Airport Cabs';
-      default:
-        return 'Outstation Cabs';
-    }
-  }
-
   Widget _buildCab() {
     final isRound = _subType == 'Round Trip';
     return Scaffold(
@@ -551,12 +541,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0.5,
         centerTitle: true,
-        title: Text(_cabTitle, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18.sp)),
-        actions: [
-          IconButton(icon: Icon(Icons.account_circle_rounded, color: _teal, size: 28.sp), onPressed: () => context.go('/customer/profile')),
-        ],
+        title: Text('Cab Booking', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18.sp)),
       ),
-      bottomNavigationBar: _cabTabs(),
+      bottomNavigationBar: _homeBottomNav(),
       body: ListView(
         padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 20.h),
         children: [
@@ -593,75 +580,57 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               ],
             ),
             SizedBox(height: 14.h),
-            if (_subType == 'One Way' || _subType == 'Round Trip') ...[
-              _owrtToggle(),
-              SizedBox(height: 14.h),
-            ],
-            // FROM / TO with swap
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+            _tripTypeTabs(),
+            SizedBox(height: 14.h),
+            // FROM / TO
+            Column(
               children: [
-                Expanded(
-                  child: Column(
+                AddressAutocompleteField(
+                  controller: _pickupCtrl,
+                  label: 'From',
+                  prefixIcon: Icons.location_on_rounded,
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
+                ),
+                for (int i = 0; i < _stops.length; i++) ...[
+                  SizedBox(height: 10.h),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      AddressAutocompleteField(
-                        controller: _pickupCtrl,
-                        label: 'From',
-                        prefixIcon: Icons.location_on_rounded,
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
-                      ),
-                      for (int i = 0; i < _stops.length; i++) ...[
-                        SizedBox(height: 10.h),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: AddressAutocompleteField(
-                                controller: _stops[i].ctrl,
-                                label: 'Stop ${i + 1}',
-                                prefixIcon: Icons.more_vert_rounded,
-                                onSelected: (a, lat, lng, city) { _stops[i].lat = lat; _stops[i].lng = lng; _stops[i].city = city; },
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => _removeStop(i),
-                              icon: Icon(Icons.close_rounded, color: AppColors.error, size: 20.sp),
-                              tooltip: 'Remove stop',
-                            ),
-                          ],
+                      Expanded(
+                        child: AddressAutocompleteField(
+                          controller: _stops[i].ctrl,
+                          label: 'Stop ${i + 1}',
+                          prefixIcon: Icons.more_vert_rounded,
+                          onSelected: (a, lat, lng, city) { _stops[i].lat = lat; _stops[i].lng = lng; _stops[i].city = city; },
                         ),
-                      ],
-                      SizedBox(height: 10.h),
-                      AddressAutocompleteField(
-                        controller: _dropCtrl,
-                        label: 'To',
-                        prefixIcon: Icons.location_on_rounded,
-                        onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
+                      ),
+                      IconButton(
+                        onPressed: () => _removeStop(i),
+                        icon: Icon(Icons.close_rounded, color: AppColors.error, size: 20.sp),
+                        tooltip: 'Remove stop',
                       ),
                     ],
                   ),
+                ],
+                SizedBox(height: 10.h),
+                AddressAutocompleteField(
+                  controller: _dropCtrl,
+                  label: 'To',
+                  prefixIcon: Icons.location_on_rounded,
+                  onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
                 ),
-                SizedBox(width: 8.w),
-                _swapBtn(),
               ],
             ),
             SizedBox(height: 14.h),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _addStop,
-                  icon: Icon(Icons.add, size: 16.sp, color: _teal),
-                  label: Text('ADD STOPS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: _teal, fontFamily: 'Poppins')),
-                  style: OutlinedButton.styleFrom(side: const BorderSide(color: _teal, width: 1.3), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
-                ),
-                SizedBox(width: 10.w),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-                  decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2AA9E0), Color(0xFF7C3AED)]), borderRadius: BorderRadius.circular(20.r)),
-                  child: Text('NEW', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
-                ),
-              ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _addStop,
+                icon: Icon(Icons.add, size: 16.sp, color: _teal),
+                label: Text('ADD STOPS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: _teal, fontFamily: 'Poppins')),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: _teal, width: 1.3), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+              ),
             ),
             SizedBox(height: 14.h),
             _dtBox('TRIP START', Icons.calendar_today_rounded, DateFormat('dd-MM-yyyy').format(_date), _time.format(context), _pickDateTime),
@@ -691,48 +660,43 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         ),
       );
 
-  Widget _owrtToggle() {
-    Widget seg(String title, String sub, bool sel, VoidCallback onTap) => Expanded(
-          child: GestureDetector(
-            onTap: onTap,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 6.w),
-              decoration: BoxDecoration(color: sel ? _teal : Colors.transparent, borderRadius: BorderRadius.circular(10.r)),
-              child: Column(
-                children: [
-                  Text(title, textAlign: TextAlign.center, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
-                  SizedBox(height: 1.h),
-                  Text(sub, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9.sp, color: sel ? Colors.white.withValues(alpha: 0.9) : AppColors.textSecondary, fontFamily: 'Poppins')),
-                ],
-              ),
-            ),
-          ),
-        );
+  // Trip-type selector at the TOP of the card (One Way / Round Trip / Local / Airport).
+  Widget _tripTypeTabs() {
+    const types = [
+      ('One Way', Icons.trending_flat_rounded),
+      ('Round Trip', Icons.sync_rounded),
+      ('Local', Icons.location_city_rounded),
+    ];
     return Container(
       padding: EdgeInsets.all(4.r),
       decoration: BoxDecoration(color: const Color(0xFFEFF3F6), borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.border)),
-      child: Row(children: [
-        seg('ONE WAY', 'Drop-off only', _subType == 'One Way', () => setState(() => _subType = 'One Way')),
-        seg('ROUND TRIP', 'Return with same cab', _subType == 'Round Trip', () => setState(() => _subType = 'Round Trip')),
-      ]),
+      child: Row(
+        children: types.map((t) {
+          final sel = _subType == t.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _subType = t.$1;
+                if (t.$1 != 'Round Trip') _returnDate = null;
+              }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 2.w),
+                decoration: BoxDecoration(color: sel ? _teal : Colors.transparent, borderRadius: BorderRadius.circular(10.r)),
+                child: Column(
+                  children: [
+                    Icon(t.$2, size: 18.sp, color: sel ? Colors.white : AppColors.textSecondary),
+                    SizedBox(height: 3.h),
+                    Text(t.$1, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, fontWeight: sel ? FontWeight.w800 : FontWeight.w600, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
-
-  Widget _swapBtn() => GestureDetector(
-        onTap: () => setState(() {
-          final t = _pickupCtrl.text; _pickupCtrl.text = _dropCtrl.text; _dropCtrl.text = t;
-          final la = _pickupLat; _pickupLat = _dropLat; _dropLat = la;
-          final ln = _pickupLng; _pickupLng = _dropLng; _dropLng = ln;
-          final c = _pickupCity; _pickupCity = _dropCity; _dropCity = c;
-        }),
-        child: Container(
-          width: 40.r,
-          height: 40.r,
-          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: _teal, width: 1.5), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4)]),
-          child: Icon(Icons.swap_vert_rounded, color: _teal, size: 22.sp),
-        ),
-      );
 
   Widget _dtBox(String label, IconData icon, String value, String? sub, VoidCallback onTap) => InkWell(
         onTap: onTap,
@@ -839,50 +803,40 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         ),
       );
 
-  Widget _cabTabs() {
-    const tabs = [
-      ('One Way', Icons.trending_flat_rounded),
-      ('Round Trip', Icons.sync_rounded),
-      ('Local', Icons.location_city_rounded),
-      ('Airport', Icons.flight_rounded),
-    ];
+  // Standard customer bottom nav (same as the Home shell): Home / Bookings /
+  // Favorites / Profile — so the cab page feels part of the app, not a dead-end.
+  Widget _homeBottomNav() {
+    Widget item(IconData icon, String label, VoidCallback onTap) => Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: Colors.white70, size: 24.sp),
+                SizedBox(height: 3.h),
+                Text(label, style: TextStyle(fontSize: 10.sp, color: Colors.white70, fontWeight: FontWeight.w500, fontFamily: 'Poppins')),
+              ],
+            ),
+          ),
+        );
     return Container(
-      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))]),
+      decoration: BoxDecoration(color: AppColors.primary, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, -2))]),
       child: SafeArea(
         top: false,
         child: SizedBox(
           height: 62.h,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: tabs.map((t) {
-              final sel = _subType == t.$1;
-              final color = sel ? _teal : AppColors.textHint;
-              return Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => setState(() {
-                    _subType = t.$1;
-                    if (t.$1 != 'Round Trip') _returnDate = null;
-                  }),
-                  child: Container(
-                    margin: EdgeInsets.symmetric(horizontal: 6.w, vertical: 8.h),
-                    decoration: BoxDecoration(
-                      color: sel ? _teal.withValues(alpha: 0.1) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12.r),
-                      border: sel ? Border.all(color: _teal.withValues(alpha: 0.5)) : null,
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(t.$2, color: color, size: 22.sp),
-                        SizedBox(height: 2.h),
-                        Text(t.$1, style: TextStyle(fontSize: 10.sp, fontWeight: sel ? FontWeight.w700 : FontWeight.w500, color: color, fontFamily: 'Poppins')),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+            children: [
+              item(Icons.home_rounded, 'Home', () => context.go('/customer')),
+              item(Icons.receipt_long_rounded, 'Bookings', () => context.go('/customer/bookings')),
+              item(Icons.favorite_border_rounded, 'Favorites', () => ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(content: Text('Favorites — coming soon! 🚧', style: TextStyle(fontFamily: 'Poppins')), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)))),
+              item(Icons.person_rounded, 'Profile', () => context.go('/customer/profile')),
+            ],
           ),
         ),
       ),

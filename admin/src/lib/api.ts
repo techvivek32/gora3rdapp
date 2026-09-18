@@ -139,6 +139,16 @@ export const adminApi = {
     });
   },
 
+  // ─── Home Content (customer app home page CMS) ───────────────────────────────
+  getHomeShowcase: (section?: 'travel' | 'offers' | 'explore') =>
+    apiClient.get('/home-content/admin/sections', { params: { section: section || undefined } }),
+  createHomeShowcase: (data: any) => apiClient.post('/home-content/admin/sections', data),
+  updateHomeShowcase: (id: string, data: any) => apiClient.put(`/home-content/admin/sections/${id}`, data),
+  deleteHomeShowcase: (id: string) => apiClient.delete(`/home-content/admin/sections/${id}`),
+  getCityImages: () => apiClient.get('/home-content/admin/city-images'),
+  upsertCityImage: (data: any) => apiClient.post('/home-content/admin/city-images', data),
+  deleteCityImage: (id: string) => apiClient.delete(`/home-content/admin/city-images/${id}`),
+
   // ─── Ringtones (admin only) ──────────────────────────────────────────────────
   getRingtones: () => apiClient.get('/admin/ringtones'),
   createRingtone: (data: { title: string; audioUrl: string; sortOrder?: number }) =>

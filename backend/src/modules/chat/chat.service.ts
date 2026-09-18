@@ -68,9 +68,20 @@ export class ChatService {
     return { message: 'Messages retrieved', data: messages.reverse() };
   }
 
+  /** True only if the user is a participant of the chat (used to gate socket joins). */
+  async isParticipant(userId: string, chatId: string): Promise<boolean> {
+    if (!Types.ObjectId.isValid(chatId)) return false;
+    const chat = await this.chatModel.findById(chatId).select('participants').lean();
+    return !!chat && (chat.participants as any[]).some((p) => p.toString() === userId);
+  }
+
   async sendMessage(userId: string, chatId: string, data: { content: string; type: MessageType }) {
     const chat = await this.chatModel.findById(chatId);
     if (!chat) throw new NotFoundException('Chat not found');
+    // Only a participant may post — stops injecting messages into other people's chats.
+    if (!chat.participants.some((p) => p.toString() === userId)) {
+      throw new ForbiddenException('Not a participant in this chat');
+    }
 
     const message = await this.messageModel.create({
       chatId: new Types.ObjectId(chatId),

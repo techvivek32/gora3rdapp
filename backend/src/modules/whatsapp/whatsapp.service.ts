@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { RequirementsService } from '../requirements/requirements.service';
@@ -43,6 +44,23 @@ export class WhatsappService {
       return challenge || '';
     }
     throw new ForbiddenException('Verification failed');
+  }
+
+  /**
+   * Verify Meta's `X-Hub-Signature-256` (HMAC-SHA256 of the raw body with the app
+   * secret). Only ENFORCED when WHATSAPP_APP_SECRET is configured — otherwise it
+   * returns true so the existing webhook keeps working until the secret is set.
+   */
+  verifySignature(rawBody?: Buffer, signature?: string): boolean {
+    const secret = this.config.get<string>('whatsapp.appSecret') || process.env.WHATSAPP_APP_SECRET;
+    if (!secret) return true; // not configured → don't block (backward compatible)
+    if (!rawBody || !signature) return false;
+    const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+    } catch {
+      return false;
+    }
   }
 
   /** POST webhook: turn an inbound WhatsApp text into a booking. Best-effort; never throws. */

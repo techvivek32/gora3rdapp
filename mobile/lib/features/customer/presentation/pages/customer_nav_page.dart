@@ -24,8 +24,8 @@ class CustomerNavPage extends StatelessWidget {
       body: child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, -2))],
+          color: AppColors.primary,
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, -2))],
         ),
         child: SafeArea(
           top: false,
@@ -39,7 +39,7 @@ class CustomerNavPage extends StatelessWidget {
                 _NavItem(icon: Icons.favorite_border_rounded, label: 'Favorites', index: 2, selectedIndex: selected, onTap: () {
                   ScaffoldMessenger.of(context)
                     ..hideCurrentSnackBar()
-                    ..showSnackBar(const SnackBar(content: Text('Favorites — aavi rahyu che! 🚧', style: TextStyle(fontFamily: 'Poppins')), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)));
+                    ..showSnackBar(const SnackBar(content: Text('Favorites — coming soon! 🚧', style: TextStyle(fontFamily: 'Poppins')), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)));
                 }),
                 _NavItem(icon: Icons.person_rounded, label: 'Profile', index: 3, selectedIndex: selected, onTap: () => context.go('/customer/profile')),
               ],
@@ -62,7 +62,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isSelected = index == selectedIndex;
-    final color = isSelected ? AppColors.info : AppColors.textHint;
+    final color = isSelected ? Colors.white : Colors.white70;
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -78,7 +78,7 @@ class _NavItem extends StatelessWidget {
             Container(
               width: 18.w,
               height: 2.5.h,
-              decoration: BoxDecoration(color: isSelected ? AppColors.info : Colors.transparent, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.transparent, borderRadius: BorderRadius.circular(2)),
             ),
           ],
         ),

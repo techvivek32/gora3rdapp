@@ -72,6 +72,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   @SubscribeMessage('chat:join')
   async handleJoinChat(@MessageBody() data: { chatId: string }, @ConnectedSocket() client: Socket) {
+    const userId = client.data.userId;
+    // Only participants may join a chat room — otherwise a client could join any
+    // `chat:<id>` room and eavesdrop on its broadcast messages.
+    if (!userId || !(await this.chatService.isParticipant(userId, data.chatId))) {
+      return { event: 'chat:error', data: { message: 'Not allowed to join this chat' } };
+    }
     client.join(`chat:${data.chatId}`);
     return { event: 'chat:joined', data: { chatId: data.chatId } };
   }

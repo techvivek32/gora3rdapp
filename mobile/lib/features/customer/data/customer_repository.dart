@@ -97,6 +97,12 @@ class CustomerRepository {
     return _list(res.data['data']);
   }
 
+  // ── Dynamic home content (admin-managed sections + per-city hero image) ──
+  Future<Map<String, dynamic>> homeContent(String? city) async {
+    final res = await _api.get('/home-content', params: {if (city != null && city.isNotEmpty) 'city': city});
+    return Map<String, dynamic>.from(res.data['data'] as Map);
+  }
+
   // ── Role switching (returns fresh tokens → store them so the new role sticks) ──
   /// Throws with message 'CUSTOMER_ONBOARDING_REQUIRED' when a logged-in account
   /// tries to switch to Customer before completing customer onboarding.

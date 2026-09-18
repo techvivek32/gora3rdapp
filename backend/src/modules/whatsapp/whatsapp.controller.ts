@@ -1,5 +1,5 @@
-import { Body, Controller, Get, HttpCode, Post, Query, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Body, Controller, Get, HttpCode, Post, Query, RawBodyRequest, Req, Res } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/roles.decorator';
 import { WhatsappService } from './whatsapp.service';
@@ -30,7 +30,13 @@ export class WhatsappController {
   @Post('webhook')
   @Public()
   @HttpCode(200)
-  async receive(@Body() body: any) {
+  async receive(@Req() req: RawBodyRequest<Request>, @Body() body: any) {
+    // Reject forged payloads (HMAC over the raw body) when the app secret is set;
+    // still return 200 so Meta doesn't retry a dropped/unverified call.
+    const sig = (req.headers['x-hub-signature-256'] as string) || '';
+    if (!this.whatsapp.verifySignature(req.rawBody, sig)) {
+      return { received: true };
+    }
     // Ack immediately; do the work in the background so Meta never retries.
     this.whatsapp.handleWebhook(body).catch(() => {});
     return { received: true };

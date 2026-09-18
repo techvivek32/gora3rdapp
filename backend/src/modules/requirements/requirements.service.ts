@@ -295,9 +295,11 @@ export class RequirementsService {
     const isPremium = this.isPaidMember(user);
 
     if (!isPremium) {
+      // Paid-contact gate: hide BOTH phone AND email from non-premium viewers.
       const postedBy = requirement.postedBy as any;
       if (postedBy) {
         postedBy.mobile = undefined;
+        postedBy.email = undefined;
       }
     } else {
       await this.requirementModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
@@ -310,6 +312,13 @@ export class RequirementsService {
         .find({ _id: { $in: acceptedByIds } })
         .select('fullName agencyName profileImage membershipType mobile email city state')
         .lean();
+      // Same gate for acceptor contacts — only premium viewers see phone/email.
+      if (!isPremium) {
+        for (const a of acceptors as any[]) {
+          a.mobile = undefined;
+          a.email = undefined;
+        }
+      }
       (requirement as any).acceptedBy = acceptors;
     } else {
       (requirement as any).acceptedBy = [];

@@ -2,8 +2,10 @@ import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SubscriptionsService } from './subscriptions.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Public } from '../../common/decorators/roles.decorator';
+import { Public, Roles } from '../../common/decorators/roles.decorator';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @ApiTags('Subscriptions')
 @Controller('subscriptions')
@@ -53,10 +55,13 @@ export class SubscriptionsController {
     return this.subscriptionsService.verifyPayment(userId, data);
   }
 
+  // ADMIN-ONLY: activates a plan without payment. Must never be open to normal
+  // users (that would be free premium for everyone).
   @Post('test-activate/:planId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'TEST: Activate subscription without payment' })
+  @ApiOperation({ summary: 'ADMIN: Activate subscription without payment (testing)' })
   testActivateSubscription(@CurrentUser('sub') userId: string, @Param('planId') planId: string) {
     return this.subscriptionsService.testActivateSubscription(userId, planId);
   }

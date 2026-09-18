@@ -34,6 +34,7 @@ import { TrainingModule } from './modules/training/training.module';
 import { RingtonesModule } from './modules/ringtones/ringtones.module';
 import { CustomerBookingsModule } from './modules/customer-bookings/customer-bookings.module';
 import { CarPoolModule } from './modules/car-pool/car-pool.module';
+import { HomeContentModule } from './modules/home-content/home-content.module';
 import { CustomerComplaintsModule } from './modules/customer-complaints/customer-complaints.module';
 import { PopupAdsModule } from './modules/popup-ads/popup-ads.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
@@ -108,6 +109,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     RingtonesModule,
     CustomerBookingsModule,
     CarPoolModule,
+    HomeContentModule,
     CustomerComplaintsModule,
     PopupAdsModule,
     FranchiseModule,
