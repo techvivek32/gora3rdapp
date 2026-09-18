@@ -58,13 +58,17 @@ class _MyPoolRidesPageState extends State<MyPoolRidesPage> with SingleTickerProv
         title: Text('My Pool Rides', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17.sp)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.canPop() ? context.pop() : context.go('/')),
         actions: [
           IconButton(tooltip: 'Earnings', onPressed: () => context.push('/car-pool/earnings'), icon: const Icon(Icons.account_balance_wallet_rounded)),
         ],
         bottom: TabBar(
           controller: _tab,
           indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           labelStyle: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13.sp),
+          unselectedLabelStyle: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w500, fontSize: 13.sp),
           tabs: const [Tab(text: 'Active'), Tab(text: 'Past')],
         ),
       ),

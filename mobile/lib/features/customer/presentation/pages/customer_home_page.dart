@@ -38,6 +38,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   // Admin-managed dynamic home content (per-city hero + travel/offers/explore).
   Map<String, dynamic>? _home;
+  final _explorePage = PageController();
+  int _exploreIndex = 0;
+
+  @override
+  void dispose() {
+    _explorePage.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -66,10 +74,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   void _openItem(Map<String, dynamic> item) {
     final url = (item['actionUrl'] ?? '').toString().trim();
-    if (url.isEmpty) {
-      _soon((item['title'] ?? 'This').toString());
-      return;
-    }
+    // No link → not clickable (do nothing). Only redirect when a link is set.
+    if (url.isEmpty) return;
     // Internal route → push; external URL → open via the shared action-url helper.
     if (url.startsWith('/')) {
       context.push(url);
@@ -128,7 +134,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 74)),
+                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 78)),
                         SizedBox(width: 10.w),
                         Expanded(child: _serviceCard('Car Pooling', 'Share a Ride', 'assets/images/car-pooling.png', AppColors.primary, () => context.push('/car-pool/search'))),
                         SizedBox(width: 10.w),
@@ -136,7 +142,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       ],
                     ),
                   ),
-                  SizedBox(height: 18.h),
+                  SizedBox(height: 14.h),
                   ..._exploreSection(),
                   ..._travelSection(),
                   ..._offersSection(),
@@ -263,38 +269,28 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       );
 
   // ─── Service cards (colored card + brand image as the icon) ──────────────────
-  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 60}) {
+  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 68}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 168.h,
-        padding: EdgeInsets.symmetric(vertical: 12.h),
+        height: 150.h,
+        padding: EdgeInsets.symmetric(vertical: 14.h),
         decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color, Color.lerp(color, Colors.black, 0.22)!]),
+          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(color, Colors.white, 0.06)!, Color.lerp(color, Colors.black, 0.16)!]),
           borderRadius: BorderRadius.circular(18.r),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 6))],
+          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Brand illustration as the icon (no white background, no round clip).
-            Image.asset(asset, width: iconSize.r, height: iconSize.r, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: Colors.white, size: 30.sp)),
-            Column(
-              children: [
-                Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2, fontFamily: 'Poppins')),
-                SizedBox(height: 2.h),
-                Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins')),
-              ],
-            ),
-            // ">" button.
-            Container(
-              width: 26.r,
-              height: 26.r,
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)]),
-              child: Icon(Icons.chevron_right_rounded, color: color, size: 20.sp),
-            ),
+            // Brand illustration as the icon.
+            Image.asset(asset, width: iconSize.r, height: iconSize.r, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: Colors.white, size: 34.sp)),
+            SizedBox(height: 8.h),
+            Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2, fontFamily: 'Poppins')),
+            SizedBox(height: 2.h),
+            Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins')),
           ],
         ),
       ),
@@ -308,47 +304,81 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     return c.isEmpty ? '' : (c[0].toUpperCase() + c.substring(1));
   }
 
-  // ─── Explore <city> — admin-managed category chips ───────────────────────────
+  // ─── Explore — admin-managed clickable banner carousel (per city) ────────────
   List<Widget> _exploreSection() {
     final items = _section('explore');
     if (items.isEmpty) return [];
-    final city = _cityName();
+    if (_exploreIndex >= items.length) _exploreIndex = 0;
     return [
-      _sectionHeader(city.isEmpty ? 'Explore' : 'Explore $city'),
-      SizedBox(height: 10.h),
       SizedBox(
-        height: 88.h,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: EdgeInsets.symmetric(horizontal: 14.w),
+        height: 132.h,
+        child: PageView.builder(
+          controller: _explorePage,
           itemCount: items.length,
-          separatorBuilder: (_, __) => SizedBox(width: 12.w),
+          onPageChanged: (i) => setState(() => _exploreIndex = i),
           itemBuilder: (_, i) {
             final it = items[i];
-            return GestureDetector(
-              onTap: () => _openItem(it),
-              child: SizedBox(
-                width: 72.w,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64.r,
-                      height: 64.r,
-                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary.withValues(alpha: 0.4), width: 2)),
-                      child: ClipOval(child: _netImg((it['imageUrl'] ?? '').toString(), fit: BoxFit.cover, fallback: AppColors.primary.withValues(alpha: 0.3))),
-                    ),
-                    SizedBox(height: 6.h),
-                    Text((it['category'] ?? it['title'] ?? '').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center, style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                  ],
+            final title = (it['title'] ?? '').toString();
+            final subtitle = (it['subtitle'] ?? '').toString();
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14.w),
+              child: GestureDetector(
+                onTap: () => _openItem(it),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(18.r),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _netImg((it['imageUrl'] ?? '').toString(), fallback: _navy),
+                      if (title.isNotEmpty || subtitle.isNotEmpty)
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Colors.black.withValues(alpha: 0.55), Colors.black.withValues(alpha: 0.05)]),
+                          ),
+                        ),
+                      if (title.isNotEmpty || subtitle.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.all(16.w),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (title.isNotEmpty)
+                                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 6)])),
+                              if (subtitle.isNotEmpty) ...[
+                                SizedBox(height: 4.h),
+                                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.95), fontFamily: 'Poppins')),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             );
           },
         ),
       ),
-      SizedBox(height: 12.h),
+      if (items.length > 1) ...[
+        SizedBox(height: 8.h),
+        Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(items.length, (i) {
+              final active = i == _exploreIndex;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: EdgeInsets.symmetric(horizontal: 3.w),
+                width: active ? 18.w : 7.w,
+                height: 7.h,
+                decoration: BoxDecoration(color: active ? AppColors.primary : AppColors.border, borderRadius: BorderRadius.circular(4.r)),
+              );
+            }),
+          ),
+        ),
+      ],
+      SizedBox(height: 16.h),
     ];
   }
 

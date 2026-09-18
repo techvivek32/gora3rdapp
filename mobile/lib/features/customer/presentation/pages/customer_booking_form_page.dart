@@ -1,11 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
 import '../../data/customer_repository.dart';
 import '../widgets/booking_card_ui.dart';
@@ -569,10 +567,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 20.h),
         children: [
           _cabCard(isRound),
-          SizedBox(height: 16.h),
-          _promoRow(),
-          SizedBox(height: 14.h),
-          _travelExpert(),
         ],
       ),
     );
@@ -751,77 +745,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         ),
       );
 
-  Widget _promoRow() => SizedBox(
-        height: 130.h,
-        child: ListView(
-          scrollDirection: Axis.horizontal,
-          children: [
-            _promoCard('CHARDHAM CAB PACKAGES', 'EXCLUSIVE', 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=600&q=70', 280.w),
-            SizedBox(width: 12.w),
-            _promoCard('Beach Getaways', 'OFFERS', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=70', 200.w),
-          ],
-        ),
-      );
-
-  Widget _promoCard(String title, String tag, String img, double width) => GestureDetector(
-        onTap: () => _snack('Offers — coming soon'),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14.r),
-          child: SizedBox(
-            width: width,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, placeholder: (_, __) => Container(color: _teal.withValues(alpha: 0.2)), errorWidget: (_, __, ___) => Container(color: _teal.withValues(alpha: 0.4))),
-                Container(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomLeft, end: Alignment.topRight, colors: [Colors.black.withValues(alpha: 0.55), Colors.black.withValues(alpha: 0.1)]))),
-                Padding(
-                  padding: EdgeInsets.all(10.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.6), borderRadius: BorderRadius.circular(6.r)),
-                        child: Text('★ $tag ★', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w700, color: Colors.white, fontFamily: 'Poppins')),
-                      ),
-                      const Spacer(),
-                      Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w900, color: AppColors.primary, height: 1.1, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 6)])),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-  Widget _travelExpert() => Container(
-        padding: EdgeInsets.all(14.w),
-        decoration: BoxDecoration(color: const Color(0xFFEAF6FC), borderRadius: BorderRadius.circular(14.r)),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('SAY HELLO TO,', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                  Text('YOUR TRAVEL EXPERT', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                  SizedBox(height: 2.h),
-                  Text('Get expert advice for smarter travel plans!', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                ],
-              ),
-            ),
-            SizedBox(width: 10.w),
-            ElevatedButton.icon(
-              onPressed: () => callNumber('+919587090620'),
-              icon: Icon(Icons.call_rounded, size: 16.sp),
-              label: Text('Call Expert | 24×7', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _teal, elevation: 1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h)),
-            ),
-          ],
-        ),
-      );
-
   // Standard customer bottom nav (same as the Home shell): Home / Bookings /
   // Favorites / Profile — so the cab page feels part of the app, not a dead-end.
   Widget _homeBottomNav() {
@@ -851,10 +774,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
             children: [
               item(Icons.home_rounded, 'Home', () => context.go('/customer')),
               item(Icons.receipt_long_rounded, 'Bookings', () => context.go('/customer/bookings')),
-              item(Icons.favorite_border_rounded, 'Favorites', () => ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(const SnackBar(content: Text('Favorites — coming soon! 🚧', style: TextStyle(fontFamily: 'Poppins')), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)))),
-              item(Icons.person_rounded, 'Profile', () => context.go('/customer/profile')),
+              item(Icons.settings_rounded, 'Settings', () => context.go('/customer/profile')),
             ],
           ),
         ),

@@ -13,7 +13,7 @@ class CustomerNavPage extends StatelessWidget {
   int _index(BuildContext context) {
     final loc = GoRouterState.of(context).matchedLocation;
     if (loc.startsWith('/customer/bookings')) return 1;
-    if (loc.startsWith('/customer/profile')) return 3;
+    if (loc.startsWith('/customer/profile')) return 2;
     return 0;
   }
 
@@ -36,12 +36,7 @@ class CustomerNavPage extends StatelessWidget {
               children: [
                 _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, selectedIndex: selected, onTap: () => context.go('/customer')),
                 _NavItem(icon: Icons.receipt_long_rounded, label: 'Bookings', index: 1, selectedIndex: selected, onTap: () => context.go('/customer/bookings')),
-                _NavItem(icon: Icons.favorite_border_rounded, label: 'Favorites', index: 2, selectedIndex: selected, onTap: () {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(const SnackBar(content: Text('Favorites — coming soon! 🚧', style: TextStyle(fontFamily: 'Poppins')), behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)));
-                }),
-                _NavItem(icon: Icons.person_rounded, label: 'Profile', index: 3, selectedIndex: selected, onTap: () => context.go('/customer/profile')),
+                _NavItem(icon: Icons.settings_rounded, label: 'Settings', index: 2, selectedIndex: selected, onTap: () => context.go('/customer/profile')),
               ],
             ),
           ),
