@@ -118,6 +118,30 @@ export class AuthController {
     return this.authService.changeRole(userId, role);
   }
 
+  @Post('switch-to-customer')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'First-time customer onboarding for a logged-in account, then switch to Customer' })
+  switchToCustomer(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { city?: string; profileImage?: string; email?: string },
+  ) {
+    return this.authService.switchToCustomer(userId, body || {});
+  }
+
+  @Post('switch-to-driver')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'First-time driver onboarding for a logged-in account, then switch to Driver' })
+  switchToDriver(
+    @CurrentUser('sub') userId: string,
+    @Body() body: { city?: string; state?: string; agencyName?: string; role?: string },
+  ) {
+    return this.authService.switchToDriver(userId, body || {});
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/network/api_client.dart';
 
@@ -97,14 +98,56 @@ class CustomerRepository {
   }
 
   // ── Role switching (returns fresh tokens → store them so the new role sticks) ──
+  /// Throws with message 'CUSTOMER_ONBOARDING_REQUIRED' when a logged-in account
+  /// tries to switch to Customer before completing customer onboarding.
   Future<String> changeRole(String role) async {
-    final res = await _api.post('/auth/change-role', data: {'role': role});
+    try {
+      final res = await _api.post('/auth/change-role', data: {'role': role});
+      final d = Map<String, dynamic>.from(res.data['data'] as Map);
+      await _storeTokens(d);
+      return (d['role'] ?? role).toString();
+    } on DioException catch (e) {
+      throw Exception(_errMsg(e));
+    }
+  }
+
+  String _errMsg(DioException e) {
+    final data = e.response?.data;
+    final m = (data is Map ? (data['message'] ?? data['error']) : null)?.toString();
+    return (m != null && m.isNotEmpty) ? m : (e.message ?? 'Request failed');
+  }
+
+  /// First-time customer onboarding for a logged-in driver/vendor → switches to
+  /// Customer. name & mobile already exist; we only collect city (+ optional).
+  Future<String> switchToCustomer({String? city, String? profileImage, String? email}) async {
+    final res = await _api.post('/auth/switch-to-customer', data: {
+      if (city != null && city.isNotEmpty) 'city': city,
+      if (profileImage != null && profileImage.isNotEmpty) 'profileImage': profileImage,
+      if (email != null && email.isNotEmpty) 'email': email,
+    });
     final d = Map<String, dynamic>.from(res.data['data'] as Map);
+    await _storeTokens(d);
+    return (d['role'] ?? 'customer').toString();
+  }
+
+  /// First-time driver onboarding for a logged-in (customer-first) account →
+  /// switches to Driver. Full KYC is completed later from the driver profile.
+  Future<String> switchToDriver({String? city, String? state, String? agencyName}) async {
+    final res = await _api.post('/auth/switch-to-driver', data: {
+      if (city != null && city.isNotEmpty) 'city': city,
+      if (state != null && state.isNotEmpty) 'state': state,
+      if (agencyName != null && agencyName.isNotEmpty) 'agencyName': agencyName,
+    });
+    final d = Map<String, dynamic>.from(res.data['data'] as Map);
+    await _storeTokens(d);
+    return (d['role'] ?? 'driver').toString();
+  }
+
+  Future<void> _storeTokens(Map<String, dynamic> d) async {
     final access = (d['accessToken'] ?? '').toString();
     final refresh = (d['refreshToken'] ?? '').toString();
     if (access.isNotEmpty) await _storage.write(key: 'access_token', value: access);
     if (refresh.isNotEmpty) await _storage.write(key: 'refresh_token', value: refresh);
-    return (d['role'] ?? role).toString();
   }
 
   List<Map<String, dynamic>> _list(dynamic v) =>

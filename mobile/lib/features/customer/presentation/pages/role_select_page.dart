@@ -34,19 +34,34 @@ class _RoleSelectPageState extends State<RoleSelectPage> {
       }
       return;
     }
-    // Already logged in → switch role in place (re-issues tokens).
+    // Already logged in → switch role in place (re-issues tokens). Switching to
+    // Customer for the first time needs a quick onboarding (city etc.) — the
+    // backend signals that with CUSTOMER_ONBOARDING_REQUIRED and we route there;
+    // an already-onboarded account switches directly. Same idea both directions.
     setState(() => _busy = true);
     try {
       await getIt<CustomerRepository>().changeRole(role);
       if (!mounted) return;
-      // Reload the profile so the router redirect sends us to the right home.
       context.read<AuthBloc>().add(const AuthReloadProfileEvent());
       context.go(role == 'customer' ? '/customer' : '/');
     } catch (e) {
+      final msg = e.toString();
+      if (role == 'customer' && msg.contains('CUSTOMER_ONBOARDING_REQUIRED')) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        context.push('/customer/onboarding');
+        return;
+      }
+      if (role != 'customer' && msg.contains('DRIVER_ONBOARDING_REQUIRED')) {
+        if (!mounted) return;
+        setState(() => _busy = false);
+        context.push('/driver/onboarding');
+        return;
+      }
       if (mounted) {
         setState(() => _busy = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not switch role: $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('Could not switch role: ${msg.replaceFirst('Exception: ', '')}'), backgroundColor: AppColors.error),
         );
       }
     }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
 import '../widgets/booking_card_ui.dart';
 
@@ -309,9 +310,9 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           ),
           if (phone.isNotEmpty)
             IconButton(
-              onPressed: () {},
+              onPressed: () => callNumber(phone),
               icon: const Icon(Icons.phone_rounded, color: AppColors.success),
-              tooltip: phone,
+              tooltip: 'Call $phone',
             ),
         ],
       ),

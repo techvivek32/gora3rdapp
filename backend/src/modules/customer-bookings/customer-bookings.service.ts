@@ -52,29 +52,51 @@ export class CustomerBookingsService {
     return true;
   }
 
-  /** Move `amount` from HELD back to AVAILABLE (application not selected / cancelled). */
+  /** Move `amount` from HELD back to AVAILABLE (application not selected / cancelled).
+   * Guarded by heldBalance >= amount so a double-release can't drive held negative
+   * or credit the wallet twice; the ledger row is only written when the move applies. */
   private async releaseHold(driverId: Types.ObjectId, amount: number, bookingRef: Types.ObjectId): Promise<void> {
     if (amount <= 0) return;
-    await this.userModel.updateOne(
-      { _id: driverId },
+    const res = await this.userModel.updateOne(
+      { _id: driverId, heldBalance: { $gte: amount } },
       { $inc: { heldBalance: -amount, walletBalance: amount } },
     );
+    if (!res.modifiedCount) {
+      this.logger.warn(`releaseHold skipped (held<${amount}) for ${driverId} on ${bookingRef}`);
+      return;
+    }
     await this.txModel.create({
       userId: driverId, amount, type: 'credit', status: 'success',
       source: 'release', bookingRef, note: 'Booking hold released',
     });
   }
 
-  /** Consume `amount` from HELD as final settlement/commission (leaves the wallet). */
+  /** Consume `amount` from HELD as final settlement/commission (leaves the wallet).
+   * Guarded so it can only ever settle once per hold. */
   private async settleHold(driverId: Types.ObjectId, amount: number, bookingRef: Types.ObjectId): Promise<void> {
     if (amount <= 0) return;
-    await this.userModel.updateOne(
-      { _id: driverId },
+    const res = await this.userModel.updateOne(
+      { _id: driverId, heldBalance: { $gte: amount } },
       { $inc: { heldBalance: -amount } },
     );
+    if (!res.modifiedCount) {
+      this.logger.warn(`settleHold skipped (held<${amount}) for ${driverId} on ${bookingRef}`);
+      return;
+    }
     await this.txModel.create({
       userId: driverId, amount, type: 'debit', status: 'success',
       source: 'settle', bookingRef, note: 'Booking commission settled',
+    });
+  }
+
+  /** Refund `amount` straight to AVAILABLE (e.g. customer cancels an already-confirmed
+   * booking — the selected driver is blameless, so their settled commitment comes back). */
+  private async refundToWallet(driverId: Types.ObjectId, amount: number, bookingRef: Types.ObjectId, note: string): Promise<void> {
+    if (amount <= 0) return;
+    await this.userModel.updateOne({ _id: driverId }, { $inc: { walletBalance: amount } });
+    await this.txModel.create({
+      userId: driverId, amount, type: 'credit', status: 'success',
+      source: 'refund', bookingRef, note,
     });
   }
 
@@ -395,35 +417,53 @@ export class CustomerBookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
     // Atomically claim the cancel so a concurrent select/expiry can't also run.
+    // findOneAndUpdate returns the PRE-update doc, so `claimed.status` is the prior status.
     const claimed = await this.bookingModel.findOneAndUpdate(
       { _id: booking._id, status: { $in: [CustomerBookingStatus.OPEN, CustomerBookingStatus.CONFIRMED, CustomerBookingStatus.ONGOING] } },
       { $set: { status: CustomerBookingStatus.CANCELLED } },
     );
     if (!claimed) throw new BadRequestException('Booking already closed');
+    const priorStatus = claimed.status;
 
-    // Release every still-held application (not yet in final settlement).
-    for (const o of booking.offers) {
-      if (o.status === 'applied') {
-        await this.releaseHold(o.driverId, o.holdAmount, booking._id);
-        o.status = 'released';
+    // Re-fetch AFTER the claim so we act on the final offer set (an offer pushed
+    // just before the claim is included; no new offer can arrive now that the
+    // status is terminal, so this save() can't drop a concurrent offer).
+    const fresh = await this.bookingModel.findById(id).select('+tripOtp +tripOtpAction +tripOtpExpiresAt');
+    if (fresh) {
+      // Release every still-held application (not yet in final settlement).
+      for (const o of fresh.offers as any[]) {
+        if (o.status === 'applied') {
+          await this.releaseHold(o.driverId, o.holdAmount, fresh._id);
+          o.status = 'released';
+          this.notifications.notifyUser(o.driverId, 'Booking Cancelled',
+            `Booking ${fresh.bookingId} was cancelled — your commitment hold has been released.`,
+            { type: 'customer_booking_cancelled', bookingId: fresh.bookingId }).catch(() => {});
+        }
       }
+      // The customer cancelled an already-confirmed/ongoing trip: the selected
+      // driver is blameless, so refund their settled commitment.
+      if (priorStatus === CustomerBookingStatus.CONFIRMED || priorStatus === CustomerBookingStatus.ONGOING) {
+        const sel = (fresh.offers as any[]).find((o) => o.status === 'selected');
+        if (sel && sel.holdAmount > 0) {
+          await this.refundToWallet(sel.driverId, sel.holdAmount, fresh._id, 'Commitment refunded — booking cancelled by customer');
+        }
+      }
+      fresh.status = CustomerBookingStatus.CANCELLED;
+      fresh.cancelledAt = new Date();
+      fresh.cancelledBy = 'customer';
+      fresh.cancelReason = reason || '';
+      fresh.tripOtp = undefined as any;
+      fresh.tripOtpAction = undefined as any;
+      fresh.tripOtpExpiresAt = undefined as any;
+      await fresh.save();
     }
-    booking.status = CustomerBookingStatus.CANCELLED;
-    booking.cancelledAt = new Date();
-    booking.cancelledBy = 'customer';
-    booking.cancelReason = reason || '';
-    // Invalidate any outstanding trip OTP so a cancelled booking can't be revived.
-    booking.tripOtp = undefined as any;
-    booking.tripOtpAction = undefined as any;
-    booking.tripOtpExpiresAt = undefined as any;
-    await booking.save();
 
-    if (booking.selectedDriverId) {
-      this.notifications.notifyUser(booking.selectedDriverId, 'Booking Cancelled',
-        `Booking ${booking.bookingId} was cancelled by the customer.`,
-        { type: 'customer_booking_cancelled', bookingId: booking.bookingId }).catch(() => {});
+    if (claimed.selectedDriverId) {
+      this.notifications.notifyUser(claimed.selectedDriverId, 'Booking Cancelled',
+        `Booking ${claimed.bookingId} was cancelled by the customer.`,
+        { type: 'customer_booking_cancelled', bookingId: claimed.bookingId }).catch(() => {});
     }
-    return { message: 'Booking cancelled', data: booking };
+    return { message: 'Booking cancelled', data: fresh ?? claimed };
   }
 
   async rate(customerId: string, id: string, dto: RateBookingDto) {
@@ -504,6 +544,10 @@ export class CustomerBookingsService {
     }
     const holdAmount = Math.round((fare * (booking.commitmentPercent || 0)) / 100);
 
+    // Hold first (atomic on the wallet), then attempt an ATOMIC conditional push:
+    // the offer is only added if the booking is still OPEN and this driver has no
+    // active (non-released) offer. This closes the concurrent double-hold / double
+    // -apply / status-revert races that a load→mutate→save() would allow.
     const held = await this.holdFunds(dId, holdAmount, booking._id);
     if (!held) {
       throw new BadRequestException(
@@ -511,7 +555,7 @@ export class CustomerBookingsService {
       );
     }
 
-    booking.offers.push({
+    const offer = {
       driverId: dId,
       quotedFare: fare,
       holdAmount,
@@ -522,8 +566,20 @@ export class CustomerBookingsService {
       farePerSeat: dto.farePerSeat || 0,
       seatsAvailable: dto.seatsAvailable || 0,
       status: 'applied',
-    } as any);
-    await booking.save();
+    };
+    const pushed = await this.bookingModel.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: CustomerBookingStatus.OPEN,
+        offers: { $not: { $elemMatch: { driverId: dId, status: { $ne: 'released' } } } },
+      },
+      { $push: { offers: offer as any } },
+    );
+    if (!pushed) {
+      // Booking closed or a concurrent apply won the race — roll the hold back.
+      await this.releaseHold(dId, holdAmount, booking._id);
+      throw new BadRequestException('This booking is no longer open, or you have already applied.');
+    }
 
     this.notifications.notifyUser(booking.customerId, '🚕 New Offer Received',
       `A driver applied for your ${booking.serviceType} booking ${booking.bookingId}.`,

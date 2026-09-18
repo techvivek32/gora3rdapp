@@ -141,7 +141,7 @@ export default function ComplaintsPage() {
       </FilterBar>
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <DataTable columns={columns} data={data?.data?.data || []} isLoading={isLoading} />
+        <DataTable columns={columns} data={data?.data || []} isLoading={isLoading} />
       </div>
 
       {target && (

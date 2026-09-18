@@ -78,6 +78,17 @@ export class User {
   @Prop({ default: false })
   isAdminApproved: boolean;
 
+  // True once the account has completed customer onboarding (registered as a
+  // customer, or switched into Customer Mode at least once). Drives the smart
+  // role switch: onboarded → switch directly; not → run the quick setup first.
+  @Prop({ default: false })
+  customerOnboarded: boolean;
+
+  // Mirror of the above for the driver/vendor side: true once the account has
+  // been a driver (registered as one, or switched into Driver Mode at least once).
+  @Prop({ default: false })
+  driverOnboarded: boolean;
+
   @Prop({ default: true })
   isActive: boolean;
 

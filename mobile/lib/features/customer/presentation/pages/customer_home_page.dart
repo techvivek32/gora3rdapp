@@ -93,15 +93,27 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _searchCard(),
+                  SizedBox(height: 16.h),
                   Padding(
                     padding: EdgeInsets.symmetric(horizontal: 14.w),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Expanded(child: _serviceCard('Cab Booking', 'One way • airport', Icons.local_taxi_rounded, AppColors.info, () => context.push('/customer/book/cab'))),
-                        SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Hire a Driver', 'Hourly • full day', Icons.airline_seat_recline_normal_rounded, _navy, () => context.push('/customer/book/hire_driver'))),
-                        SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Car Pooling', 'Share a ride', Icons.groups_rounded, AppColors.primary, () => context.push('/car-pool/search'))),
+                        Row(
+                          children: [
+                            Expanded(child: _serviceCard('Cab Booking', 'One way • airport', Icons.local_taxi_rounded, AppColors.info, () => context.push('/customer/book/cab'))),
+                            SizedBox(width: 10.w),
+                            Expanded(child: _serviceCard('Hire a Driver', 'Hourly • full day', Icons.airline_seat_recline_normal_rounded, _navy, () => context.push('/customer/book/hire_driver'))),
+                          ],
+                        ),
+                        SizedBox(height: 10.h),
+                        Row(
+                          children: [
+                            Expanded(child: _serviceCard('Car Pooling', 'Share a ride', Icons.groups_rounded, AppColors.primary, () => context.push('/car-pool/search'))),
+                            SizedBox(width: 10.w),
+                            Expanded(child: _serviceCard('Luxury Car', 'Premium • events', Icons.workspace_premium_rounded, const Color(0xFF7C3AED), () => context.push('/customer/book/luxury'))),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -190,7 +202,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         ],
                       ),
                       const Spacer(),
-                      _circleBtn(Icons.notifications_none_rounded, () => _soon('Notifications')),
+                      _circleBtn(Icons.notifications_none_rounded, () => context.push('/notifications')),
                       SizedBox(width: 8.w),
                       GestureDetector(
                         onTap: () => context.go('/customer/profile'),
@@ -242,6 +254,73 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle, border: Border.all(color: Colors.white24)),
           child: Icon(icon, color: Colors.white, size: 20.sp),
         ),
+      );
+
+  // ─── Top search card (pickup / drop / date-time / passengers) ────────────────
+  Widget _searchCard() => Padding(
+        padding: EdgeInsets.symmetric(horizontal: 14.w),
+        child: GestureDetector(
+          onTap: () => context.push('/customer/book/cab'),
+          child: Container(
+            padding: EdgeInsets.all(14.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18.r),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Column(
+              children: [
+                _searchRow(Icons.my_location_rounded, 'Pickup location', AppColors.primary),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.h),
+                  child: Row(children: [SizedBox(width: 4.w), Container(width: 1.5, height: 16.h, color: AppColors.border), const Spacer()]),
+                ),
+                _searchRow(Icons.location_on_rounded, 'Drop location', AppColors.error),
+                SizedBox(height: 12.h),
+                Row(
+                  children: [
+                    Expanded(child: _searchMini(Icons.calendar_today_rounded, 'Date & Time')),
+                    SizedBox(width: 10.w),
+                    Expanded(child: _searchMini(Icons.people_rounded, 'Passengers')),
+                  ],
+                ),
+                SizedBox(height: 12.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                    borderRadius: BorderRadius.circular(12.r),
+                  ),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Icon(Icons.search_rounded, color: Colors.white, size: 20.sp),
+                    SizedBox(width: 8.w),
+                    Text('Search Cabs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14.sp, fontFamily: 'Poppins')),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  Widget _searchRow(IconData icon, String hint, Color color) => Row(
+        children: [
+          Icon(icon, size: 18.sp, color: color),
+          SizedBox(width: 10.w),
+          Text(hint, style: TextStyle(fontSize: 13.5.sp, color: AppColors.textHint, fontFamily: 'Poppins')),
+        ],
+      );
+
+  Widget _searchMini(IconData icon, String label) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+        decoration: BoxDecoration(color: const Color(0xFFF6F7F9), borderRadius: BorderRadius.circular(10.r), border: Border.all(color: AppColors.border)),
+        child: Row(children: [
+          Icon(icon, size: 15.sp, color: AppColors.primary),
+          SizedBox(width: 6.w),
+          Text(label, style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+        ]),
       );
 
   // ─── Service cards (clean icon tiles) ────────────────────────────────────────

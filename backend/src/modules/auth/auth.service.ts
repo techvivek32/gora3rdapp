@@ -188,6 +188,9 @@ export class AuthService {
       city: dto.city,
       state: dto.state,
       role: dto.role || UserRole.DRIVER,
+      // Whichever side they register on counts as onboarded for that side.
+      customerOnboarded: (dto.role || UserRole.DRIVER) === UserRole.CUSTOMER,
+      driverOnboarded: (dto.role || UserRole.DRIVER) !== UserRole.CUSTOMER,
       membershipType: MembershipType.NEW,
       isActive: true,
       // The referral code IS the user's mobile number — one less thing to explain
@@ -445,13 +448,88 @@ export class AuthService {
     if (!user) throw new NotFoundException('User not found');
     if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
 
+    // Opportunistic backfill: if the account currently holds a driver-family role
+    // it has clearly been a driver, so mark it driver-onboarded (covers legacy
+    // accounts created before the flag existed) before we flip the role.
+    if (this.isDriverRole(user.role)) user.driverOnboarded = true;
+
+    // Smart switch: block a direct switch until the account has been onboarded on
+    // the target side — the app then runs the quick setup first.
+    if (role === UserRole.CUSTOMER && !user.customerOnboarded) {
+      throw new BadRequestException('CUSTOMER_ONBOARDING_REQUIRED');
+    }
+    if (this.isDriverRole(role as UserRole) && !user.driverOnboarded) {
+      throw new BadRequestException('DRIVER_ONBOARDING_REQUIRED');
+    }
+
     user.role = role as UserRole;
     await user.save();
 
     const sessionId = randomUUID();
     const tokens = await this.generateTokens(user, sessionId);
     await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
-    return { message: 'Role updated', data: { role: user.role, ...tokens } };
+    return { message: 'Role updated', data: { role: user.role, customerOnboarded: user.customerOnboarded, driverOnboarded: user.driverOnboarded, ...tokens } };
+  }
+
+  private isDriverRole(role: UserRole): boolean {
+    return role === UserRole.DRIVER || role === UserRole.TRAVEL_AGENCY || role === UserRole.FLEET_OWNER;
+  }
+
+  /**
+   * Complete customer onboarding for an existing (logged-in) account and switch
+   * it into Customer Mode. Used when a driver/vendor picks "Customer" for the
+   * first time — name & mobile already exist, so we only collect city (+ optional
+   * photo/email), mark the account customer-onboarded, and re-issue tokens.
+   */
+  async switchToCustomer(
+    userId: string,
+    dto: { city?: string; profileImage?: string; email?: string },
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+
+    // Keep driver capability if they've been a driver (so switching back is direct).
+    if (this.isDriverRole(user.role)) user.driverOnboarded = true;
+    if (dto.city) user.city = dto.city;
+    if (dto.profileImage) user.profileImage = dto.profileImage;
+    if (dto.email && !user.email) user.email = dto.email.toLowerCase();
+    user.customerOnboarded = true;
+    user.role = UserRole.CUSTOMER;
+    await user.save();
+
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
+    return { message: 'Welcome to Customer Mode', data: { role: user.role, customerOnboarded: true, ...tokens } };
+  }
+
+  /**
+   * First-time driver onboarding for a logged-in (customer-first) account, then
+   * switch into Driver Mode. Collects the driver basics that a customer account
+   * may lack; full KYC is still completed later from the driver profile.
+   */
+  async switchToDriver(
+    userId: string,
+    dto: { city?: string; state?: string; agencyName?: string; role?: string },
+  ) {
+    const user = await this.userModel.findById(userId);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
+
+    // Only driver-family roles are valid targets here; default to plain driver.
+    const target = this.isDriverRole(dto.role as UserRole) ? (dto.role as UserRole) : UserRole.DRIVER;
+    if (dto.city) user.city = dto.city;
+    if (dto.state) user.state = dto.state;
+    if (dto.agencyName) user.agencyName = dto.agencyName;
+    user.driverOnboarded = true;
+    user.role = target;
+    await user.save();
+
+    const sessionId = randomUUID();
+    const tokens = await this.generateTokens(user, sessionId);
+    await this.saveRefreshToken(user._id.toString(), tokens.refreshToken, sessionId);
+    return { message: 'Welcome to Driver Mode', data: { role: user.role, driverOnboarded: true, ...tokens } };
   }
 
   async refreshTokens(userId: string, refreshToken: string) {
