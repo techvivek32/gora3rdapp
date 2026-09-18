@@ -149,6 +149,12 @@ export const adminApi = {
   upsertCityImage: (data: any) => apiClient.post('/home-content/admin/city-images', data),
   deleteCityImage: (id: string) => apiClient.delete(`/home-content/admin/city-images/${id}`),
 
+  // ─── Cab Categories (customer app Explore Cabs vehicle classes) ──────────────
+  getCabCategories: () => apiClient.get('/home-content/admin/cab-categories'),
+  createCabCategory: (data: any) => apiClient.post('/home-content/admin/cab-categories', data),
+  updateCabCategory: (id: string, data: any) => apiClient.put(`/home-content/admin/cab-categories/${id}`, data),
+  deleteCabCategory: (id: string) => apiClient.delete(`/home-content/admin/cab-categories/${id}`),
+
   // ─── Ringtones (admin only) ──────────────────────────────────────────────────
   getRingtones: () => apiClient.get('/admin/ringtones'),
   createRingtone: (data: { title: string; audioUrl: string; sortOrder?: number }) =>

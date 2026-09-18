@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 import { HomeSectionType } from '../../../database/schemas/home-content.schema';
 
 export class CreateShowcaseDto {
@@ -28,5 +28,27 @@ export class UpdateShowcaseDto {
 export class UpsertCityImageDto {
   @IsString() city: string;
   @IsOptional() @IsString() imageUrl?: string;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class CreateCabCategoryDto {
+  @IsString() name: string;
+  @IsOptional() @IsString() vehicleClass?: string;
+  @IsOptional() @IsString() imageUrl?: string;
+  @IsNumber() pricePerKm: number;
+  @IsOptional() @IsInt() seats?: number;
+  @IsOptional() @IsString() bags?: string;
+  @IsOptional() @IsInt() order?: number;
+  @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
+export class UpdateCabCategoryDto {
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() vehicleClass?: string;
+  @IsOptional() @IsString() imageUrl?: string;
+  @IsOptional() @IsNumber() pricePerKm?: number;
+  @IsOptional() @IsInt() seats?: number;
+  @IsOptional() @IsString() bags?: string;
+  @IsOptional() @IsInt() order?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

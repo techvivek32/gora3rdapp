@@ -5,7 +5,13 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { HomeContentService } from './home-content.service';
-import { CreateShowcaseDto, UpdateShowcaseDto, UpsertCityImageDto } from './dto/home-content.dto';
+import {
+  CreateCabCategoryDto,
+  CreateShowcaseDto,
+  UpdateCabCategoryDto,
+  UpdateShowcaseDto,
+  UpsertCityImageDto,
+} from './dto/home-content.dto';
 
 @ApiTags('Home Content')
 @ApiBearerAuth('access-token')
@@ -19,6 +25,42 @@ export class HomeContentController {
   @ApiOperation({ summary: 'Customer: dynamic home content for a city' })
   getForCustomer(@Query('city') city?: string) {
     return this.service.getForCustomer(city);
+  }
+
+  // Customer: active cab categories for the Explore Cabs results.
+  @Get('cab-categories')
+  @ApiOperation({ summary: 'Customer: active cab categories (name, image, price/km, seats)' })
+  cabCategories() {
+    return this.service.listCabCategories(true);
+  }
+
+  // ── Admin: cab categories ──
+  @Get('admin/cab-categories')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  adminCabCategories() {
+    return this.service.listCabCategories(false);
+  }
+
+  @Post('admin/cab-categories')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  createCabCategory(@Body() dto: CreateCabCategoryDto) {
+    return this.service.createCabCategory(dto);
+  }
+
+  @Put('admin/cab-categories/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  updateCabCategory(@Param('id') id: string, @Body() dto: UpdateCabCategoryDto) {
+    return this.service.updateCabCategory(id, dto);
+  }
+
+  @Delete('admin/cab-categories/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  deleteCabCategory(@Param('id') id: string) {
+    return this.service.deleteCabCategory(id);
   }
 
   // ── Admin: showcase ──

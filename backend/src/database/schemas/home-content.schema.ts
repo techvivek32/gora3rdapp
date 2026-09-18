@@ -3,6 +3,7 @@ import { Document } from 'mongoose';
 
 export type HomeShowcaseDocument = HomeShowcase & Document;
 export type CityImageDocument = CityImage & Document;
+export type CabCategoryDocument = CabCategory & Document;
 
 export enum HomeSectionType {
   TRAVEL = 'travel', // "Travel Made Better" — Hotels / Restaurants / Business
@@ -38,3 +39,20 @@ export class CityImage {
   @Prop({ default: true }) isActive: boolean;
 }
 export const CityImageSchema = SchemaFactory.createForClass(CityImage);
+
+/// Admin-managed cab class shown on the "Explore Cabs" results screen. The fare
+/// is computed as distanceKm × pricePerKm; everything (name, class, image, seats,
+/// bags, per-km rate) is set from the admin panel.
+@Schema({ timestamps: true, collection: 'cabCategories' })
+export class CabCategory {
+  @Prop({ required: true }) name: string; // e.g. "Wagon R or equivalent"
+  @Prop({ default: '' }) vehicleClass: string; // e.g. "Compact" / "Sedan" / "SUV"
+  @Prop({ default: '' }) imageUrl: string;
+  @Prop({ default: 0 }) pricePerKm: number;
+  @Prop({ default: 4 }) seats: number;
+  @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
+  @Prop({ default: 0 }) order: number;
+  @Prop({ default: true }) isActive: boolean;
+}
+export const CabCategorySchema = SchemaFactory.createForClass(CabCategory);
+CabCategorySchema.index({ isActive: 1, order: 1 });

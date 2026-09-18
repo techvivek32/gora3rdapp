@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
+  CabCategory,
+  CabCategorySchema,
   CityImage,
   CityImageSchema,
   HomeShowcase,
@@ -14,6 +16,7 @@ import { HomeContentService } from './home-content.service';
     MongooseModule.forFeature([
       { name: HomeShowcase.name, schema: HomeShowcaseSchema },
       { name: CityImage.name, schema: CityImageSchema },
+      { name: CabCategory.name, schema: CabCategorySchema },
     ]),
   ],
   controllers: [HomeContentController],

@@ -176,6 +176,27 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     if (d != null) setState(() => _returnDate = d);
   }
 
+  // Cab "Explore Cabs": validate the route, then open the fare-estimate results
+  // screen (the booking is created there when the customer picks a cab + Book Now).
+  void _exploreCabs() {
+    if (_pickupCtrl.text.trim().isEmpty || _dropCtrl.text.trim().isEmpty) {
+      _snack('Please select From and To locations');
+      return;
+    }
+    final trip = <String, dynamic>{
+      'subType': _subType,
+      'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
+      'pickupCity': _pickupCity,
+      'drop': {'address': _dropCtrl.text.trim(), 'lat': _dropLat ?? 0, 'lng': _dropLng ?? 0},
+      'dropCity': _dropCity,
+      'travelDate': ymdString(_date),
+      'travelTime': _time.format(context),
+      'passengers': _passengers,
+      if (_subType == 'Round Trip' && _returnDate != null) 'notes': 'Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}',
+    };
+    context.push('/customer/cab-results', extra: trip);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_pickupCtrl.text.trim().isEmpty) {
@@ -643,7 +664,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               width: double.infinity,
               height: 52.h,
               child: ElevatedButton(
-                onPressed: _busy ? null : _submit,
+                onPressed: _exploreCabs,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -651,9 +672,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 ),
-                child: _busy
-                    ? SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text('EXPLORE CABS', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'Poppins')),
+                child: Text('EXPLORE CABS', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'Poppins')),
               ),
             ),
           ],

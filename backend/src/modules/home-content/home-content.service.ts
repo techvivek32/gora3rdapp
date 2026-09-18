@@ -2,19 +2,28 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
+  CabCategory,
+  CabCategoryDocument,
   CityImage,
   CityImageDocument,
   HomeSectionType,
   HomeShowcase,
   HomeShowcaseDocument,
 } from '../../database/schemas/home-content.schema';
-import { CreateShowcaseDto, UpdateShowcaseDto, UpsertCityImageDto } from './dto/home-content.dto';
+import {
+  CreateCabCategoryDto,
+  CreateShowcaseDto,
+  UpdateCabCategoryDto,
+  UpdateShowcaseDto,
+  UpsertCityImageDto,
+} from './dto/home-content.dto';
 
 @Injectable()
 export class HomeContentService {
   constructor(
     @InjectModel(HomeShowcase.name) private readonly showcaseModel: Model<HomeShowcaseDocument>,
     @InjectModel(CityImage.name) private readonly cityImageModel: Model<CityImageDocument>,
+    @InjectModel(CabCategory.name) private readonly cabCategoryModel: Model<CabCategoryDocument>,
   ) {}
 
   // ─── Customer: fetch the whole home payload for a city ───────────────────────
@@ -87,6 +96,30 @@ export class HomeContentService {
   async deleteCityImage(id: string) {
     const res = await this.cityImageModel.findByIdAndDelete(id);
     if (!res) throw new NotFoundException('City image not found');
+    return { message: 'Deleted', data: { id } };
+  }
+
+  // ─── Cab categories (Explore Cabs results) ───────────────────────────────────
+  async listCabCategories(activeOnly = false) {
+    const q: any = activeOnly ? { isActive: true } : {};
+    const data = await this.cabCategoryModel.find(q).sort({ order: 1, createdAt: 1 }).lean();
+    return { message: 'Cab categories', data };
+  }
+
+  async createCabCategory(dto: CreateCabCategoryDto) {
+    const item = await this.cabCategoryModel.create(dto);
+    return { message: 'Created', data: item };
+  }
+
+  async updateCabCategory(id: string, dto: UpdateCabCategoryDto) {
+    const item = await this.cabCategoryModel.findByIdAndUpdate(id, { $set: dto }, { new: true });
+    if (!item) throw new NotFoundException('Cab category not found');
+    return { message: 'Updated', data: item };
+  }
+
+  async deleteCabCategory(id: string) {
+    const res = await this.cabCategoryModel.findByIdAndDelete(id);
+    if (!res) throw new NotFoundException('Cab category not found');
     return { message: 'Deleted', data: { id } };
   }
 }

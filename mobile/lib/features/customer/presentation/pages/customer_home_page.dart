@@ -34,11 +34,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   static const _imgHero =
       'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=800&q=70';
 
-  // Car photos for the 3 service cards (premium look; graceful color fallback).
-  static const _imgCarCab = 'https://images.unsplash.com/photo-1549924231-f129b911e442?auto=format&fit=crop&w=400&q=70';
-  static const _imgCarHire = 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=70';
-  static const _imgCarPool = 'https://images.unsplash.com/photo-1502877338535-766e1452684a?auto=format&fit=crop&w=400&q=70';
-
   static const _navy = Color(0xFF12213D);
 
   // Admin-managed dynamic home content (per-city hero + travel/offers/explore).
@@ -133,11 +128,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', Icons.local_taxi_rounded, AppColors.info, _imgCarCab, () => context.push('/customer/book/cab'))),
+                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 74)),
                         SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Hire a Driver', 'Hourly • Full Day', Icons.airline_seat_recline_normal_rounded, _navy, _imgCarHire, () => context.push('/customer/book/hire_driver'))),
+                        Expanded(child: _serviceCard('Car Pooling', 'Share a Ride', 'assets/images/car-pooling.png', AppColors.primary, () => context.push('/car-pool/search'))),
                         SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Car Pooling', 'Share a Ride', Icons.groups_rounded, AppColors.primary, _imgCarPool, () => context.push('/car-pool/search'))),
+                        Expanded(child: _serviceCard('Hire a Driver', 'Hourly • Full Day', 'assets/images/hire-a-driver.png', _navy, () => context.push('/customer/book/hire_driver'))),
                       ],
                     ),
                   ),
@@ -158,25 +153,37 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // ─── Hero header ────────────────────────────────────────────────────────────
   Widget _hero(String name) {
     return SizedBox(
-      height: 250.h,
+      height: 268.h,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28.r)),
-            child: _netImg(
-              (_home?['heroImage'] ?? '').toString().isNotEmpty ? _home!['heroImage'].toString() : _imgHero,
-              fallback: _navy,
+          // Hero image — no rounded corners; it fades into the page below.
+          _netImg(
+            (_home?['heroImage'] ?? '').toString().isNotEmpty ? _home!['heroImage'].toString() : _imgHero,
+            fallback: _navy,
+          ),
+          // Dark overlay for text readability.
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.black.withValues(alpha: 0.45), Colors.black.withValues(alpha: 0.10), Colors.black.withValues(alpha: 0.25)],
+              ),
             ),
           ),
-          ClipRRect(
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(28.r)),
+          // Bottom fade — only the lower strip blends into the page background,
+          // so most of the image stays clearly visible.
+          Align(
+            alignment: Alignment.bottomCenter,
             child: Container(
-              decoration: BoxDecoration(
+              height: 55.h,
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.black.withValues(alpha: 0.45), Colors.black.withValues(alpha: 0.10), Colors.black.withValues(alpha: 0.30)],
+                  colors: [Color(0x00F6F7F9), Color(0xFFF6F7F9)],
+                  stops: [0.0, 0.9],
                 ),
               ),
             ),
@@ -188,7 +195,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top bar: menu · brand · bell + avatar
+                  // Top bar: menu · brand · bell
                   Row(
                     children: [
                       _circleBtn(Icons.menu_rounded, _openMenu),
@@ -255,54 +262,38 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
       );
 
-  // ─── Service cards (premium photo style — GORA TAXI/POOL/LUXURY look) ─────────
-  Widget _serviceCard(String title, String subtitle, IconData icon, Color color, String carImg, VoidCallback onTap) {
+  // ─── Service cards (colored card + brand image as the icon) ──────────────────
+  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 60}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 178.h,
+        height: 168.h,
+        padding: EdgeInsets.symmetric(vertical: 12.h),
         decoration: BoxDecoration(
           gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color, Color.lerp(color, Colors.black, 0.22)!]),
           borderRadius: BorderRadius.circular(18.r),
           boxShadow: [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 6))],
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            SizedBox(height: 12.h),
-            // White circular icon badge.
+            // Brand illustration as the icon (no white background, no round clip).
+            Image.asset(asset, width: iconSize.r, height: iconSize.r, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: Colors.white, size: 30.sp)),
+            Column(
+              children: [
+                Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2, fontFamily: 'Poppins')),
+                SizedBox(height: 2.h),
+                Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins')),
+              ],
+            ),
+            // ">" button.
             Container(
-              width: 46.r,
-              height: 46.r,
-              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6)]),
-              child: Icon(icon, color: color, size: 24.sp),
-            ),
-            SizedBox(height: 8.h),
-            Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2, fontFamily: 'Poppins')),
-            Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins')),
-            // Car photo fills the bottom (graceful transparent/color fallback).
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6.w),
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10.r),
-                    child: _netImg(carImg, height: 46.h, width: double.infinity, fallback: Colors.white.withValues(alpha: 0.12)),
-                  ),
-                ),
-              ),
-            ),
-            // ">" button straddling the bottom edge.
-            Transform.translate(
-              offset: Offset(0, 12.h),
-              child: Container(
-                width: 26.r,
-                height: 26.r,
-                decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)]),
-                child: Icon(Icons.chevron_right_rounded, color: color, size: 20.sp),
-              ),
+              width: 26.r,
+              height: 26.r,
+              decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 4)]),
+              child: Icon(Icons.chevron_right_rounded, color: color, size: 20.sp),
             ),
           ],
         ),
