@@ -12,7 +12,7 @@ class QuickActionGridWidget extends StatelessWidget {
     final actions = [
       _QuickAction(icon: Icons.event_available_rounded, label: 'Booking'.tr, onTap: () => context.go('/requirements')),
       _QuickAction(icon: Icons.directions_car_rounded, label: 'Available Car'.tr, onTap: () => context.go('/vehicles')),
-      _QuickAction(icon: Icons.badge_rounded, label: 'Hire a Driver'.tr, onTap: () => context.push('/customer/book/hire_driver')),
+      _QuickAction(icon: Icons.badge_rounded, label: 'Hire a Driver'.tr, onTap: () => context.push('/customer-requests?serviceType=hire_driver')),
       _QuickAction(icon: Icons.groups_rounded, label: 'Car Pooling'.tr, onTap: () => context.push('/car-pool/my-rides')),
       _QuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Recharge Plans'.tr, onTap: () => context.push('/subscriptions')),
       _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),

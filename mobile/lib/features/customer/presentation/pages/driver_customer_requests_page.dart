@@ -12,7 +12,10 @@ import '../widgets/customer_request_card.dart';
 /// the trips you've won. The driver's wallet balance is only shown to the
 /// driver — never to the customer.
 class DriverCustomerRequestsPage extends StatefulWidget {
-  const DriverCustomerRequestsPage({super.key});
+  /// When set, only requests of this serviceType are shown (e.g. 'hire_driver').
+  final String? serviceType;
+  final String? title;
+  const DriverCustomerRequestsPage({super.key, this.serviceType, this.title});
 
   @override
   State<DriverCustomerRequestsPage> createState() => _DriverCustomerRequestsPageState();
@@ -43,7 +46,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
   Future<void> _loadAvailable() async {
     setState(() { _loadingA = true; _errA = null; });
     try {
-      final d = await _repo.available();
+      final d = await _repo.available(serviceType: widget.serviceType);
       if (!mounted) return;
       setState(() { _available = d; _loadingA = false; });
     } catch (e) {
@@ -208,7 +211,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Customer Requests'),
+        title: Text(widget.title ?? 'Customer Requests'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         bottom: TabBar(

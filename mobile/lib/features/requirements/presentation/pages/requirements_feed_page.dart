@@ -71,7 +71,9 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
   Future<void> _loadCustomerBookings() async {
     try {
-      final d = await getIt<CustomerRepository>().available();
+      // Only cab bookings belong in this feed. Hire-a-Driver has its own
+      // requests list (driver grid) and Car Pooling has its own screen.
+      final d = await getIt<CustomerRepository>().available(serviceType: 'cab');
       if (mounted) setState(() => _customerBookings = d);
     } catch (_) {}
   }

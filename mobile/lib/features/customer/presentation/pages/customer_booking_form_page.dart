@@ -38,7 +38,7 @@ const _meta = <String, _ServiceMeta>{
   'cab': _ServiceMeta('Cabs Booking', 'Book a taxi to your destination', Icons.local_taxi_rounded,
       subTypes: ['One Way', 'Round Trip', 'Local', 'Airport'], vehicles: ['Sedan', 'SUV', 'Hatchback', 'Any']),
   'hire_driver': _ServiceMeta('Hire a Driver', 'A driver for your own car', Icons.badge_rounded,
-      needsDrop: false, needsDuration: true, needsPassengers: false, subTypes: ['Hourly', 'Full Day', 'Outstation', 'Local']),
+      needsDrop: false, needsDuration: false, needsPassengers: false, subTypes: ['6 Hours', '8 Hours', '12 Hours']),
   'luxury': _ServiceMeta('Luxury Car', 'Premium cars for every occasion', Icons.workspace_premium_rounded,
       subTypes: ['Sedan', 'SUV', 'Wedding', 'Event'], vehicles: ['Luxury Sedan', 'Luxury SUV', 'Premium', 'Any']),
   'car_pool': _ServiceMeta('Car Pooling', 'Share a ride on your route', Icons.groups_rounded, subTypes: []),
@@ -227,6 +227,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       'travelTime': _time.format(context),
       if (_m.needsPassengers) 'passengers': _passengers,
       if (_m.needsDuration) 'durationHours': _durationHours,
+      // Hire a Driver: duration comes from the selected "6/8/12 Hours" chip.
+      if (widget.serviceType == 'hire_driver' && _subType != null)
+        'durationHours': int.tryParse(_subType!.split(' ').first) ?? 0,
       if (_fareCtrl.text.trim().isNotEmpty) 'estimatedFare': num.tryParse(_fareCtrl.text.trim()),
       if (notes.isNotEmpty) 'notes': notes.join(' • '),
     };
@@ -268,11 +271,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         child: ListView(
           padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 20.h),
           children: [
-            _hero(),
-            SizedBox(height: 16.h),
-
             if (_m.subTypes.isNotEmpty)
-              _card('Trip Type', Icons.tune_rounded, _chips(_m.subTypes, _subType, (v) => setState(() => _subType = v))),
+              _card(widget.serviceType == 'hire_driver' ? 'Duration' : 'Trip Type', Icons.tune_rounded, _chips(_m.subTypes, _subType, (v) => setState(() => _subType = v))),
 
             if (_m.vehicles.isNotEmpty)
               _card('Vehicle', Icons.directions_car_rounded, _chips(_m.vehicles, _vehicle, (v) => setState(() => _vehicle = v))),
@@ -345,35 +345,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   }
 
   // ── Building blocks ──────────────────────────────────────────────────────
-
-  Widget _hero() => Container(
-        padding: EdgeInsets.all(16.w),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
-          borderRadius: BorderRadius.circular(16.r),
-          boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46.w, height: 46.w,
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
-              child: Icon(_m.icon, color: Colors.white, size: 26.sp),
-            ),
-            SizedBox(width: 14.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_m.title, style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
-                  SizedBox(height: 2.h),
-                  Text(_m.subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12.sp, fontFamily: 'Poppins')),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
 
   Widget _card(String title, IconData icon, Widget child) => Container(
         margin: EdgeInsets.only(bottom: 14.h),

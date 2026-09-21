@@ -212,7 +212,13 @@ class AppRouter {
       // Driver / vendor side of Customer Mode
       GoRoute(
         path: '/customer-requests',
-        builder: (_, __) => const DriverCustomerRequestsPage(),
+        builder: (_, state) {
+          final st = state.uri.queryParameters['serviceType'];
+          return DriverCustomerRequestsPage(
+            serviceType: st,
+            title: st == 'hire_driver' ? 'Hire a Driver Requests' : null,
+          );
+        },
       ),
 
       // Detail Routes
