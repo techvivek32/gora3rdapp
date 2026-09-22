@@ -130,20 +130,12 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: 8.h),
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: 12.w),
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20.r),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
-                      ],
-                    ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 78)),
+                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 124)),
                         SizedBox(width: 10.w),
                         Expanded(child: _serviceCard('Car Pooling', 'Share a Ride', 'assets/images/car-pooling.png', AppColors.primary, () => context.push('/car-pool/search'))),
                         SizedBox(width: 10.w),
@@ -168,7 +160,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // ─── Hero header ────────────────────────────────────────────────────────────
   Widget _hero(String name) {
     return SizedBox(
-      height: 268.h,
+      height: 296.h,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -177,13 +169,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             (_home?['heroImage'] ?? '').toString().isNotEmpty ? _home!['heroImage'].toString() : _imgHero,
             fallback: _navy,
           ),
-          // Dark overlay for text readability.
+          // Dark overlay for text readability — darker at top (brand) and bottom
+          // (tagline) so both read cleanly while the middle image stays visible.
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.black.withValues(alpha: 0.45), Colors.black.withValues(alpha: 0.10), Colors.black.withValues(alpha: 0.25)],
+                colors: [Colors.black.withValues(alpha: 0.50), Colors.black.withValues(alpha: 0.06), Colors.black.withValues(alpha: 0.62)],
+                stops: const [0.0, 0.4, 1.0],
               ),
             ),
           ),
@@ -225,8 +219,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         children: [
                           Text('GORA TAXI',
                               style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black45, blurRadius: 6)])),
-                          Text('Rajasthan Ka Apna App',
-                              style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: AppColors.primaryLight, fontFamily: 'Poppins')),
+                          SizedBox(height: 2.h),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(width: 12.w, height: 1.2.h, color: AppColors.primary),
+                              SizedBox(width: 5.w),
+                              Text('India Ka Apna App',
+                                  style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: 0.5, fontFamily: 'Poppins')),
+                              SizedBox(width: 5.w),
+                              Container(width: 12.w, height: 1.2.h, color: AppColors.primary),
+                            ],
+                          ),
                         ],
                       ),
                       const Spacer(),
@@ -234,24 +238,55 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     ],
                   ),
                   const Spacer(),
-                  Text('Har Safar',
-                      style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.w800, color: Colors.white, fontStyle: FontStyle.italic, height: 1.05, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Gora Ke Saath',
-                          style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.w800, color: Colors.white, fontStyle: FontStyle.italic, height: 1.05, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 8)])),
-                      const Spacer(),
-                      _locationPill(name),
-                    ],
-                  ),
-                  SizedBox(height: 22.h),
+                  _tagline(),
+                  SizedBox(height: 14.h),
+                  Align(alignment: Alignment.centerRight, child: _locationPill(name)),
+                  SizedBox(height: 26.h),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Bold two-line tagline with an orange "Gora" and a hand-drawn swoosh under it.
+  Widget _tagline() {
+    final base = TextStyle(
+      fontSize: 30.sp,
+      fontWeight: FontWeight.w900,
+      height: 1.06,
+      color: Colors.white,
+      fontFamily: 'Poppins',
+      shadows: const [Shadow(color: Colors.black87, blurRadius: 12, offset: Offset(0, 2))],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Har Safar,', style: base),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.bottomLeft,
+              children: [
+                Text('Gora', style: base.copyWith(color: AppColors.primary)),
+                Positioned(
+                  bottom: -7.h,
+                  left: 0,
+                  right: -2.w,
+                  child: CustomPaint(size: Size(60.w, 9.h), painter: _SwooshPainter()),
+                ),
+              ],
+            ),
+            Text(' Ke Saath', style: base),
+          ],
+        ),
+      ],
     );
   }
 
@@ -266,7 +301,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           Icon(Icons.location_on, color: AppColors.primary, size: 15.sp),
           SizedBox(width: 4.w),
           Text(city.isEmpty ? 'Set city' : city, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-          Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary, size: 18.sp),
+          SizedBox(width: 2.w),
+          Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 18.sp),
         ]),
       ),
     );
@@ -282,29 +318,58 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
       );
 
-  // ─── Service cards (colored card + brand image as the icon) ──────────────────
-  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 68}) {
+  // ─── Service cards (white card, tinted icon badge, corner arrow) ─────────────
+  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 80}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 150.h,
-        padding: EdgeInsets.symmetric(vertical: 14.h),
+        height: 180.h,
+        padding: EdgeInsets.fromLTRB(11.w, 13.h, 11.w, 11.h),
         decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color.lerp(color, Colors.white, 0.06)!, Color.lerp(color, Colors.black, 0.16)!]),
-          borderRadius: BorderRadius.circular(18.r),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          boxShadow: [
+            BoxShadow(color: color.withValues(alpha: 0.14), blurRadius: 16, offset: const Offset(0, 8)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1)),
+          ],
         ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Brand illustration as the icon.
-            Image.asset(asset, width: iconSize.r, height: iconSize.r, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: Colors.white, size: 34.sp)),
-            SizedBox(height: 8.h),
-            Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.2, fontFamily: 'Poppins')),
+            // Tinted rounded badge with the brand illustration.
+            Container(
+              width: 70.r,
+              height: 70.r,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [color.withValues(alpha: 0.20), color.withValues(alpha: 0.07)],
+                ),
+                borderRadius: BorderRadius.circular(18.r),
+              ),
+              child: Center(
+                child: Image.asset(asset, width: 56.r, height: 56.r, fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: color, size: 34.sp)),
+              ),
+            ),
+            const Spacer(),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
             SizedBox(height: 2.h),
-            Text(subtitle, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins')),
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            SizedBox(height: 8.h),
+            // Corner arrow button.
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 28.r,
+                height: 28.r,
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+                child: Icon(Icons.arrow_forward_rounded, size: 15.sp, color: color),
+              ),
+            ),
           ],
         ),
       ),
@@ -498,7 +563,20 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // ─── Shared bits ─────────────────────────────────────────────────────────────
   Widget _sectionHeader(String title) => Padding(
         padding: EdgeInsets.symmetric(horizontal: 16.w),
-        child: Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+            SizedBox(height: 4.h),
+            // Orange accent underline.
+            Container(
+              width: 32.w,
+              height: 3.h,
+              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2)),
+            ),
+          ],
+        ),
       );
 
   Widget _netImg(String url, {double? height, double? width, BoxFit fit = BoxFit.cover, Color fallback = AppColors.border}) => CachedNetworkImage(
@@ -532,4 +610,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       ),
     );
   }
+}
+
+/// Hand-drawn upward "swoosh" underline (orange) drawn under the word "Gora".
+class _SwooshPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.primary
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.5
+      ..strokeCap = StrokeCap.round;
+    final path = Path()
+      ..moveTo(0, size.height * 0.7)
+      ..quadraticBezierTo(size.width * 0.45, size.height * 1.5, size.width, size.height * 0.15);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -36,6 +36,9 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsString() vehicleClass?: string;
   @IsOptional() @IsString() imageUrl?: string;
   @IsNumber() pricePerKm: number;
+  @IsOptional() @IsNumber() pricePerKmPetrol?: number;
+  @IsOptional() @IsNumber() pricePerKmDiesel?: number;
+  @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
   @IsOptional() @IsInt() order?: number;
@@ -47,6 +50,9 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsString() vehicleClass?: string;
   @IsOptional() @IsString() imageUrl?: string;
   @IsOptional() @IsNumber() pricePerKm?: number;
+  @IsOptional() @IsNumber() pricePerKmPetrol?: number;
+  @IsOptional() @IsNumber() pricePerKmDiesel?: number;
+  @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
   @IsOptional() @IsInt() order?: number;

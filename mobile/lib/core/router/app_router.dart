@@ -42,6 +42,7 @@ import '../../features/customer/presentation/pages/customer_register_page.dart';
 import '../../features/customer/presentation/pages/customer_onboarding_page.dart';
 import '../../features/customer/presentation/pages/driver_onboarding_page.dart';
 import '../../features/customer/presentation/pages/cab_results_page.dart';
+import '../../features/customer/presentation/pages/cab_confirm_page.dart';
 import '../../features/customer/presentation/pages/customer_nav_page.dart';
 import '../../features/customer/presentation/pages/customer_home_page.dart';
 import '../../features/customer/presentation/pages/customer_booking_form_page.dart';
@@ -151,6 +152,10 @@ class AppRouter {
       GoRoute(
         path: '/customer/cab-results',
         builder: (_, state) => CabResultsPage(trip: state.extra is Map ? Map<String, dynamic>.from(state.extra as Map) : const {}),
+      ),
+      GoRoute(
+        path: '/customer/cab-confirm',
+        builder: (_, state) => CabConfirmPage(data: state.extra is Map ? Map<String, dynamic>.from(state.extra as Map) : const {}),
       ),
       GoRoute(path: '/driver/onboarding', builder: (_, __) => const DriverOnboardingPage()),
       GoRoute(

@@ -9,6 +9,7 @@ export enum HomeSectionType {
   TRAVEL = 'travel', // "Travel Made Better" — Hotels / Restaurants / Business
   OFFERS = 'offers', // "Special Offers"
   EXPLORE = 'explore', // "Explore <city/state>" category chips
+  INCLUSIONS = 'inclusions', // "All Inclusive" list on the cab-results screen (title = item)
 }
 
 /// One admin-managed card in a customer-home showcase section. `city=''` shows it
@@ -37,6 +38,8 @@ export class CityImage {
   @Prop({ required: true, unique: true, lowercase: true, trim: true }) city: string;
   @Prop({ default: '' }) imageUrl: string;
   @Prop({ default: true }) isActive: boolean;
+  // When the image was last auto-resolved from Google Places (cache TTL).
+  @Prop({ default: null }) fetchedAt: Date;
 }
 export const CityImageSchema = SchemaFactory.createForClass(CityImage);
 
@@ -48,7 +51,11 @@ export class CabCategory {
   @Prop({ required: true }) name: string; // e.g. "Wagon R or equivalent"
   @Prop({ default: '' }) vehicleClass: string; // e.g. "Compact" / "Sedan" / "SUV"
   @Prop({ default: '' }) imageUrl: string;
-  @Prop({ default: 0 }) pricePerKm: number;
+  @Prop({ default: 0 }) pricePerKm: number; // fallback / default rate
+  // Per-km rate by fuel type (customer picks fuel; 0 = fall back to pricePerKm).
+  @Prop({ default: 0 }) pricePerKmPetrol: number;
+  @Prop({ default: 0 }) pricePerKmDiesel: number;
+  @Prop({ default: 0 }) pricePerKmCng: number;
   @Prop({ default: 4 }) seats: number;
   @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
   @Prop({ default: 0 }) order: number;

@@ -95,18 +95,70 @@ export class PlacesService {
       const legs: any[] = body.routes?.[0]?.legs ?? [];
       const meters = legs.reduce((sum, l) => sum + (l.distance?.value ?? 0), 0);
       const seconds = legs.reduce((sum, l) => sum + (l.duration?.value ?? 0), 0);
+      const tollInr = await this.fetchToll(origin, destination, waypoints);
       return {
         message: 'ok',
         data: {
           distanceMeters: meters,
           distanceKm: Math.round((meters / 1000) * 10) / 10,
           durationSeconds: seconds,
+          tollInr, // estimated toll (₹) from Google Routes API; 0 if unavailable
         },
       };
     } catch (e: any) {
       if (e instanceof BadRequestException) throw e;
       this.logger.error(`Directions failed: ${e?.message ?? e}`);
       throw new BadRequestException('Could not compute route.');
+    }
+  }
+
+  /**
+   * Estimated toll (INR) for a driving route via the Google Routes API
+   * (extraComputations: TOLLS). Returns 0 when Google has no toll data for the
+   * route or on any error, so the caller can degrade gracefully.
+   */
+  private async fetchToll(
+    origin: { lat: number; lng: number },
+    destination: { lat: number; lng: number },
+    waypoints: { lat: number; lng: number }[],
+  ): Promise<number> {
+    try {
+      const loc = (p: { lat: number; lng: number }) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
+      const bodyReq = {
+        origin: loc(origin),
+        destination: loc(destination),
+        intermediates: waypoints.map(loc),
+        travelMode: 'DRIVE',
+        routingPreference: 'TRAFFIC_UNAWARE',
+        extraComputations: ['TOLLS'],
+      };
+      const res = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': this.key,
+          'X-Goog-FieldMask': 'routes.travelAdvisory.tollInfo,routes.distanceMeters',
+        },
+        body: JSON.stringify(bodyReq),
+      });
+      const body: any = await res.json();
+      // Surface Routes API problems (e.g. API not enabled) instead of silently 0.
+      if (body?.error) {
+        this.logger.error(`Routes API error ${body.error.status ?? body.error.code}: ${body.error.message ?? ''}`);
+        return 0;
+      }
+      const prices: any[] = body?.routes?.[0]?.travelAdvisory?.tollInfo?.estimatedPrice ?? [];
+      // Sum the INR component (units + nanos). Ignore other currencies.
+      let inr = 0;
+      for (const p of prices) {
+        if ((p?.currencyCode ?? 'INR') === 'INR') {
+          inr += Number(p.units ?? 0) + Number(p.nanos ?? 0) / 1e9;
+        }
+      }
+      return Math.round(inr);
+    } catch (e: any) {
+      this.logger.warn(`Routes toll fetch failed: ${e?.message ?? e}`);
+      return 0;
     }
   }
 

@@ -12,6 +12,9 @@ interface CabCategory {
   vehicleClass?: string;
   imageUrl?: string;
   pricePerKm: number;
+  pricePerKmPetrol?: number;
+  pricePerKmDiesel?: number;
+  pricePerKmCng?: number;
   seats?: number;
   bags?: string;
   order: number;
@@ -21,7 +24,8 @@ interface CabCategory {
 
 const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
-  pricePerKm: 0, seats: 0, bags: '', order: 0, isActive: true,
+  pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
+  seats: 0, bags: '', order: 0, isActive: true,
 };
 
 export default function CabCategoriesPage() {
@@ -30,6 +34,8 @@ export default function CabCategoriesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  // Which fuels are offered for this category (shows its price input when on).
+  const [fuelActive, setFuelActive] = useState({ petrol: false, diesel: false, cng: false });
   const [imgError, setImgError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,11 +48,36 @@ export default function CabCategoriesPage() {
   // Interceptor extracts data?.data, so response.data = categoriesArray
   const items: CabCategory[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
 
+  // ── "All Inclusive" items (stored as home-showcase section=inclusions) ──
+  const [newInc, setNewInc] = useState('');
+  const { data: incData } = useQuery({
+    queryKey: ['inclusions'],
+    queryFn: () => adminApi.getHomeShowcase('inclusions'),
+  });
+  const inclusions: { _id: string; title: string }[] = Array.isArray((incData as any)?.data) ? (incData as any).data : [];
+  const addInc = useMutation({
+    mutationFn: (title: string) => adminApi.createHomeShowcase({ section: 'inclusions', title }),
+    onSuccess: () => { setNewInc(''); queryClient.invalidateQueries({ queryKey: ['inclusions'] }); },
+    onError: () => toast.error('Failed to add item'),
+  });
+  const delInc = useMutation({
+    mutationFn: (id: string) => adminApi.deleteHomeShowcase(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inclusions'] }),
+    onError: () => toast.error('Failed to remove item'),
+  });
+
   const buildPayload = () => ({
     name: form.name.trim(),
     vehicleClass: form.vehicleClass.trim(),
     imageUrl: form.imageUrl.trim(),
-    pricePerKm: Number(form.pricePerKm) || 0,
+    // Base rate = the first active fuel's price (kept as a safe fallback).
+    pricePerKm:
+      (fuelActive.petrol && Number(form.pricePerKmPetrol)) ||
+      (fuelActive.diesel && Number(form.pricePerKmDiesel)) ||
+      (fuelActive.cng && Number(form.pricePerKmCng)) || 0,
+    pricePerKmPetrol: fuelActive.petrol ? (Number(form.pricePerKmPetrol) || 0) : 0,
+    pricePerKmDiesel: fuelActive.diesel ? (Number(form.pricePerKmDiesel) || 0) : 0,
+    pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
     seats: Number(form.seats) || 0,
     bags: form.bags.trim(),
     order: Number(form.order) || 0,
@@ -94,6 +125,7 @@ export default function CabCategoriesPage() {
   const openCreate = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setFuelActive({ petrol: false, diesel: false, cng: false });
     setImgError(false);
     setShowForm(true);
   };
@@ -105,10 +137,18 @@ export default function CabCategoriesPage() {
       vehicleClass: it.vehicleClass ?? '',
       imageUrl: it.imageUrl ?? '',
       pricePerKm: it.pricePerKm ?? 0,
+      pricePerKmPetrol: it.pricePerKmPetrol ?? 0,
+      pricePerKmDiesel: it.pricePerKmDiesel ?? 0,
+      pricePerKmCng: it.pricePerKmCng ?? 0,
       seats: it.seats ?? 0,
       bags: it.bags ?? '',
       order: it.order ?? 0,
       isActive: it.isActive,
+    });
+    setFuelActive({
+      petrol: (it.pricePerKmPetrol ?? 0) > 0,
+      diesel: (it.pricePerKmDiesel ?? 0) > 0,
+      cng: (it.pricePerKmCng ?? 0) > 0,
     });
     setImgError(false);
     setShowForm(true);
@@ -134,7 +174,11 @@ export default function CabCategoriesPage() {
 
   const handleSubmit = () => {
     if (!form.name.trim()) return toast.error('A name is required');
-    if (!(Number(form.pricePerKm) > 0)) return toast.error('Price per km is required');
+    const anyFuel =
+      (fuelActive.petrol && Number(form.pricePerKmPetrol) > 0) ||
+      (fuelActive.diesel && Number(form.pricePerKmDiesel) > 0) ||
+      (fuelActive.cng && Number(form.pricePerKmCng) > 0);
+    if (!anyFuel) return toast.error('Add at least one fuel with a price per km');
     if (editingId) updateMutation.mutate();
     else createMutation.mutate();
   };
@@ -154,6 +198,38 @@ export default function CabCategoriesPage() {
         >
           {showForm ? 'Cancel' : '+ Add Category'}
         </button>
+      </div>
+
+      {/* All Inclusive items */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">&quot;All Inclusive&quot; items</h2>
+        <p className="text-xs text-gray-500 mb-3">Shown on the cab-results screen (e.g. Toll tax, Car parking, GST). These apply to all cabs.</p>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            placeholder="e.g. Toll tax"
+            value={newInc}
+            onChange={(e) => setNewInc(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && newInc.trim()) addInc.mutate(newInc.trim()); }}
+            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <button
+            onClick={() => newInc.trim() && addInc.mutate(newInc.trim())}
+            disabled={addInc.isPending || !newInc.trim()}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
+          >
+            Add
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {inclusions.length === 0 && <span className="text-xs text-gray-400">No items yet — the app shows sensible defaults.</span>}
+          {inclusions.map((it) => (
+            <span key={it._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400">
+              {it.title}
+              <button onClick={() => delInc.mutate(it._id)} className="text-green-600 hover:text-red-600 font-bold leading-none">×</button>
+            </span>
+          ))}
+        </div>
       </div>
 
       {/* Form */}
@@ -251,15 +327,39 @@ export default function CabCategoriesPage() {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Price per km (₹)</label>
-              <input
-                type="number"
-                placeholder="e.g. 12"
-                value={form.pricePerKm}
-                onChange={(e) => setForm({ ...form, pricePerKm: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Available fuels &amp; price/km (₹)</label>
+              <p className="text-xs text-gray-500 mb-2">Tick a fuel to offer it, then set its per-km rate. Only ticked fuels show in the app.</p>
+              <div className="space-y-2">
+                {([
+                  { key: 'petrol', label: 'Petrol', field: 'pricePerKmPetrol' as const },
+                  { key: 'diesel', label: 'Diesel', field: 'pricePerKmDiesel' as const },
+                  { key: 'cng', label: 'CNG', field: 'pricePerKmCng' as const },
+                ] as const).map((f) => {
+                  const active = fuelActive[f.key as keyof typeof fuelActive];
+                  return (
+                    <div key={f.key} className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 w-28 shrink-0 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={(e) => setFuelActive({ ...fuelActive, [f.key]: e.target.checked })}
+                          className="w-4 h-4 accent-brand-600"
+                        />
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{f.label}</span>
+                      </label>
+                      <input
+                        type="number"
+                        placeholder={`₹/km for ${f.label}`}
+                        disabled={!active}
+                        value={form[f.field]}
+                        onChange={(e) => setForm({ ...form, [f.field]: Number(e.target.value) })}
+                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Seats</label>

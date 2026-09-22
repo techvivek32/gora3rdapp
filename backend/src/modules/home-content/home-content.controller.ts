@@ -34,6 +34,13 @@ export class HomeContentController {
     return this.service.listCabCategories(true);
   }
 
+  // Customer: the "All Inclusive" list shown on the cab-results screen.
+  @Get('inclusions')
+  @ApiOperation({ summary: 'Customer: admin-managed "all inclusive" items' })
+  inclusions() {
+    return this.service.listInclusions();
+  }
+
   // ── Admin: cab categories ──
   @Get('admin/cab-categories')
   @UseGuards(RolesGuard)
