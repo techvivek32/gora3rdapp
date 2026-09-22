@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/utils/action_url.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -129,8 +130,16 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: 8.h),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  Container(
+                    margin: EdgeInsets.symmetric(horizontal: 12.w),
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20.r),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6)),
+                      ],
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -201,12 +210,17 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Top bar: menu · brand · bell
+                  // Top bar: logo + brand (left) · bell (right).
+                  // Tap the logo for the support menu (My Rides / WhatsApp / Call).
                   Row(
                     children: [
-                      _circleBtn(Icons.menu_rounded, _openMenu),
-                      const Spacer(),
+                      GestureDetector(
+                        onTap: _openMenu,
+                        child: const AppLogo(size: 42, radius: 11),
+                      ),
+                      SizedBox(width: 10.w),
                       Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text('GORA TAXI',

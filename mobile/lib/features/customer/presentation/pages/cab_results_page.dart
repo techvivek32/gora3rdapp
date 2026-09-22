@@ -42,6 +42,11 @@ class _CabResultsPageState extends State<CabResultsPage> {
 
   bool get _isRound => (widget.trip['subType'] ?? '').toString() == 'Round Trip';
 
+  // When a bookingId is passed in, this screen edits that booking instead of
+  // creating a new one (the Edit Booking flow reuses the cab-class picker).
+  String get _editId => (widget.trip['bookingId'] ?? '').toString();
+  bool get _isEdit => _editId.isNotEmpty;
+
   Future<void> _load() async {
     double dist = (widget.trip['distanceKm'] as num?)?.toDouble() ?? 0;
     List<Map<String, dynamic>> cats = [];
@@ -82,7 +87,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final t = widget.trip;
     final base = _baseFare(cat);
     final body = <String, dynamic>{
-      'serviceType': 'cab',
+      // serviceType is fixed on edit (backend rejects it in the update DTO).
+      if (!_isEdit) 'serviceType': 'cab',
       if (t['subType'] != null) 'subType': t['subType'],
       'vehicleType': (cat['name'] ?? 'Cab').toString(),
       'pickup': t['pickup'],
@@ -96,15 +102,16 @@ class _CabResultsPageState extends State<CabResultsPage> {
       if (t['notes'] != null && (t['notes'] as String).isNotEmpty) 'notes': t['notes'],
     };
     try {
-      final booking = await getIt<CustomerRepository>().createBooking(body);
+      final repo = getIt<CustomerRepository>();
+      final booking = _isEdit ? await repo.updateBooking(_editId, body) : await repo.createBooking(body);
       if (!mounted) return;
-      final id = (booking['_id'] ?? booking['id'] ?? '').toString();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking posted — drivers will send offers'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
+      final id = (booking['_id'] ?? booking['id'] ?? _editId).toString();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_isEdit ? 'Booking updated — drivers will re-send offers' : 'Booking posted — drivers will send offers'), backgroundColor: AppColors.success, behavior: SnackBarBehavior.floating));
       context.go('/customer/bookings/$id');
     } catch (e) {
       if (mounted) {
         setState(() => _booking = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not book: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not ${_isEdit ? 'update' : 'book'}: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating));
       }
     }
   }
@@ -112,8 +119,14 @@ class _CabResultsPageState extends State<CabResultsPage> {
   @override
   Widget build(BuildContext context) {
     final t = widget.trip;
-    final from = (t['pickupCity'] ?? (t['pickup'] as Map?)?['address'] ?? 'From').toString();
-    final to = (t['dropCity'] ?? (t['drop'] as Map?)?['address'] ?? 'To').toString();
+    // Prefer the first NON-EMPTY of [city, full address]; '' is not null so a
+    // plain ?? would keep an empty city and render a blank "→ Mumbai" header.
+    String pick(List<String?> vals, String fallback) {
+      final v = vals.firstWhere((x) => x != null && x.trim().isNotEmpty, orElse: () => fallback)!.trim();
+      return v.split(',').first.trim(); // "Rajkot, Gujarat, India" → "Rajkot"
+    }
+    final from = pick([t['pickupCity']?.toString(), (t['pickup'] as Map?)?['address']?.toString()], 'From');
+    final to = pick([t['dropCity']?.toString(), (t['drop'] as Map?)?['address']?.toString()], 'To');
     final sub = (t['subType'] ?? 'One Way').toString();
     final date = (t['travelDate'] ?? '').toString();
     final time = (t['travelTime'] ?? '').toString();
@@ -271,7 +284,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
                 ElevatedButton(
                   onPressed: _booking ? null : () => _book(cat),
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 11.h), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r))),
-                  child: Text('Book Now', style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                  child: Text(_isEdit ? 'Save' : 'Book Now', style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
                 ),
               ],
             ),

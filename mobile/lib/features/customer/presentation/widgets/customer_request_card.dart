@@ -27,6 +27,15 @@ class CustomerRequestCard extends StatelessWidget {
     final applied = b['alreadyApplied'] == true;
     final subType = (b['subType'] ?? '').toString();
 
+    // Round-trip return date is carried in notes as "Return date: dd-MM-yyyy".
+    // Show only the number of days (under the ROUND TRIP chip).
+    final rt = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
+    final returnDate = rt != null ? DateTime(int.parse(rt.group(3)!), int.parse(rt.group(2)!), int.parse(rt.group(1)!)) : null;
+    int? days = (returnDate != null && date != null)
+        ? returnDate.difference(DateTime(date.year, date.month, date.day)).inDays
+        : null;
+    if (days != null && days < 0) days = null;
+
     return brandCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,7 +62,17 @@ class CustomerRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (subType.isNotEmpty) filledChip(subType.toUpperCase(), AppColors.primary),
+              if (subType.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    filledChip(subType.toUpperCase(), AppColors.primary),
+                    if (days != null) ...[
+                      SizedBox(height: 4.h),
+                      Text('$days days', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                    ],
+                  ],
+                ),
             ],
           ),
           SizedBox(height: 10.h),

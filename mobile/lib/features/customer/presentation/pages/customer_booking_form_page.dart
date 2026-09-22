@@ -36,7 +36,7 @@ class _ServiceMeta {
 
 const _meta = <String, _ServiceMeta>{
   'cab': _ServiceMeta('Cabs Booking', 'Book a taxi to your destination', Icons.local_taxi_rounded,
-      subTypes: ['One Way', 'Round Trip', 'Local', 'Airport'], vehicles: ['Sedan', 'SUV', 'Hatchback', 'Any']),
+      subTypes: ['One Way', 'Round Trip', 'Local'], vehicles: ['Sedan', 'SUV', 'Hatchback', 'Any']),
   'hire_driver': _ServiceMeta('Hire a Driver', 'A driver for your own car', Icons.badge_rounded,
       needsDrop: false, needsDuration: false, needsPassengers: false, subTypes: ['6 Hours', '8 Hours', '12 Hours']),
   'luxury': _ServiceMeta('Luxury Car', 'Premium cars for every occasion', Icons.workspace_premium_rounded,
@@ -191,6 +191,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       'travelTime': _time.format(context),
       'passengers': _passengers,
       if (_subType == 'Round Trip' && _returnDate != null) 'notes': 'Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}',
+      // Editing an existing booking: cab-results will UPDATE instead of create.
+      if (_isEdit) 'bookingId': widget.bookingId,
+      if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
     };
     context.push('/customer/cab-results', extra: trip);
   }
@@ -216,7 +219,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       notes.add('Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}');
     }
     final body = <String, dynamic>{
-      'serviceType': widget.serviceType,
+      // serviceType is fixed on edit (backend rejects it in the update DTO).
+      if (!_isEdit) 'serviceType': widget.serviceType,
       if (_subType != null) 'subType': _subType,
       if (_vehicle != null) 'vehicleType': _vehicle,
       'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
@@ -256,7 +260,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   @override
   Widget build(BuildContext context) {
     // The cab service uses the dedicated "Outstation Cabs" layout for new bookings.
-    if (widget.serviceType == 'cab' && !_isEdit) return _buildCab();
+    if (widget.serviceType == 'cab') return _buildCab();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -531,14 +535,17 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         foregroundColor: AppColors.textPrimary,
         elevation: 0.5,
         centerTitle: true,
-        title: Text('Cab Booking', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18.sp)),
+        title: Text(_isEdit ? 'Edit Booking' : 'Cab Booking', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 18.sp)),
       ),
-      bottomNavigationBar: _homeBottomNav(),
-      body: ListView(
-        padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 20.h),
-        children: [
-          _cabCard(isRound),
-        ],
+      bottomNavigationBar: _isEdit ? null : _homeBottomNav(),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 20.h),
+          children: [
+            _cabCard(isRound),
+          ],
+        ),
       ),
     );
   }
@@ -629,7 +636,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               width: double.infinity,
               height: 52.h,
               child: ElevatedButton(
-                onPressed: _exploreCabs,
+                onPressed: _busy ? null : _exploreCabs,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -637,7 +644,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                 ),
-                child: Text('EXPLORE CABS', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'Poppins')),
+                child: _busy
+                    ? SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                    : Text(_isEdit ? 'CHOOSE VEHICLE' : 'EXPLORE CABS', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'Poppins')),
               ),
             ),
           ],
