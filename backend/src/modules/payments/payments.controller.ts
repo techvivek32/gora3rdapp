@@ -25,10 +25,15 @@ export class PaymentsController {
   ) {
     const keys = await this.settingsService.getRazorpayKeys();
     const webhookSecret = keys.webhookSecret;
+    // Never verify with an empty secret — an empty HMAC key is public, so an
+    // attacker could forge a valid signature and activate paid memberships free.
+    if (!webhookSecret || !signature) {
+      return { status: 'invalid_signature' };
+    }
     const rawBody = req.rawBody?.toString() || JSON.stringify(body);
 
     const expectedSig = crypto
-      .createHmac('sha256', webhookSecret!)
+      .createHmac('sha256', webhookSecret)
       .update(rawBody)
       .digest('hex');
 

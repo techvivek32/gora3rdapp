@@ -121,7 +121,8 @@ export class StorageService {
       .replace(/\/+/g, '/') || 'uploads';
     // Only allow a safe extension derived from the original name; never .js/.sh/.php etc.
     const rawExt = (file.originalname.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'pdf'];
+    // NOTE: no 'svg' — SVGs can carry <script> (stored XSS).
+    const allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'pdf'];
     let ext = allowedExt.includes(rawExt) ? rawExt : 'bin';
 
     if (file.mimetype.startsWith('image/') && options?.resize) {
@@ -222,6 +223,13 @@ export class StorageService {
     folder: string,
     contentType: string,
   ): Promise<{ url: string; key: string; publicUrl: string }> {
+    // Sanitize folder for consistency (no traversal even in the S3 key).
+    folder = (folder || 'uploads')
+      .replace(/\\/g, '/')
+      .replace(/\.\.+/g, '')
+      .replace(/^\/+/, '')
+      .replace(/[^a-zA-Z0-9/_-]/g, '')
+      .replace(/\/+/g, '/') || 'uploads';
     if (this.useLocal) {
       const base = this.getLocalBaseUrl();
       const key = `${folder}/${uuidv4()}.${contentType.split('/')[1]}`;

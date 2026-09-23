@@ -505,13 +505,15 @@ export class UsersService {
   async searchUsers(query: string, page = 1, limit = 20) {
     const { skip, sort } = getPaginationParams({ page, limit });
 
+    // Escape user input before building a regex (prevents ReDoS / regex injection).
+    const rx = new RegExp(String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     const filter = {
       isActive: true,
       isBlocked: false,
       $or: [
-        { fullName: new RegExp(query, 'i') },
-        { agencyName: new RegExp(query, 'i') },
-        { city: new RegExp(query, 'i') },
+        { fullName: rx },
+        { agencyName: rx },
+        { city: rx },
       ],
     };
 

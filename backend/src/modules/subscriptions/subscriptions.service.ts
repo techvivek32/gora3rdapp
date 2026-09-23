@@ -304,8 +304,10 @@ export class SubscriptionsService implements OnModuleInit {
       throw new Error('Payment verification failed');
     }
 
+    // Atomically claim PENDING → SUCCESS so a replay of the same (deterministic)
+    // signature can't re-activate the subscription and extend it for free.
     const payment = await this.paymentModel.findOneAndUpdate(
-      { razorpayOrderId: data.razorpayOrderId },
+      { razorpayOrderId: data.razorpayOrderId, status: { $ne: PaymentStatus.SUCCESS } },
       {
         status: PaymentStatus.SUCCESS,
         razorpayPaymentId: data.razorpayPaymentId,
@@ -314,7 +316,14 @@ export class SubscriptionsService implements OnModuleInit {
       { new: true },
     );
 
-    if (!payment) throw new NotFoundException('Payment not found');
+    if (!payment) {
+      // Already verified once (replay) → do NOT activate again.
+      const existing = await this.paymentModel.findOne({ razorpayOrderId: data.razorpayOrderId }).lean();
+      if (existing && existing.status === PaymentStatus.SUCCESS) {
+        return { message: 'Payment already verified' };
+      }
+      throw new NotFoundException('Payment not found');
+    }
 
     const effectiveUserId = userId || payment.userId?.toString();
     if (!effectiveUserId) throw new NotFoundException('User not found for payment');

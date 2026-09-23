@@ -53,7 +53,11 @@ export class WhatsappService {
    */
   verifySignature(rawBody?: Buffer, signature?: string): boolean {
     const secret = this.config.get<string>('whatsapp.appSecret') || process.env.WHATSAPP_APP_SECRET;
-    if (!secret) return true; // not configured → don't block (backward compatible)
+    if (!secret) {
+      // In production, fail CLOSED (no secret → reject) so forged inbound messages
+      // can't create bookings. In dev, stay open for local testing.
+      return process.env.NODE_ENV !== 'production';
+    }
     if (!rawBody || !signature) return false;
     const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
     try {

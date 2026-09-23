@@ -212,8 +212,10 @@ export class RequirementsService {
       ]);
     }
 
-    if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');
-    if (query.dropCity) filter.dropCity = new RegExp(query.dropCity, 'i');
+    // Escape user input before building a regex (prevents ReDoS / regex injection).
+    const rx = (s: string) => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    if (query.pickupCity) filter.pickupCity = rx(query.pickupCity);
+    if (query.dropCity) filter.dropCity = rx(query.dropCity);
     if (query.vehicleType) filter.vehicleType = query.vehicleType;
     if (query.tripType) filter.tripType = query.tripType;
     if (query.bookingId) filter.bookingId = query.bookingId;
