@@ -9,7 +9,11 @@ export enum HomeSectionType {
   TRAVEL = 'travel', // "Travel Made Better" — Hotels / Restaurants / Business
   OFFERS = 'offers', // "Special Offers"
   EXPLORE = 'explore', // "Explore <city/state>" category chips
-  INCLUSIONS = 'inclusions', // "All Inclusive" list on the cab-results screen (title = item)
+  // Cab-booking info tabs (title = one bullet line). All admin-managed.
+  INCLUSIONS = 'inclusions', // what the fare covers
+  EXCLUSIONS = 'exclusions', // what's not included
+  FACILITIES = 'facilities', // car/service facilities
+  TERMS = 'terms', // terms & conditions
 }
 
 /// One admin-managed card in a customer-home showcase section. `city=''` shows it
@@ -58,6 +62,11 @@ export class CabCategory {
   @Prop({ default: 0 }) pricePerKmCng: number;
   @Prop({ default: 4 }) seats: number;
   @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
+  // Per-cab info shown as tabs on the customer Confirm Booking screen.
+  @Prop({ type: [String], default: [] }) inclusions: string[];
+  @Prop({ type: [String], default: [] }) exclusions: string[];
+  @Prop({ type: [String], default: [] }) facilities: string[];
+  @Prop({ type: [String], default: [] }) terms: string[];
   @Prop({ default: 0 }) order: number;
   @Prop({ default: true }) isActive: boolean;
 }

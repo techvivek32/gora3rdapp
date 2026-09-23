@@ -41,6 +41,13 @@ export class HomeContentController {
     return this.service.listInclusions();
   }
 
+  // Customer: the 4 cab-booking info tabs (inclusions/exclusions/facilities/terms).
+  @Get('cab-info')
+  @ApiOperation({ summary: 'Customer: cab booking info tabs' })
+  cabInfo() {
+    return this.service.listCabInfo();
+  }
+
   // ── Admin: cab categories ──
   @Get('admin/cab-categories')
   @UseGuards(RolesGuard)

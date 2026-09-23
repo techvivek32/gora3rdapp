@@ -349,18 +349,24 @@ class _CabResultsPageState extends State<CabResultsPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10.r),
-                  child: Container(
-                    width: 92.w,
-                    height: 74.h,
-                    color: const Color(0xFFF3F4F6),
-                    child: img.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: img,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Icon(Icons.directions_car_filled_rounded, size: 40.sp, color: AppColors.primary.withValues(alpha: 0.5)),
-                            errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
-                          )
-                        : Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
+                  child: SizedBox(
+                    width: 100.r,
+                    child: AspectRatio(
+                      aspectRatio: 4 / 3, // exact 4:3 box for the recommended image
+                      child: Container(
+                        color: Colors.white,
+                        child: img.isNotEmpty
+                            ? CachedNetworkImage(
+                                imageUrl: img,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                placeholder: (_, __) => Icon(Icons.directions_car_filled_rounded, size: 40.sp, color: AppColors.primary.withValues(alpha: 0.5)),
+                                errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
+                              )
+                            : Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
+                      ),
+                    ),
                   ),
                 ),
                 SizedBox(width: 12.w),

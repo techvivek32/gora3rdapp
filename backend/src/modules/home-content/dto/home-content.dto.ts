@@ -1,4 +1,4 @@
-import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
 import { HomeSectionType } from '../../../database/schemas/home-content.schema';
 
 export class CreateShowcaseDto {
@@ -41,6 +41,10 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) inclusions?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) exclusions?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) facilities?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) terms?: string[];
   @IsOptional() @IsInt() order?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }
@@ -55,6 +59,10 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) inclusions?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) exclusions?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) facilities?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) terms?: string[];
   @IsOptional() @IsInt() order?: number;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

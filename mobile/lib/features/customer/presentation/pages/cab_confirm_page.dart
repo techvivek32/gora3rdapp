@@ -19,6 +19,17 @@ class CabConfirmPage extends StatefulWidget {
 
 class _CabConfirmPageState extends State<CabConfirmPage> {
   bool _busy = false;
+  // Per-cab info tabs come from the selected cab (admin-set on each category).
+  int _infoTab = 0;
+  static const _tabs = [
+    ('Inclusions', 'inclusions'),
+    ('Exclusions', 'exclusions'),
+    ('Facilities', 'facilities'),
+    ('T&C', 'terms'),
+  ];
+
+  List<String> _infoList(String key) => ((_cat[key] as List?) ?? []).map((e) => e.toString()).toList();
+  bool get _hasAnyInfo => _tabs.any((t) => _infoList(t.$2).isNotEmpty);
 
   Map<String, dynamic> get _trip => Map<String, dynamic>.from(widget.data['trip'] as Map? ?? {});
   Map<String, dynamic> get _cat => Map<String, dynamic>.from(widget.data['cat'] as Map? ?? {});
@@ -145,13 +156,17 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             Row(children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10.r),
-                child: Container(
-                  width: 74.w,
-                  height: 58.h,
-                  color: const Color(0xFFF3F4F6),
-                  child: img.isNotEmpty
-                      ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 34.sp, color: AppColors.primary.withValues(alpha: 0.6)))
-                      : Icon(Icons.directions_car_filled_rounded, size: 34.sp, color: AppColors.primary.withValues(alpha: 0.6)),
+                child: SizedBox(
+                  width: 84.r,
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3, // exact 4:3 box
+                    child: Container(
+                      color: Colors.white,
+                      child: img.isNotEmpty
+                          ? CachedNetworkImage(imageUrl: img, fit: BoxFit.cover, width: double.infinity, height: double.infinity, errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 34.sp, color: AppColors.primary.withValues(alpha: 0.6)))
+                          : Icon(Icons.directions_car_filled_rounded, size: 34.sp, color: AppColors.primary.withValues(alpha: 0.6)),
+                    ),
+                  ),
                 ),
               ),
               SizedBox(width: 12.w),
@@ -223,6 +238,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
                 ])).toList()),
               ]),
             ),
+          if (_hasAnyInfo) ...[
+            SizedBox(height: 12.h),
+            _infoTabsCard(),
+          ],
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -240,6 +259,77 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Admin-managed 4-tab info section (Inclusions / Exclusions / Facilities / T&C).
+  Widget _infoTabsCard() {
+    final key = _tabs[_infoTab].$2;
+    final items = _infoList(key);
+    IconData icon;
+    Color color;
+    switch (key) {
+      case 'exclusions':
+        icon = Icons.cancel_rounded;
+        color = AppColors.error;
+        break;
+      case 'facilities':
+        icon = Icons.star_rounded;
+        color = AppColors.warning;
+        break;
+      case 'terms':
+        icon = Icons.article_rounded;
+        color = AppColors.textSecondary;
+        break;
+      default:
+        icon = Icons.check_circle_rounded;
+        color = AppColors.success;
+    }
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tab row.
+          Row(
+            children: _tabs.asMap().entries.map((e) {
+              final i = e.key;
+              final sel = i == _infoTab;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _infoTab = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: sel ? AppColors.primary : Colors.transparent, width: 2.5)),
+                    ),
+                    child: Text(e.value.$1, textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11.5.sp, fontWeight: sel ? FontWeight.w800 : FontWeight.w600, color: sel ? AppColors.primary : AppColors.textSecondary, fontFamily: 'Poppins')),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 14.h),
+            child: items.isEmpty
+                ? Text('No items listed.', style: TextStyle(fontSize: 12.sp, color: AppColors.textHint, fontFamily: 'Poppins'))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: items.map((t) => Padding(
+                          padding: EdgeInsets.symmetric(vertical: 4.h),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Icon(icon, size: 15.sp, color: color),
+                            SizedBox(width: 8.w),
+                            Expanded(child: Text(t, style: TextStyle(fontSize: 12.5.sp, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+                          ]),
+                        )).toList(),
+                  ),
+          ),
+        ],
       ),
     );
   }

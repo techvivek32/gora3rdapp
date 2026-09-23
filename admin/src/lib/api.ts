@@ -139,8 +139,17 @@ export const adminApi = {
     });
   },
 
+  // Cab thumbnail: server trims white space + fits to 4:3 (600×450).
+  uploadCabImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/cab', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   // ─── Home Content (customer app home page CMS) ───────────────────────────────
-  getHomeShowcase: (section?: 'travel' | 'offers' | 'explore' | 'inclusions') =>
+  getHomeShowcase: (section?: 'travel' | 'offers' | 'explore' | 'inclusions' | 'exclusions' | 'facilities' | 'terms') =>
     apiClient.get('/home-content/admin/sections', { params: { section: section || undefined } }),
   createHomeShowcase: (data: any) => apiClient.post('/home-content/admin/sections', data),
   updateHomeShowcase: (id: string, data: any) => apiClient.put(`/home-content/admin/sections/${id}`, data),

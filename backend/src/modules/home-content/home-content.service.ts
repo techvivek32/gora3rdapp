@@ -173,6 +173,25 @@ export class HomeContentService {
     return { message: 'Inclusions', data: data.map((d) => d.title).filter(Boolean) };
   }
 
+  // ─── Customer: cab-booking info tabs (inclusions/exclusions/facilities/terms) ──
+  async listCabInfo(): Promise<{ message: string; data: Record<string, string[]> }> {
+    const sections = [
+      HomeSectionType.INCLUSIONS,
+      HomeSectionType.EXCLUSIONS,
+      HomeSectionType.FACILITIES,
+      HomeSectionType.TERMS,
+    ];
+    const rows = await this.showcaseModel
+      .find({ section: { $in: sections }, isActive: true })
+      .sort({ order: 1, createdAt: 1 })
+      .lean();
+    const data: Record<string, string[]> = { inclusions: [], exclusions: [], facilities: [], terms: [] };
+    for (const r of rows) {
+      if (r.title) (data[r.section] ??= []).push(r.title);
+    }
+    return { message: 'Cab info', data };
+  }
+
   // ─── Cab categories (Explore Cabs results) ───────────────────────────────────
   async listCabCategories(activeOnly = false) {
     const q: any = activeOnly ? { isActive: true } : {};

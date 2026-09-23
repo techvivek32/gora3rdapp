@@ -51,6 +51,14 @@ export class StorageController {
     return { url };
   }
 
+  @Post('upload/cab')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload cab image (trim white space → 4:3 600×450, WebP)' })
+  async uploadCab(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+    const url = await this.storageService.uploadCabImage(file, this.baseUrl(req));
+    return { url };
+  }
+
   @Post('upload/notification')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload notification image (1024×512, WebP)' })

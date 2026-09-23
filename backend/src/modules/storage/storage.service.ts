@@ -100,14 +100,34 @@ export class StorageService {
   async uploadFile(
     file: Express.Multer.File,
     folder: string = 'uploads',
-    options?: { resize?: { width: number; height: number }; quality?: number; contentType?: string; baseUrl?: string },
+    options?: {
+      resize?: { width: number; height: number };
+      quality?: number;
+      contentType?: string;
+      baseUrl?: string;
+      trim?: boolean; // strip a uniform (e.g. white) border before resizing
+      fit?: 'cover' | 'contain'; // 'contain' pads to fit without cropping
+    },
   ): Promise<string> {
     let buffer = file.buffer;
     let ext = file.originalname.split('.').pop() || 'jpg';
 
     if (file.mimetype.startsWith('image/') && options?.resize) {
-      buffer = await sharp(buffer)
-        .resize(options.resize.width, options.resize.height, { fit: 'cover' })
+      let pipeline = sharp(buffer);
+      // Trim the surrounding uniform background (e.g. the white space around a
+      // car photo) so the subject fills the frame. Safe if there's nothing to trim.
+      if (options.trim) {
+        try {
+          pipeline = sharp(await pipeline.trim().toBuffer());
+        } catch {
+          pipeline = sharp(buffer);
+        }
+      }
+      buffer = await pipeline
+        .resize(options.resize.width, options.resize.height, {
+          fit: options.fit || 'cover',
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
         .webp({ quality: options.quality || 85 })
         .toBuffer();
       ext = 'webp';
@@ -133,6 +153,12 @@ export class StorageService {
 
   async uploadProfileImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
     return this.uploadFile(file, 'profiles', { resize: { width: 400, height: 400 }, quality: 85, baseUrl });
+  }
+
+  async uploadCabImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
+    // Cab thumbnails: trim the white space around the car, then fit it into an
+    // exact 4:3 frame (padded white) so every cab looks uniform in the app.
+    return this.uploadFile(file, 'cabs', { resize: { width: 600, height: 450 }, fit: 'contain', trim: true, quality: 90, baseUrl });
   }
 
   async uploadBannerImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {

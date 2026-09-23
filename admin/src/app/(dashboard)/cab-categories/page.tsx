@@ -17,6 +17,10 @@ interface CabCategory {
   pricePerKmCng?: number;
   seats?: number;
   bags?: string;
+  inclusions?: string[];
+  exclusions?: string[];
+  facilities?: string[];
+  terms?: string[];
   order: number;
   isActive: boolean;
   createdAt?: string;
@@ -25,8 +29,42 @@ interface CabCategory {
 const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
   pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
-  seats: 0, bags: '', order: 0, isActive: true,
+  seats: 0, bags: '',
+  inclusions: [] as string[], exclusions: [] as string[], facilities: [] as string[], terms: [] as string[],
+  order: 0, isActive: true,
 };
+
+// A simple add/remove editor for a per-cab string list, held in the form state.
+function ArrayField({ label, placeholder, values, onChange }: { label: string; placeholder: string; values: string[]; onChange: (v: string[]) => void }) {
+  const [val, setVal] = useState('');
+  const add = () => { const t = val.trim(); if (t) { onChange([...values, t]); setVal(''); } };
+  return (
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{label}</h3>
+      <div className="flex gap-2 mb-2">
+        <input
+          type="text"
+          placeholder={placeholder}
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+        />
+        <button type="button" onClick={add} disabled={!val.trim()}
+          className="px-3 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">Add</button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {values.length === 0 && <span className="text-xs text-gray-400">No items yet.</span>}
+        {values.map((v, i) => (
+          <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300">
+            {v}
+            <button type="button" onClick={() => onChange(values.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-600 font-bold leading-none">×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function CabCategoriesPage() {
   const queryClient = useQueryClient();
@@ -48,24 +86,6 @@ export default function CabCategoriesPage() {
   // Interceptor extracts data?.data, so response.data = categoriesArray
   const items: CabCategory[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
 
-  // ── "All Inclusive" items (stored as home-showcase section=inclusions) ──
-  const [newInc, setNewInc] = useState('');
-  const { data: incData } = useQuery({
-    queryKey: ['inclusions'],
-    queryFn: () => adminApi.getHomeShowcase('inclusions'),
-  });
-  const inclusions: { _id: string; title: string }[] = Array.isArray((incData as any)?.data) ? (incData as any).data : [];
-  const addInc = useMutation({
-    mutationFn: (title: string) => adminApi.createHomeShowcase({ section: 'inclusions', title }),
-    onSuccess: () => { setNewInc(''); queryClient.invalidateQueries({ queryKey: ['inclusions'] }); },
-    onError: () => toast.error('Failed to add item'),
-  });
-  const delInc = useMutation({
-    mutationFn: (id: string) => adminApi.deleteHomeShowcase(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inclusions'] }),
-    onError: () => toast.error('Failed to remove item'),
-  });
-
   const buildPayload = () => ({
     name: form.name.trim(),
     vehicleClass: form.vehicleClass.trim(),
@@ -80,6 +100,10 @@ export default function CabCategoriesPage() {
     pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
     seats: Number(form.seats) || 0,
     bags: form.bags.trim(),
+    inclusions: form.inclusions,
+    exclusions: form.exclusions,
+    facilities: form.facilities,
+    terms: form.terms,
     order: Number(form.order) || 0,
     isActive: form.isActive,
   });
@@ -142,6 +166,10 @@ export default function CabCategoriesPage() {
       pricePerKmCng: it.pricePerKmCng ?? 0,
       seats: it.seats ?? 0,
       bags: it.bags ?? '',
+      inclusions: it.inclusions ?? [],
+      exclusions: it.exclusions ?? [],
+      facilities: it.facilities ?? [],
+      terms: it.terms ?? [],
       order: it.order ?? 0,
       isActive: it.isActive,
     });
@@ -158,7 +186,7 @@ export default function CabCategoriesPage() {
     if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
     setUploading(true);
     try {
-      const res = await adminApi.uploadBannerImage(file) as any;
+      const res = await adminApi.uploadCabImage(file) as any;
       // Interceptor: { data: { url } } or { url } depending on nesting
       const url = res?.data?.url ?? res?.url ?? res?.data?.data?.url;
       if (!url) throw new Error('No URL returned');
@@ -200,38 +228,6 @@ export default function CabCategoriesPage() {
         </button>
       </div>
 
-      {/* All Inclusive items */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-        <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">&quot;All Inclusive&quot; items</h2>
-        <p className="text-xs text-gray-500 mb-3">Shown on the cab-results screen (e.g. Toll tax, Car parking, GST). These apply to all cabs.</p>
-        <div className="flex gap-2 mb-3">
-          <input
-            type="text"
-            placeholder="e.g. Toll tax"
-            value={newInc}
-            onChange={(e) => setNewInc(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && newInc.trim()) addInc.mutate(newInc.trim()); }}
-            className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <button
-            onClick={() => newInc.trim() && addInc.mutate(newInc.trim())}
-            disabled={addInc.isPending || !newInc.trim()}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50"
-          >
-            Add
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {inclusions.length === 0 && <span className="text-xs text-gray-400">No items yet — the app shows sensible defaults.</span>}
-          {inclusions.map((it) => (
-            <span key={it._id} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-400">
-              {it.title}
-              <button onClick={() => delInc.mutate(it._id)} className="text-green-600 hover:text-red-600 font-bold leading-none">×</button>
-            </span>
-          ))}
-        </div>
-      </div>
-
       {/* Form */}
       {showForm && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
@@ -239,7 +235,9 @@ export default function CabCategoriesPage() {
 
           {/* Image upload + URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Image <span className="font-normal text-gray-400">— recommended 400 × 300 px (4:3), same size for all cabs</span>
+            </label>
 
             {/* Hidden file input */}
             <input
@@ -281,7 +279,7 @@ export default function CabCategoriesPage() {
                     <>
                       <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                       <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Click or drag to upload image</span>
-                      <span className="text-gray-400 text-xs">PNG, JPG, WebP</span>
+                      <span className="text-gray-400 text-xs">PNG, JPG, WebP · Recommended 400 × 300 px (4:3)</span>
                     </>
                   )}
                 </div>
@@ -389,6 +387,17 @@ export default function CabCategoriesPage() {
                 onChange={(e) => setForm({ ...form, order: Number(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
+            </div>
+          </div>
+
+          {/* Per-cab info tabs — shown on the customer Confirm Booking screen */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Booking Info (shows as tabs in the app for this cab)</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <ArrayField label="Inclusions" placeholder="e.g. Toll tax" values={form.inclusions} onChange={(v) => setForm({ ...form, inclusions: v })} />
+              <ArrayField label="Exclusions" placeholder="e.g. Parking beyond 2 hrs" values={form.exclusions} onChange={(v) => setForm({ ...form, exclusions: v })} />
+              <ArrayField label="Facilities" placeholder="e.g. AC, Music, Luggage carrier" values={form.facilities} onChange={(v) => setForm({ ...form, facilities: v })} />
+              <ArrayField label="Terms & Conditions" placeholder="e.g. Waiting charge ₹100/hr" values={form.terms} onChange={(v) => setForm({ ...form, terms: v })} />
             </div>
           </div>
 
