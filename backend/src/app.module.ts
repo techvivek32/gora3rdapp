@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -115,6 +116,11 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     FranchiseModule,
     ImpersonationModule,
     WhatsappModule,
+  ],
+  providers: [
+    // Apply rate limiting globally — ThrottlerModule alone is inert without this,
+    // so login/OTP/etc. had NO brute-force protection until now.
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
