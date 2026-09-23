@@ -2,6 +2,7 @@ import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Http
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AvailableVehiclesService } from './available-vehicles.service';
 import { CreateAvailableVehicleDto } from './dto/create-available-vehicle.dto';
+import { UpdateAvailableVehicleDto } from './dto/update-available-vehicle.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -63,7 +64,7 @@ export class AvailableVehiclesController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update vehicle listing' })
-  update(@Param('id') id: string, @CurrentUser('sub') userId: string, @Body() dto: Partial<CreateAvailableVehicleDto>) {
+  update(@Param('id') id: string, @CurrentUser('sub') userId: string, @Body() dto: UpdateAvailableVehicleDto) {
     return this.service.update(id, userId, dto);
   }
 

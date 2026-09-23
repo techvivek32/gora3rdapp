@@ -30,9 +30,9 @@ export class SettingsController {
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get full settings including secrets (admin only)' })
+  @ApiOperation({ summary: 'Get settings for admin dashboard (secrets masked, only "set" flags)' })
   getAdminSettings() {
-    return this.settingsService.getSettings();
+    return this.settingsService.getAdminSettings();
   }
 
   @Put()

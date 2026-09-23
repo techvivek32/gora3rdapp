@@ -153,14 +153,17 @@ export class WalletService {
     }
 
     const tx = await this.txModel.findOneAndUpdate(
-      { razorpayOrderId: dto.razorpayOrderId, status: 'pending' },
+      // Bind to the caller so you can only verify your OWN order — a valid
+      // signature for someone else's order can't credit your wallet.
+      { razorpayOrderId: dto.razorpayOrderId, userId, status: 'pending' },
       { status: 'success', razorpayPaymentId: dto.razorpayPaymentId },
       { new: true },
     );
     if (!tx) throw new NotFoundException('Transaction not found or already processed');
 
+    // Credit the order's owner (== caller, enforced above).
     const user = await this.userModel.findByIdAndUpdate(
-      userId,
+      tx.userId,
       { $inc: { walletBalance: tx.amount } },
       { new: true },
     ).select('walletBalance');
@@ -259,15 +262,23 @@ export class WalletService {
     const { minWithdrawal } = await this.settingsService.getWalletLimits();
     if (amount < minWithdrawal) throw new BadRequestException(`Minimum withdrawal is ₹${minWithdrawal}`);
 
-    const user = await this.userModel.findById(userId).select('walletBalance');
-    if (!user) throw new NotFoundException('User not found');
-
-    const current = user.walletBalance ?? 0;
-    if (amount > current) {
-      throw new BadRequestException(`You can withdraw at most ₹${current}.`);
+    // Atomic, conditional debit — the `$gte` guard makes this safe against
+    // concurrent withdrawal requests that would otherwise each pass a stale
+    // read-check and drive the balance negative / over-withdraw.
+    const updated = await this.userModel
+      .findOneAndUpdate(
+        { _id: userId, walletBalance: { $gte: amount } },
+        { $inc: { walletBalance: -amount } },
+        { new: true },
+      )
+      .select('walletBalance');
+    if (!updated) {
+      const u = await this.userModel.findById(userId).select('walletBalance');
+      if (!u) throw new NotFoundException('User not found');
+      throw new BadRequestException(`You can withdraw at most ₹${u.walletBalance ?? 0}.`);
     }
 
-    // Debit the wallet now (held against the request).
+    // Record the debit only after it actually succeeded (held against the request).
     await this.txModel.create({
       userId: new Types.ObjectId(userId),
       amount,
@@ -276,9 +287,6 @@ export class WalletService {
       note: 'Withdrawal request',
       source: 'withdrawal',
     });
-    const updated = await this.userModel
-      .findByIdAndUpdate(userId, { $inc: { walletBalance: -amount } }, { new: true })
-      .select('walletBalance');
 
     // Store only the fields that belong to the chosen payout method.
     const method = dto.method ?? 'bank';

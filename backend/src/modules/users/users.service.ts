@@ -17,8 +17,12 @@ import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
 // Public-facing profile fields (no credentials / private data).
+// SECURITY: never include `walletBalance` here — this select feeds
+// lookupByMobile / getUserCard, which any authenticated user can call for
+// ANOTHER user, and a customer must never see a driver/vendor wallet balance.
+// Self balance comes only from the owner's wallet/profile endpoints.
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus isActive isBlocked rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus isActive isBlocked rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
 
 // Paid membership tiers (mirrors the app's `canContactPosters` gate) — used to
 // decide whether the VIEWER may see another user's last location.

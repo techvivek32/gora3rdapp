@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { City, CityDocument } from '../../database/schemas/city.schema';
+import { safeRegex } from '../../common/utils/regex.util';
 
 @Injectable()
 export class CitiesService {
@@ -9,8 +10,8 @@ export class CitiesService {
 
   async getAll(search?: string, state?: string) {
     const filter: any = { isActive: true };
-    if (search) filter.$or = [{ name: new RegExp(search, 'i') }, { state: new RegExp(search, 'i') }];
-    if (state) filter.state = new RegExp(state, 'i');
+    if (search) filter.$or = [{ name: safeRegex(search) }, { state: safeRegex(search) }];
+    if (state) filter.state = safeRegex(state);
 
     const cities = await this.cityModel.find(filter).sort({ sortOrder: 1, name: 1 }).lean();
     return { message: 'Cities retrieved', data: cities };

@@ -8,6 +8,7 @@ import { AvailabilityStatus } from '../../common/enums/vehicle-type.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
 import { generateVehicleListingId } from '../../common/utils/booking-id.util';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+import { safeRegex } from '../../common/utils/regex.util';
 import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
@@ -66,9 +67,11 @@ export class AvailableVehiclesService {
       filter.currentCity = { $in: user.businessCities };
     }
 
-    if (query.currentCity) filter.currentCity = new RegExp(query.currentCity, 'i');
-    if (query.vehicleType) filter.vehicleType = query.vehicleType;
-    if (query.dateFrom) filter.availableDate = { $gte: new Date(query.dateFrom) };
+    // Coerce to strings so a nested query object (e.g. ?vehicleType[$ne]=x) can't
+    // inject a Mongo operator into the filter, and escape the regex input (ReDoS).
+    if (query.currentCity) filter.currentCity = safeRegex(String(query.currentCity));
+    if (query.vehicleType) filter.vehicleType = String(query.vehicleType);
+    if (query.dateFrom) filter.availableDate = { $gte: new Date(String(query.dateFrom)) };
 
     const [vehicles, total] = await Promise.all([
       this.vehicleModel

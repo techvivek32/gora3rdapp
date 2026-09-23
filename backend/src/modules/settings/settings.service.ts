@@ -83,6 +83,22 @@ export class SettingsService {
     return pub;
   }
 
+  // Admin settings for the dashboard. SECURITY: never send the actual Razorpay
+  // secrets to the browser — a stolen admin session / XSS / browser extension
+  // would otherwise leak the payment-gateway secret. We expose only whether each
+  // secret is configured; writes still accept new values via PUT /settings.
+  async getAdminSettings(): Promise<Partial<PlatformSettings> & { razorpayKeySecretSet: boolean; razorpayWebhookSecretSet: boolean }> {
+    const s = await this.getSettings();
+    const { razorpayKeySecret, razorpayWebhookSecret, ...safe } = s as any;
+    return {
+      ...safe,
+      razorpayKeySecret: '',
+      razorpayWebhookSecret: '',
+      razorpayKeySecretSet: !!(razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET),
+      razorpayWebhookSecretSet: !!(razorpayWebhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET),
+    };
+  }
+
   // Returns full settings including secrets — admin only
   async getRazorpayKeys(): Promise<{ keyId: string; keySecret: string; webhookSecret: string }> {
     const s = await this.getSettings();
@@ -114,9 +130,14 @@ export class SettingsService {
     bookingCancellationPolicy?: string;
     driverCancelPenaltyPercent?: number;
   }): Promise<PlatformSettings> {
+    // Don't let a blank secret field (the admin form now loads secrets masked as '')
+    // wipe a configured secret — only overwrite when a real value is sent.
+    const clean: any = { ...data };
+    if (!clean.razorpayKeySecret) delete clean.razorpayKeySecret;
+    if (!clean.razorpayWebhookSecret) delete clean.razorpayWebhookSecret;
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },
-      { $set: data },
+      { $set: clean },
       { new: true, upsert: true },
     ).lean();
     return settings;

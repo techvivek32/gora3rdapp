@@ -26,6 +26,7 @@ import { AvailableVehiclesService } from '../available-vehicles/available-vehicl
 import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { getPaginationParams, buildPaginatedResult, dateRangeFilter } from '../../common/utils/pagination.util';
+import { safeRegex } from '../../common/utils/regex.util';
 
 @Injectable()
 export class AdminService {
@@ -431,10 +432,10 @@ export class AdminService {
 
     if (query.search) {
       filter.$or = [
-        { fullName: new RegExp(query.search, 'i') },
-        { email: new RegExp(query.search, 'i') },
-        { mobile: new RegExp(query.search, 'i') },
-        { agencyName: new RegExp(query.search, 'i') },
+        { fullName: safeRegex(query.search) },
+        { email: safeRegex(query.search) },
+        { mobile: safeRegex(query.search) },
+        { agencyName: safeRegex(query.search) },
       ];
     }
 
@@ -448,7 +449,7 @@ export class AdminService {
     // Account status (what the Status column shows) — distinct from `active` below,
     // which means "seen in the last 7 days".
     if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
-    if (query.city) filter.city = new RegExp(query.city, 'i');
+    if (query.city) filter.city = safeRegex(query.city);
     // "Active" = same definition as the dashboard card: not blocked and seen in the last 7 days.
     if (query.active === 'true') {
       filter.isActive = true;
@@ -766,10 +767,10 @@ export class AdminService {
 
     if (query.search) {
       filter.$or = [
-        { fullName: new RegExp(query.search, 'i') },
-        { email: new RegExp(query.search, 'i') },
-        { mobile: new RegExp(query.search, 'i') },
-        { agencyName: new RegExp(query.search, 'i') },
+        { fullName: safeRegex(query.search) },
+        { email: safeRegex(query.search) },
+        { mobile: safeRegex(query.search) },
+        { agencyName: safeRegex(query.search) },
       ];
     }
     if (query.role) filter.role = query.role;
@@ -1093,10 +1094,10 @@ export class AdminService {
     const filter: any = { isDeleted: false };
 
     if (query.search) {
-      const rx = new RegExp(query.search, 'i');
+      const rx = safeRegex(query.search);
       filter.$or = [{ bookingId: rx }, { pickupCity: rx }, { dropCity: rx }, { pickupCityName: rx }, { dropCityName: rx }];
     }
-    if (query.pickupCity) filter.pickupCity = new RegExp(query.pickupCity, 'i');
+    if (query.pickupCity) filter.pickupCity = safeRegex(query.pickupCity);
     if (query.status) filter.status = query.status;
     if (franchiseCity) filter.postedBy = { $in: await this.cityUserIds(franchiseCity) };
     Object.assign(filter, dateRangeFilter(query));
@@ -1121,7 +1122,7 @@ export class AdminService {
     // Search by the subscriber's name / mobile (resolve matching users first).
     // For a franchise the user query is additionally restricted to their city.
     if (query.search) {
-      const rx = new RegExp(query.search, 'i');
+      const rx = safeRegex(query.search);
       const userFilter: any = { $or: [{ fullName: rx }, { mobile: rx }, { agencyName: rx }] };
       if (franchiseCity) userFilter._id = { $in: await this.cityUserIds(franchiseCity) };
       const matchedUsers = await this.userModel.find(userFilter).select('_id').lean();
@@ -1148,11 +1149,11 @@ export class AdminService {
 
     if (query.search) {
       filter.$or = [
-        { listingId: new RegExp(query.search, 'i') },
-        { currentCity: new RegExp(query.search, 'i') },
-        { destinationCity: new RegExp(query.search, 'i') },
-        { vehicleNumber: new RegExp(query.search, 'i') },
-        { driverName: new RegExp(query.search, 'i') },
+        { listingId: safeRegex(query.search) },
+        { currentCity: safeRegex(query.search) },
+        { destinationCity: safeRegex(query.search) },
+        { vehicleNumber: safeRegex(query.search) },
+        { driverName: safeRegex(query.search) },
       ];
     }
     if (query.status) filter.status = query.status;
@@ -1253,7 +1254,7 @@ export class AdminService {
   async getCities(query: any, franchiseCity?: any) {
     const { page, limit, skip } = getPaginationParams(query);
     const filter: any = {};
-    if (query.search) filter.name = new RegExp(query.search, 'i');
+    if (query.search) filter.name = safeRegex(query.search);
     if (query.isActive !== undefined) filter.isActive = query.isActive === 'true';
     // A franchise only sees cities within its scope (its cities and/or whole states).
     if (franchiseCity) Object.assign(filter, this.cityDocScopeMatch(franchiseCity) || {});
@@ -1397,7 +1398,7 @@ export class AdminService {
     const filter: any = {};
     if (query.status) filter.status = query.status;
     if (query.search) {
-      const rx = new RegExp(query.search, 'i');
+      const rx = safeRegex(query.search);
       filter.$or = [{ reason: rx }, { description: rx }, { targetType: rx }];
     }
     // Scope to reports raised by this city's users.

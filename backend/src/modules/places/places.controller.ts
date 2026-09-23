@@ -20,6 +20,12 @@ export class PlacesController {
     return this.placesService.autocomplete(input, '(cities)');
   }
 
+  // Guarded: Directions is the expensive Google call and is only used in the
+  // (post-login) booking flow, so require auth to stop anonymous quota/billing abuse.
+  // autocomplete/cities stay public (registration city-select needs them pre-login)
+  // and are protected by the global per-IP throttler.
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
   @Get('route')
   @ApiOperation({ summary: 'Google Directions driving distance through ordered points "lat,lng;lat,lng;..."' })
   route(@Query('points') points: string) {
