@@ -110,7 +110,19 @@ export class StorageService {
     },
   ): Promise<string> {
     let buffer = file.buffer;
-    let ext = file.originalname.split('.').pop() || 'jpg';
+    // SECURITY: sanitize the (caller/request-controlled) folder so it can never
+    // escape the uploads dir (path traversal → arbitrary file write). Strip "..",
+    // backslashes, leading slashes and any char outside [a-z0-9/_-].
+    folder = (folder || 'uploads')
+      .replace(/\\/g, '/')
+      .replace(/\.\.+/g, '')
+      .replace(/^\/+/, '')
+      .replace(/[^a-zA-Z0-9/_-]/g, '')
+      .replace(/\/+/g, '/') || 'uploads';
+    // Only allow a safe extension derived from the original name; never .js/.sh/.php etc.
+    const rawExt = (file.originalname.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const allowedExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'mp3', 'wav', 'm4a', 'aac', 'ogg', 'pdf'];
+    let ext = allowedExt.includes(rawExt) ? rawExt : 'bin';
 
     if (file.mimetype.startsWith('image/') && options?.resize) {
       let pipeline = sharp(buffer);

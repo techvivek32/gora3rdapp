@@ -112,9 +112,10 @@ export class AuthService {
   }
 
   private async verifyOtp(mobile: string, otp: string) {
-    // TESTING ONLY: a configured bypass code is accepted for any number.
+    // TESTING ONLY: a configured bypass code is accepted for any number — but
+    // NEVER in production (in prod it was a full auth bypass / account takeover).
     const bypass = this.configService.get<string>('sms.bypassOtp');
-    if (bypass && otp === bypass) return;
+    if (bypass && otp === bypass && process.env.NODE_ENV !== 'production') return;
 
     const record = await this.otpModel.findOne({ mobile });
     if (!record) throw new BadRequestException('Please request an OTP first');
@@ -167,7 +168,22 @@ export class AuthService {
     return { message: 'Password reset successful. You can now sign in with your new password.' };
   }
 
+  // Roles a person may self-register with. admin/super_admin/franchise are
+  // created only by internal tooling — NEVER via the public register endpoint.
+  private static readonly PUBLIC_ROLES: UserRole[] = [
+    UserRole.DRIVER,
+    UserRole.TRAVEL_AGENCY,
+    UserRole.FLEET_OWNER,
+    UserRole.CUSTOMER,
+  ];
+
   async register(dto: RegisterDto) {
+    // SECURITY: block privilege escalation — a public request must not be able to
+    // create an admin/super_admin/franchise by passing `role`. Coerce to driver.
+    const role = AuthService.PUBLIC_ROLES.includes(dto.role as UserRole)
+      ? (dto.role as UserRole)
+      : UserRole.DRIVER;
+
     // Account is only created after the OTP is verified.
     await this.verifyOtp(dto.mobile, dto.otp);
     await this.ensureUnique(dto.email, dto.mobile);
@@ -187,10 +203,10 @@ export class AuthService {
       agencyName: dto.agencyName,
       city: dto.city,
       state: dto.state,
-      role: dto.role || UserRole.DRIVER,
+      role,
       // Whichever side they register on counts as onboarded for that side.
-      customerOnboarded: (dto.role || UserRole.DRIVER) === UserRole.CUSTOMER,
-      driverOnboarded: (dto.role || UserRole.DRIVER) !== UserRole.CUSTOMER,
+      customerOnboarded: role === UserRole.CUSTOMER,
+      driverOnboarded: role !== UserRole.CUSTOMER,
       membershipType: MembershipType.NEW,
       isActive: true,
       // The referral code IS the user's mobile number — one less thing to explain
