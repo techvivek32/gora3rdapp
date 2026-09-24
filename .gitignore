@@ -46,3 +46,6 @@ desktop.ini
 .idea/
 *.suo
 *.user
+
+# Backend local uploads (served/generated, never commit)
+backend/uploads/

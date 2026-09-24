@@ -122,7 +122,7 @@ class ProfilePage extends StatelessWidget {
                       SizedBox(height: 12.h),
                       
                       _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'My Wallet'.tr, onTap: () => context.push('/wallet')),
-                      _ProfileAction(icon: Icons.directions_car_outlined, label: 'My Vehicles'.tr, onTap: () => context.push('/my-vehicles-garage')),
+                      _ProfileAction(icon: Icons.directions_car_outlined, label: 'My Vehicles & Drivers'.tr, onTap: () => context.push('/my-vehicles-garage')),
                       _ProfileAction(icon: Icons.emoji_people_outlined, label: 'Customer Rides'.tr, onTap: () => context.push('/customer-requests')),
                       _ProfileAction(icon: Icons.swap_horiz_rounded, label: 'Change Role'.tr, onTap: () => context.push('/role-select')),
                       _ProfileAction(icon: Icons.card_giftcard_outlined, label: 'Invite Friends'.tr, onTap: () => context.push('/invite')),

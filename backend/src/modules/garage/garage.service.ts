@@ -2,12 +2,15 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
+import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garage-driver.schema';
 import { CreateGarageVehicleDto, UpdateGarageVehicleDto } from './dto/garage-vehicle.dto';
+import { CreateGarageDriverDto, UpdateGarageDriverDto } from './dto/garage-driver.dto';
 
 @Injectable()
 export class GarageService {
   constructor(
     @InjectModel(GarageVehicle.name) private garageModel: Model<GarageVehicleDocument>,
+    @InjectModel(GarageDriver.name) private driverModel: Model<GarageDriverDocument>,
   ) {}
 
   async list(userId: string) {
@@ -48,5 +51,47 @@ export class GarageService {
       throw new ForbiddenException('This vehicle is not yours');
     }
     return vehicle;
+  }
+
+  // ─── Drivers (My Drivers) ──────────────────────────────────────────────────
+
+  async listDrivers(userId: string) {
+    const drivers = await this.driverModel
+      .find({ userId: new Types.ObjectId(userId) })
+      .sort({ createdAt: -1 })
+      .lean();
+    return { message: 'My drivers', data: drivers };
+  }
+
+  async createDriver(userId: string, dto: CreateGarageDriverDto) {
+    const driver = await this.driverModel.create({
+      ...dto,
+      userId: new Types.ObjectId(userId),
+    });
+    return { message: 'Driver added', data: driver };
+  }
+
+  async updateDriver(userId: string, id: string, dto: UpdateGarageDriverDto) {
+    const driver = await this.ownedDriver(userId, id);
+    Object.assign(driver, dto);
+    await driver.save();
+    return { message: 'Driver updated', data: driver };
+  }
+
+  async removeDriver(userId: string, id: string) {
+    await this.ownedDriver(userId, id);
+    await this.driverModel.findByIdAndDelete(id);
+    return { message: 'Driver removed' };
+  }
+
+  /** Fetch the driver and confirm it belongs to this user. */
+  private async ownedDriver(userId: string, id: string): Promise<GarageDriverDocument> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Driver not found');
+    const driver = await this.driverModel.findById(id);
+    if (!driver) throw new NotFoundException('Driver not found');
+    if (driver.userId.toString() !== userId) {
+      throw new ForbiddenException('This driver is not yours');
+    }
+    return driver;
   }
 }

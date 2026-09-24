@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nes
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GarageService } from './garage.service';
 import { CreateGarageVehicleDto, UpdateGarageVehicleDto } from './dto/garage-vehicle.dto';
+import { CreateGarageDriverDto, UpdateGarageDriverDto } from './dto/garage-driver.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -11,6 +12,34 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Controller('garage')
 export class GarageController {
   constructor(private readonly service: GarageService) {}
+
+  // ── Drivers (literal routes declared before ':id' to avoid collision) ──
+
+  @Get('drivers')
+  @ApiOperation({ summary: "List the user's saved drivers" })
+  listDrivers(@CurrentUser('sub') userId: string) {
+    return this.service.listDrivers(userId);
+  }
+
+  @Post('drivers')
+  @ApiOperation({ summary: 'Add a driver to My Drivers' })
+  createDriver(@CurrentUser('sub') userId: string, @Body() dto: CreateGarageDriverDto) {
+    return this.service.createDriver(userId, dto);
+  }
+
+  @Put('drivers/:id')
+  @ApiOperation({ summary: 'Edit a saved driver' })
+  updateDriver(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: UpdateGarageDriverDto) {
+    return this.service.updateDriver(userId, id, dto);
+  }
+
+  @Delete('drivers/:id')
+  @ApiOperation({ summary: 'Remove a saved driver' })
+  removeDriver(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+    return this.service.removeDriver(userId, id);
+  }
+
+  // ── Vehicles ──
 
   @Get()
   @ApiOperation({ summary: "List the user's saved vehicles" })
