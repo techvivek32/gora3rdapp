@@ -4,6 +4,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
+import '../utils/invoice_actions.dart';
 import '../widgets/booking_card_ui.dart';
 import '../widgets/customer_request_card.dart';
 
@@ -263,7 +264,8 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
             onStart: (id) => _tripOtpFlow(id, 'start'),
             onComplete: (id) => _tripOtpFlow(id, 'end'),
             onArrived: _arrived,
-            onCancel: _driverCancel),
+            onCancel: _driverCancel,
+            onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id)),
       ),
     );
   }
@@ -292,7 +294,8 @@ class _MyOfferCard extends StatelessWidget {
   final void Function(String id) onComplete;
   final void Function(String id) onArrived;
   final void Function(String id) onCancel;
-  const _MyOfferCard(this.b, {required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel});
+  final void Function(String id) onInvoice;
+  const _MyOfferCard(this.b, {required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice});
 
   @override
   Widget build(BuildContext context) {
@@ -421,6 +424,17 @@ class _MyOfferCard extends StatelessWidget {
               icon: Icon(Icons.flag_rounded, size: 18.sp),
               label: const Text('Complete Trip'),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.success, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 11.h)),
+            )),
+          ],
+          // Driver can cancel while the trip hasn't been completed (penalty may apply).
+          // Once completed, the driver can download the ride invoice too.
+          if (won && status == 'completed') ...[
+            SizedBox(height: 12.h),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              onPressed: () => onInvoice(id),
+              icon: Icon(Icons.receipt_long_rounded, size: 18.sp),
+              label: const Text('Download Invoice'),
+              style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary), padding: EdgeInsets.symmetric(vertical: 11.h)),
             )),
           ],
           // Driver can cancel while the trip hasn't been completed (penalty may apply).

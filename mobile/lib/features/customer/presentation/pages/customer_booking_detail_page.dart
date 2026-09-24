@@ -6,6 +6,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
+import '../utils/invoice_actions.dart';
 import '../widgets/booking_card_ui.dart';
 
 /// The heart of Customer Mode: watch offers arrive, pick a driver, follow the
@@ -372,6 +373,15 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
         const Text('You rated ', style: TextStyle(color: AppColors.textSecondary)),
         ...List.generate(5, (i) => Icon(i < (b['rating'] as num).round() ? Icons.star_rounded : Icons.star_border_rounded, color: Colors.amber, size: 20)),
       ]));
+    }
+    if (status == 'completed') {
+      children.add(const SizedBox(height: 10));
+      children.add(OutlinedButton.icon(
+        onPressed: _acting ? null : () => downloadAndOpenInvoice(context, _repo, widget.bookingId),
+        icon: const Icon(Icons.receipt_long_rounded, size: 18),
+        label: const Text('Download Invoice'),
+        style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary), minimumSize: const Size.fromHeight(48)),
+      ));
     }
     return Column(children: children);
   }

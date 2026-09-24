@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../core/network/api_client.dart';
@@ -43,6 +44,25 @@ class CustomerRepository {
 
   Future<void> rateBooking(String id, double rating, {String? review}) async {
     await _api.post('/customer-bookings/$id/rate', data: {'rating': rating, if (review != null) 'review': review});
+  }
+
+  /// Download the completed-booking PDF invoice. Returns the raw bytes + a
+  /// filename (from the server's Content-Disposition). Works for the customer,
+  /// the selected driver, or an admin — the backend enforces access.
+  Future<({Uint8List bytes, String filename})> downloadInvoice(String id) async {
+    final res = await _api.dio.get(
+      '/customer-bookings/$id/invoice',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = res.data;
+    final bytes = data is Uint8List ? data : Uint8List.fromList(List<int>.from(data as List));
+    var filename = 'Gora-Invoice-$id.pdf';
+    final cd = res.headers.value('content-disposition');
+    if (cd != null) {
+      final m = RegExp('filename="?([^"]+)"?').firstMatch(cd);
+      if (m != null) filename = m.group(1)!;
+    }
+    return (bytes: bytes, filename: filename);
   }
 
   // ── Driver / vendor side ──

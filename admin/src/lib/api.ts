@@ -236,6 +236,9 @@ export const adminApi = {
 
   // ─── Customer Bookings (rides) ─────────────────────────────────────────────
   getCustomerBookings: (params?: any) => apiClient.get('/customer-bookings/admin/all', { params }),
+  // Returns the invoice PDF as a Blob (response interceptor passes res.data through).
+  downloadCustomerBookingInvoice: (id: string) =>
+    apiClient.get(`/customer-bookings/${id}/invoice`, { responseType: 'blob' }) as unknown as Promise<Blob>,
 
   // ─── Car Pool (pool rides) ─────────────────────────────────────────────────
   getCarPoolRides: (status?: string) => apiClient.get('/car-pool/admin/all', { params: { status: status || undefined } }),

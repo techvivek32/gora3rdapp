@@ -12,6 +12,7 @@ import { WalletTransaction, WalletTransactionDocument } from '../../database/sch
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
+import { buildInvoicePdf } from './invoice.util';
 import {
   CreateCustomerBookingDto,
   UpdateCustomerBookingDto,
@@ -257,6 +258,66 @@ export class CustomerBookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
     return { message: 'Booking', data: await this.withOfferProfiles(booking) };
+  }
+
+  /**
+   * Build a PDF invoice for a COMPLETED booking. Access: the booking's customer,
+   * its selected driver, or an admin. Returns the raw PDF bytes + a filename.
+   */
+  async getInvoice(userId: string, roles: string[], id: string): Promise<{ buffer: Buffer; filename: string }> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const booking: any = await this.bookingModel.findById(id).lean();
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const isAdmin = (roles || []).some((r) => r === UserRole.ADMIN || r === UserRole.SUPER_ADMIN);
+    const isCustomer = booking.customerId?.toString() === userId;
+    const isDriver = booking.selectedDriverId?.toString() === userId;
+    if (!isAdmin && !isCustomer && !isDriver) throw new ForbiddenException('Not allowed');
+
+    if (booking.status !== CustomerBookingStatus.COMPLETED) {
+      throw new BadRequestException('Invoice is available only after the trip is completed');
+    }
+
+    const customer: any = await this.userModel
+      .findById(booking.customerId)
+      .select('fullName mobile')
+      .lean();
+
+    const fare = booking.finalFare || booking.estimatedFare || 0;
+    // Toll was concatenated into `notes` client-side (there's no discrete field);
+    // best-effort extract so the breakdown can show it, otherwise it's folded in.
+    let tollAmount = 0;
+    const m = /toll[^0-9]{0,12}(\d+)/i.exec(booking.notes || '');
+    if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
+    const fareMode = /all\s*inclusive/i.test(booking.notes || '') ? 'All Inclusive' : undefined;
+
+    const buffer = await buildInvoicePdf({
+      bookingId: booking.bookingId,
+      serviceType: booking.serviceType,
+      subType: booking.subType,
+      customerName: customer?.fullName || 'Customer',
+      customerMobile: customer?.mobile || '',
+      driverName: booking.driverSnapshot?.name || 'Driver',
+      driverPhone: booking.driverSnapshot?.phone || '',
+      vehicle: booking.driverSnapshot?.vehicle || booking.vehicleType || '',
+      vehicleNumber: booking.driverSnapshot?.vehicleNumber || '',
+      pickup: booking.pickup?.address || '',
+      drop: booking.drop?.address || '',
+      pickupCity: booking.pickupCity || '',
+      dropCity: booking.dropCity || '',
+      travelDate: booking.travelDate,
+      travelTime: booking.travelTime,
+      startedAt: booking.startedAt,
+      completedAt: booking.completedAt,
+      distanceKm: booking.estimatedDistance || 0,
+      passengers: booking.passengers || 0,
+      fare,
+      tollAmount,
+      fareMode,
+      paymentMode: 'Cash — paid directly to the driver',
+    });
+
+    return { buffer, filename: `Gora-Invoice-${booking.bookingId}.pdf` };
   }
 
   private async withOfferProfiles(booking: any) {

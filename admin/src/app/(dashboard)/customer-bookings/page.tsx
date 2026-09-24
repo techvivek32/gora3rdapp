@@ -6,7 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
-import { CarTaxiFront } from 'lucide-react';
+import { CarTaxiFront, FileText, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -44,6 +44,39 @@ const STATUS_COLORS: Record<string, 'warning' | 'success' | 'default' | 'destruc
   cancelled: 'destructive',
   expired: 'destructive',
 };
+
+function InvoiceButton({ id, bookingId }: { id: string; bookingId: string }) {
+  const [busy, setBusy] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    try {
+      const blob = await adminApi.downloadCustomerBookingInvoice(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Gora-Invoice-${bookingId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e?.message || 'Could not download invoice');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      onClick={download}
+      disabled={busy}
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-600 hover:text-orange-700 disabled:opacity-50"
+      title="Download invoice PDF"
+    >
+      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+      Invoice
+    </button>
+  );
+}
 
 export default function CustomerBookingsPage() {
   const [status, setStatus] = useState('');
@@ -126,6 +159,16 @@ export default function CustomerBookingsPage() {
       accessorKey: 'createdAt',
       header: 'Created',
       cell: ({ row }) => <span className="text-xs text-gray-500 dark:text-gray-400">{formatDate(row.original.createdAt)}</span>,
+    },
+    {
+      id: 'invoice',
+      header: 'Invoice',
+      cell: ({ row }) =>
+        row.original.status === 'completed' ? (
+          <InvoiceButton id={row.original._id} bookingId={row.original.bookingId} />
+        ) : (
+          <span className="text-xs text-gray-300 dark:text-gray-600">—</span>
+        ),
     },
   ];
 

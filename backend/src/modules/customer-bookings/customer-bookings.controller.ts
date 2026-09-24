@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, UseGuards, HttpCode, HttpStatus, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CustomerBookingsService } from './customer-bookings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -57,6 +58,24 @@ export class CustomerBookingsController {
   @ApiOperation({ summary: 'Customer: create a booking request' })
   create(@CurrentUser('sub') userId: string, @Body() dto: CreateCustomerBookingDto) {
     return this.service.create(userId, dto);
+  }
+
+  @Get(':id/invoice')
+  @ApiOperation({ summary: 'Download the PDF invoice for a completed booking (customer, selected driver, or admin)' })
+  async invoice(
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') role: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename } = await this.service.getInvoice(userId, [role], id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(buffer.length),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(buffer);
   }
 
   @Get(':id')
