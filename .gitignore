@@ -10,6 +10,8 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+.env.bak*
+.env.*.bak
 !.env.example
 
 # ─── Flutter / Dart ───────────────────────────────────────────────────────────
@@ -49,3 +51,11 @@ desktop.ini
 
 # Backend local uploads (served/generated, never commit)
 backend/uploads/
+
+# Local server backups (DB dump + uploads — sensitive, never commit)
+gora-backup/
+.env.production
+.env.staging
+
+# Local flow/test screenshots (do NOT commit)
+flow_screenshots/

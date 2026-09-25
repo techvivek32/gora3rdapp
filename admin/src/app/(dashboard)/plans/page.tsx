@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Star, X, Plus } from 'lucide-react';
+import { Star, X, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Plan {
@@ -67,6 +67,12 @@ export default function PlansPage() {
   const plans: Plan[] = (raw as any)?.data || [];
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['admin-plans'] });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminApi.deletePlan(id),
+    onSuccess: () => { toast.success('Plan deleted'); invalidate(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not delete plan'),
+  });
 
   const saveMutation = useMutation({
     mutationFn: (f: FormState) => {
@@ -166,6 +172,15 @@ export default function PlansPage() {
                   </td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(p)} className="text-orange-600 hover:underline font-medium">Edit</button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete plan "${p.name}"? This cannot be undone.`)) deleteMutation.mutate(p._id);
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="ml-4 inline-flex items-center gap-1 text-red-600 hover:underline font-medium disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
                   </td>
                 </tr>
               ))}

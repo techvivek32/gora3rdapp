@@ -25,6 +25,10 @@ const _planIcons = [
   Icons.emoji_events,
 ];
 const _planNames = ['Free', 'Active', 'Premium', 'Golden'];
+// Columns shown in the "Feature Comparison" table, as indices into the
+// [Free=0, Active=1, Premium=2, Golden=3] scheme. Premium is intentionally
+// hidden here (only Free / Active / Golden are compared).
+const _comparisonCols = [0, 1, 3];
 // [icon, label, free, active, premium, golden]
 const _features = [
   [Icons.person_outline, 'View Contact Details', false, true, true, true],
@@ -691,7 +695,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
       child: Row(
         children: [
           SizedBox(width: _featureColWidth),
-          ...List.generate(4, (col) {
+          ..._comparisonCols.map((col) {
             final color = _planColors[col];
             return Expanded(
               child: Container(
@@ -737,7 +741,7 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
               ),
             ),
           ),
-          ...List.generate(4, (col) {
+          ..._comparisonCols.map((col) {
             final has = row[col + 2] as bool;
             return Expanded(
               child: Padding(
