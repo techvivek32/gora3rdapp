@@ -118,7 +118,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     final date = (t['travelDate'] ?? '').toString();
     final time = (t['travelTime'] ?? '').toString();
     final sub = (t['subType'] ?? 'One Way').toString();
-    final pax = (t['passengers'] as num?)?.toInt() ?? 1;
+    final returnDate = (t['returnDate'] ?? '').toString();
+    final tripDays = _isRound ? _roundTripDays(date, returnDate) : '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -136,19 +137,51 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
           _card(
             'Trip',
             Icons.route_rounded,
+            trailing: _tripTypeChip(sub),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _routeRow(Icons.trip_origin_rounded, AppColors.success, 'FROM', _cityOf('pickupCity', 'pickup')),
-                Padding(padding: EdgeInsets.only(left: 9.w), child: SizedBox(height: 18.h, child: const VerticalDivider(thickness: 1.2, color: AppColors.border))),
-                _routeRow(Icons.location_on_rounded, AppColors.error, 'TO', _cityOf('dropCity', 'drop')),
-                SizedBox(height: 10.h),
-                Wrap(spacing: 8.w, runSpacing: 8.h, children: [
-                  _pill(Icons.swap_horiz_rounded, sub),
-                  _pill(Icons.speed_rounded, _distanceKm > 0 ? '${_distanceKm.round()} km${_isRound ? ' (round)' : ''}' : '—'),
-                  _pill(Icons.people_rounded, '$pax passenger(s)'),
-                  if (date.isNotEmpty) _pill(Icons.event_rounded, '$date${time.isNotEmpty ? ', $time' : ''}'),
-                ]),
+                Divider(height: 1, color: AppColors.border),
+                SizedBox(height: 12.h),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    if (_distanceKm > 0) ...[
+                      RotatedBox(
+                        quarterTurns: 3,
+                        child: Text(
+                          '${_distanceKm.round()} KM${_isRound ? ' • RT' : ''}',
+                          style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: 0.3, fontFamily: 'Poppins'),
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                    ],
+                    Expanded(child: _routeTimeline(_cityOf('pickupCity', 'pickup'), _cityOf('dropCity', 'drop'))),
+                    if (date.isNotEmpty) ...[
+                      SizedBox(width: 10.w),
+                      _dateTimeBox(date, time),
+                    ],
+                  ],
+                ),
+                // Round trip: how many days between start and return.
+                if (tripDays.isNotEmpty) ...[
+                  SizedBox(height: 12.h),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10.r)),
+                    child: Row(children: [
+                      Icon(Icons.event_repeat_rounded, size: 15.sp, color: AppColors.primary),
+                      SizedBox(width: 6.w),
+                      Expanded(
+                        child: Text(
+                          '$tripDays  •  ${_prettyDate(date)} → ${_prettyDate(returnDate)}',
+                          style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Poppins'),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
               ],
             ),
           ),
@@ -194,33 +227,6 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             ]),
           ),
           SizedBox(height: 12.h),
-          // Fare
-          _card(
-            'Fare Estimate',
-            Icons.currency_rupee_rounded,
-            Column(children: [
-              _fareRow('Distance fare (${_billedKm.round()} km)', '₹$_baseFare'),
-              if (_isMinApplied) ...[
-                SizedBox(height: 6.h),
-                Text(
-                  'Minimum ${_minKm.round()} km bill applies — your trip is ${_distanceKm.round()} km, so it is charged as ${_minKm.round()} km.',
-                  style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
-                ),
-              ],
-              if (!_isBestPrice && _toll > 0) ...[
-                SizedBox(height: 6.h),
-                _fareRow('Toll (auto on route)', '₹$_toll'),
-              ],
-              const Divider(height: 18),
-              _fareRow('Estimated total', _fare > 0 ? '₹$_fare – ₹$high' : 'On request', bold: true),
-              SizedBox(height: 6.h),
-              Text(_isBestPrice
-                  ? 'Best Price — toll & other charges paid directly to the driver. Final fare confirmed by the driver offer.'
-                  : 'Final fare is confirmed by the driver offer. Pay the driver directly.',
-                style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-            ]),
-          ),
-          SizedBox(height: 12.h),
           if (_isBestPrice)
             Container(
               padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
@@ -253,6 +259,33 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             SizedBox(height: 12.h),
             _infoTabsCard(),
           ],
+          SizedBox(height: 12.h),
+          // Fare Estimate — shown last, right above the Confirm button.
+          _card(
+            'Fare Estimate',
+            Icons.currency_rupee_rounded,
+            Column(children: [
+              _fareRow('Distance fare (${_billedKm.round()} km)', '₹$_baseFare'),
+              if (_isMinApplied) ...[
+                SizedBox(height: 6.h),
+                Text(
+                  'Minimum ${_minKm.round()} km bill applies — your trip is ${_distanceKm.round()} km, so it is charged as ${_minKm.round()} km.',
+                  style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+                ),
+              ],
+              if (!_isBestPrice && _toll > 0) ...[
+                SizedBox(height: 6.h),
+                _fareRow('Toll (auto on route)', '₹$_toll'),
+              ],
+              const Divider(height: 18),
+              _fareRow('Estimated total', _fare > 0 ? '₹$_fare – ₹$high' : 'On request', bold: true),
+              SizedBox(height: 6.h),
+              Text(_isBestPrice
+                  ? 'Best Price — toll & other charges paid directly to the driver. Final fare confirmed by the driver offer.'
+                  : 'Final fare is confirmed by the driver offer. Pay the driver directly.',
+                style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            ]),
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -345,7 +378,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     );
   }
 
-  Widget _card(String title, IconData icon, Widget child) => Container(
+  Widget _card(String title, IconData icon, Widget child, {Widget? trailing}) => Container(
         padding: EdgeInsets.all(14.w),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border)),
         child: Column(
@@ -355,6 +388,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
               Icon(icon, size: 18.sp, color: AppColors.primary),
               SizedBox(width: 8.w),
               Text(title, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
+              if (trailing != null) ...[const Spacer(), trailing],
             ]),
             SizedBox(height: 12.h),
             child,
@@ -362,29 +396,91 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
         ),
       );
 
-  Widget _routeRow(IconData icon, Color color, String label, String value) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18.sp, color: color),
-          SizedBox(width: 10.w),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(label, style: TextStyle(fontSize: 9.5.sp, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.4, fontFamily: 'Poppins')),
-              Text(value, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-            ]),
-          ),
-        ],
+  /// A clean pickup → drop timeline: a green origin dot and a red destination
+  /// pin joined by a vertical rail, with just the city names beside them
+  /// (no FROM/TO labels — matches the requirement card style).
+  Widget _routeTimeline(String from, String to) => IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Left rail: dot → line → pin
+            Padding(
+              padding: EdgeInsets.only(top: 2.h),
+              child: Column(
+                children: [
+                  Container(
+                    width: 13.r,
+                    height: 13.r,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.success, width: 3.5),
+                    ),
+                  ),
+                  Expanded(child: Container(width: 2.r, color: AppColors.border)),
+                  Icon(Icons.location_on_rounded, size: 19.sp, color: AppColors.error),
+                ],
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(from, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                  SizedBox(height: 18.h),
+                  Text(to, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                ],
+              ),
+            ),
+          ],
+        ),
       );
 
-  Widget _pill(IconData icon, String text) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-        decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(20.r)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 13.sp, color: AppColors.textSecondary),
-          SizedBox(width: 4.w),
-          Text(text, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-        ]),
+  /// Filled trip-type chip (e.g. ONE WAY) shown at the top of the Trip card.
+  Widget _tripTypeChip(String text) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20.r)),
+        child: Text(
+          text.toUpperCase(),
+          style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5, fontFamily: 'Poppins'),
+        ),
       );
+
+  /// Colored date/time box shown on the right of the route.
+  Widget _dateTimeBox(String date, String time) => Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10.r)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(_prettyDate(date), style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+            if (time.isNotEmpty)
+              Text(time, style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w600, color: Colors.white, fontFamily: 'Poppins')),
+          ],
+        ),
+      );
+
+  /// Inclusive day count between the start and return dates, e.g. "2 days".
+  String _roundTripDays(String start, String ret) {
+    final s = DateTime.tryParse(start);
+    final r = DateTime.tryParse(ret);
+    if (s == null || r == null) return '';
+    final days = DateTime(r.year, r.month, r.day).difference(DateTime(s.year, s.month, s.day)).inDays + 1;
+    if (days < 1) return '';
+    return '$days day${days == 1 ? '' : 's'}';
+  }
+
+  /// "2026-09-25" → "25 Sep"; falls back to the raw string if unexpected.
+  String _prettyDate(String d) {
+    final p = d.split('-');
+    if (p.length == 3) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final m = int.tryParse(p[1]) ?? 0;
+      if (m >= 1 && m <= 12) return '${p[2]} ${months[m - 1]}';
+    }
+    return d;
+  }
 
   Widget _fareRow(String k, String v, {bool bold = false}) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

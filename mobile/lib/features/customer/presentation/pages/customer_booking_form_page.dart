@@ -181,6 +181,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select From and To locations');
       return;
     }
+    if (_subType == 'Round Trip' && _returnDate == null) {
+      _snack('Please select a return date for the round trip');
+      return;
+    }
     final trip = <String, dynamic>{
       'subType': _subType,
       'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
@@ -190,6 +194,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       'travelDate': ymdString(_date),
       'travelTime': _time.format(context),
       'passengers': _passengers,
+      if (_subType == 'Round Trip' && _returnDate != null) 'returnDate': ymdString(_returnDate!),
       if (_subType == 'Round Trip' && _returnDate != null) 'notes': 'Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}',
       // Editing an existing booking: cab-results will UPDATE instead of create.
       if (_isEdit) 'bookingId': widget.bookingId,
@@ -206,6 +211,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     }
     if (_m.needsDrop && _dropCtrl.text.trim().isEmpty) {
       _snack('Please select a drop location');
+      return;
+    }
+    if (_subType == 'Round Trip' && _returnDate == null) {
+      _snack('Please select a return date for the round trip');
       return;
     }
     setState(() => _busy = true);
@@ -629,7 +638,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
             _dtBox('TRIP START', Icons.calendar_today_rounded, DateFormat('dd-MM-yyyy').format(_date), _time.format(context), _pickDateTime),
             if (isRound) ...[
               SizedBox(height: 12.h),
-              _dtBox('RETURN', Icons.event_repeat_rounded, _returnDate == null ? 'Select return date' : DateFormat('dd-MM-yyyy').format(_returnDate!), null, _pickReturnDate),
+              _dtBox('RETURN *', Icons.event_repeat_rounded, _returnDate == null ? 'Select return date (required)' : DateFormat('dd-MM-yyyy').format(_returnDate!), null, _pickReturnDate),
             ],
             SizedBox(height: 16.h),
             SizedBox(

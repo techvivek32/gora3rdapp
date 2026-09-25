@@ -238,9 +238,19 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                     ],
                   ),
                   const Spacer(),
-                  _tagline(),
-                  SizedBox(height: 14.h),
-                  Align(alignment: Alignment.centerRight, child: _locationPill(name)),
+                  // Tagline and the city pill on one line, bottom-aligned so
+                  // "Gora Ke Saath" lines up with the Rajkot pill.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(child: _tagline()),
+                      SizedBox(width: 10.w),
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 4.h),
+                        child: _locationPill(name),
+                      ),
+                    ],
+                  ),
                   SizedBox(height: 26.h),
                 ],
               ),
@@ -301,8 +311,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           Icon(Icons.location_on, color: AppColors.primary, size: 15.sp),
           SizedBox(width: 4.w),
           Text(city.isEmpty ? 'Set city' : city, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-          SizedBox(width: 2.w),
-          Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 18.sp),
         ]),
       ),
     );
@@ -323,8 +331,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 180.h,
-        padding: EdgeInsets.fromLTRB(11.w, 13.h, 11.w, 11.h),
+        padding: EdgeInsets.fromLTRB(8.w, 10.h, 8.w, 10.h),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20.r),
@@ -334,38 +341,39 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Tinted rounded badge with the brand illustration.
+            // Centered tinted badge with the brand illustration (larger).
             Container(
-              width: 70.r,
-              height: 70.r,
+              width: 80.r,
+              height: 80.r,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [color.withValues(alpha: 0.20), color.withValues(alpha: 0.07)],
                 ),
-                borderRadius: BorderRadius.circular(18.r),
+                borderRadius: BorderRadius.circular(20.r),
               ),
               child: Center(
-                child: Image.asset(asset, width: 56.r, height: 56.r, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: color, size: 34.sp)),
+                child: Image.asset(asset, width: 62.r, height: 62.r, fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: color, size: 38.sp)),
               ),
             ),
-            const Spacer(),
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+            SizedBox(height: 8.h),
+            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
             SizedBox(height: 2.h),
-            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis,
+            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary, fontFamily: 'Poppins')),
             SizedBox(height: 8.h),
-            // Corner arrow button.
+            // Arrow button on the right (compact, no extra gap).
             Align(
               alignment: Alignment.centerRight,
               child: Container(
-                width: 28.r,
-                height: 28.r,
+                width: 26.r,
+                height: 26.r,
                 decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
                 child: Icon(Icons.arrow_forward_rounded, size: 15.sp, color: color),
               ),

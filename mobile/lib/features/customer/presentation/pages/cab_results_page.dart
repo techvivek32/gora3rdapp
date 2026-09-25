@@ -185,6 +185,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final sub = (t['subType'] ?? 'One Way').toString();
     final date = (t['travelDate'] ?? '').toString();
     final time = (t['travelTime'] ?? '').toString();
+    final returnDate = (t['returnDate'] ?? '').toString();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -198,7 +199,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('$from → $to', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-            Text('$sub  •  $date${time.isNotEmpty ? ', $time' : ''}', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            Text('$sub  •  $date${time.isNotEmpty ? ', $time' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            if (_isRound && returnDate.isNotEmpty)
+              Text('Return  •  $returnDate', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary, fontFamily: 'Poppins')),
           ],
         ),
       ),

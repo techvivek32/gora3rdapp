@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
@@ -22,11 +23,38 @@ class CustomerBookingDetailPage extends StatefulWidget {
 
 class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
   final _repo = getIt<CustomerRepository>();
+  final _api = getIt<ApiClient>();
   Map<String, dynamic>? _b;
+  Map<String, dynamic>? _cat; // matched cab category (image + info tabs)
+  int _infoTab = 0;
   bool _loading = true;
   bool _acting = false;
   String? _error;
   Timer? _poll;
+
+  // Per-cab info tabs, same as the Confirm screen.
+  static const _tabs = [
+    ('Inclusions', 'inclusions'),
+    ('Exclusions', 'exclusions'),
+    ('Facilities', 'facilities'),
+    ('T&C', 'terms'),
+  ];
+  List<String> _infoList(String key) => ((_cat?[key] as List?) ?? []).map((e) => e.toString()).toList();
+  bool get _hasAnyInfo => _cat != null && _tabs.any((t) => _infoList(t.$2).isNotEmpty);
+
+  /// Fetch the admin's cab categories once and match this booking's cab by name,
+  /// so we can show its image + inclusions/exclusions/facilities/terms.
+  Future<void> _loadCat(String name) async {
+    try {
+      final res = await _api.get('/home-content/cab-categories');
+      final list = (res.data['data'] as List?) ?? [];
+      final match = list.cast<Map>().firstWhere(
+            (c) => (c['name'] ?? '').toString().toLowerCase() == name.toLowerCase(),
+            orElse: () => const {},
+          );
+      if (mounted && match.isNotEmpty) setState(() => _cat = Map<String, dynamic>.from(match));
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -51,6 +79,8 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
       final b = await _repo.getBooking(widget.bookingId);
       if (!mounted) return;
       setState(() { _b = b; _loading = false; _error = null; });
+      final cabName = (b['vehicleType'] ?? '').toString();
+      if (cabName.isNotEmpty && _cat == null) _loadCat(cabName);
     } catch (e) {
       if (!mounted) return;
       setState(() { _error = '$e'; _loading = false; });
@@ -154,6 +184,7 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
 
     final tripOtp = (b['tripOtp'] ?? '').toString();
     final otpAction = (b['tripOtpAction'] ?? '').toString();
+    final parsed = _parseNotes((b['notes'] ?? '').toString());
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -164,8 +195,25 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           _otpCard(tripOtp, otpAction),
         ],
         const SizedBox(height: 16),
-        _tripCard(b, date),
+        _tripCard(b, date, parsed),
         const SizedBox(height: 16),
+        // Selected cab + fuel (mirrors the Confirm screen's "Your Cab").
+        if ((b['vehicleType'] ?? '').toString().isNotEmpty) ...[
+          _cabCard(b, parsed.fuel),
+          const SizedBox(height: 16),
+        ],
+        // All-inclusive fare / inclusions, as on the Confirm screen.
+        if (parsed.bestPrice)
+          _hint('Best Price — toll, tax & parking are paid directly to the driver by you.')
+        else if (parsed.inclusions.isNotEmpty) ...[
+          _inclusionsBox(parsed.inclusions),
+          const SizedBox(height: 16),
+        ],
+        // Per-cab info tabs (Inclusions / Exclusions / Facilities / T&C).
+        if (_hasAnyInfo) ...[
+          _infoTabsCard(),
+          const SizedBox(height: 16),
+        ],
 
         // OPEN → show incoming offers to pick from.
         if (status == 'open') ...[
@@ -254,35 +302,359 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     );
   }
 
-  Widget _tripCard(Map<String, dynamic> b, DateTime? date) {
-    final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
-    final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
+  Widget _tripCard(Map<String, dynamic> b, DateTime? date, _ParsedNotes parsed) {
+    final pickup = _loc(b, 'pickupCity', 'pickup');
+    final drop = _loc(b, 'dropCity', 'drop');
+    final sub = (b['subType'] ?? b['tripType'] ?? 'One Way').toString().replaceAll('_', ' ');
+    final dist = (b['estimatedDistance'] as num?)?.toDouble() ?? 0;
+    final time = (b['travelTime'] ?? '').toString();
+    final status = (b['status'] ?? '').toString();
+    final confirmed = status == 'confirmed' || status == 'ongoing' || status == 'completed';
+    final isRound = sub.toLowerCase().contains('round');
+    final tripDays = isRound ? _roundTripDays(date, parsed.returnDate) : '';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
-      child: Builder(builder: (_) {
-        final status = (b['status'] ?? '').toString();
-        final confirmed = status == 'confirmed' || status == 'ongoing' || status == 'completed';
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if ((b['bookingId'] ?? '').toString().isNotEmpty)
-              _kv(Icons.confirmation_number_rounded, 'Booking ID', b['bookingId'].toString()),
-            _kv(Icons.my_location_rounded, 'Pickup', pickup),
-            if (drop.isNotEmpty) _kv(Icons.location_on_rounded, 'Drop', drop),
-            _kv(Icons.calendar_today_rounded, 'When',
-                '${date != null ? DateFormat('EEE, d MMM').format(date) : ''} • ${(b['travelTime'] ?? '').toString()}'),
-            if ((b['passengers'] ?? 0) != 0) _kv(Icons.people_rounded, 'Passengers', '${b['passengers']}'),
-            if ((b['durationHours'] ?? 0) != 0) _kv(Icons.timelapse_rounded, 'Duration', '${b['durationHours']} hrs'),
-            if ((b['estimatedFare'] ?? 0) != 0) _kv(Icons.currency_rupee_rounded, 'Your budget', '₹${b['estimatedFare']}'),
-            if ((b['finalFare'] ?? 0) != 0) _kv(Icons.receipt_long_rounded, 'Agreed fare', '₹${b['finalFare']}'),
-            if (confirmed) _kv(Icons.payments_rounded, 'Payment', status == 'completed' ? 'Paid to driver directly' : 'Pay driver directly'),
-            if ((b['notes'] ?? '').toString().isNotEmpty) _kv(Icons.notes_rounded, 'Notes', b['notes'].toString()),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Booking ID + trip-type chip (e.g. ONE WAY) on the right.
+          Row(children: [
+            const Icon(Icons.confirmation_number_rounded, size: 18, color: AppColors.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                (b['bookingId'] ?? 'Trip').toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ),
+            const SizedBox(width: 8),
+            _tripTypeChip(sub),
+          ]),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 12),
+          // Route: distance (vertical) + pickup→drop timeline + date/time box.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              if (dist > 0) ...[
+                RotatedBox(
+                  quarterTurns: 3,
+                  child: Text('${dist.round()} KM', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary, letterSpacing: 0.3)),
+                ),
+                const SizedBox(width: 4),
+              ],
+              Expanded(child: _routeTimeline(pickup, drop)),
+              if (date != null) ...[
+                const SizedBox(width: 10),
+                _dateTimeBox(DateFormat('d MMM').format(date), time),
+              ],
+            ],
+          ),
+          // Round trip: days between start and return.
+          if (tripDays.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.event_repeat_rounded, size: 15, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '$tripDays  •  Return ${parsed.returnDate}',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  ),
+                ),
+              ]),
+            ),
           ],
-        );
-      }),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 8),
+          // Remaining details (Booking ID now in header; Passengers removed).
+          if ((b['durationHours'] ?? 0) != 0) _kv(Icons.timelapse_rounded, 'Duration', '${b['durationHours']} hrs'),
+          if ((b['estimatedFare'] ?? 0) != 0) _kv(Icons.currency_rupee_rounded, 'Your budget', '₹${b['estimatedFare']}'),
+          if ((b['finalFare'] ?? 0) != 0) _kv(Icons.receipt_long_rounded, 'Agreed fare', '₹${b['finalFare']}'),
+          if (confirmed) _kv(Icons.payments_rounded, 'Payment', status == 'completed' ? 'Paid to driver directly' : 'Pay driver directly'),
+          if (parsed.userNotes.isNotEmpty) _kv(Icons.notes_rounded, 'Notes', parsed.userNotes),
+        ],
+      ),
     );
   }
+
+  /// "Your Cab" card — the cab the customer picked (image + class + fuel).
+  Widget _cabCard(Map<String, dynamic> b, String fuel) {
+    final name = (b['vehicleType'] ?? 'Cab').toString();
+    final img = (_cat?['imageUrl'] ?? '').toString();
+    final vc = (_cat?['vehicleClass'] ?? '').toString();
+    final seats = (_cat?['seats'] as num?)?.toInt();
+    final bags = (_cat?['bags'] ?? '').toString();
+    final sub = [
+      if (vc.isNotEmpty) vc,
+      if (seats != null && seats > 0) '$seats seats',
+      if (bags.isNotEmpty) bags,
+    ].join(' • ');
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 76,
+              child: AspectRatio(
+                aspectRatio: 4 / 3,
+                child: Container(
+                  color: Colors.white,
+                  child: img.isNotEmpty
+                      ? Image.network(img, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.local_taxi_rounded, color: AppColors.primary, size: 30))
+                      : const Icon(Icons.local_taxi_rounded, color: AppColors.primary, size: 30),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                if (sub.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                ],
+                if (fuel.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(6)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.local_gas_station_rounded, size: 12, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text('Fuel: $fuel', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    ]),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Per-cab info tabs (Inclusions / Exclusions / Facilities / T&C), same as Confirm.
+  Widget _infoTabsCard() {
+    final key = _tabs[_infoTab].$2;
+    final items = _infoList(key);
+    IconData icon;
+    Color color;
+    switch (key) {
+      case 'exclusions':
+        icon = Icons.cancel_rounded;
+        color = AppColors.error;
+        break;
+      case 'facilities':
+        icon = Icons.star_rounded;
+        color = AppColors.warning;
+        break;
+      case 'terms':
+        icon = Icons.article_rounded;
+        color = AppColors.textSecondary;
+        break;
+      default:
+        icon = Icons.check_circle_rounded;
+        color = AppColors.success;
+    }
+    return Container(
+      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: _tabs.asMap().entries.map((e) {
+              final i = e.key;
+              final sel = i == _infoTab;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _infoTab = i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: sel ? AppColors.primary : Colors.transparent, width: 2.5)),
+                    ),
+                    child: Text(e.value.$1, textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 11.5, fontWeight: sel ? FontWeight.w800 : FontWeight.w600, color: sel ? AppColors.primary : AppColors.textSecondary)),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: items.isEmpty
+                ? const Text('No items listed.', style: TextStyle(fontSize: 12, color: AppColors.textHint))
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: items.map((t) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Icon(icon, size: 15, color: color),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(t, style: const TextStyle(fontSize: 12.5, color: AppColors.textPrimary))),
+                          ]),
+                        )).toList(),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// All-inclusive fare box listing what the fare covers.
+  Widget _inclusionsBox(List<String> inclusions) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: const [
+            Icon(Icons.verified_rounded, color: AppColors.success, size: 18),
+            SizedBox(width: 6),
+            Text('All Inclusive Fare', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.success)),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: inclusions.map((t) => Row(mainAxisSize: MainAxisSize.min, children: [
+              const Icon(Icons.check_circle_rounded, size: 13, color: AppColors.success),
+              const SizedBox(width: 4),
+              Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            ])).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Inclusive day count between the start and return dates, e.g. "2 days".
+  String _roundTripDays(DateTime? start, String ret) {
+    final r = DateTime.tryParse(ret) ?? _parseDmy(ret);
+    if (start == null || r == null) return '';
+    final days = DateTime(r.year, r.month, r.day).difference(DateTime(start.year, start.month, start.day)).inDays + 1;
+    if (days < 1) return '';
+    return '$days day${days == 1 ? '' : 's'}';
+  }
+
+  /// Parse a "dd-MM-yyyy" string (how return dates are stored in notes).
+  DateTime? _parseDmy(String s) {
+    final p = s.split('-');
+    if (p.length != 3) return null;
+    final d = int.tryParse(p[0]), m = int.tryParse(p[1]), y = int.tryParse(p[2]);
+    if (d == null || m == null || y == null) return null;
+    // Guard against yyyy-MM-dd sneaking in.
+    if (y < 100) return null;
+    try { return DateTime(y, m, d); } catch (_) { return null; }
+  }
+
+  /// Splits the packed notes string into its known parts + the user's own note.
+  _ParsedNotes _parseNotes(String raw) {
+    final parts = raw.split(' • ').map((e) => e.trim()).where((e) => e.isNotEmpty);
+    String ret = '', fuel = '';
+    final inc = <String>[];
+    var best = false;
+    final rest = <String>[];
+    for (final p in parts) {
+      final low = p.toLowerCase();
+      if (low.startsWith('return date:')) {
+        ret = p.substring(p.indexOf(':') + 1).trim();
+      } else if (low.startsWith('fuel:')) {
+        fuel = p.substring(p.indexOf(':') + 1).trim();
+      } else if (low.startsWith('all inclusive:')) {
+        inc.addAll(p.substring(p.indexOf(':') + 1).split(',').map((e) => e.trim()).where((e) => e.isNotEmpty));
+      } else if (low.startsWith('toll included')) {
+        inc.add(p);
+      } else if (low.startsWith('best price')) {
+        best = true;
+      } else {
+        rest.add(p);
+      }
+    }
+    return _ParsedNotes(returnDate: ret, fuel: fuel, inclusions: inc, bestPrice: best, userNotes: rest.join(' • '));
+  }
+
+  /// City if the booking stored one, else the full pickup/drop address.
+  String _loc(Map b, String cityKey, String objKey) {
+    final c = (b[cityKey] ?? '').toString().trim();
+    if (c.isNotEmpty) return c;
+    return ((b[objKey] as Map?)?['address'] ?? '').toString();
+  }
+
+  Widget _tripTypeChip(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
+        child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+      );
+
+  /// Pickup → drop timeline: green dot, rail, red pin, with city/address beside.
+  Widget _routeTimeline(String from, String to) => IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Column(
+                children: [
+                  Container(
+                    width: 13,
+                    height: 13,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white, border: Border.all(color: AppColors.success, width: 3.5)),
+                  ),
+                  Expanded(child: Container(width: 2, color: AppColors.border)),
+                  const Icon(Icons.location_on_rounded, size: 19, color: AppColors.error),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(from, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  const SizedBox(height: 18),
+                  Text(to, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _dateTimeBox(String date, String time) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+        child: Column(
+          children: [
+            Text(date, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+            if (time.isNotEmpty) Text(time, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white)),
+          ],
+        ),
+      );
 
   Widget _driverCard(Map snapshot, Map<String, dynamic> b) {
     final name = (snapshot['name'] ?? snapshot['fullName'] ?? 'Driver').toString();
@@ -393,7 +765,7 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           children: [
             Icon(icon, size: 16, color: AppColors.primary),
             const SizedBox(width: 10),
-            SizedBox(width: 78, child: Text(k, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary))),
+            SizedBox(width: 96, child: Text(k, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary))),
             Expanded(child: Text(v, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
           ],
         ),
@@ -601,4 +973,20 @@ class _RateSheetState extends State<_RateSheet> {
       ),
     );
   }
+}
+
+/// Parsed pieces of a cab booking's packed `notes` string.
+class _ParsedNotes {
+  final String returnDate; // "dd-MM-yyyy" when a round trip, else ''
+  final String fuel;
+  final List<String> inclusions;
+  final bool bestPrice;
+  final String userNotes; // whatever the customer actually typed
+  const _ParsedNotes({
+    required this.returnDate,
+    required this.fuel,
+    required this.inclusions,
+    required this.bestPrice,
+    required this.userNotes,
+  });
 }
