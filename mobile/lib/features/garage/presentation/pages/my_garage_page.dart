@@ -181,6 +181,9 @@ class _VehiclesTabState extends State<_VehiclesTab> with AutomaticKeepAliveClien
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton.extended(
+        // Unique tag so this FAB never shares the default hero tag with the main
+        // nav "+" button (that clash made the "+" vanish after visiting here).
+        heroTag: 'garageVehicleFab',
         onPressed: () => _openForm(),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),
@@ -372,6 +375,8 @@ class _DriversTabState extends State<_DriversTab> with AutomaticKeepAliveClientM
     return Scaffold(
       backgroundColor: AppColors.background,
       floatingActionButton: FloatingActionButton.extended(
+        // Unique tag — see the Vehicles FAB above (avoids the hero-tag clash).
+        heroTag: 'garageDriverFab',
         onPressed: () => _openForm(),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add, color: Colors.white),
@@ -800,6 +805,9 @@ class _DriverFormState extends State<_DriverForm> {
   final _addressCtrl = TextEditingController();
 
   bool _saving = false;
+  // Server-side error for the phone field (e.g. "not registered as driver/vendor"),
+  // shown inline under the field instead of a snackbar the user might miss.
+  String? _phoneServerError;
   String? _photo;
   String? _dlFront;
   String? _dlBack;
@@ -875,6 +883,8 @@ class _DriverFormState extends State<_DriverForm> {
   }
 
   Future<void> _save() async {
+    // Clear any stale server error so validation reflects the latest input.
+    _phoneServerError = null;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final body = {
@@ -898,10 +908,22 @@ class _DriverFormState extends State<_DriverForm> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(serverMessage(e, fallback: 'Could not save driver')), backgroundColor: AppColors.error),
-      );
+      final msg = serverMessage(e, fallback: 'Could not save driver');
+      final lower = msg.toLowerCase();
+      // Number-related rejections show inline under the Phone field so they don't
+      // disappear with a snackbar; other errors keep the snackbar.
+      final isPhoneError = lower.contains('number') || lower.contains('mobile') || lower.contains('driver/vendor');
+      setState(() {
+        _saving = false;
+        _phoneServerError = isPhoneError ? msg : null;
+      });
+      if (isPhoneError) {
+        _formKey.currentState?.validate(); // surface it on the field
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+        );
+      }
     }
   }
 
@@ -966,16 +988,23 @@ class _DriverFormState extends State<_DriverForm> {
               ),
               SizedBox(height: 14.h),
 
-              _fieldLabel('Phone'),
+              _fieldLabel('Phone *'),
               TextFormField(
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
                 decoration: _fieldDec(Icons.phone_outlined, hint: 'e.g. 9876543210'),
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (_) {
+                  if (_phoneServerError != null) setState(() => _phoneServerError = null);
+                },
                 validator: (v) {
                   final t = (v ?? '').trim();
-                  if (t.isEmpty) return null; // phone optional
+                  // Required: the number must belong to a registered driver/vendor.
+                  if (t.isEmpty) return 'Mobile number is required';
                   if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) return 'Enter a valid 10-digit mobile';
+                  // Backend rejection (e.g. number not registered) shown right here.
+                  if (_phoneServerError != null) return _phoneServerError;
                   return null;
                 },
               ),

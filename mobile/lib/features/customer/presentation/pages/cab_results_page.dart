@@ -21,6 +21,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
   final _api = getIt<ApiClient>();
   bool _loading = true;
   double _distanceKm = 0;
+  double _minBillKm = 0; // global minimum billable distance (all cabs), from settings
   double _toll = 0; // estimated route toll (₹), auto from Google Routes API
   List<Map<String, dynamic>> _cats = [];
   List<String> _inclusions = [];
@@ -78,6 +79,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
       cats = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
     if (cats.isEmpty) cats = _defaultCats.map((e) => Map<String, dynamic>.from(e)).toList();
+    // Global minimum bill km (applies to all cabs). Non-fatal if it fails.
+    double minKm = 0;
+    try {
+      final res = await _api.get('/settings');
+      minKm = ((res.data['data']?['minBillKm']) as num?)?.toDouble() ?? 0;
+    } catch (_) {}
     List<String> inc = [];
     try {
       final res = await _api.get('/home-content/inclusions');
@@ -89,6 +96,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
     if (!mounted) return;
     setState(() {
       _distanceKm = _isRound ? dist * 2 : dist;
+      _minBillKm = minKm;
       _toll = _isRound ? toll * 2 : toll;
       _cats = cats;
       _inclusions = inc;
@@ -129,7 +137,16 @@ class _CabResultsPageState extends State<CabResultsPage> {
     return r > 0 ? r : ((cat['pricePerKm'] as num?)?.toDouble() ?? 0);
   }
 
-  int _baseFare(Map<String, dynamic> cat) => (_distanceKm * _rate(cat)).round();
+  /// Global minimum billable distance for ALL cabs (platform setting; 0 = none).
+  double get _minKm => _minBillKm;
+
+  /// The distance actually charged: at least the global minimum km.
+  double get _billableKm => _distanceKm < _minKm ? _minKm : _distanceKm;
+
+  /// True when the trip is shorter than the minimum, so the fare is bumped up.
+  bool get _isMinApplied => _minKm > 0 && _distanceKm < _minKm;
+
+  int _baseFare(Map<String, dynamic> cat) => (_billableKm * _rate(cat)).round();
 
   // Book Now → open the confirmation/review page. The booking is only posted
   // there when the customer taps "Confirm Booking".
@@ -141,6 +158,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
       'cat': cat,
       'fuel': fuel.isEmpty ? 'Standard' : fuel,
       'distanceKm': _distanceKm,
+      // Distance the fare is billed on (>= global minimum) + minimum info.
+      'billedKm': _billableKm,
+      'minKm': _minKm,
       'fare': _fareFor(cat),
       'baseFare': _baseFare(cat),
       'toll': _isBestPrice ? 0 : _toll.round(),
@@ -403,6 +423,14 @@ class _CabResultsPageState extends State<CabResultsPage> {
                   _chip(Icons.speed_rounded, kms),
                 ]),
                 _cardFuelChips(cat),
+                if (_isMinApplied)
+                  Padding(
+                    padding: EdgeInsets.only(top: 6.h),
+                    child: Text(
+                      'Minimum ${_minKm.round()} km billed (your trip is ${_distanceKm.round()} km).',
+                      style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -414,7 +442,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
                 padding: EdgeInsets.all(10.w),
                 decoration: BoxDecoration(color: const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(10.r)),
                 child: Column(children: [
-                  _fareRow('Distance fare (${_distanceKm.round()} km)', '₹$base'),
+                  _fareRow('Distance fare (${_billableKm.round()} km)', '₹$base'),
+                  if (_isMinApplied) _fareRow('Minimum ${_minKm.round()} km applied', ''),
                   if (!_isBestPrice && _toll > 0) _fareRow('Toll (auto)', '₹${_toll.round()}'),
                   const Divider(height: 14),
                   _fareRow('Estimated total', '₹$fare', bold: true),

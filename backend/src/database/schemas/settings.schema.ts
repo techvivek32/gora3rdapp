@@ -112,6 +112,13 @@ export class PlatformSettings {
    */
   @Prop({ default: 100, min: 0, max: 100 })
   driverCancelPenaltyPercent: number;
+
+  /**
+   * Minimum billable distance (km) for customer CAB bookings, applied to ALL cabs.
+   * If a trip is shorter, the fare is charged for this many km. 0 = no minimum.
+   */
+  @Prop({ default: 0, min: 0 })
+  minBillKm: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
@@ -85,6 +85,25 @@ export default function CabCategoriesPage() {
 
   // Interceptor extracts data?.data, so response.data = categoriesArray
   const items: CabCategory[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
+
+  // ── Global minimum bill KM (applies to ALL cabs) ──────────────────────────────
+  const [minBillKm, setMinBillKm] = useState<number>(0);
+  const { data: settingsData } = useQuery({
+    queryKey: ['admin-settings-minbillkm'],
+    queryFn: () => adminApi.getAdminSettings(),
+  });
+  useEffect(() => {
+    const v = (settingsData as any)?.data?.minBillKm;
+    if (typeof v === 'number') setMinBillKm(v);
+  }, [settingsData]);
+  const saveMinKmMutation = useMutation({
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0 }),
+    onSuccess: () => {
+      toast.success('Minimum bill KM saved');
+      queryClient.invalidateQueries({ queryKey: ['admin-settings-minbillkm'] });
+    },
+    onError: () => toast.error('Failed to save minimum bill KM'),
+  });
 
   const buildPayload = () => ({
     name: form.name.trim(),
@@ -225,6 +244,31 @@ export default function CabCategoriesPage() {
           className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors"
         >
           {showForm ? 'Cancel' : '+ Add Category'}
+        </button>
+      </div>
+
+      {/* Global minimum bill KM — applies to every cab */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-end gap-3 flex-wrap">
+        <div className="flex-1 min-w-[240px]">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Bill KM (all cabs)</label>
+          <input
+            type="number"
+            min={0}
+            placeholder="e.g. 200 (0 = no minimum)"
+            value={minBillKm}
+            onChange={(e) => setMinBillKm(Number(e.target.value))}
+            className="w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Applies to every cab. Shorter trips are billed for at least this many km — e.g. min 200 → a 69 km ride is charged as 200 km.
+          </p>
+        </div>
+        <button
+          onClick={() => saveMinKmMutation.mutate()}
+          disabled={saveMinKmMutation.isPending}
+          className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-60 transition-colors"
+        >
+          {saveMinKmMutation.isPending ? 'Saving…' : 'Save'}
         </button>
       </div>
 

@@ -35,6 +35,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   Map<String, dynamic> get _cat => Map<String, dynamic>.from(widget.data['cat'] as Map? ?? {});
   String get _fuel => (widget.data['fuel'] ?? 'Petrol').toString();
   double get _distanceKm => (widget.data['distanceKm'] as num?)?.toDouble() ?? 0;
+  // Distance the fare is billed on (>= category minimum) and the minimum itself.
+  double get _billedKm => (widget.data['billedKm'] as num?)?.toDouble() ?? _distanceKm;
+  double get _minKm => (widget.data['minKm'] as num?)?.toDouble() ?? 0;
+  bool get _isMinApplied => _minKm > 0 && _distanceKm < _minKm;
   int get _fare => (widget.data['fare'] as num?)?.toInt() ?? 0;
   bool get _isRound => widget.data['isRound'] == true;
   String get _editId => (widget.data['bookingId'] ?? '').toString();
@@ -195,7 +199,14 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             'Fare Estimate',
             Icons.currency_rupee_rounded,
             Column(children: [
-              _fareRow('Distance fare (${_distanceKm.round()} km)', '₹$_baseFare'),
+              _fareRow('Distance fare (${_billedKm.round()} km)', '₹$_baseFare'),
+              if (_isMinApplied) ...[
+                SizedBox(height: 6.h),
+                Text(
+                  'Minimum ${_minKm.round()} km bill applies — your trip is ${_distanceKm.round()} km, so it is charged as ${_minKm.round()} km.',
+                  style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w600, fontFamily: 'Poppins'),
+                ),
+              ],
               if (!_isBestPrice && _toll > 0) ...[
                 SizedBox(height: 6.h),
                 _fareRow('Toll (auto on route)', '₹$_toll'),

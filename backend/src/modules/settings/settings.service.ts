@@ -129,6 +129,7 @@ export class SettingsService {
     bookingCommitmentPercent?: number;
     bookingCancellationPolicy?: string;
     driverCancelPenaltyPercent?: number;
+    minBillKm?: number;
   }): Promise<PlatformSettings> {
     // Don't let a blank secret field (the admin form now loads secrets masked as '')
     // wipe a configured secret — only overwrite when a real value is sent.
