@@ -74,7 +74,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     // Activity notices jump straight to the thing they're about.
     if (type == 'requirement_assigned') {
-      context.push('/my-requirements?tab=2'); // My Requirements → Assigned
+      context.go('/my-requirements?tab=2'); // My Requirements → Assigned
       return;
     }
     if (type == 'requirement_posted' || type == 'requirement_accepted') {

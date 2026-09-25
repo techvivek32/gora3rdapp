@@ -11,6 +11,7 @@ class MainNavPage extends StatelessWidget {
 
   int _getSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
+    if (location.startsWith('/my-requirements')) return 1;
     if (location.startsWith('/requirements')) return 1;
     if (location.startsWith('/vehicles')) return 2;
     if (location.startsWith('/profile')) return 3;
@@ -39,10 +40,7 @@ class MainNavPage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(icon: Icons.home_rounded, label: 'Home'.tr, index: 0, selectedIndex: selectedIndex, onTap: () => context.go('/')),
-            _NavItem(icon: Icons.search_rounded, label: 'Booking'.tr, index: 1, selectedIndex: selectedIndex, onTap: () {
-              // Already on Booking → refresh; otherwise navigate.
-              if (selectedIndex == 1) { TabRefresh.requirements.value++; } else { context.go('/requirements'); }
-            }),
+            _NavItem(icon: Icons.event_note_rounded, label: 'My Bookings'.tr, index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/my-requirements')),
             const SizedBox(width: 48),
             _NavItem(icon: Icons.directions_car_rounded, label: 'Available'.tr, index: 2, selectedIndex: selectedIndex, onTap: () {
               if (selectedIndex == 2) { TabRefresh.vehicles.value++; } else { context.go('/vehicles'); }
@@ -122,7 +120,7 @@ class _NavItem extends StatelessWidget {
           children: [
             Icon(icon, color: isSelected ? Colors.white : Colors.white70, size: 24.sp),
             SizedBox(height: 2.h),
-            Text(label, style: TextStyle(fontSize: 10.sp, color: isSelected ? Colors.white : Colors.white70, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400)),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, softWrap: false, style: TextStyle(fontSize: 10.sp, color: isSelected ? Colors.white : Colors.white70, fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400)),
           ],
         ),
       ),

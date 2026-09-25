@@ -197,13 +197,13 @@ class PushNotificationService {
     // before the block below — this push carries a requirementId too, but it is
     // NOT a new-requirement alert.
     if (data['type'] == 'requirement_assigned') {
-      ctx.push('/my-requirements?tab=2');
+      ctx.go('/my-requirements?tab=2');
       return;
     }
 
     // Trip started/ended: open My Requirements on the Assigned tab.
     if (data['type'] == 'trip_started' || data['type'] == 'trip_ended') {
-      ctx.push('/my-requirements?tab=2');
+      ctx.go('/my-requirements?tab=2');
       return;
     }
 

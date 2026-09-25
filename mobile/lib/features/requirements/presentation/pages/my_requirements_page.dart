@@ -13,6 +13,7 @@ import '../../../../core/utils/api_error.dart';
 import '../../../../core/widgets/otp_input.dart';
 import '../bloc/requirements_bloc.dart';
 import '../widgets/requirement_card_widget.dart';
+import '../../../customer/presentation/widgets/my_customer_offers_list.dart';
 
 class MyRequirementsPage extends StatefulWidget {
   /// Which tab to open on: 0 Running, 1 Booked, 2 Assigned. An assignment push
@@ -45,6 +46,7 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
       child: Scaffold(
         backgroundColor: AppColors.background,
         appBar: AppBar(
+          automaticallyImplyLeading: false,
           title: Text(
             'My Bookings'.tr,
             style: TextStyle(fontFamily: 'Poppins', fontSize: 17.sp, fontWeight: FontWeight.bold),
@@ -137,9 +139,9 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
                 children: [
                   _buildList(context, running, 'No running bookings'.tr, showMenu: true),
                   _buildList(context, booked, 'No booked bookings'.tr),
-                  // Requirements OTHER people assigned to me — I'm the driver here,
-                  // so no owner menu, and no BOOKED stamp obscuring a live job.
-                  _buildList(context, state.assignedToMe, 'No bookings assigned to you'.tr, isAssignedTab: true),
+                  // Assigned = requirements assigned to me AS the driver + the
+                  // customer-app trips I've won (merged, no separate page).
+                  _buildAssignedTab(context, state.assignedToMe),
                 ],
               );
             }
@@ -210,6 +212,58 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
             ),
     );
   }
+
+  /// Assigned tab: requirements assigned to me as the driver, plus the customer
+  /// trips I've won (merged into one scroll).
+  Widget _buildAssignedTab(BuildContext context, List<Map<String, dynamic>> assigned) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<RequirementsBloc>().add(const LoadMyRequirementsEvent());
+        await Future.delayed(const Duration(milliseconds: 500));
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+        children: [
+          ...assigned.map((req) {
+            final trip = (req['tripStatus'] ?? 'pending').toString();
+            final showStamp = trip == 'completed';
+            return Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Column(
+                children: [
+                  RequirementCardWidget(requirement: req, showStamp: showStamp),
+                  if (trip != 'completed') ...[
+                    SizedBox(height: 8.h),
+                    _tripButton(context, req, trip),
+                  ],
+                ],
+              ),
+            );
+          }),
+          // Won customer-app trips — hidden when none; shows the empty state only
+          // when there are also no assigned requirements.
+          MyCustomerOffersList(
+            emptyPlaceholder: assigned.isEmpty ? _emptyState('No bookings assigned to you'.tr) : null,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _emptyState(String text) => Padding(
+        padding: EdgeInsets.only(top: 0.22.sh),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.post_add_outlined, size: 64.sp, color: AppColors.textHint),
+              SizedBox(height: 12.h),
+              Text(text, style: TextStyle(color: AppColors.textSecondary, fontFamily: 'Poppins', fontSize: 15.sp)),
+            ],
+          ),
+        ),
+      );
 
   Widget _buildMenu(BuildContext context, Map<String, dynamic> req) {
     final isHeld = req['status'] == 'on_hold';

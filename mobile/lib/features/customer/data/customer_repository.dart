@@ -77,6 +77,12 @@ class CustomerRepository {
     return Map<String, dynamic>.from(res.data['data'] as Map);
   }
 
+  /// Golden driver/vendor directly accepts a booking → assigned immediately
+  /// (no offer / customer selection). Places the commitment hold + settles it.
+  Future<void> accept(String id) async {
+    await _api.post('/customer-bookings/$id/accept');
+  }
+
   Future<List<Map<String, dynamic>>> myApplications() async {
     final res = await _api.get('/customer-bookings/my-applications');
     return _list(res.data['data']);

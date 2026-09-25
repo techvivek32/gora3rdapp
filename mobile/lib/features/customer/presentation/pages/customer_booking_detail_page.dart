@@ -215,19 +215,16 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           const SizedBox(height: 16),
         ],
 
-        // OPEN → show incoming offers to pick from.
+        // OPEN → a driver will accept and be assigned directly (no offers now).
+        // Legacy offers (if any exist) are still shown so they can be picked.
         if (status == 'open') ...[
-          Row(
-            children: [
-              const Text('Offers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(width: 8),
-              Text('(${offers.length})', style: const TextStyle(color: AppColors.textSecondary)),
-            ],
-          ),
-          const SizedBox(height: 8),
           if (offers.isEmpty)
-            _hint('Waiting for drivers to send offers… pull down to refresh.'),
-          ...offers.map((o) => _OfferCard(o, acting: _acting, onSelect: () => _select((o['offerId'] ?? o['_id']).toString()))),
+            _hint('Waiting for a driver to accept your booking… pull down to refresh.')
+          else ...[
+            const Text('Offers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            ...offers.map((o) => _OfferCard(o, acting: _acting, onSelect: () => _select((o['offerId'] ?? o['_id']).toString()))),
+          ],
         ],
 
         // Confirmed / ongoing / completed → show the chosen driver.
@@ -896,7 +893,7 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final map = <String, (Color, IconData, String)>{
-      'open': (AppColors.info, Icons.hourglass_top_rounded, 'Waiting for offers'),
+      'open': (AppColors.info, Icons.hourglass_top_rounded, 'Waiting for a driver'),
       'confirmed': (AppColors.primary, Icons.check_circle_rounded, 'Driver confirmed'),
       'ongoing': (AppColors.warning, Icons.directions_car_rounded, 'Trip in progress'),
       'completed': (AppColors.success, Icons.flag_rounded, 'Trip completed'),

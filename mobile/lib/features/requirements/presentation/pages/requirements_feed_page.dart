@@ -8,6 +8,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/tab_refresh.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -85,17 +86,52 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
   Future<void> _applyCustomer(Map<String, dynamic> b) async {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
-    final result = await showCustomerApplySheet(context, b);
-    if (result == null) return;
+    final fare = (b['estimatedFare'] as num?)?.toInt() ?? 0;
+    final pct = (b['commitmentPercent'] as num?)?.toInt() ?? 0;
+    final hold = (pct > 0 && fare != 0) ? (fare * pct / 100).round() : 0;
+    // Direct accept → the booking is assigned to this driver immediately (no offer,
+    // no customer selection). Golden-only is enforced server-side.
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Accept this booking?', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(child: acceptHoldContent(fare, pct, hold)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accept')),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
-      await getIt<CustomerRepository>().apply(id, result);
+      await getIt<CustomerRepository>().accept(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offer sent! A commitment hold is placed on your wallet.'), backgroundColor: AppColors.success));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking assigned to you! 🎉'), backgroundColor: AppColors.success));
       _loadCustomerBookings();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not apply: ${e.toString().replaceFirst('Exception: ', '')}'), backgroundColor: AppColors.error));
+      _showAcceptError(serverMessage(e, fallback: 'Could not accept the booking.'));
     }
+  }
+
+  /// Clean popup for accept failures (e.g. low wallet balance for the hold).
+  void _showAcceptError(String message) {
+    final lowBalance = message.toLowerCase().contains('wallet') || message.toLowerCase().contains('balance');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(lowBalance ? 'Add money to accept' : "Can't accept", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: Text(message, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          if (lowBalance)
+            ElevatedButton(
+              onPressed: () { Navigator.pop(ctx); context.push('/wallet'); },
+              child: const Text('Add Money'),
+            ),
+        ],
+      ),
+    );
   }
 
   void _silentRefresh() {
@@ -171,7 +207,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           IconButton(
             icon: Icon(Icons.history_rounded, color: Colors.white),
             tooltip: 'My Bookings',
-            onPressed: () => context.push('/my-requirements'),
+            onPressed: () => context.go('/my-requirements'),
           ),
           IconButton(
             icon: Icon(Icons.add, color: Colors.white, size: 28.sp),

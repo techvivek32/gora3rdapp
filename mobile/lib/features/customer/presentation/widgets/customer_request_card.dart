@@ -31,10 +31,11 @@ class CustomerRequestCard extends StatelessWidget {
     // Show only the number of days (under the ROUND TRIP chip).
     final rt = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
     final returnDate = rt != null ? DateTime(int.parse(rt.group(3)!), int.parse(rt.group(2)!), int.parse(rt.group(1)!)) : null;
+    // Inclusive day count (25→26 = 2 days), consistent with the other screens.
     int? days = (returnDate != null && date != null)
-        ? returnDate.difference(DateTime(date.year, date.month, date.day)).inDays
+        ? returnDate.difference(DateTime(date.year, date.month, date.day)).inDays + 1
         : null;
-    if (days != null && days < 0) days = null;
+    if (days != null && days < 1) days = null;
 
     return brandCard(
       child: Column(
@@ -69,7 +70,7 @@ class CustomerRequestCard extends StatelessWidget {
                     filledChip(subType.toUpperCase(), AppColors.primary),
                     if (days != null) ...[
                       SizedBox(height: 4.h),
-                      Text('$days days', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                      Text('$days day${days == 1 ? '' : 's'}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                     ],
                   ],
                 ),
@@ -90,10 +91,17 @@ class CustomerRequestCard extends StatelessWidget {
           const Divider(height: 1, color: Colors.black26),
           SizedBox(height: 10.h),
           Row(children: [
-            if ((b['passengers'] ?? 0) != 0) ...[
-              Icon(Icons.people_rounded, size: 15.sp, color: AppColors.primary),
+            if ((b['vehicleType'] ?? '').toString().isNotEmpty) ...[
+              Icon(Icons.local_taxi_rounded, size: 15.sp, color: AppColors.primary),
               SizedBox(width: 5.w),
-              Text('${b['passengers']} passenger(s)', style: TextStyle(fontSize: 12.5.sp, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+              Flexible(
+                child: Text(
+                  b['vehicleType'].toString(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                ),
+              ),
             ],
             const Spacer(),
             if (fare != 0) Text('Budget: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
@@ -103,8 +111,8 @@ class CustomerRequestCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: applied ? null : onApply,
-              icon: Icon(applied ? Icons.check_rounded : Icons.local_offer_rounded, size: 18.sp),
-              label: Text(applied ? 'Offer already sent' : 'Send Offer'),
+              icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
+              label: Text(applied ? 'Accepted' : 'Accept'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: applied ? AppColors.textHint : AppColors.primary,
                 foregroundColor: Colors.white,
@@ -117,6 +125,53 @@ class CustomerRequestCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Content for the "Accept this booking?" dialog — explains WHY a commitment
+/// hold is placed and HOW it works, with the actual hold amount when known.
+Widget acceptHoldContent(int fare, int pct, int hold) {
+  return Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        "You'll be directly assigned to this trip${fare != 0 ? " at the customer's budget (₹$fare)" : ''}.",
+        style: TextStyle(fontSize: 13.sp, color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+      ),
+      SizedBox(height: 12.h),
+      Container(
+        padding: EdgeInsets.all(10.w),
+        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10.r)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(Icons.lock_outline_rounded, size: 16.sp, color: AppColors.primary),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              hold > 0
+                  ? 'A commitment hold of ₹$hold ($pct% of the fare) is kept from your wallet when you accept.'
+                  : 'A commitment hold is kept from your wallet when you accept.',
+              style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+            ),
+          ),
+        ]),
+      ),
+      SizedBox(height: 12.h),
+      _holdPoint('Why?', 'It confirms you\'re serious and will complete the trip — it protects the customer from no-shows.'),
+      SizedBox(height: 8.h),
+      _holdPoint('How it works', 'The amount is only HELD (not charged). It\'s settled once the trip is completed, and released back to your wallet if the booking is cancelled as per policy.'),
+    ],
+  );
+}
+
+Widget _holdPoint(String label, String body) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+      SizedBox(height: 2.h),
+      Text(body, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, height: 1.35)),
+    ],
+  );
 }
 
 /// Opens the apply/offer bottom sheet and returns the offer payload (or null).

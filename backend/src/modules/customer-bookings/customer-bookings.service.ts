@@ -557,7 +557,14 @@ export class CustomerBookingsService {
 
   /** Open bookings a driver can apply to (not their own, not expired, city match). */
   async listAvailable(driverId: string, serviceType?: string) {
-    const driver = await this.userModel.findById(driverId).select('businessCities').lean();
+    const driver = await this.userModel
+      .findById(driverId)
+      .select('businessCities isGolden membershipType membershipExpiresAt')
+      .lean();
+    // Only Golden members can see customer-app bookings (active/free cannot).
+    if (!this.isGoldenActive(driver)) {
+      return { message: 'Golden membership required to view customer bookings', data: [], goldenRequired: true };
+    }
     const cities = ((driver as any)?.businessCities ?? []).filter(Boolean);
     const filter: any = {
       status: CustomerBookingStatus.OPEN,
@@ -647,6 +654,96 @@ export class CustomerBookingsService {
       { type: 'customer_booking_offer', bookingId: booking.bookingId }).catch(() => {});
 
     return { message: 'Applied successfully', data: { holdAmount } };
+  }
+
+  /** A user is an active Golden member (flag or tier, and not expired). */
+  private isGoldenActive(u: any): boolean {
+    if (!u) return false;
+    const golden = u.isGolden === true || u.membershipType === 'golden';
+    if (!golden) return false;
+    if (u.membershipExpiresAt && new Date(u.membershipExpiresAt) <= new Date()) return false;
+    return true;
+  }
+
+  /**
+   * Golden driver/vendor directly ACCEPTS an open booking → assigned immediately
+   * (no offer, no customer selection). Holds the commitment then settles it, and
+   * releases any other applicants' holds. Atomic OPEN→CONFIRMED so only one wins.
+   */
+  async acceptDirect(driverId: string, id: string) {
+    const driver = await this.userModel
+      .findById(driverId)
+      .select('isGolden membershipType membershipExpiresAt fullName agencyName mobile rating')
+      .lean();
+    if (!this.isGoldenActive(driver)) {
+      throw new ForbiddenException('Only Golden members can accept customer bookings directly.');
+    }
+
+    const booking = await this.bookingModel.findById(id);
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== CustomerBookingStatus.OPEN) throw new BadRequestException('This booking is no longer open');
+    if (booking.customerId.toString() === driverId) throw new BadRequestException('You cannot accept your own booking');
+
+    const dId = new Types.ObjectId(driverId);
+    const fare = booking.estimatedFare || 0;
+    const holdAmount = Math.round((fare * (booking.commitmentPercent || 0)) / 100);
+
+    // Place the commitment hold first (atomic on the wallet).
+    const held = await this.holdFunds(dId, holdAmount, booking._id);
+    if (!held) {
+      throw new BadRequestException(`Insufficient wallet balance. You need ₹${holdAmount} available to accept this booking.`);
+    }
+
+    // Atomically claim OPEN → CONFIRMED so two accepts can't both win.
+    const claimed = await this.bookingModel.findOneAndUpdate(
+      { _id: booking._id, status: CustomerBookingStatus.OPEN },
+      { $set: { status: CustomerBookingStatus.CONFIRMED } },
+    );
+    if (!claimed) {
+      await this.releaseHold(dId, holdAmount, booking._id);
+      throw new BadRequestException('This booking was just taken. Please pick another.');
+    }
+
+    // We're the selected driver → settle our hold; release everyone else's.
+    await this.settleHold(dId, holdAmount, booking._id);
+    for (const o of booking.offers as any[]) {
+      if (o.status === 'applied') {
+        await this.releaseHold(o.driverId, o.holdAmount, booking._id);
+        o.status = 'released';
+      }
+    }
+
+    booking.offers.push({
+      driverId: dId,
+      quotedFare: fare,
+      holdAmount,
+      vehicle: '',
+      vehicleNumber: '',
+      vehicleImage: '',
+      message: '',
+      farePerSeat: 0,
+      seatsAvailable: 0,
+      status: 'selected',
+    } as any);
+
+    booking.selectedDriverId = dId;
+    booking.finalFare = fare;
+    booking.status = CustomerBookingStatus.CONFIRMED;
+    booking.confirmedAt = new Date();
+    booking.driverSnapshot = {
+      name: (driver as any)?.agencyName || (driver as any)?.fullName || 'Driver',
+      phone: (driver as any)?.mobile || '',
+      vehicle: '',
+      vehicleNumber: '',
+      rating: (driver as any)?.rating || 0,
+    };
+    await booking.save();
+
+    this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
+      `A partner accepted your ${booking.serviceType} booking ${booking.bookingId}. Contact them to coordinate.`,
+      { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
+
+    return { message: 'Booking accepted — assigned to you', data: booking };
   }
 
   async getMyApplications(driverId: string) {

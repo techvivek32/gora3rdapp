@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
 import '../utils/invoice_actions.dart';
@@ -71,17 +73,47 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
   void _snack(String m, {bool ok = false}) => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(m), backgroundColor: ok ? AppColors.success : AppColors.error));
 
-  Future<void> _apply(Map<String, dynamic> b) async {
+  Future<void> _accept(Map<String, dynamic> b) async {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
-    final result = await showCustomerApplySheet(context, b);
-    if (result == null) return;
+    final fare = (b['estimatedFare'] as num?)?.toInt() ?? 0;
+    final pct = (b['commitmentPercent'] as num?)?.toInt() ?? 0;
+    final hold = (pct > 0 && fare != 0) ? (fare * pct / 100).round() : 0;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Accept this booking?', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(child: acceptHoldContent(fare, pct, hold)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accept')),
+        ],
+      ),
+    );
+    if (ok != true) return;
     try {
-      await _repo.apply(id, result);
-      _snack('Offer sent! A commitment hold is placed on your wallet.', ok: true);
+      await _repo.accept(id);
+      _snack('Booking assigned to you! 🎉', ok: true);
       _loadAvailable();
       _loadMine();
     } catch (e) {
-      _snack('Could not apply: ${_clean(e)}');
+      if (!mounted) return;
+      final message = serverMessage(e, fallback: 'Could not accept the booking.');
+      final lowBalance = message.toLowerCase().contains('wallet') || message.toLowerCase().contains('balance');
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(lowBalance ? 'Add money to accept' : "Can't accept", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          content: Text(message, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            if (lowBalance)
+              ElevatedButton(
+                onPressed: () { Navigator.pop(ctx); context.push('/wallet'); },
+                child: const Text('Add Money'),
+              ),
+          ],
+        ),
+      );
     }
   }
 
@@ -244,7 +276,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
         padding: const EdgeInsets.all(16),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => CustomerRequestCard(items[i], onApply: () => _apply(items[i])),
+        itemBuilder: (_, i) => CustomerRequestCard(items[i], onApply: () => _accept(items[i])),
       ),
     );
   }
@@ -260,7 +292,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
         padding: const EdgeInsets.all(16),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _MyOfferCard(items[i],
+        itemBuilder: (_, i) => MyOfferCard(items[i],
             onStart: (id) => _tripOtpFlow(id, 'start'),
             onComplete: (id) => _tripOtpFlow(id, 'end'),
             onArrived: _arrived,
@@ -288,14 +320,14 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
 }
 
 
-class _MyOfferCard extends StatelessWidget {
+class MyOfferCard extends StatelessWidget {
   final Map<String, dynamic> b;
   final void Function(String id) onStart;
   final void Function(String id) onComplete;
   final void Function(String id) onArrived;
   final void Function(String id) onCancel;
   final void Function(String id) onInvoice;
-  const _MyOfferCard(this.b, {required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice});
+  const MyOfferCard(this.b, {super.key, required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice});
 
   @override
   Widget build(BuildContext context) {

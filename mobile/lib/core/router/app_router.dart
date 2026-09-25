@@ -138,6 +138,14 @@ class AppRouter {
         routes: [
           GoRoute(path: '/', builder: (_, __) => const HomePage()),
           GoRoute(path: '/requirements', builder: (_, __) => const RequirementsFeedPage()),
+          // "My Bookings" is a bottom-nav tab (Booking) — lives in the shell so it
+          // shows the bottom nav and has no back button. ?tab=2 deep-links Assigned.
+          GoRoute(
+            path: '/my-requirements',
+            builder: (_, state) => MyRequirementsPage(
+              initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0,
+            ),
+          ),
           GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
         ],
@@ -227,13 +235,6 @@ class AppRouter {
       ),
 
       // Detail Routes
-      GoRoute(
-        path: '/my-requirements',
-        // ?tab=2 deep-links to the Assigned tab (used by the assignment push).
-        builder: (_, state) => MyRequirementsPage(
-          initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0,
-        ),
-      ),
       GoRoute(
         path: '/requirements/create',
         builder: (_, __) => const CreateRequirementPage(),

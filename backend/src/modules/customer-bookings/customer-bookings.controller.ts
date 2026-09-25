@@ -116,6 +116,12 @@ export class CustomerBookingsController {
     return this.service.apply(userId, id, dto);
   }
 
+  @Post(':id/accept')
+  @ApiOperation({ summary: 'Golden Driver/Vendor: directly accept a booking (instant assign)' })
+  accept(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+    return this.service.acceptDirect(userId, id);
+  }
+
   @Post(':id/arrived')
   @ApiOperation({ summary: 'Driver: mark arriving at pickup (notifies customer)' })
   arrived(@CurrentUser('sub') userId: string, @Param('id') id: string) {
