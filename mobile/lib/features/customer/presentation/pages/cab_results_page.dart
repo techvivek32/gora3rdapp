@@ -79,12 +79,20 @@ class _CabResultsPageState extends State<CabResultsPage> {
       cats = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (_) {}
     if (cats.isEmpty) cats = _defaultCats.map((e) => Map<String, dynamic>.from(e)).toList();
-    // Global minimum bill km (applies to all cabs). Non-fatal if it fails.
+    // Global cab settings (min bill km + toll/tax fallback). Non-fatal if it fails.
     double minKm = 0;
+    double tollTaxPerKm = 0;
     try {
       final res = await _api.get('/settings');
       minKm = ((res.data['data']?['minBillKm']) as num?)?.toDouble() ?? 0;
+      tollTaxPerKm = ((res.data['data']?['tollTaxPerKm']) as num?)?.toDouble() ?? 0;
     } catch (_) {}
+    // When Google returns no toll amount (empty on many long/inter-state routes,
+    // and it never includes state tax), fall back to the admin ₹/km estimate for
+    // inter-city trips so "All Inclusive" still reflects toll + state tax.
+    if (toll <= 0 && tollTaxPerKm > 0 && dist >= 50) {
+      toll = (dist * tollTaxPerKm).roundToDouble();
+    }
     List<String> inc = [];
     try {
       final res = await _api.get('/home-content/inclusions');

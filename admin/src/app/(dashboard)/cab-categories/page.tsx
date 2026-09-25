@@ -86,23 +86,25 @@ export default function CabCategoriesPage() {
   // Interceptor extracts data?.data, so response.data = categoriesArray
   const items: CabCategory[] = Array.isArray((data as any)?.data) ? (data as any).data : [];
 
-  // ── Global minimum bill KM (applies to ALL cabs) ──────────────────────────────
+  // ── Global cab settings (apply to ALL cabs) ───────────────────────────────────
   const [minBillKm, setMinBillKm] = useState<number>(0);
+  const [tollTaxPerKm, setTollTaxPerKm] = useState<number>(0);
   const { data: settingsData } = useQuery({
-    queryKey: ['admin-settings-minbillkm'],
+    queryKey: ['admin-settings-cab'],
     queryFn: () => adminApi.getAdminSettings(),
   });
   useEffect(() => {
-    const v = (settingsData as any)?.data?.minBillKm;
-    if (typeof v === 'number') setMinBillKm(v);
+    const s = (settingsData as any)?.data;
+    if (typeof s?.minBillKm === 'number') setMinBillKm(s.minBillKm);
+    if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0 }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0 }),
     onSuccess: () => {
-      toast.success('Minimum bill KM saved');
-      queryClient.invalidateQueries({ queryKey: ['admin-settings-minbillkm'] });
+      toast.success('Cab settings saved');
+      queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
     },
-    onError: () => toast.error('Failed to save minimum bill KM'),
+    onError: () => toast.error('Failed to save cab settings'),
   });
 
   const buildPayload = () => ({
@@ -247,21 +249,38 @@ export default function CabCategoriesPage() {
         </button>
       </div>
 
-      {/* Global minimum bill KM — applies to every cab */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex items-end gap-3 flex-wrap">
-        <div className="flex-1 min-w-[240px]">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Bill KM (all cabs)</label>
-          <input
-            type="number"
-            min={0}
-            placeholder="e.g. 200 (0 = no minimum)"
-            value={minBillKm}
-            onChange={(e) => setMinBillKm(Number(e.target.value))}
-            className="w-full max-w-xs px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Applies to every cab. Shorter trips are billed for at least this many km — e.g. min 200 → a 69 km ride is charged as 200 km.
-          </p>
+      {/* Global cab settings — apply to every cab */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Bill KM (all cabs)</label>
+            <input
+              type="number"
+              min={0}
+              placeholder="e.g. 200 (0 = no minimum)"
+              value={minBillKm}
+              onChange={(e) => setMinBillKm(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Shorter trips are billed for at least this many km — e.g. min 200 → a 69 km ride is charged as 200 km.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Toll &amp; State Tax estimate (₹/km)</label>
+            <input
+              type="number"
+              min={0}
+              step="0.5"
+              placeholder="e.g. 1.5 (0 = off)"
+              value={tollTaxPerKm}
+              onChange={(e) => setTollTaxPerKm(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Used for the “All Inclusive” fare only when Google has no toll amount for a route (long/inter-state trips + state tax). e.g. 1200 km × ₹1.5 = ₹1800.
+            </p>
+          </div>
         </div>
         <button
           onClick={() => saveMinKmMutation.mutate()}

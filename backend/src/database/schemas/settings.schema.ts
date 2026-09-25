@@ -119,6 +119,14 @@ export class PlatformSettings {
    */
   @Prop({ default: 0, min: 0 })
   minBillKm: number;
+
+  /**
+   * Estimated toll + state-tax per km (₹), used for the "All Inclusive" fare ONLY
+   * when Google's Routes API returns no toll amount for a route (common on long
+   * Indian inter-state routes, and Google never includes state tax). 0 = disabled.
+   */
+  @Prop({ default: 0, min: 0 })
+  tollTaxPerKm: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

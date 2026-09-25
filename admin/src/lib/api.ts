@@ -267,6 +267,7 @@ export const adminApi = {
     driverCancelPenaltyPercent?: number;
     bookingCancellationPolicy?: string;
     minBillKm?: number;
+    tollTaxPerKm?: number;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

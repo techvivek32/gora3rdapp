@@ -61,6 +61,7 @@ export class SettingsController {
     bookingCancellationPolicy?: string;
     driverCancelPenaltyPercent?: number;
     minBillKm?: number;
+    tollTaxPerKm?: number;
   }) {
     return this.settingsService.updateSettings(body);
   }
