@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CustomerBookingsService } from './customer-bookings.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles, Public } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
@@ -58,6 +58,28 @@ export class CustomerBookingsController {
   @ApiOperation({ summary: 'Customer: create a booking request' })
   create(@CurrentUser('sub') userId: string, @Body() dto: CreateCustomerBookingDto) {
     return this.service.create(userId, dto);
+  }
+
+  // Public PDF via a short-lived signed token — the app opens this URL in the
+  // browser, so downloads work without native file plugins on the device.
+  @Get('invoice-file/:token')
+  @Public()
+  @ApiOperation({ summary: 'Public: PDF invoice for a valid signed token' })
+  async invoiceFile(@Param('token') token: string, @Res() res: Response) {
+    const { buffer, filename } = await this.service.getInvoiceByToken(token);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': String(buffer.length),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(buffer);
+  }
+
+  @Get(':id/invoice-link')
+  @ApiOperation({ summary: 'Get a short-lived tokenized link to open the invoice PDF' })
+  invoiceLink(@CurrentUser('sub') userId: string, @CurrentUser('role') role: string, @Param('id') id: string) {
+    return this.service.getInvoiceLink(userId, [role], id);
   }
 
   @Get(':id/invoice')

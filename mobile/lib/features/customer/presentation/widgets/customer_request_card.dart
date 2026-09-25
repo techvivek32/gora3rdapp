@@ -26,6 +26,16 @@ class CustomerRequestCard extends StatelessWidget {
     final fare = b['estimatedFare'] ?? 0;
     final applied = b['alreadyApplied'] == true;
     final subType = (b['subType'] ?? '').toString();
+    final status = (b['status'] ?? 'open').toString();
+    final isOpen = status == 'open';
+    // Confirmed/booked ones stay in the feed for 7 days (backend) with a stamp.
+    final (String, Color)? stamp = switch (status) {
+      'confirmed' || 'ongoing' => ('BOOKED', AppColors.primary),
+      'completed' => ('COMPLETED', AppColors.success),
+      'cancelled' => ('CANCELLED', AppColors.error),
+      'expired' => ('EXPIRED', AppColors.textHint),
+      _ => null,
+    };
 
     // Round-trip return date is carried in notes as "Return date: dd-MM-yyyy".
     // Show only the number of days (under the ROUND TRIP chip).
@@ -38,6 +48,8 @@ class CustomerRequestCard extends StatelessWidget {
     if (days != null && days < 1) days = null;
 
     return brandCard(
+      stamp: stamp?.$1,
+      stampColor: stamp?.$2,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -106,21 +118,24 @@ class CustomerRequestCard extends StatelessWidget {
             const Spacer(),
             if (fare != 0) Text('Budget: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
-          SizedBox(height: 12.h),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: applied ? null : onApply,
-              icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
-              label: Text(applied ? 'Accepted' : 'Accept'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: applied ? AppColors.textHint : AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 11.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          // Accept only while still open; once booked the stamp says it all.
+          if (isOpen) ...[
+            SizedBox(height: 12.h),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: applied ? null : onApply,
+                icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
+                label: Text(applied ? 'Accepted' : 'Accept'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: applied ? AppColors.textHint : AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 11.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );

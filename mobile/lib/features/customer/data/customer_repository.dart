@@ -49,6 +49,12 @@ class CustomerRepository {
   /// Download the completed-booking PDF invoice. Returns the raw bytes + a
   /// filename (from the server's Content-Disposition). Works for the customer,
   /// the selected driver, or an admin — the backend enforces access.
+  /// Short-lived token to open the invoice PDF via a public URL (no auth header).
+  Future<String> invoiceLinkToken(String id) async {
+    final res = await _api.get('/customer-bookings/$id/invoice-link');
+    return (res.data['data']?['token'] ?? res.data['token'] ?? '').toString();
+  }
+
   Future<({Uint8List bytes, String filename})> downloadInvoice(String id) async {
     final res = await _api.dio.get(
       '/customer-bookings/$id/invoice',

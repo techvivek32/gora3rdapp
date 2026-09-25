@@ -99,15 +99,6 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     } catch (_) {}
   }
 
-  void _soon(String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text('$feature — coming soon! 🚧', style: const TextStyle(fontFamily: 'Poppins')),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -302,17 +293,15 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   Widget _locationPill(String name) {
     final city = _cityName();
-    return GestureDetector(
-      onTap: () => _soon('City select'),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6)]),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.location_on, color: AppColors.primary, size: 15.sp),
-          SizedBox(width: 4.w),
-          Text(city.isEmpty ? 'Set city' : city, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-        ]),
-      ),
+    // Display-only — the city comes from the user's profile, so no tap action.
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 7.h),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 6)]),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.location_on, color: AppColors.primary, size: 15.sp),
+        SizedBox(width: 4.w),
+        Text(city.isEmpty ? 'Set city' : city, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+      ]),
     );
   }
 

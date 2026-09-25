@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -269,15 +270,71 @@ export class CustomerBookingsService {
     const booking: any = await this.bookingModel.findById(id).lean();
     if (!booking) throw new NotFoundException('Booking not found');
 
+    this.assertInvoiceAccess(booking, userId, roles);
+    return this.buildInvoiceForBooking(booking);
+  }
+
+  /** Access check shared by the direct download and the tokenized link. */
+  private assertInvoiceAccess(booking: any, userId: string, roles: string[]) {
     const isAdmin = (roles || []).some((r) => r === UserRole.ADMIN || r === UserRole.SUPER_ADMIN);
     const isCustomer = booking.customerId?.toString() === userId;
     const isDriver = booking.selectedDriverId?.toString() === userId;
     if (!isAdmin && !isCustomer && !isDriver) throw new ForbiddenException('Not allowed');
-
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('Invoice is available only after the trip is completed');
     }
+  }
 
+  // ── Tokenized invoice link (lets the app open the PDF in the browser, so it
+  // works without the path_provider/share_plus plugins on the device) ──────────
+  private invoiceSecret(): string {
+    return process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'gora-invoice';
+  }
+
+  private makeInvoiceToken(id: string): string {
+    const exp = Date.now() + 15 * 60 * 1000; // valid 15 minutes
+    const payload = `${id}.${exp}`;
+    const sig = crypto.createHmac('sha256', this.invoiceSecret()).update(payload).digest('hex');
+    return Buffer.from(`${payload}.${sig}`).toString('base64url');
+  }
+
+  private verifyInvoiceToken(token: string): string {
+    let decoded = '';
+    try {
+      decoded = Buffer.from(token, 'base64url').toString('utf8');
+    } catch {
+      throw new BadRequestException('Invalid invoice link');
+    }
+    const [id, expStr, sig] = decoded.split('.');
+    if (!id || !expStr || !sig) throw new BadRequestException('Invalid invoice link');
+    const expected = crypto.createHmac('sha256', this.invoiceSecret()).update(`${id}.${expStr}`).digest('hex');
+    if (expected !== sig) throw new ForbiddenException('Invalid or tampered invoice link');
+    if (Date.now() > Number(expStr)) throw new BadRequestException('Invoice link expired — please try again');
+    return id;
+  }
+
+  /** Access-checked → returns a short-lived token the app opens as a public URL. */
+  async getInvoiceLink(userId: string, roles: string[], id: string): Promise<{ token: string }> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const booking: any = await this.bookingModel.findById(id).lean();
+    if (!booking) throw new NotFoundException('Booking not found');
+    this.assertInvoiceAccess(booking, userId, roles);
+    return { token: this.makeInvoiceToken(id) };
+  }
+
+  /** Public: serve the PDF for a valid signed token (no login header needed). */
+  async getInvoiceByToken(token: string): Promise<{ buffer: Buffer; filename: string }> {
+    const id = this.verifyInvoiceToken(token);
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const booking: any = await this.bookingModel.findById(id).lean();
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== CustomerBookingStatus.COMPLETED) {
+      throw new BadRequestException('Invoice is available only after the trip is completed');
+    }
+    return this.buildInvoiceForBooking(booking);
+  }
+
+  private async buildInvoiceForBooking(booking: any): Promise<{ buffer: Buffer; filename: string }> {
     const customer: any = await this.userModel
       .findById(booking.customerId)
       .select('fullName mobile')
@@ -566,16 +623,30 @@ export class CustomerBookingsService {
       return { message: 'Golden membership required to view customer bookings', data: [], goldenRequired: true };
     }
     const cities = ((driver as any)?.businessCities ?? []).filter(Boolean);
+    // Keep confirmed/booked ones visible (with a BOOKED stamp) for 7 days after
+    // they were taken, like the requirements feed — then they drop off.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const statusCond = {
+      $or: [
+        { status: CustomerBookingStatus.OPEN },
+        {
+          status: { $in: [CustomerBookingStatus.CONFIRMED, CustomerBookingStatus.ONGOING, CustomerBookingStatus.COMPLETED] },
+          confirmedAt: { $gte: sevenDaysAgo },
+        },
+      ],
+    };
     const filter: any = {
-      status: CustomerBookingStatus.OPEN,
       customerId: { $ne: new Types.ObjectId(driverId) },
+      $and: [statusCond],
     };
     if (serviceType) filter.serviceType = serviceType;
     if (cities.length) {
-      filter.$or = [
-        { pickupCity: { $in: cities } },
-        { dropCity: { $in: cities } },
-      ];
+      filter.$and.push({
+        $or: [
+          { pickupCity: { $in: cities } },
+          { dropCity: { $in: cities } },
+        ],
+      });
     }
     const bookings = await this.bookingModel.find(filter).sort({ createdAt: -1 }).limit(100).lean();
     const uid = driverId;

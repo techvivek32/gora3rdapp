@@ -1,12 +1,11 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/config/env.dart';
 import '../../data/customer_repository.dart';
 
-/// Downloads the booking's PDF invoice, saves it to the temp dir, then opens the
-/// system share/open sheet so the user can view or save it. Shared by the
-/// customer booking-detail screen and the driver "My Offers" screen.
+/// Opens the booking's PDF invoice in the browser / PDF viewer via a short-lived
+/// signed URL. Uses url_launcher only (no file/share native plugins), so it works
+/// without path_provider. Shared by the customer + driver invoice buttons.
 Future<void> downloadAndOpenInvoice(
   BuildContext context,
   CustomerRepository repo,
@@ -14,23 +13,18 @@ Future<void> downloadAndOpenInvoice(
 ) async {
   final messenger = ScaffoldMessenger.of(context);
   messenger.showSnackBar(
-    const SnackBar(content: Text('Preparing invoice…'), duration: Duration(seconds: 1)),
+    const SnackBar(content: Text('Opening invoice…'), duration: Duration(seconds: 1)),
   );
   try {
-    final res = await repo.downloadInvoice(bookingId);
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/${res.filename}');
-    await file.writeAsBytes(res.bytes, flush: true);
-
-    await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/pdf', name: res.filename)],
-      subject: 'Gora Cabs Invoice',
-      text: 'Your Gora Cabs invoice for booking $bookingId.',
-    );
+    final token = await repo.invoiceLinkToken(bookingId);
+    if (token.isEmpty) throw Exception('Invoice link unavailable');
+    final url = Uri.parse('${Env.apiBaseUrl}/customer-bookings/invoice-file/$token');
+    final ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    if (!ok) throw Exception('Could not open the invoice');
   } catch (e) {
     messenger.showSnackBar(
       SnackBar(
-        content: Text('Could not download invoice: ${_msg(e)}'),
+        content: Text('Could not open invoice: ${_msg(e)}'),
         backgroundColor: Colors.red.shade600,
       ),
     );
