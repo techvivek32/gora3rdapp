@@ -62,6 +62,10 @@ export class CabCategory {
   @Prop({ default: 0 }) pricePerKmCng: number;
   @Prop({ default: 4 }) seats: number;
   @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
+  // Round-trip rental: included km PER DAY (0 = no per-day limit / unlimited).
+  @Prop({ default: 0 }) dailyKmLimit: number;
+  // ₹ charged per km beyond the included allowance (GPS-measured on the trip).
+  @Prop({ default: 0 }) extraKmPrice: number;
   // Per-cab info shown as tabs on the customer Confirm Booking screen.
   @Prop({ type: [String], default: [] }) inclusions: string[];
   @Prop({ type: [String], default: [] }) exclusions: string[];

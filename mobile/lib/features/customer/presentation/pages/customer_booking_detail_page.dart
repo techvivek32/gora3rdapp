@@ -376,6 +376,11 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           // Remaining details (Booking ID now in header; Passengers removed).
           if ((b['durationHours'] ?? 0) != 0) _kv(Icons.timelapse_rounded, 'Duration', '${b['durationHours']} hrs'),
           if ((b['estimatedFare'] ?? 0) != 0) _kv(Icons.currency_rupee_rounded, 'Your budget', '₹${b['estimatedFare']}'),
+          // Round-trip GPS km breakdown.
+          if ((b['includedKm'] ?? 0) != 0) _kv(Icons.route_rounded, 'Included KM', '${b['includedKm']} km'),
+          if ((b['trackedKm'] ?? 0) != 0) _kv(Icons.gps_fixed_rounded, 'Travelled KM', '${(b['trackedKm'] as num).toStringAsFixed(1)} km'),
+          if ((b['extraKm'] ?? 0) != 0)
+            _kv(Icons.add_road_rounded, 'Extra KM', '${b['extraKm']} km × ₹${b['extraKmPrice'] ?? 0} = ₹${b['extraCharge'] ?? 0}'),
           if ((b['finalFare'] ?? 0) != 0) _kv(Icons.receipt_long_rounded, 'Agreed fare', '₹${b['finalFare']}'),
           if (confirmed) _kv(Icons.payments_rounded, 'Payment', status == 'completed' ? 'Paid to driver directly' : 'Pay driver directly'),
           if (parsed.userNotes.isNotEmpty) _kv(Icons.notes_rounded, 'Notes', parsed.userNotes),

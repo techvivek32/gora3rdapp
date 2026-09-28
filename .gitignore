@@ -59,3 +59,6 @@ gora-backup/
 
 # Local flow/test screenshots (do NOT commit)
 flow_screenshots/
+
+# Local test screenshots (not committed)
+test_screenshots/

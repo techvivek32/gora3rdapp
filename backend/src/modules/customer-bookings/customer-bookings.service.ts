@@ -10,6 +10,7 @@ import {
 } from '../../database/schemas/customer-booking.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
+import { CabCategory, CabCategoryDocument } from '../../database/schemas/home-content.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -29,6 +30,7 @@ export class CustomerBookingsService {
     @InjectModel(CustomerBooking.name) private bookingModel: Model<CustomerBookingDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
+    @InjectModel(CabCategory.name) private cabCategoryModel: Model<CabCategoryDocument>,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
   ) {}
@@ -191,6 +193,10 @@ export class CustomerBookingsService {
       notes: dto.notes || '',
       estimatedFare: dto.estimatedFare || 0,
       estimatedDistance: dto.estimatedDistance || 0,
+      // Round-trip rental snapshot from the chosen cab (0 = no extra-km tracking).
+      dailyKmLimit: dto.dailyKmLimit || 0,
+      extraKmPrice: dto.extraKmPrice || 0,
+      includedKm: dto.includedKm || 0,
       commitmentPercent,
       status: CustomerBookingStatus.OPEN,
       expiresAt,
@@ -348,6 +354,34 @@ export class CustomerBookingsService {
     if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
     const fareMode = /all\s*inclusive/i.test(booking.notes || '') ? 'All Inclusive' : undefined;
 
+    // Car details for the invoice: match the booked class (vehicleType is the cab
+    // category name) and read its class/seats/bags/per-km rate from the admin panel.
+    const fuelMatch = /fuel[:\s-]*([a-zA-Z]+)/i.exec(booking.notes || '');
+    const fuel = fuelMatch ? fuelMatch[1] : '';
+    let carClass = '';
+    let carSeats = 0;
+    let carBags = '';
+    let ratePerKm = 0;
+    try {
+      if (booking.vehicleType) {
+        const cat: any = await this.cabCategoryModel
+          .findOne({ name: new RegExp(`^${booking.vehicleType}$`, 'i') })
+          .lean();
+        if (cat) {
+          carClass = cat.vehicleClass || '';
+          carSeats = cat.seats || 0;
+          carBags = cat.bags || '';
+          const f = fuel.toLowerCase();
+          ratePerKm =
+            (f === 'diesel' ? cat.pricePerKmDiesel : f === 'cng' ? cat.pricePerKmCng : f === 'petrol' ? cat.pricePerKmPetrol : 0) ||
+            cat.pricePerKm ||
+            0;
+        }
+      }
+    } catch {
+      /* best-effort — invoice still renders without car details */
+    }
+
     const buffer = await buildInvoicePdf({
       bookingId: booking.bookingId,
       serviceType: booking.serviceType,
@@ -358,6 +392,13 @@ export class CustomerBookingsService {
       driverPhone: booking.driverSnapshot?.phone || '',
       vehicle: booking.driverSnapshot?.vehicle || booking.vehicleType || '',
       vehicleNumber: booking.driverSnapshot?.vehicleNumber || '',
+      carName: booking.vehicleType || '',
+      carClass,
+      carSeats,
+      carBags,
+      carFuel: fuel,
+      ratePerKm,
+      dailyKmLimit: booking.dailyKmLimit || 0,
       pickup: booking.pickup?.address || '',
       drop: booking.drop?.address || '',
       pickupCity: booking.pickupCity || '',
@@ -371,6 +412,11 @@ export class CustomerBookingsService {
       fare,
       tollAmount,
       fareMode,
+      includedKm: booking.includedKm || 0,
+      trackedKm: booking.trackedKm || 0,
+      extraKm: booking.extraKm || 0,
+      extraKmPrice: booking.extraKmPrice || 0,
+      extraCharge: booking.extraCharge || 0,
       paymentMode: 'Cash — paid directly to the driver',
     });
 
@@ -936,6 +982,13 @@ export class CustomerBookingsService {
     } else {
       booking.status = CustomerBookingStatus.COMPLETED;
       booking.completedAt = new Date();
+      // Round-trip extra-km billing: GPS-measured km beyond the included allowance.
+      if ((booking.includedKm || 0) > 0 && (booking.extraKmPrice || 0) > 0) {
+        const extraKm = Math.max(0, Math.round((booking.trackedKm || 0) - booking.includedKm));
+        booking.extraKm = extraKm;
+        booking.extraCharge = Math.round(extraKm * booking.extraKmPrice);
+        booking.finalFare = Math.round((booking.finalFare || booking.estimatedFare || 0) + booking.extraCharge);
+      }
     }
     await booking.save();
 
@@ -949,6 +1002,25 @@ export class CustomerBookingsService {
         { type: 'customer_trip_completed', bookingId: booking.bookingId }).catch(() => {});
     }
     return { message: action === 'start' ? 'Trip started' : 'Trip completed', data: booking };
+  }
+
+  /**
+   * The selected driver reports the running GPS-measured distance (km) during an
+   * ongoing trip. We keep the max so retries / out-of-order pings never lower it.
+   */
+  async trackTrip(driverId: string, id: string, km: number) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const value = Number(km);
+    if (!isFinite(value) || value < 0) throw new BadRequestException('Invalid distance');
+    const booking = await this.bookingModel
+      .findOne({ _id: id, selectedDriverId: new Types.ObjectId(driverId), status: CustomerBookingStatus.ONGOING })
+      .select('trackedKm includedKm');
+    if (!booking) throw new BadRequestException('Trip is not active');
+    if (value > (booking.trackedKm || 0)) {
+      booking.trackedKm = Math.round(value * 10) / 10;
+      await booking.save();
+    }
+    return { message: 'ok', data: { trackedKm: booking.trackedKm, includedKm: booking.includedKm } };
   }
 
   async cancelByDriver(driverId: string, id: string, reason?: string) {

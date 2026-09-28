@@ -10,6 +10,14 @@ export interface InvoiceData {
   driverPhone?: string;
   vehicle?: string;
   vehicleNumber?: string;
+  // Booked cab class details (from the admin cab category).
+  carName?: string;
+  carClass?: string;
+  carSeats?: number;
+  carBags?: string;
+  carFuel?: string;
+  ratePerKm?: number;
+  dailyKmLimit?: number;
   pickup?: string;
   drop?: string;
   pickupCity?: string;
@@ -24,6 +32,12 @@ export interface InvoiceData {
   tollAmount?: number;
   fareMode?: string;
   paymentMode?: string;
+  // Round-trip GPS extra-km billing (optional).
+  includedKm?: number;
+  trackedKm?: number;
+  extraKm?: number;
+  extraKmPrice?: number;
+  extraCharge?: number;
 }
 
 const ORANGE = '#F26522';
@@ -94,14 +108,30 @@ export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
   // ── Trip details ─────────────────────────────────────────────────────────
   doc.fillColor(DARK).font('Helvetica-Bold').fontSize(13).text('Trip Details', M, y);
   y += 22;
+  const carLine = [data.carName, data.carClass].filter(Boolean).join(' • ');
+  const carExtra = [
+    data.carSeats ? `${data.carSeats} seats` : '',
+    data.carFuel || '',
+    data.carBags || '',
+  ].filter(Boolean).join(' • ');
   const rows: [string, string][] = [
     ['Service', [prettyService(data.serviceType), data.subType].filter(Boolean).join(' — ')],
+    ...(carLine ? ([['Cab', carLine]] as [string, string][]) : []),
+    ...(carExtra ? ([['Vehicle', carExtra]] as [string, string][]) : []),
+    ...((data.ratePerKm && data.ratePerKm > 0) ? ([['Rate', `Rs.${data.ratePerKm}/km`]] as [string, string][]) : []),
     ['Pickup', data.pickup || data.pickupCity || '-'],
     ['Drop', data.drop || data.dropCity || '-'],
     ['Trip start', fmtDate(data.startedAt)],
     ['Trip end', fmtDate(data.completedAt)],
     ['Distance', data.distanceKm ? `${data.distanceKm} km` : '-'],
     ['Passengers', data.passengers ? String(data.passengers) : '-'],
+    ...((data.includedKm && data.includedKm > 0)
+      ? ([
+          ['Included KM', `${data.includedKm} km`],
+          ['Travelled KM (GPS)', `${(data.trackedKm ?? 0).toFixed(1)} km`],
+          ...((data.extraKm && data.extraKm > 0) ? ([['Extra KM', `${data.extraKm} km`]] as [string, string][]) : []),
+        ] as [string, string][])
+      : []),
   ];
   doc.font('Helvetica').fontSize(10);
   for (const [k, v] of rows) {
@@ -116,9 +146,11 @@ export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
   doc.fillColor(DARK).font('Helvetica-Bold').fontSize(13).text('Fare Summary', M, y);
   y += 22;
 
-  const base = Math.max(0, Math.round((data.fare || 0) - (data.tollAmount || 0)));
+  const extraCharge = data.extraCharge && data.extraCharge > 0 ? data.extraCharge : 0;
+  const base = Math.max(0, Math.round((data.fare || 0) - (data.tollAmount || 0) - extraCharge));
   const items: [string, number][] = [['Ride fare' + (data.fareMode ? ` (${data.fareMode})` : ''), base]];
   if (data.tollAmount && data.tollAmount > 0) items.push(['Toll / taxes', data.tollAmount]);
+  if (extraCharge > 0) items.push([`Extra ${data.extraKm} km @ Rs.${data.extraKmPrice}/km`, extraCharge]);
 
   // header row
   doc.rect(M, y, contentW, 26).fill(DARK);

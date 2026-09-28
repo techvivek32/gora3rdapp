@@ -94,6 +94,19 @@ export class CustomerBooking {
   @Prop({ default: 0 }) estimatedFare: number;
   @Prop({ default: 0 }) estimatedDistance: number;
 
+  // ── Round-trip GPS km tracking + extra-km billing ──────────────────────────
+  // Snapshot of the cab's rental limits at accept time (so later admin edits
+  // don't change an in-progress trip).
+  @Prop({ default: 0 }) dailyKmLimit: number;
+  @Prop({ default: 0 }) extraKmPrice: number;
+  // Included allowance for this trip (dailyKmLimit × days). 0 = no extra tracking.
+  @Prop({ default: 0 }) includedKm: number;
+  // Live GPS-measured distance the driver has actually travelled (km).
+  @Prop({ default: 0 }) trackedKm: number;
+  // Finalised at trip completion.
+  @Prop({ default: 0 }) extraKm: number;
+  @Prop({ default: 0 }) extraCharge: number;
+
   @Prop({ type: String, enum: CustomerBookingStatus, default: CustomerBookingStatus.OPEN, index: true })
   status: CustomerBookingStatus;
 

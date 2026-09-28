@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
+import '../../data/trip_tracker.dart';
 import '../utils/invoice_actions.dart';
 import '../widgets/booking_card_ui.dart';
 import '../widgets/customer_request_card.dart';
@@ -165,6 +166,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     if (ok != true) return;
     try {
       await _repo.driverCancel(id, reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim());
+      await TripTracker.instance.stop();
       _snack('Trip cancelled', ok: true);
       _loadMine();
     } catch (e) {
@@ -188,6 +190,12 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     if (otp == null || otp.trim().isEmpty) return;
     try {
       await _repo.verifyTripOtp(id, action, otp.trim());
+      if (action == 'start') {
+        final ok = await TripTracker.instance.start(id);
+        if (!ok && mounted) _snack('Enable location to record trip distance.');
+      } else {
+        await TripTracker.instance.stop();
+      }
       _snack(action == 'start' ? 'Trip started 🚕' : 'Trip completed 🎉', ok: true);
       _loadMine();
     } catch (e) {

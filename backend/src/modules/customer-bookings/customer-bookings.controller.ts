@@ -167,6 +167,12 @@ export class CustomerBookingsController {
     return this.service.verifyTripOtp(userId, id, action, otp);
   }
 
+  @Post(':id/track')
+  @ApiOperation({ summary: 'Driver: report running GPS distance (km) during an ongoing trip' })
+  track(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body('km') km: number) {
+    return this.service.trackTrip(userId, id, km);
+  }
+
   @Post(':id/driver-cancel')
   @ApiOperation({ summary: 'Driver: cancel after being selected' })
   driverCancel(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: CancelBookingDto) {

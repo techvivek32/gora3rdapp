@@ -70,6 +70,19 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (_toll > 0) notes.add('Toll included (auto): ₹$_toll');
       if (_inclusions.isNotEmpty) notes.add('All Inclusive: ${_inclusions.join(', ')}');
     }
+    // Round-trip rental: snapshot the cab's per-day km limit + extra ₹/km and the
+    // included allowance (km/day × days) so the driver's GPS km can be billed.
+    final dailyKm = (_cat['dailyKmLimit'] as num?)?.toInt() ?? 0;
+    final extraKmP = (_cat['extraKmPrice'] as num?)?.toInt() ?? 0;
+    int days = 1;
+    if (_isRound) {
+      final rd = DateTime.tryParse((t['returnDate'] ?? '').toString());
+      final sd = DateTime.tryParse((t['travelDate'] ?? '').toString());
+      if (rd != null && sd != null) {
+        days = (DateTime(rd.year, rd.month, rd.day).difference(DateTime(sd.year, sd.month, sd.day)).inDays + 1).clamp(1, 60);
+      }
+    }
+    final includedKm = (_isRound && dailyKm > 0) ? dailyKm * days : 0;
     final body = <String, dynamic>{
       if (!_isEdit) 'serviceType': 'cab',
       if (t['subType'] != null) 'subType': t['subType'],
@@ -83,6 +96,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       'passengers': t['passengers'] ?? 1,
       if (_fare > 0) 'estimatedFare': _fare,
       if (_distanceKm > 0) 'estimatedDistance': _distanceKm.round(),
+      if (dailyKm > 0) 'dailyKmLimit': dailyKm,
+      if (extraKmP > 0) 'extraKmPrice': extraKmP,
+      if (includedKm > 0) 'includedKm': includedKm,
       'notes': notes.join(' • '),
     };
     try {
@@ -91,7 +107,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (!mounted) return;
       final id = (booking['_id'] ?? booking['id'] ?? _editId).toString();
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_isEdit ? 'Booking updated — drivers will re-send offers' : 'Booking confirmed — drivers will send offers'),
+        content: Text(_isEdit ? 'Booking updated' : 'Booking confirmed — waiting for a driver to accept'),
         backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
       ));

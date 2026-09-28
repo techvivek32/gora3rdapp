@@ -28,6 +28,10 @@ export class CreateCustomerBookingDto {
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsNumber() estimatedFare?: number;
   @IsOptional() @IsNumber() estimatedDistance?: number;
+  // Round-trip GPS rental snapshot (from the chosen cab category).
+  @IsOptional() @IsNumber() dailyKmLimit?: number;
+  @IsOptional() @IsNumber() extraKmPrice?: number;
+  @IsOptional() @IsNumber() includedKm?: number;
 }
 
 /** Customer edits an OPEN booking. serviceType cannot change (that's a new booking). */
@@ -46,6 +50,10 @@ export class UpdateCustomerBookingDto {
   @IsOptional() @IsString() notes?: string;
   @IsOptional() @IsNumber() estimatedFare?: number;
   @IsOptional() @IsNumber() estimatedDistance?: number;
+  // Round-trip GPS rental snapshot (from the chosen cab category).
+  @IsOptional() @IsNumber() dailyKmLimit?: number;
+  @IsOptional() @IsNumber() extraKmPrice?: number;
+  @IsOptional() @IsNumber() includedKm?: number;
 }
 
 export class ApplyBookingDto {

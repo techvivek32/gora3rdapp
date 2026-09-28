@@ -253,7 +253,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
           : await repo.createBooking(body);
       if (!mounted) return;
       final id = (booking['_id'] ?? booking['id'] ?? widget.bookingId ?? '').toString();
-      _snack(_isEdit ? 'Booking updated — drivers will re-send offers' : 'Request posted — drivers will start sending offers', ok: true);
+      _snack(_isEdit ? 'Booking updated' : 'Request posted — waiting for a driver to accept', ok: true);
       context.go('/customer/bookings/$id');
     } catch (e) {
       if (mounted) {
@@ -524,7 +524,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                 ),
               ),
               SizedBox(height: 6.h),
-              Text('Drivers near you send offers — you pick one. No upfront payment.',
+              Text('A nearby driver accepts your booking directly. No upfront payment.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
             ],
           ),

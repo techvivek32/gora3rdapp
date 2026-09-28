@@ -142,8 +142,8 @@ class CustomerRequestCard extends StatelessWidget {
   }
 }
 
-/// Content for the "Accept this booking?" dialog — explains WHY a commitment
-/// hold is placed and HOW it works, with the actual hold amount when known.
+/// Content for the "Accept this booking?" dialog — explains the commission that
+/// is deducted at accept and HOW it works, with the actual amount when known.
 Widget acceptHoldContent(int fare, int pct, int hold) {
   return Column(
     mainAxisSize: MainAxisSize.min,
@@ -163,17 +163,17 @@ Widget acceptHoldContent(int fare, int pct, int hold) {
           Expanded(
             child: Text(
               hold > 0
-                  ? 'A commitment hold of ₹$hold ($pct% of the fare) is kept from your wallet when you accept.'
-                  : 'A commitment hold is kept from your wallet when you accept.',
+                  ? 'A commission of ₹$hold ($pct% of the fare) is deducted from your wallet the moment you accept.'
+                  : 'A commission is deducted from your wallet the moment you accept.',
               style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
             ),
           ),
         ]),
       ),
       SizedBox(height: 12.h),
-      _holdPoint('Why?', 'It confirms you\'re serious and will complete the trip — it protects the customer from no-shows.'),
+      _holdPoint('Why?', 'This is your platform commission for the trip. You collect the full fare directly from the customer.'),
       SizedBox(height: 8.h),
-      _holdPoint('How it works', 'The amount is only HELD (not charged). It\'s settled once the trip is completed, and released back to your wallet if the booking is cancelled as per policy.'),
+      _holdPoint('How it works', 'It\'s charged once, right when you accept. If the booking is later cancelled as per policy, it\'s refunded to your wallet.'),
     ],
   );
 }

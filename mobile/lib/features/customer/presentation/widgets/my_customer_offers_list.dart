@@ -4,6 +4,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../data/customer_repository.dart';
+import '../../data/trip_tracker.dart';
 import '../pages/driver_customer_requests_page.dart' show MyOfferCard;
 import '../utils/invoice_actions.dart';
 
@@ -40,6 +41,13 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
         _mine = d.where((b) => (b['myOffer'] as Map?)?['status'] == 'selected').toList();
         _loading = false;
       });
+      // If a won trip is still ONGOING but the tracker isn't running (app was
+      // killed / phone restarted mid-trip), resume GPS distance tracking for it.
+      final ongoing = _mine.firstWhere((b) => b['status'] == 'ongoing', orElse: () => const {});
+      final oid = ongoing['_id']?.toString();
+      if (oid != null && oid.isNotEmpty && TripTracker.instance.currentBookingId != oid) {
+        TripTracker.instance.resumeIfActive(ongoingBookingId: oid);
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -96,6 +104,7 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
     if (ok != true) return;
     try {
       await _repo.driverCancel(id, reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim());
+      await TripTracker.instance.stop();
       _snack('Trip cancelled', ok: true);
       _load();
     } catch (e) {
@@ -117,6 +126,13 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
     if (otp == null || otp.trim().isEmpty) return;
     try {
       await _repo.verifyTripOtp(id, action, otp.trim());
+      // Start/stop GPS distance tracking with the trip.
+      if (action == 'start') {
+        final ok = await TripTracker.instance.start(id);
+        if (!ok && mounted) _snack('Enable location to record trip distance.');
+      } else {
+        await TripTracker.instance.stop();
+      }
       _snack(action == 'start' ? 'Trip started 🚕' : 'Trip completed 🎉', ok: true);
       _load();
     } catch (e) {

@@ -15,6 +15,8 @@ interface CabCategory {
   pricePerKmPetrol?: number;
   pricePerKmDiesel?: number;
   pricePerKmCng?: number;
+  dailyKmLimit?: number;
+  extraKmPrice?: number;
   seats?: number;
   bags?: string;
   inclusions?: string[];
@@ -29,6 +31,7 @@ interface CabCategory {
 const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
   pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
+  dailyKmLimit: 0, extraKmPrice: 0,
   seats: 0, bags: '',
   inclusions: [] as string[], exclusions: [] as string[], facilities: [] as string[], terms: [] as string[],
   order: 0, isActive: true,
@@ -119,6 +122,8 @@ export default function CabCategoriesPage() {
     pricePerKmPetrol: fuelActive.petrol ? (Number(form.pricePerKmPetrol) || 0) : 0,
     pricePerKmDiesel: fuelActive.diesel ? (Number(form.pricePerKmDiesel) || 0) : 0,
     pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
+    dailyKmLimit: Number(form.dailyKmLimit) || 0,
+    extraKmPrice: Number(form.extraKmPrice) || 0,
     seats: Number(form.seats) || 0,
     bags: form.bags.trim(),
     inclusions: form.inclusions,
@@ -185,6 +190,8 @@ export default function CabCategoriesPage() {
       pricePerKmPetrol: it.pricePerKmPetrol ?? 0,
       pricePerKmDiesel: it.pricePerKmDiesel ?? 0,
       pricePerKmCng: it.pricePerKmCng ?? 0,
+      dailyKmLimit: it.dailyKmLimit ?? 0,
+      extraKmPrice: it.extraKmPrice ?? 0,
       seats: it.seats ?? 0,
       bags: it.bags ?? '',
       inclusions: it.inclusions ?? [],
@@ -451,7 +458,32 @@ export default function CabCategoriesPage() {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Round-trip KM / day</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 250 (0 = no limit)"
+                value={form.dailyKmLimit}
+                onChange={(e) => setForm({ ...form, dailyKmLimit: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Extra KM price (₹/km)</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 10"
+                value={form.extraKmPrice}
+                onChange={(e) => setForm({ ...form, extraKmPrice: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
           </div>
+          <p className="text-xs text-gray-500 -mt-2">
+            Round trip: included km = KM/day × days (e.g. 250 × 3 = 750). GPS measures the driver’s actual km; anything beyond is billed at the extra ₹/km.
+          </p>
 
           {/* Per-cab info tabs — shown on the customer Confirm Booking screen */}
           <div>
@@ -512,6 +544,7 @@ export default function CabCategoriesPage() {
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Class</th>
                   <th className="px-4 py-3">₹ / km</th>
+                  <th className="px-4 py-3">Rental</th>
                   <th className="px-4 py-3">Seats</th>
                   <th className="px-4 py-3">Bags</th>
                   <th className="px-4 py-3">Order</th>
@@ -540,6 +573,7 @@ export default function CabCategoriesPage() {
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.vehicleClass || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">₹{it.pricePerKm}</td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.dailyKmLimit ? `${it.dailyKmLimit} km/day · ₹${it.extraKmPrice || 0}/extra` : '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.seats ? it.seats : '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.bags || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.order}</td>

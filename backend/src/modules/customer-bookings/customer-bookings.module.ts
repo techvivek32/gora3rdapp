@@ -5,6 +5,7 @@ import { CustomerBookingsService } from './customer-bookings.service';
 import { CustomerBooking, CustomerBookingSchema } from '../../database/schemas/customer-booking.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionSchema } from '../../database/schemas/wallet-transaction.schema';
+import { CabCategory, CabCategorySchema } from '../../database/schemas/home-content.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -14,6 +15,7 @@ import { SettingsModule } from '../settings/settings.module';
       { name: CustomerBooking.name, schema: CustomerBookingSchema },
       { name: User.name, schema: UserSchema },
       { name: WalletTransaction.name, schema: WalletTransactionSchema },
+      { name: CabCategory.name, schema: CabCategorySchema },
     ]),
     NotificationsModule,
     SettingsModule,
