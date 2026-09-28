@@ -284,7 +284,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
         padding: const EdgeInsets.all(16),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => CustomerRequestCard(items[i], onApply: () => _accept(items[i])),
+        itemBuilder: (_, i) => CustomerRequestCard(items[i], canAccept: items[i]['canAccept'] != false, onApply: () => _accept(items[i])),
       ),
     );
   }

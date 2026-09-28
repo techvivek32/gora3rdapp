@@ -14,7 +14,10 @@ import 'booking_card_ui.dart';
 class CustomerRequestCard extends StatelessWidget {
   final Map<String, dynamic> booking;
   final VoidCallback onApply;
-  const CustomerRequestCard(this.booking, {super.key, required this.onApply});
+  /// Only Golden members can accept. When false, the card shows a
+  /// "Golden membership required" note in place of the Accept button.
+  final bool canAccept;
+  const CustomerRequestCard(this.booking, {super.key, required this.onApply, this.canAccept = true});
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +49,13 @@ class CustomerRequestCard extends StatelessWidget {
         ? returnDate.difference(DateTime(date.year, date.month, date.day)).inDays + 1
         : null;
     if (days != null && days < 1) days = null;
+
+    // Fare inclusions + round-trip extra-km terms, shown so the driver knows
+    // exactly what's covered before accepting.
+    final notes = (b['notes'] ?? '').toString();
+    final isInclusive = RegExp(r'all\s*inclusive', caseSensitive: false).hasMatch(notes);
+    final includedKm = (b['includedKm'] as num?)?.toInt() ?? 0;
+    final extraKmPrice = (b['extraKmPrice'] as num?)?.toInt() ?? 0;
 
     return brandCard(
       stamp: stamp?.$1,
@@ -118,23 +128,75 @@ class CustomerRequestCard extends StatelessWidget {
             const Spacer(),
             if (fare != 0) Text('Budget: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
-          // Accept only while still open; once booked the stamp says it all.
-          if (isOpen) ...[
-            SizedBox(height: 12.h),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: applied ? null : onApply,
-                icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
-                label: Text(applied ? 'Accepted' : 'Accept'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: applied ? AppColors.textHint : AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 11.h),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                ),
+          // Fare inclusions/exclusions (one clean line, no boxed background).
+          SizedBox(height: 10.h),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(isInclusive ? Icons.verified_rounded : Icons.info_outline_rounded,
+                size: 15.sp, color: isInclusive ? AppColors.success : AppColors.warning),
+            SizedBox(width: 6.w),
+            Expanded(
+              child: Text(
+                isInclusive
+                    ? 'All Inclusive — Toll, State tax, Car parking, Driver allowance & GST included'
+                    : 'Best Price — Toll, state tax & parking excluded (collect from customer)',
+                style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600,
+                    color: isInclusive ? AppColors.success : AppColors.warning),
               ),
             ),
+          ]),
+          // Included-km / extra-km terms — outside, no white background.
+          if (includedKm > 0 || extraKmPrice > 0) ...[
+            SizedBox(height: 8.h),
+            Row(children: [
+              if (includedKm > 0) _kmInfo(Icons.speed_rounded, 'Included $includedKm km'),
+              if (includedKm > 0 && extraKmPrice > 0) SizedBox(width: 16.w),
+              if (extraKmPrice > 0) _kmInfo(Icons.add_road_rounded, 'Extra ₹$extraKmPrice/km'),
+            ]),
+          ],
+          // Accept only while still open; once booked the stamp says it all.
+          // Everyone SEES the booking, but only Golden members can accept —
+          // others get a "Golden membership required" note instead of the button.
+          if (isOpen) ...[
+            SizedBox(height: 12.h),
+            if (canAccept)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: applied ? null : onApply,
+                  icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
+                  label: Text(applied ? 'Accepted' : 'Accept'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: applied ? AppColors.textHint : AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(vertical: 11.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.workspace_premium_rounded, size: 18.sp, color: AppColors.warning),
+                    SizedBox(width: 8.w),
+                    Flexible(
+                      child: Text(
+                        'Golden membership required to accept',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.warning),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ],
       ),
@@ -142,8 +204,19 @@ class CustomerRequestCard extends StatelessWidget {
   }
 }
 
-/// Content for the "Accept this booking?" dialog — explains the commission that
-/// is deducted at accept and HOW it works, with the actual amount when known.
+/// Included-km / extra-km-rate term — plain icon + text, no background.
+Widget _kmInfo(IconData icon, String label) {
+  return Row(mainAxisSize: MainAxisSize.min, children: [
+    Icon(icon, size: 14.sp, color: AppColors.textSecondary),
+    SizedBox(width: 5.w),
+    Text(label, style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+  ]);
+}
+
+/// Content for the "Accept this booking?" dialog. Accepting is FREE — no
+/// commission or hold is charged; you only need a minimum wallet balance to be
+/// eligible (set by admin). `pct`/`hold` are unused now, kept for call-site
+/// compatibility.
 Widget acceptHoldContent(int fare, int pct, int hold) {
   return Column(
     mainAxisSize: MainAxisSize.min,
@@ -156,24 +229,20 @@ Widget acceptHoldContent(int fare, int pct, int hold) {
       SizedBox(height: 12.h),
       Container(
         padding: EdgeInsets.all(10.w),
-        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10.r)),
+        decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(10.r)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(Icons.lock_outline_rounded, size: 16.sp, color: AppColors.primary),
+          Icon(Icons.verified_rounded, size: 16.sp, color: AppColors.success),
           SizedBox(width: 8.w),
           Expanded(
             child: Text(
-              hold > 0
-                  ? 'A commission of ₹$hold ($pct% of the fare) is deducted from your wallet the moment you accept.'
-                  : 'A commission is deducted from your wallet the moment you accept.',
-              style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.primary),
+              'No commission and nothing is deducted on accept — you collect the full fare directly from the customer.',
+              style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.success),
             ),
           ),
         ]),
       ),
       SizedBox(height: 12.h),
-      _holdPoint('Why?', 'This is your platform commission for the trip. You collect the full fare directly from the customer.'),
-      SizedBox(height: 8.h),
-      _holdPoint('How it works', 'It\'s charged once, right when you accept. If the booking is later cancelled as per policy, it\'s refunded to your wallet.'),
+      _holdPoint('Eligibility', 'You just need to keep a minimum wallet balance (set by admin) to accept bookings. It is only checked, never charged.'),
     ],
   );
 }

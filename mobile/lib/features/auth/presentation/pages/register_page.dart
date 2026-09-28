@@ -14,11 +14,10 @@ import '../../../../core/widgets/places_city_field.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
 
-/// A single KYC document the user must provide (id number + image).
+/// A single KYC document the user must provide (front + back image, both required).
 class _DocField {
   final String key; // matches backend: aadhar, pan, drivingLicense, vehicleRc
   final String label;
-  final TextEditingController numberCtrl = TextEditingController();
   Uint8List? bytes; // front side
   Uint8List? backBytes; // back side
   _DocField(this.key, this.label);
@@ -93,9 +92,6 @@ class _RegisterPageState extends State<RegisterPage> {
     _referralCtrl.dispose();
     _cityCtrl.dispose();
     _stateCtrl.dispose();
-    for (final d in _docs.values) {
-      d.numberCtrl.dispose();
-    }
     super.dispose();
   }
 
@@ -158,6 +154,15 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // KYC documents are mandatory — both front and back images for each.
+    for (final key in _visibleDocKeys) {
+      final d = _docs[key]!;
+      if (d.bytes == null || d.backBytes == null) {
+        _snack('Please upload both front and back images of ${d.label}.');
+        return;
+      }
+    }
 
     // Step 1 — send an OTP to the mobile number (also checks email/mobile aren't
     // already registered).
@@ -234,23 +239,20 @@ class _RegisterPageState extends State<RegisterPage> {
         await _apiClient.dio.put('/users/profile', data: {'profileImage': profileUrl});
       }
 
-      // Build a verification payload only from documents the user actually filled.
+      // Front + back images are required (validated before OTP), so always upload
+      // both for every KYC document. No document number is collected anymore.
       final body = <String, dynamic>{};
       for (final key in _visibleDocKeys) {
         final d = _docs[key]!;
-        final hasNumber = d.numberCtrl.text.trim().isNotEmpty;
-        final hasImage = d.bytes != null;
-        final hasBack = d.backBytes != null;
-        if (!hasNumber && !hasImage && !hasBack) continue;
+        if (d.bytes == null || d.backBytes == null) continue;
         setState(() => _status = 'Uploading documents...');
-        final entry = <String, dynamic>{};
-        if (hasNumber) entry['number'] = d.numberCtrl.text.trim();
-        if (hasImage) entry['image'] = await _uploadImage(d.bytes!, '${key}_front');
-        if (hasBack) entry['backImage'] = await _uploadImage(d.backBytes!, '${key}_back');
-        body[key] = entry;
+        body[key] = {
+          'image': await _uploadImage(d.bytes!, '${key}_front'),
+          'backImage': await _uploadImage(d.backBytes!, '${key}_back'),
+        };
       }
 
-      // Submit for verification only when at least one document was provided.
+      // Submit for verification (documents are mandatory).
       if (body.isNotEmpty) {
         setState(() => _status = 'Submitting documents...');
         await _apiClient.dio.post('/users/verification', data: body);
@@ -406,7 +408,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Optional — add documents now or later from your profile to get verified.',
+                    'Required — upload front & back photos of each document to get verified.',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ),
@@ -509,7 +511,8 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _buildDocTile(_DocField doc) {
-    final hasData = doc.bytes != null || doc.backBytes != null || doc.numberCtrl.text.trim().isNotEmpty;
+    // Complete only when BOTH sides are uploaded (both are required).
+    final hasData = doc.bytes != null && doc.backBytes != null;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -531,14 +534,10 @@ class _RegisterPageState extends State<RegisterPage> {
               ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
               : const Icon(Icons.keyboard_arrow_down),
           children: [
-            TextFormField(
-              controller: doc.numberCtrl,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: '${doc.label} Number',
-                isDense: true,
-                prefixIcon: const Icon(Icons.badge_outlined),
-              ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Upload clear photos of both sides (required).',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
             ),
             const SizedBox(height: 12),
             _docSideBox(doc, back: false),

@@ -664,10 +664,10 @@ export class CustomerBookingsService {
       .findById(driverId)
       .select('businessCities isGolden membershipType membershipExpiresAt')
       .lean();
-    // Only Golden members can see customer-app bookings (active/free cannot).
-    if (!this.isGoldenActive(driver)) {
-      return { message: 'Golden membership required to view customer bookings', data: [], goldenRequired: true };
-    }
+    // Everyone can SEE customer-app bookings; only Golden members can ACCEPT them.
+    // `canAccept` drives whether the app shows the Accept button or a
+    // "Golden membership required" note in its place.
+    const canAccept = this.isGoldenActive(driver);
     const cities = ((driver as any)?.businessCities ?? []).filter(Boolean);
     // Keep confirmed/booked ones visible (with a BOOKED stamp) for 7 days after
     // they were taken, like the requirements feed — then they drop off.
@@ -701,9 +701,11 @@ export class CustomerBookingsService {
       ...b,
       offerCount: (b.offers ?? []).filter((o: any) => o.status !== 'released').length,
       alreadyApplied: (b.offers ?? []).some((o: any) => o.driverId.toString() === uid && o.status !== 'released'),
+      // Per-item so it survives the response interceptor (which keeps only `data`).
+      canAccept,
       offers: undefined,
     }));
-    return { message: 'Available bookings', data };
+    return { message: 'Available bookings', data, canAccept, goldenRequired: !canAccept };
   }
 
   async apply(driverId: string, id: string, dto: ApplyBookingDto) {
@@ -790,10 +792,21 @@ export class CustomerBookingsService {
   async acceptDirect(driverId: string, id: string) {
     const driver = await this.userModel
       .findById(driverId)
-      .select('isGolden membershipType membershipExpiresAt fullName agencyName mobile rating')
+      .select('isGolden membershipType membershipExpiresAt fullName agencyName mobile rating walletBalance')
       .lean();
     if (!this.isGoldenActive(driver)) {
       throw new ForbiddenException('Only Golden members can accept customer bookings directly.');
+    }
+
+    // No commission is held/charged on accept anymore. Instead the driver must
+    // simply keep a minimum wallet balance (set by admin) to be eligible.
+    const settings: any = await this.settings.getSettings();
+    const minWallet = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
+    const balance = (driver as any)?.walletBalance || 0;
+    if (minWallet > 0 && balance < minWallet) {
+      throw new BadRequestException(
+        `A minimum wallet balance of ₹${minWallet} is required to accept bookings. Your balance is ₹${Math.round(balance)}. Please recharge.`,
+      );
     }
 
     const booking = await this.bookingModel.findById(id);
@@ -803,13 +816,6 @@ export class CustomerBookingsService {
 
     const dId = new Types.ObjectId(driverId);
     const fare = booking.estimatedFare || 0;
-    const holdAmount = Math.round((fare * (booking.commitmentPercent || 0)) / 100);
-
-    // Place the commitment hold first (atomic on the wallet).
-    const held = await this.holdFunds(dId, holdAmount, booking._id);
-    if (!held) {
-      throw new BadRequestException(`Insufficient wallet balance. You need ₹${holdAmount} available to accept this booking.`);
-    }
 
     // Atomically claim OPEN → CONFIRMED so two accepts can't both win.
     const claimed = await this.bookingModel.findOneAndUpdate(
@@ -817,12 +823,10 @@ export class CustomerBookingsService {
       { $set: { status: CustomerBookingStatus.CONFIRMED } },
     );
     if (!claimed) {
-      await this.releaseHold(dId, holdAmount, booking._id);
       throw new BadRequestException('This booking was just taken. Please pick another.');
     }
 
-    // We're the selected driver → settle our hold; release everyone else's.
-    await this.settleHold(dId, holdAmount, booking._id);
+    // Release any earlier applicants' commitment holds (from the older apply flow).
     for (const o of booking.offers as any[]) {
       if (o.status === 'applied') {
         await this.releaseHold(o.driverId, o.holdAmount, booking._id);
@@ -833,7 +837,7 @@ export class CustomerBookingsService {
     booking.offers.push({
       driverId: dId,
       quotedFare: fare,
-      holdAmount,
+      holdAmount: 0,
       vehicle: '',
       vehicleNumber: '',
       vehicleImage: '',

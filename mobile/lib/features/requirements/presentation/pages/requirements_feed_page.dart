@@ -302,7 +302,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 final data = entry['data'] as Map<String, dynamic>;
                 // Customer-side booking → offer/apply card.
                 if (entry['_kind'] == 'cust') {
-                  return CustomerRequestCard(data, onApply: () => _applyCustomer(data));
+                  return CustomerRequestCard(data, canAccept: data['canAccept'] != false, onApply: () => _applyCustomer(data));
                 }
                 // Requirement card with the caution marquee above it.
                 return Column(

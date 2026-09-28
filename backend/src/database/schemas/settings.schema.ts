@@ -127,6 +127,14 @@ export class PlatformSettings {
    */
   @Prop({ default: 0, min: 0 })
   tollTaxPerKm: number;
+
+  /**
+   * Minimum wallet balance (₹) a Golden driver/vendor must have to ACCEPT a
+   * customer booking. Nothing is deducted — it's only an eligibility check.
+   * 0 = no minimum (anyone Golden can accept).
+   */
+  @Prop({ default: 0, min: 0 })
+  minWalletToAccept: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

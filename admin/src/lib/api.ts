@@ -268,6 +268,7 @@ export const adminApi = {
     bookingCancellationPolicy?: string;
     minBillKm?: number;
     tollTaxPerKm?: number;
+    minWalletToAccept?: number;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

@@ -75,6 +75,10 @@ class CustomerRepository {
   Future<List<Map<String, dynamic>>> available({String? serviceType}) async {
     final res = await _api.get('/customer-bookings/available',
         params: {if (serviceType != null) 'serviceType': serviceType});
+    // Everyone sees the bookings; only Golden members can accept. The backend
+    // stamps `canAccept` onto each item (survives the response interceptor), so
+    // cards show the Accept button (Golden) or a "Golden membership required"
+    // note (others). Missing flag defaults to allowed.
     return _list(res.data['data']);
   }
 
@@ -84,7 +88,8 @@ class CustomerRepository {
   }
 
   /// Golden driver/vendor directly accepts a booking → assigned immediately
-  /// (no offer / customer selection). Places the commitment hold + settles it.
+  /// (no offer / customer selection). No commission/hold is charged; the driver
+  /// only needs a minimum wallet balance (set by admin) to be eligible.
   Future<void> accept(String id) async {
     await _api.post('/customer-bookings/$id/accept');
   }
