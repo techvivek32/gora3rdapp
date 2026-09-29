@@ -46,6 +46,11 @@ interface AcceptedDriver {
   walletBalance?: number;
   vehicleNumber?: string;
   vehicleRcImage?: string;
+  offerVehicle?: string;
+  offerVehicleNumber?: string;
+  offerVehicleImage?: string;
+  assignedDriverName?: string;
+  assignedDriverPhone?: string;
   completedTrips?: number;
 }
 
@@ -178,10 +183,17 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
                       {d.city && <><span className="text-gray-300">·</span><span>{d.city}</span></>}
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
-                      {d.vehicleNumber && <span>🚗 {d.vehicleNumber}</span>}
-                      <span className="text-gray-300">·</span>
+                      {(d.offerVehicle || d.offerVehicleNumber) && (
+                        <span>🚗 {[d.offerVehicle, d.offerVehicleNumber].filter(Boolean).join(' · ')}</span>
+                      )}
+                      {(d.offerVehicle || d.offerVehicleNumber) && <span className="text-gray-300">·</span>}
                       <span>Wallet ₹{d.walletBalance ?? 0}</span>
                     </div>
+                    {(d.assignedDriverName || d.assignedDriverPhone) && (
+                      <div className="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                        👤 Driver: <b>{d.assignedDriverName || '—'}</b>{d.assignedDriverPhone ? ` · ${d.assignedDriverPhone}` : ''}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => { setError(''); assign.mutate(d.driverId); }}

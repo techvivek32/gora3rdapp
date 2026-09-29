@@ -65,6 +65,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   TimeOfDay _time = TimeOfDay.now();
   int _passengers = 1;
   int _durationHours = 4;
+  int _localHours = 8; // Local (hourly rental) package length
   String? _subType;
   String? _vehicle;
   DateTime? _returnDate; // round-trip return (cab layout)
@@ -177,6 +178,16 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   // Cab "Explore Cabs": validate the route, then open the fare-estimate results
   // screen (the booking is created there when the customer picks a cab + Book Now).
   void _exploreCabs() {
+    // Local (hourly rental) has no destination — fare is by the chosen package,
+    // so we create the booking directly instead of the distance-based results.
+    if (_subType == 'Local') {
+      if (_pickupCtrl.text.trim().isEmpty) {
+        _snack('Please select a pickup location');
+        return;
+      }
+      _createLocalBooking();
+      return;
+    }
     if (_pickupCtrl.text.trim().isEmpty || _dropCtrl.text.trim().isEmpty) {
       _snack('Please select From and To locations');
       return;
@@ -201,6 +212,38 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
     };
     context.push('/customer/cab-results', extra: trip);
+  }
+
+  /// Local hourly rental → create the booking straight away (no destination /
+  /// distance step). Drivers accept and the fare is settled for the package.
+  Future<void> _createLocalBooking() async {
+    setState(() => _busy = true);
+    final body = <String, dynamic>{
+      if (!_isEdit) 'serviceType': 'cab',
+      'subType': 'Local',
+      if (_vehicle != null) 'vehicleType': _vehicle,
+      'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
+      'pickupCity': _pickupCity,
+      'travelDate': ymdString(_date),
+      'travelTime': _time.format(context),
+      'durationHours': _localHours,
+      'notes': 'Local $_localHours-hour package',
+    };
+    try {
+      final repo = getIt<CustomerRepository>();
+      final booking = _isEdit
+          ? await repo.updateBooking(widget.bookingId!, body)
+          : await repo.createBooking(body);
+      if (!mounted) return;
+      final id = (booking['_id'] ?? booking['id'] ?? widget.bookingId ?? '').toString();
+      _snack(_isEdit ? 'Booking updated' : 'Request posted — waiting for a driver to accept', ok: true);
+      context.go('/customer/bookings/$id');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _busy = false);
+        _snack(_isEdit ? 'Could not update: $e' : 'Could not post request: $e');
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -584,7 +627,12 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
             SizedBox(height: 14.h),
             _tripTypeTabs(),
             SizedBox(height: 14.h),
-            // FROM / TO
+            // Local hourly-package picker sits ABOVE the pickup (no destination).
+            if (_subType == 'Local') ...[
+              _localDurationChips(),
+              SizedBox(height: 14.h),
+            ],
+            // FROM (+ TO / stops only for point-to-point trips; Local = pickup only)
             Column(
               children: [
                 AddressAutocompleteField(
@@ -594,46 +642,51 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
                 ),
-                for (int i = 0; i < _stops.length; i++) ...[
-                  SizedBox(height: 10.h),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: AddressAutocompleteField(
-                          controller: _stops[i].ctrl,
-                          label: 'Stop ${i + 1}',
-                          prefixIcon: Icons.more_vert_rounded,
-                          onSelected: (a, lat, lng, city) { _stops[i].lat = lat; _stops[i].lng = lng; _stops[i].city = city; },
+                if (_subType != 'Local') ...[
+                  for (int i = 0; i < _stops.length; i++) ...[
+                    SizedBox(height: 10.h),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: AddressAutocompleteField(
+                            controller: _stops[i].ctrl,
+                            label: 'Stop ${i + 1}',
+                            prefixIcon: Icons.more_vert_rounded,
+                            onSelected: (a, lat, lng, city) { _stops[i].lat = lat; _stops[i].lng = lng; _stops[i].city = city; },
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _removeStop(i),
-                        icon: Icon(Icons.close_rounded, color: AppColors.error, size: 20.sp),
-                        tooltip: 'Remove stop',
-                      ),
-                    ],
+                        IconButton(
+                          onPressed: () => _removeStop(i),
+                          icon: Icon(Icons.close_rounded, color: AppColors.error, size: 20.sp),
+                          tooltip: 'Remove stop',
+                        ),
+                      ],
+                    ),
+                  ],
+                  SizedBox(height: 10.h),
+                  AddressAutocompleteField(
+                    controller: _dropCtrl,
+                    label: 'To',
+                    prefixIcon: Icons.location_on_rounded,
+                    onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
                   ),
                 ],
-                SizedBox(height: 10.h),
-                AddressAutocompleteField(
-                  controller: _dropCtrl,
-                  label: 'To',
-                  prefixIcon: Icons.location_on_rounded,
-                  onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
-                ),
               ],
             ),
-            SizedBox(height: 14.h),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: _addStop,
-                icon: Icon(Icons.add, size: 16.sp, color: _teal),
-                label: Text('ADD STOPS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: _teal, fontFamily: 'Poppins')),
-                style: OutlinedButton.styleFrom(side: const BorderSide(color: _teal, width: 1.3), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+            // Add Stops only for point-to-point trips (not Local).
+            if (_subType != 'Local') ...[
+              SizedBox(height: 14.h),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: _addStop,
+                  icon: Icon(Icons.add, size: 16.sp, color: _teal),
+                  label: Text('ADD STOPS', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: _teal, fontFamily: 'Poppins')),
+                  style: OutlinedButton.styleFrom(side: const BorderSide(color: _teal, width: 1.3), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h)),
+                ),
               ),
-            ),
+            ],
             SizedBox(height: 14.h),
             _dtBox('TRIP START', Icons.calendar_today_rounded, DateFormat('dd-MM-yyyy').format(_date), _time.format(context), _pickDateTime),
             if (isRound) ...[
@@ -697,6 +750,47 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
           );
         }).toList(),
       ),
+    );
+  }
+
+  // Local (hourly rental) package chips — shown only for the "Local" trip type.
+  Widget _localDurationChips() {
+    const hours = [6, 8, 10, 12];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('PACKAGE', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w800, color: AppColors.textSecondary, letterSpacing: 0.4, fontFamily: 'Poppins')),
+        SizedBox(height: 8.h),
+        Row(
+          children: hours.map((h) {
+            final sel = _localHours == h;
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: h == hours.last ? 0 : 8.w),
+                child: GestureDetector(
+                  onTap: () => setState(() => _localHours = h),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: sel ? AppColors.primary : const Color(0xFFEFF3F6),
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: sel ? AppColors.primary : AppColors.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('$h', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                        Text('hour', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: sel ? Colors.white : AppColors.textSecondary, fontFamily: 'Poppins')),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatListPage extends StatefulWidget {
@@ -11,6 +12,11 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
+  // The ChatBloc is shared with the chat room, so opening a chat flips its state
+  // to MessagesLoaded. Cache the last loaded chats so returning here never shows
+  // a blank screen while we reload.
+  List _cached = [];
+
   @override
   void initState() {
     super.initState();
@@ -20,13 +26,25 @@ class _ChatListPageState extends State<ChatListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Messages'), centerTitle: true),
-      body: BlocBuilder<ChatBloc, ChatState>(
+      appBar: AppBar(
+        title: const Text('Messages'),
+        centerTitle: true,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      body: BlocConsumer<ChatBloc, ChatState>(
+        listener: (context, state) {
+          if (state is ChatsLoaded) setState(() => _cached = state.chats);
+        },
         builder: (context, state) {
-          if (state is ChatLoading) return const Center(child: CircularProgressIndicator());
-          if (state is ChatError) return Center(child: Text(state.message));
-          if (state is ChatsLoaded) {
-            if (state.chats.isEmpty) {
+          // While a chat room is open the shared bloc holds MessagesLoaded — fall
+          // back to the cached chats so this screen never goes blank.
+          final chats = state is ChatsLoaded ? state.chats : _cached;
+          if (state is ChatLoading && chats.isEmpty) return const Center(child: CircularProgressIndicator());
+          if (state is ChatError && chats.isEmpty) return Center(child: Text(state.message));
+          {
+            if (chats.isEmpty) {
               return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -43,10 +61,10 @@ class _ChatListPageState extends State<ChatListPage> {
             return RefreshIndicator(
               onRefresh: () async => context.read<ChatBloc>().add(LoadChatsEvent()),
               child: ListView.separated(
-                itemCount: state.chats.length,
+                itemCount: chats.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (_, i) {
-                  final chat = state.chats[i];
+                  final chat = chats[i];
                   // Backend sends `otherUser` (the other participant, populated).
                   // Fall back to the first participant object if it's missing, and
                   // guard every cast so a raw id (String) never crashes the list.
@@ -93,13 +111,16 @@ class _ChatListPageState extends State<ChatListPage> {
                             child: Text('$unread', style: const TextStyle(color: Colors.white, fontSize: 11)),
                           )
                         : null,
-                    onTap: () => context.push('/chats/${chat['_id']}'),
+                    onTap: () async {
+                      // Reload on return — the shared bloc was left on MessagesLoaded.
+                      await context.push('/chats/${chat['_id']}');
+                      if (context.mounted) context.read<ChatBloc>().add(LoadChatsEvent());
+                    },
                   );
                 },
               ),
             );
           }
-          return const SizedBox.shrink();
         },
       ),
     );

@@ -67,6 +67,15 @@ export class ApplyBookingDto {
   @IsOptional() @IsInt() seatsAvailable?: number;
 }
 
+/** Driver accepts a customer booking, choosing a vehicle + driver from garage. */
+export class AcceptBookingDto {
+  @IsOptional() @IsString() vehicle?: string;
+  @IsOptional() @IsString() vehicleNumber?: string;
+  @IsOptional() @IsString() vehicleImage?: string;
+  @IsOptional() @IsString() driverName?: string;
+  @IsOptional() @IsString() driverPhone?: string;
+}
+
 export class SelectOfferDto {
   @IsString() offerId: string;
 }

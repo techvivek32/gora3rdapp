@@ -36,11 +36,16 @@ const navigation = [
       { href: '/requirements', label: 'Requirements', icon: FileText },
       { href: '/vehicles', label: 'Available Vehicles', icon: Car },
       { href: '/reports', label: 'Reports', icon: Flag },
-      { href: '/customer-bookings', label: 'Customer Bookings', icon: CarTaxiFront },
-      { href: '/home-content', label: 'Home Content', icon: LayoutGrid },
+    ],
+  },
+  {
+    label: 'Customer Management',
+    items: [
       { href: '/cab-categories', label: 'Cab Categories', icon: CarFront },
       { href: '/car-pool', label: 'Car Pool', icon: Car },
+      { href: '/customer-bookings', label: 'Customer Bookings', icon: CarTaxiFront },
       { href: '/complaints', label: 'Customer Complaints', icon: MessageSquareWarning },
+      { href: '/home-content', label: 'Home Content', icon: LayoutGrid },
     ],
   },
   {

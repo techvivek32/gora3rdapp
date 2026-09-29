@@ -47,6 +47,14 @@ export class BookingOffer {
   @Prop({ default: '' })
   message: string;
 
+  // The actual person who will drive, chosen from the accepting owner's "My
+  // Drivers" garage (may differ from the account holder who accepted).
+  @Prop({ default: '' })
+  assignedDriverName: string;
+
+  @Prop({ default: '' })
+  assignedDriverPhone: string;
+
   // Car Pooling: per-seat pricing + how many seats this driver can offer.
   @Prop({ default: 0 })
   farePerSeat: number;

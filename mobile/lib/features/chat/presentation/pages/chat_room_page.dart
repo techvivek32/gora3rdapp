@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -76,7 +77,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
         : (other?['fullName']?.toString() ?? 'Chat');
 
     if (req == null) {
-      return Text(otherName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700));
+      return Text(otherName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white));
     }
 
     final from = (req['pickupCity']?.toString().trim().isNotEmpty ?? false)
@@ -93,15 +94,15 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(children: [
-          Flexible(child: Text(from, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700))),
-          const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(Icons.arrow_forward_rounded, size: 15)),
-          Flexible(child: Text(to, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700))),
+          Flexible(child: Text(from, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: Colors.white))),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(Icons.arrow_forward_rounded, size: 15, color: Colors.white)),
+          Flexible(child: Text(to, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700, color: Colors.white))),
         ]),
         Text(
           [if (bookingId.isNotEmpty) bookingId, if (when.isNotEmpty) when].join('  •  '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+          style: const TextStyle(fontSize: 11.5, color: Colors.white70, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -149,11 +150,14 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 2,
         title: _buildHeaderTitle(),
         actions: [
           if (_isTyping) const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Center(child: Text('typing...', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13))),
+            child: Center(child: Text('typing...', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 13, color: Colors.white))),
           ),
         ],
       ),

@@ -798,7 +798,11 @@ export class CustomerBookingsService {
    * charged — the driver only needs the admin-set minimum wallet balance to be
    * eligible. Multiple drivers can accept the same booking.
    */
-  async acceptDirect(driverId: string, id: string) {
+  async acceptDirect(
+    driverId: string,
+    id: string,
+    selection?: { vehicle?: string; vehicleNumber?: string; vehicleImage?: string; driverName?: string; driverPhone?: string },
+  ) {
     const driver = await this.userModel
       .findById(driverId)
       .select('isGolden membershipType membershipExpiresAt fullName agencyName mobile rating walletBalance')
@@ -833,9 +837,11 @@ export class CustomerBookingsService {
       driverId: dId,
       quotedFare: fare,
       holdAmount: 0,
-      vehicle: '',
-      vehicleNumber: '',
-      vehicleImage: '',
+      vehicle: selection?.vehicle || '',
+      vehicleNumber: selection?.vehicleNumber || '',
+      vehicleImage: selection?.vehicleImage || '',
+      assignedDriverName: selection?.driverName || '',
+      assignedDriverPhone: selection?.driverPhone || '',
       message: '',
       farePerSeat: 0,
       seatsAvailable: 0,
@@ -908,6 +914,13 @@ export class CustomerBookingsService {
             isGolden: !!d.isGolden,
             isVerified: !!d.isVerified,
             walletBalance: Math.round(d.walletBalance || 0),
+            // The vehicle + driver the owner picked from their garage on accept.
+            offerVehicle: o.vehicle || '',
+            offerVehicleNumber: o.vehicleNumber || '',
+            offerVehicleImage: o.vehicleImage || '',
+            assignedDriverName: o.assignedDriverName || '',
+            assignedDriverPhone: o.assignedDriverPhone || '',
+            // Fallback identity/vehicle from the account's own KYC.
             vehicleNumber: rc.number || rc.documentNumber || '',
             vehicleRcImage: rc.image || '',
             completedTrips,
@@ -963,11 +976,13 @@ export class CustomerBookingsService {
     booking.finalFare = chosen.quotedFare || booking.estimatedFare;
     booking.status = CustomerBookingStatus.CONFIRMED;
     booking.confirmedAt = new Date();
+    // Prefer the actual driver + vehicle the owner chose from their garage; fall
+    // back to the account holder's own name / KYC vehicle.
     booking.driverSnapshot = {
-      name: driver?.agencyName || driver?.fullName || 'Driver',
-      phone: driver?.mobile || '',
-      vehicle: booking.vehicleType || '',
-      vehicleNumber: rc.number || rc.documentNumber || '',
+      name: chosen.assignedDriverName || driver?.agencyName || driver?.fullName || 'Driver',
+      phone: chosen.assignedDriverPhone || driver?.mobile || '',
+      vehicle: chosen.vehicle || booking.vehicleType || '',
+      vehicleNumber: chosen.vehicleNumber || rc.number || rc.documentNumber || '',
       rating: driver?.rating || 0,
     };
     await booking.save();

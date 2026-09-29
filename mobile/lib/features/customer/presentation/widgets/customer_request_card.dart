@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'booking_card_ui.dart';
 
@@ -250,4 +253,227 @@ Widget _holdPoint(String label, String body) {
       Text(body, style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, height: 1.35)),
     ],
   );
+}
+
+/// Centered accept dialog: the owner picks a vehicle + driver from their garage
+/// (via dropdowns) before accepting a customer booking. Returns the selection
+/// payload (vehicle + driver) to send with the accept call, or null if cancelled.
+Future<Map<String, dynamic>?> showAcceptVehicleDriverSheet(BuildContext context, Map<String, dynamic> booking) {
+  return showDialog<Map<String, dynamic>>(
+    context: context,
+    builder: (_) => Dialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+      child: _AcceptDialog(booking: booking),
+    ),
+  );
+}
+
+class _AcceptDialog extends StatefulWidget {
+  final Map<String, dynamic> booking;
+  const _AcceptDialog({required this.booking});
+
+  @override
+  State<_AcceptDialog> createState() => _AcceptDialogState();
+}
+
+class _AcceptDialogState extends State<_AcceptDialog> {
+  final _api = getIt<ApiClient>();
+  List<Map<String, dynamic>> _vehicles = [];
+  List<Map<String, dynamic>> _drivers = [];
+  Map<String, dynamic>? _vehicle;
+  Map<String, dynamic>? _driver;
+  bool _loading = true;
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final v = await _api.get('/garage');
+      final d = await _api.get('/garage/drivers');
+      List<Map<String, dynamic>> parse(dynamic raw) =>
+          (raw as List? ?? []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      if (!mounted) return;
+      setState(() {
+        _vehicles = parse(v.data['data']);
+        _drivers = parse(d.data['data']);
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() { _err = '$e'; _loading = false; });
+    }
+  }
+
+  String _vehicleLabel(Map<String, dynamic> v) {
+    final name = (v['modelName'] ?? '').toString().trim();
+    final type = (v['vehicleType'] ?? '').toString().trim();
+    final base = name.isNotEmpty ? name : (type.isNotEmpty ? type : 'Vehicle');
+    final reg = (v['registrationNumber'] ?? '').toString().trim();
+    return reg.isNotEmpty ? '$base • $reg' : base;
+  }
+
+  String _driverLabel(Map<String, dynamic> d) {
+    final name = (d['fullName'] ?? 'Driver').toString().trim();
+    final phone = (d['phone'] ?? '').toString().trim();
+    return phone.isNotEmpty ? '$name • $phone' : name;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fare = widget.booking['estimatedFare'] ?? 0;
+    final canSubmit = _vehicle != null && _driver != null;
+    final emptyGarage = !_loading && _err == null && (_vehicles.isEmpty || _drivers.isEmpty);
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 16.h),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Accept this booking', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+          SizedBox(height: 4.h),
+          Text(
+            fare != 0 ? "Choose the vehicle & driver for this trip (budget ₹$fare)." : 'Choose the vehicle & driver for this trip.',
+            style: TextStyle(fontSize: 12.5.sp, color: AppColors.textSecondary),
+          ),
+          SizedBox(height: 18.h),
+          if (_loading)
+            const Padding(padding: EdgeInsets.symmetric(vertical: 28), child: Center(child: CircularProgressIndicator()))
+          else if (_err != null)
+            Text('Could not load your garage: $_err', style: TextStyle(fontSize: 12.5.sp, color: AppColors.error))
+          else if (emptyGarage) ...[
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12.r)),
+              child: Row(children: [
+                Icon(Icons.info_outline_rounded, size: 18.sp, color: AppColors.warning),
+                SizedBox(width: 10.w),
+                Expanded(child: Text(
+                  _vehicles.isEmpty && _drivers.isEmpty
+                      ? 'Add at least one vehicle and one driver in My Garage first.'
+                      : _vehicles.isEmpty ? 'Add at least one vehicle in My Garage first.' : 'Add at least one driver in My Garage first.',
+                  style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.warning),
+                )),
+              ]),
+            ),
+            SizedBox(height: 14.h),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () { Navigator.pop(context); context.push('/my-vehicles-garage'); },
+                icon: Icon(Icons.garage_rounded, size: 18.sp),
+                label: const Text('Open My Garage'),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
+              ),
+            ),
+          ] else ...[
+            _label('Select Vehicle'),
+            SizedBox(height: 6.h),
+            _dropdown<Map<String, dynamic>>(
+              hint: 'Choose a vehicle',
+              icon: Icons.directions_car_rounded,
+              value: _vehicle,
+              items: _vehicles,
+              labelFor: _vehicleLabel,
+              onChanged: (v) => setState(() => _vehicle = v),
+            ),
+            SizedBox(height: 16.h),
+            _label('Select Driver'),
+            SizedBox(height: 6.h),
+            _dropdown<Map<String, dynamic>>(
+              hint: 'Choose a driver',
+              icon: Icons.person_rounded,
+              value: _driver,
+              items: _drivers,
+              labelFor: _driverLabel,
+              onChanged: (d) => setState(() => _driver = d),
+            ),
+            SizedBox(height: 20.h),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(padding: EdgeInsets.symmetric(vertical: 12.h), side: const BorderSide(color: AppColors.border)),
+                  child: Text('Cancel', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                ),
+              ),
+              SizedBox(width: 10.w),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton(
+                  onPressed: canSubmit
+                      ? () {
+                          final v = _vehicle!;
+                          final d = _driver!;
+                          final photos = (v['carPhotos'] as List?)?.whereType<String>().toList() ?? const [];
+                          final name = (v['modelName'] ?? '').toString().trim();
+                          final type = (v['vehicleType'] ?? '').toString().trim();
+                          Navigator.pop(context, {
+                            'vehicle': name.isNotEmpty ? name : type,
+                            'vehicleNumber': (v['registrationNumber'] ?? '').toString(),
+                            if (photos.isNotEmpty) 'vehicleImage': photos.first,
+                            'driverName': (d['fullName'] ?? '').toString(),
+                            'driverPhone': (d['phone'] ?? '').toString(),
+                          });
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h), disabledBackgroundColor: AppColors.textHint),
+                  child: Text('Accept', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _label(String t) => Text(t, style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary));
+
+  Widget _dropdown<T>({
+    required String hint,
+    required IconData icon,
+    required T? value,
+    required List<T> items,
+    required String Function(T) labelFor,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isExpanded: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textSecondary),
+          hint: Row(children: [
+            Icon(icon, size: 18.sp, color: AppColors.textSecondary),
+            SizedBox(width: 8.w),
+            Text(hint, style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary)),
+          ]),
+          items: items
+              .map((e) => DropdownMenuItem<T>(
+                    value: e,
+                    child: Row(children: [
+                      Icon(icon, size: 18.sp, color: AppColors.primary),
+                      SizedBox(width: 8.w),
+                      Expanded(child: Text(labelFor(e), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
+                    ]),
+                  ))
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
 }

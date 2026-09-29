@@ -87,11 +87,12 @@ class CustomerRepository {
     return Map<String, dynamic>.from(res.data['data'] as Map);
   }
 
-  /// Golden driver/vendor directly accepts a booking → assigned immediately
-  /// (no offer / customer selection). No commission/hold is charged; the driver
-  /// only needs a minimum wallet balance (set by admin) to be eligible.
-  Future<void> accept(String id) async {
-    await _api.post('/customer-bookings/$id/accept');
+  /// Golden driver/vendor accepts a booking → registers interest with the chosen
+  /// vehicle + driver (from the garage). An admin later assigns one accepted
+  /// driver. No commission/hold is charged; the driver only needs a minimum
+  /// wallet balance (set by admin) to be eligible.
+  Future<void> accept(String id, {Map<String, dynamic>? selection}) async {
+    await _api.post('/customer-bookings/$id/accept', data: selection);
   }
 
   Future<List<Map<String, dynamic>>> myApplications() async {

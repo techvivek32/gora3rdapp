@@ -11,6 +11,7 @@ import {
   CreateCustomerBookingDto,
   UpdateCustomerBookingDto,
   ApplyBookingDto,
+  AcceptBookingDto,
   SelectOfferDto,
   CancelBookingDto,
   RateBookingDto,
@@ -155,9 +156,9 @@ export class CustomerBookingsController {
   }
 
   @Post(':id/accept')
-  @ApiOperation({ summary: 'Golden Driver/Vendor: accept a booking (registers interest; admin assigns)' })
-  accept(@CurrentUser('sub') userId: string, @Param('id') id: string) {
-    return this.service.acceptDirect(userId, id);
+  @ApiOperation({ summary: 'Golden Driver/Vendor: accept a booking with a chosen vehicle + driver (registers interest; admin assigns)' })
+  accept(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: AcceptBookingDto) {
+    return this.service.acceptDirect(userId, id, dto);
   }
 
   @Post(':id/arrived')

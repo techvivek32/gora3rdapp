@@ -76,23 +76,12 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
 
   Future<void> _accept(Map<String, dynamic> b) async {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
-    final fare = (b['estimatedFare'] as num?)?.toInt() ?? 0;
-    final pct = (b['commitmentPercent'] as num?)?.toInt() ?? 0;
-    final hold = (pct > 0 && fare != 0) ? (fare * pct / 100).round() : 0;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Accept this booking?', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        content: SingleChildScrollView(child: acceptHoldContent(fare, pct, hold)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accept')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    // Pick a vehicle + driver from the garage, then accept (min-wallet checked
+    // server-side; low balance shows the "Add money" dialog below).
+    final selection = await showAcceptVehicleDriverSheet(context, b);
+    if (selection == null) return;
     try {
-      await _repo.accept(id);
+      await _repo.accept(id, selection: selection);
       _snack('Accepted! Our team will assign the driver soon. ✅', ok: true);
       _loadAvailable();
       _loadMine();

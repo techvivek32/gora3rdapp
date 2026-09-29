@@ -86,23 +86,12 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
   Future<void> _applyCustomer(Map<String, dynamic> b) async {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
-    final fare = (b['estimatedFare'] as num?)?.toInt() ?? 0;
-    // Accepting only registers interest — an admin assigns the driver later.
-    // Golden-only + min-wallet eligibility are enforced server-side.
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Accept this booking?', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        content: SingleChildScrollView(child: acceptHoldContent(fare, 0, 0)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accept')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    // Pick a vehicle + driver from the garage, then accept (registers interest;
+    // an admin assigns the driver). Golden + min-wallet enforced server-side.
+    final selection = await showAcceptVehicleDriverSheet(context, b);
+    if (selection == null) return;
     try {
-      await getIt<CustomerRepository>().accept(id);
+      await getIt<CustomerRepository>().accept(id, selection: selection);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Accepted! Our team will assign the driver soon. ✅'), backgroundColor: AppColors.success));
       _loadCustomerBookings();
