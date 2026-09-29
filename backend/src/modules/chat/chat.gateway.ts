@@ -130,4 +130,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   emitToUser(userId: string, event: string, data: any) {
     this.server.to(`user:${userId}`).emit(event, data);
   }
+
+  /** Broadcast a message to a chat room (used by the HTTP send endpoint so
+   *  real-time delivery works even when the sender used HTTP, not the socket). */
+  broadcastNewMessage(chatId: string, message: any) {
+    this.server.to(`chat:${chatId}`).emit('chat:new-message', message);
+  }
 }

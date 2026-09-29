@@ -15,17 +15,45 @@ export class ChatService {
     private firebaseService: FirebaseService,
   ) {}
 
-  async getOrCreateChat(userId1: string, userId2: string) {
+  async getOrCreateChat(userId1: string, userId2: string, requirementId?: string) {
+    const reqId = requirementId && Types.ObjectId.isValid(requirementId) ? new Types.ObjectId(requirementId) : undefined;
     const existingChat = await this.chatModel.findOne({
       participants: { $all: [new Types.ObjectId(userId1), new Types.ObjectId(userId2)] },
     });
 
-    if (existingChat) return existingChat;
+    if (existingChat) {
+      // Link (or re-link) to the booking this chat was opened from so the list
+      // + header can show the booking id / route / date.
+      if (reqId && existingChat.relatedRequirement?.toString() !== reqId.toString()) {
+        existingChat.relatedRequirement = reqId;
+        await existingChat.save();
+      }
+      return existingChat;
+    }
 
     return this.chatModel.create({
       participants: [new Types.ObjectId(userId1), new Types.ObjectId(userId2)],
       unreadCount: { [userId1]: 0, [userId2]: 0 },
+      ...(reqId ? { relatedRequirement: reqId } : {}),
     });
+  }
+
+  /** Id (string) of the other participant in a chat. */
+  private otherParticipantId(participants: any[], userId: string): string | undefined {
+    return participants
+      .map((p) => (p?._id?.toString?.() ?? p?.toString?.()))
+      .find((id) => id && id !== userId);
+  }
+
+  /** Fetch the given users keyed by id (manual populate — reliable across modules). */
+  private async usersById(ids: string[]): Promise<Map<string, any>> {
+    const uniq = [...new Set(ids.filter(Boolean))];
+    if (!uniq.length) return new Map();
+    const users = await this.userModel
+      .find({ _id: { $in: uniq.map((id) => new Types.ObjectId(id)) } })
+      .select('fullName agencyName profileImage lastActive membershipType isVerified')
+      .lean();
+    return new Map(users.map((u: any) => [u._id.toString(), u]));
   }
 
   async getUserChats(userId: string): Promise<any> {
@@ -34,18 +62,42 @@ export class ChatService {
         participants: new Types.ObjectId(userId),
         isActive: true,
       })
-      .populate('participants', 'fullName agencyName profileImage lastActive membershipType isVerified')
       .populate('lastMessage')
+      .populate('relatedRequirement', 'bookingId pickupCity dropCity pickup drop travelDate travelTime tripType vehicleType')
       .sort({ lastMessageAt: -1 })
       .lean();
 
+    // Manually attach the OTHER participant's profile (populate('participants') is
+    // unreliable here, so fetch them directly with the injected User model).
+    const otherIds = chats.map((c) => this.otherParticipantId(c.participants as any[], userId));
+    const userMap = await this.usersById(otherIds.filter(Boolean) as string[]);
+
     return {
       message: 'Chats retrieved',
-      data: chats.map((chat) => ({
-        ...chat,
-        unreadCount: chat.unreadCount?.[userId] || 0,
-      })),
+      data: chats.map((chat) => {
+        const otherId = this.otherParticipantId(chat.participants as any[], userId);
+        return {
+          ...chat,
+          otherUser: otherId ? userMap.get(otherId) ?? null : null,
+          unreadCount: chat.unreadCount?.[userId] || 0,
+        };
+      }),
     };
+  }
+
+  /** Single chat with the other participant + linked booking, for the room header. */
+  async getChatDetail(chatId: string, userId: string) {
+    if (!Types.ObjectId.isValid(chatId)) throw new NotFoundException('Chat not found');
+    const chat: any = await this.chatModel
+      .findById(chatId)
+      .populate('relatedRequirement', 'bookingId pickupCity dropCity pickup drop travelDate travelTime tripType vehicleType')
+      .lean();
+    if (!chat) throw new NotFoundException('Chat not found');
+    const isParticipant = (chat.participants as any[]).some((p) => (p?._id?.toString?.() ?? p?.toString?.()) === userId);
+    if (!isParticipant) throw new ForbiddenException('Not a participant in this chat');
+    const otherId = this.otherParticipantId(chat.participants as any[], userId);
+    const other = otherId ? (await this.usersById([otherId])).get(otherId) : null;
+    return { message: 'Chat', data: { ...chat, otherUser: other ?? null } };
   }
 
   async getChatMessages(chatId: string, userId: string, page = 1, limit = 50) {
@@ -65,7 +117,12 @@ export class ChatService {
       .limit(limit)
       .lean();
 
-    return { message: 'Messages retrieved', data: messages.reverse() };
+    // Flag the caller's own messages so the app can right-align them.
+    const withMine = messages.reverse().map((m: any) => ({
+      ...m,
+      isMe: (m.senderId?._id?.toString?.() ?? m.senderId?.toString?.()) === userId,
+    }));
+    return { message: 'Messages retrieved', data: withMine };
   }
 
   /** True only if the user is a participant of the chat (used to gate socket joins). */

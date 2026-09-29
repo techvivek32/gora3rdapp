@@ -47,15 +47,45 @@ class _ChatListPageState extends State<ChatListPage> {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   final chat = state.chats[i];
-                  final other = (chat['participants'] as List?)?.firstWhere((p) => true, orElse: () => {}) as Map?;
-                  final unread = (chat['unreadCount'] as Map?)?['me'] ?? 0;
+                  // Backend sends `otherUser` (the other participant, populated).
+                  // Fall back to the first participant object if it's missing, and
+                  // guard every cast so a raw id (String) never crashes the list.
+                  Map? other = chat['otherUser'] is Map ? chat['otherUser'] as Map : null;
+                  if (other == null) {
+                    final parts = chat['participants'];
+                    if (parts is List) {
+                      final obj = parts.firstWhere((p) => p is Map, orElse: () => null);
+                      if (obj is Map) other = obj;
+                    }
+                  }
+                  final unread = (chat['unreadCount'] is num) ? (chat['unreadCount'] as num).toInt() : 0;
+                  final photo = other?['profileImage']?.toString();
+                  final name = (other?['agencyName']?.toString().trim().isNotEmpty ?? false)
+                      ? other!['agencyName'].toString()
+                      : (other?['fullName']?.toString() ?? 'User');
+                  // Title = the linked booking id (in place of the name); the
+                  // person's name sits in the subtitle so multiple chats about the
+                  // SAME booking (different drivers) are still distinguishable.
+                  final req = chat['relatedRequirement'] is Map ? chat['relatedRequirement'] as Map : null;
+                  final bookingId = req?['bookingId']?.toString();
+                  final title = (bookingId != null && bookingId.isNotEmpty) ? bookingId : name;
+                  final lastMsg = chat['lastMessageText']?.toString() ?? '';
                   return ListTile(
                     leading: CircleAvatar(
-                      backgroundImage: other?['profileImage'] != null ? NetworkImage(other!['profileImage'] as String) : null,
-                      child: other?['profileImage'] == null ? const Icon(Icons.person) : null,
+                      backgroundImage: (photo != null && photo.isNotEmpty) ? NetworkImage(photo) : null,
+                      child: (photo == null || photo.isEmpty) ? const Icon(Icons.person) : null,
                     ),
-                    title: Text(other?['fullName'] as String? ?? 'User', style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text(chat['lastMessageText'] as String? ?? '', maxLines: 1, overflow: TextOverflow.ellipsis),
+                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                        if (lastMsg.isNotEmpty)
+                          Text(lastMsg, maxLines: 1, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600)),
+                      ],
+                    ),
                     trailing: unread > 0
                         ? Container(
                             padding: const EdgeInsets.all(6),

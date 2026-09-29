@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -19,12 +20,23 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final _scrollCtrl = ScrollController();
   io.Socket? _socket;
   bool _isTyping = false;
+  Map<String, dynamic>? _header; // { relatedRequirement, otherUser }
 
   @override
   void initState() {
     super.initState();
     context.read<ChatBloc>().add(LoadMessagesEvent(widget.chatId));
+    _loadHeader();
     _initSocket();
+  }
+
+  /// Load the chat's booking + other participant to show in the app bar.
+  Future<void> _loadHeader() async {
+    try {
+      final res = await getIt<ApiClient>().get('/chats/${widget.chatId}');
+      final data = res.data is Map ? res.data['data'] : null;
+      if (mounted && data is Map) setState(() => _header = Map<String, dynamic>.from(data));
+    } catch (_) {}
   }
 
   Future<void> _initSocket() async {
@@ -54,6 +66,61 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     _socket!.on('chat:stop-typing', (_) => setState(() => _isTyping = false));
   }
 
+  /// App-bar title: the linked booking's From → To on top, booking id + date/time
+  /// below. Falls back to the other user's name (or "Chat") when there's no booking.
+  Widget _buildHeaderTitle() {
+    final req = _header?['relatedRequirement'] is Map ? _header!['relatedRequirement'] as Map : null;
+    final other = _header?['otherUser'] is Map ? _header!['otherUser'] as Map : null;
+    final otherName = (other?['agencyName']?.toString().trim().isNotEmpty ?? false)
+        ? other!['agencyName'].toString()
+        : (other?['fullName']?.toString() ?? 'Chat');
+
+    if (req == null) {
+      return Text(otherName, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700));
+    }
+
+    final from = (req['pickupCity']?.toString().trim().isNotEmpty ?? false)
+        ? req['pickupCity'].toString()
+        : ((req['pickup'] as Map?)?['address']?.toString() ?? '');
+    final to = (req['dropCity']?.toString().trim().isNotEmpty ?? false)
+        ? req['dropCity'].toString()
+        : ((req['drop'] as Map?)?['address']?.toString() ?? '');
+    final bookingId = req['bookingId']?.toString() ?? '';
+    final when = _fmtWhen(req['travelDate'], req['travelTime']);
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Flexible(child: Text(from, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700))),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(Icons.arrow_forward_rounded, size: 15)),
+          Flexible(child: Text(to, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700))),
+        ]),
+        Text(
+          [if (bookingId.isNotEmpty) bookingId, if (when.isNotEmpty) when].join('  •  '),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(fontSize: 11.5, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
+  String _fmtWhen(dynamic isoDate, dynamic time) {
+    String out = '';
+    if (isoDate != null) {
+      final d = DateTime.tryParse(isoDate.toString());
+      if (d != null) {
+        const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        out = '${d.day} ${m[d.month - 1]}';
+      }
+    }
+    final t = time?.toString().trim() ?? '';
+    if (t.isNotEmpty) out = out.isEmpty ? t : '$out, $t';
+    return out;
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -64,7 +131,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     final text = _msgCtrl.text.trim();
     if (text.isEmpty) return;
     _msgCtrl.clear();
-    _socket?.emit('chat:send-message', {'chatId': widget.chatId, 'content': text, 'type': 'text'});
+    // Send over HTTP (reliable, persists + the server broadcasts to the room).
+    // Not via the socket too, or the message would be saved twice.
     context.read<ChatBloc>().add(SendMessageEvent(chatId: widget.chatId, content: text));
   }
 
@@ -80,7 +148,8 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat'),
+        titleSpacing: 0,
+        title: _buildHeaderTitle(),
         actions: [
           if (_isTyping) const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16),

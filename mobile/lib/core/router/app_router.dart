@@ -147,6 +147,8 @@ class AppRouter {
             ),
           ),
           GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
+          // Chat list is a bottom-nav tab → lives in the shell (shows the nav bar).
+          GoRoute(path: '/chats', builder: (_, __) => const ChatListPage()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
         ],
       ),
@@ -334,10 +336,7 @@ class AppRouter {
         path: '/notifications',
         builder: (_, __) => const NotificationsPage(),
       ),
-      GoRoute(
-        path: '/chats',
-        builder: (_, __) => const ChatListPage(),
-      ),
+      // '/chats' (list) now lives in the driver shell above for the bottom nav.
       GoRoute(
         path: '/chats/:chatId',
         builder: (_, state) => ChatRoomPage(chatId: state.pathParameters['chatId']!),

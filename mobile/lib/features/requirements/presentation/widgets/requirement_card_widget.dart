@@ -6,6 +6,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/vehicle_types.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -115,6 +117,11 @@ class RequirementCardWidget extends StatelessWidget {
           final posterId = postedBy?['_id'];
           isCurrentUserOwner = mine || (currentUserId != null && posterId != null && currentUserId == posterId);
         }
+
+        // "Hide my profile" secure bookings: the backend masks the poster's name
+        // for everyone except the owner + assigned driver. When masked, the card
+        // hides the identity + all contact actions and offers ONLY chat.
+        final hiddenProfile = (postedBy?['fullName'] as String?) == 'Hidden until assigned';
 
         final acceptedByList = List.from(requirement['acceptedBy'] as List? ?? []);
         final hasCurrentUserAccepted = currentUserId != null && acceptedByList.any((id) => id.toString() == currentUserId);
@@ -480,6 +487,25 @@ class RequirementCardWidget extends StatelessWidget {
                                       child: Text('Duty Booking',
                                           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.black)),
                                     ),
+                                  ] else if (hiddenProfile) ...[
+                                    // Secure + hide-profile: identity stays hidden until assigned.
+                                    CircleAvatar(
+                                      radius: 20.r,
+                                      backgroundColor: Colors.grey.withOpacity(0.15),
+                                      child: Icon(Icons.lock_outline_rounded, color: Colors.grey[600], size: 20.sp),
+                                    ),
+                                    SizedBox(width: 10.w),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Hidden until assigned',
+                                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold, color: Colors.grey[700])),
+                                          Text('Secure booking',
+                                              style: TextStyle(fontSize: 11.sp, color: Colors.grey[500])),
+                                        ],
+                                      ),
+                                    ),
                                   ] else ...[
                                   GestureDetector(
                                     onTap: postedBy == null ? null : openSheet,
@@ -538,8 +564,8 @@ class RequirementCardWidget extends StatelessWidget {
                                               style: TextStyle(fontSize: 9.sp, color: Colors.grey[600])),
                                         ),
                                       // Member badge (ACTIVE USER etc.) — hidden on
-                                      // WhatsApp cards; the poster isn't the customer.
-                                      if (!isWhatsapp)
+                                      // WhatsApp cards + hidden-profile secure bookings.
+                                      if (!isWhatsapp && !hiddenProfile)
                                         Container(
                                           padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
                                           decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(4.r), border: Border.all(color: badgeColor)),
@@ -561,7 +587,26 @@ class RequirementCardWidget extends StatelessWidget {
                             ],
 
                             // 8. actions (gated)
-                            if (canContact)
+                            // Hidden-profile secure booking: ONLY the Chat button —
+                            // no phone/whatsapp/advice/rating/report until assigned.
+                            if (hiddenProfile)
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: postedBy?['_id'] == null
+                                      ? null
+                                      : () => _openChat(context, postedBy!['_id'].toString(), requirement['_id']?.toString()),
+                                  icon: Icon(Icons.chat_bubble_rounded, size: 18.sp),
+                                  label: const Text('Chat'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(vertical: 11.h),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                                  ),
+                                ),
+                              )
+                            else if (canContact)
                               isWhatsapp
                                   // Duty/WhatsApp cards: big filled Call + WhatsApp buttons.
                                   ? Row(
@@ -596,6 +641,9 @@ class RequirementCardWidget extends StatelessWidget {
                                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
                                           }
                                         }),
+                                        if (!mine && postedBy?['_id'] != null)
+                                          _action(Icon(Icons.chat_bubble, color: AppColors.primary, size: 28), 'Chat',
+                                              () => _openChat(context, postedBy!['_id'].toString(), requirement['_id']?.toString())),
                                         _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
                                           if (mobile != null && mobile.isNotEmpty) {
                                             openWhatsApp(mobile, message: _buildWhatsAppMessage());
@@ -722,6 +770,26 @@ class RequirementCardWidget extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Open (or create) a direct chat with the booking's poster, then navigate to
+  /// the chat room. Uses the backend getOrCreate endpoint so repeat taps reuse
+  /// the same conversation.
+  Future<void> _openChat(BuildContext context, String userId, [String? requirementId]) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    try {
+      final res = await getIt<ApiClient>().post(
+        '/chats/with/$userId',
+        data: requirementId != null ? {'requirementId': requirementId} : null,
+      );
+      final data = (res.data is Map) ? (res.data['data'] ?? res.data) : null;
+      final chatId = (data is Map) ? (data['_id'] ?? data['id'])?.toString() : null;
+      if (chatId == null) throw Exception('no chat id');
+      router.push('/chats/$chatId');
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('Could not open chat. Please try again.')));
+    }
   }
 
   Widget _ratingAction(double rating) {

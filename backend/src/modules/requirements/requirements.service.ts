@@ -274,10 +274,28 @@ export class RequirementsService {
         const driver = req.assignedDriver as any;
         if (driver) driver.mobile = undefined;
       }
+      this.applyHideProfile(req, userId, isOwner);
       return req;
     });
 
     return buildPaginatedResult(processedRequirements, total, page, limit);
+  }
+
+  /**
+   * "Hide my profile" (secure bookings): mask the poster's name/agency/photo for
+   * everyone except the owner and the assigned driver. The identity is revealed
+   * to the driver only once the booking is assigned to them.
+   */
+  private applyHideProfile(req: any, viewerId: string, isOwner?: boolean) {
+    if (!req?.hideProfile || !req?.secureBooking) return;
+    const postedBy = req.postedBy as any;
+    if (!postedBy) return;
+    const owner = isOwner ?? postedBy._id?.toString() === viewerId;
+    const assignedId = (req.assignedDriver as any)?._id?.toString() ?? req.assignedDriver?.toString();
+    if (owner || assignedId === viewerId) return; // owner + assigned driver see the real profile
+    postedBy.fullName = 'Hidden until assigned';
+    postedBy.agencyName = undefined;
+    postedBy.profileImage = undefined;
   }
 
   async findOne(id: string, userId: string) {
@@ -306,6 +324,8 @@ export class RequirementsService {
     } else {
       await this.requirementModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
     }
+
+    this.applyHideProfile(requirement, userId);
 
     // Manually populate acceptedBy to avoid Mongoose lean() populate inconsistencies
     const acceptedByIds = (requirement as any).acceptedBy as Types.ObjectId[];

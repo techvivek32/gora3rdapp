@@ -94,6 +94,17 @@ export class Requirement {
   @Prop({ type: Boolean })
   isAppSuggested: boolean;
 
+  // "Secure this booking": the acceptor pays the commission in advance (payment-
+  // fraud / cancellation protection). Enables the hideProfile option.
+  @Prop({ type: Boolean, default: false })
+  secureBooking: boolean;
+
+  // "Hide my profile" (only with secureBooking): the poster's name + photo stay
+  // hidden in the feed and are revealed to the driver only once the booking is
+  // assigned to them.
+  @Prop({ type: Boolean, default: false })
+  hideProfile: boolean;
+
   @Prop({ trim: true })
   notes: string;
 

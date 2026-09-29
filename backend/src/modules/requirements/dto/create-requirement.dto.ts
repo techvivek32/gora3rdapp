@@ -113,6 +113,16 @@ export class CreateRequirementDto {
   @IsBoolean()
   isAppSuggested?: boolean;
 
+  @ApiPropertyOptional({ description: 'Secure booking — acceptor pays commission in advance' })
+  @IsOptional()
+  @IsBoolean()
+  secureBooking?: boolean;
+
+  @ApiPropertyOptional({ description: 'Hide poster name/photo until the booking is assigned (secure only)' })
+  @IsOptional()
+  @IsBoolean()
+  hideProfile?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

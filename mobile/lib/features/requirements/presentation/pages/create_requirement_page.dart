@@ -37,6 +37,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   DateTime? _returnDate;
   TimeOfDay? _returnTime;
   bool _useCustomFare = false;
+  bool _secureBooking = false; // acceptor pays commission in advance
+  bool _hideProfile = false; // hide name/photo until assigned (secure only)
   bool _submitting = false; // blocks a double-tap from posting twice
 
   // Location lat/lng from map picker
@@ -124,6 +126,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
     if (r['commission'] != null) _commissionCtrl.text = '${(r['commission'] as num).round()}';
     if (r['fare'] != null) _customFareCtrl.text = '${(r['fare'] as num).round()}';
+    _secureBooking = r['secureBooking'] == true;
+    _hideProfile = r['hideProfile'] == true;
     if (r['estimatedDistance'] != null) _computedDistance = (r['estimatedDistance'] as num).toDouble();
     if (r['travelDate'] != null) {
       try {
@@ -330,6 +334,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'commission': _commission.round(),
       'totalAmount': _total.round(),
       'isAppSuggested': !_useCustomFare,
+      'secureBooking': _secureBooking,
+      'hideProfile': _secureBooking && _hideProfile,
       if (_pickupLat != null && _pickupLng != null)
         'pickupCoordinates': {'lat': _pickupLat, 'lng': _pickupLng, 'address': _pickupCtrl.text.trim()},
       if (_dropLat != null && _dropLng != null)
@@ -345,7 +351,52 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     bloc.add(CreateRequirementEvent(data: data));
   }
 
-
+  /// "Secure this booking" + "Hide my profile" toggles.
+  Widget _buildSecureToggles() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+      child: Column(
+        children: [
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            activeColor: AppColors.primary,
+            value: _secureBooking,
+            onChanged: (v) => setState(() {
+              _secureBooking = v;
+              if (!v) _hideProfile = false; // hide-profile needs secure ON
+            }),
+            title: Text('Secure this booking',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary)),
+            subtitle: Text(
+              'Receiver pays the commission amount in advance — protects you from payment fraud & pickup cancellations.',
+              style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary),
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Opacity(
+            opacity: _secureBooking ? 1 : 0.45,
+            child: SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              activeColor: AppColors.primary,
+              value: _hideProfile,
+              onChanged: _secureBooking ? (v) => setState(() => _hideProfile = v) : null,
+              title: Text('Hide my profile',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary)),
+              subtitle: Text(
+                'Only for secure booking — your photo & name stay hidden and are shown to the driver only once the booking is assigned.',
+                style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -648,7 +699,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                   ],
                 ),
                 SizedBox(height: 20.h),
-                
+
+                // Secure booking + hide-profile toggles.
+                _buildSecureToggles(),
+                SizedBox(height: 20.h),
+
                 // Fare Selection Section
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

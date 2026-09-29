@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/tab_refresh.dart';
 
 class MainNavPage extends StatelessWidget {
   final Widget child;
@@ -13,7 +12,7 @@ class MainNavPage extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/my-requirements')) return 1;
     if (location.startsWith('/requirements')) return 1;
-    if (location.startsWith('/vehicles')) return 2;
+    if (location.startsWith('/chats')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0;
   }
@@ -42,9 +41,7 @@ class MainNavPage extends StatelessWidget {
             _NavItem(icon: Icons.home_rounded, label: 'Home'.tr, index: 0, selectedIndex: selectedIndex, onTap: () => context.go('/')),
             _NavItem(icon: Icons.event_note_rounded, label: 'My Bookings'.tr, index: 1, selectedIndex: selectedIndex, onTap: () => context.go('/my-requirements')),
             const SizedBox(width: 48),
-            _NavItem(icon: Icons.directions_car_rounded, label: 'Available'.tr, index: 2, selectedIndex: selectedIndex, onTap: () {
-              if (selectedIndex == 2) { TabRefresh.vehicles.value++; } else { context.go('/vehicles'); }
-            }),
+            _NavItem(icon: Icons.chat_bubble_rounded, label: 'Chat'.tr, index: 2, selectedIndex: selectedIndex, onTap: () => context.go('/chats')),
             _NavItem(icon: Icons.settings_rounded, label: 'Settings'.tr, index: 3, selectedIndex: selectedIndex, onTap: () => context.go('/profile')),
           ],
         ),
