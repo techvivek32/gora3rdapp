@@ -632,7 +632,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               _localDurationChips(),
               SizedBox(height: 14.h),
             ],
-            // FROM (+ TO / stops only for point-to-point trips; Local = pickup only)
+            // FROM → (swap) → TO / stops (Local = pickup only). The swap button
+            // sits IN-FLOW between From and To (right-aligned) — never overlaid —
+            // so it can't drift over the address suggestions. Hidden once stops exist.
             Column(
               children: [
                 AddressAutocompleteField(
@@ -653,6 +655,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                             controller: _stops[i].ctrl,
                             label: 'Stop ${i + 1}',
                             prefixIcon: Icons.more_vert_rounded,
+                            prefixWidget: _stopNumberBadge(i + 1),
+                            hintText: 'Enter stop city',
                             onSelected: (a, lat, lng, city) { _stops[i].lat = lat; _stops[i].lng = lng; _stops[i].city = city; },
                           ),
                         ),
@@ -664,12 +668,27 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                       ],
                     ),
                   ],
-                  SizedBox(height: 10.h),
-                  AddressAutocompleteField(
-                    controller: _dropCtrl,
-                    label: 'To',
-                    prefixIcon: Icons.location_on_rounded,
-                    onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
+                  SizedBox(height: 14.h),
+                  // TO with the swap button straddling the From↔To gap on the right.
+                  // The button is anchored to To's TOP (not the column centre), so it
+                  // moves with the layout and can't drift into the address suggestions.
+                  // Hidden once stops are added. clipBehavior:none lets it sit above To.
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AddressAutocompleteField(
+                        controller: _dropCtrl,
+                        label: 'To',
+                        prefixIcon: Icons.location_on_rounded,
+                        onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
+                      ),
+                      if (_stops.isEmpty)
+                        Positioned(
+                          right: 6.w,
+                          top: -25.h,
+                          child: _swapButton(),
+                        ),
+                    ],
                   ),
                 ],
               ],
@@ -752,6 +771,47 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       ),
     );
   }
+
+  /// Numbered circle badge used as the prefix for each stop field.
+  Widget _stopNumberBadge(int n) => Center(
+        widthFactor: 1,
+        child: Container(
+          width: 24.w,
+          height: 24.w,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withValues(alpha: 0.08),
+            border: Border.all(color: AppColors.primary, width: 1.6),
+          ),
+          child: Text('$n', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: AppColors.primary)),
+        ),
+      );
+
+  /// Swap the From and To locations (address + coords + city).
+  void _swapFromTo() {
+    setState(() {
+      final t = _pickupCtrl.text; _pickupCtrl.text = _dropCtrl.text; _dropCtrl.text = t;
+      final la = _pickupLat; _pickupLat = _dropLat; _dropLat = la;
+      final ln = _pickupLng; _pickupLng = _dropLng; _dropLng = ln;
+      final c = _pickupCity; _pickupCity = _dropCity; _dropCity = c;
+    });
+  }
+
+  /// Round swap button that sits in the gap between From and To.
+  Widget _swapButton() => Material(
+        color: Colors.white,
+        shape: const CircleBorder(side: BorderSide(color: _teal, width: 1.3)),
+        elevation: 1.5,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _swapFromTo,
+          child: Padding(
+            padding: EdgeInsets.all(7.w),
+            child: Icon(Icons.swap_vert_rounded, size: 20.sp, color: _teal),
+          ),
+        ),
+      );
 
   // Local (hourly rental) package chips — shown only for the "Local" trip type.
   Widget _localDurationChips() {

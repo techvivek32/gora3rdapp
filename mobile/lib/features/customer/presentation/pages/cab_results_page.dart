@@ -25,12 +25,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
   double _toll = 0; // estimated route toll (₹), auto from Google Routes API
   List<Map<String, dynamic>> _cats = [];
   List<String> _inclusions = [];
-  // Fare mode: 'All Inclusive' (distance + toll) or 'Best Price' (distance only).
-  String _incMode = 'All Inclusive';
+  // Fare mode: 'Best Price' (distance only) or 'All Inclusive' (distance + toll).
+  // Defaults to Best Price (shown first in the toggle).
+  String _incMode = 'Best Price';
   // Selected fuel per cab card (keyed by category id/name). Only fuels the admin
   // priced for that category are offered; the fare uses the selected fuel's rate.
   final Map<String, String> _cardFuel = {};
-  final Set<String> _expanded = {};
 
   // Fallback classes if the admin hasn't added any yet (so the screen still works).
   static const _defaultCats = <Map<String, dynamic>>[
@@ -228,48 +228,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
     );
   }
 
-  IconData _fuelIcon(String f) =>
-      f == 'Diesel' ? Icons.local_gas_station_rounded : f == 'CNG' ? Icons.eco_rounded : Icons.local_gas_station_outlined;
-
-  // Per-card fuel chips. Shows only the fuels the admin priced for this category;
-  // tapping one re-computes that card's fare. Nothing renders if none are set.
-  Widget _cardFuelChips(Map<String, dynamic> cat) {
-    final avail = _availableFuels(cat);
-    if (avail.isEmpty) return const SizedBox.shrink();
-    final selected = _fuelOf(cat);
-    final single = avail.length == 1;
-    return Padding(
-      padding: EdgeInsets.only(top: 10.h),
-      child: Wrap(
-        spacing: 8.w,
-        runSpacing: 8.h,
-        children: avail.map((f) {
-          final sel = selected == f;
-          return GestureDetector(
-            onTap: single ? null : () => setState(() => _cardFuel[_catId(cat)] = f),
-            behavior: HitTestBehavior.opaque,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 11.w, vertical: 6.h),
-              decoration: BoxDecoration(
-                color: sel ? AppColors.primary.withValues(alpha: 0.12) : Colors.white,
-                borderRadius: BorderRadius.circular(20.r),
-                border: Border.all(color: sel ? AppColors.primary : AppColors.border, width: sel ? 1.4 : 1),
-              ),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_fuelIcon(f), size: 13.sp, color: sel ? AppColors.primary : AppColors.textSecondary),
-                SizedBox(width: 4.w),
-                Text(f, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: sel ? AppColors.primary : AppColors.textSecondary, fontFamily: 'Poppins')),
-              ]),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
   // Top toggle: All Inclusive (distance + toll) vs Best Price (distance only).
   Widget _modeToggle() {
-    const modes = ['All Inclusive', 'Best Price'];
+    const modes = ['Best Price', 'All Inclusive'];
     return Container(
       padding: EdgeInsets.all(6.w),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14.r), border: Border.all(color: AppColors.border)),
@@ -355,158 +316,177 @@ class _CabResultsPageState extends State<CabResultsPage> {
     );
   }
 
+  /// Cheapest fare across all cab classes (drives the "Lowest Price" badge).
+  int get _minFare {
+    int m = 0;
+    for (final c in _cats) {
+      final f = _fareFor(c);
+      if (f > 0 && (m == 0 || f < m)) m = f;
+    }
+    return m;
+  }
+
   Widget _cabCard(Map<String, dynamic> cat) {
-    final id = (cat['_id'] ?? cat['name'] ?? '').toString();
-    final base = _baseFare(cat); // distance-only
     final fare = _fareFor(cat); // + toll when All Inclusive
-    final high = (fare * 1.15).round();
     final hasFare = fare > 0;
-    final kms = _distanceKm > 0 ? '${_distanceKm.round()} Kms' : '—';
-    final expanded = _expanded.contains(id);
     final img = (cat['imageUrl'] ?? '').toString();
     final seats = (cat['seats'] as num?)?.toInt() ?? 4;
     final bags = (cat['bags'] ?? '').toString();
+    final vclass = (cat['vehicleClass'] ?? '').toString().trim();
+    final extraKm = (cat['extraKmPrice'] as num?)?.toInt() ?? 0; // ₹/km beyond included
+    final charges = (_isBestPrice ? 0 : _toll.round());
+    final isLowest = hasFare && fare == _minFare;
 
     return Container(
       margin: EdgeInsets.only(bottom: 14.h),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.all(12.w),
-            child: Row(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))]),
+      child: Padding(
+        padding: EdgeInsets.all(14.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Name + seater/rating on the left, car image (+ Lowest badge) on the right.
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10.r),
-                  child: SizedBox(
-                    width: 100.r,
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3, // exact 4:3 box for the recommended image
-                      child: Container(
-                        color: Colors.white,
-                        child: img.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: img,
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                placeholder: (_, __) => Icon(Icons.directions_car_filled_rounded, size: 40.sp, color: AppColors.primary.withValues(alpha: 0.5)),
-                                errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
-                              )
-                            : Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text((cat['name'] ?? 'Cab').toString(), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
-                      SizedBox(height: 2.h),
-                      Text('${(cat['vehicleClass'] ?? '').toString().isEmpty ? 'Cab' : cat['vehicleClass']} | AC', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.info, fontFamily: 'Poppins')),
-                      SizedBox(height: 3.h),
-                      Row(children: List.generate(5, (i) => Icon(i < 4 ? Icons.star_rounded : Icons.star_border_rounded, size: 14.sp, color: AppColors.warning))),
+                      RichText(
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        text: TextSpan(
+                          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'),
+                          children: [
+                            TextSpan(text: (cat['name'] ?? 'Cab').toString()),
+                            TextSpan(text: '  or similar', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 6.h),
+                      Text('$seats seater ${vclass.isEmpty ? '' : '$vclass '}AC Cab', style: TextStyle(fontSize: 12.5.sp, fontStyle: FontStyle.italic, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                      SizedBox(height: 10.h),
+                      Text(hasFare ? '₹$fare' : 'On request', style: TextStyle(fontSize: 24.sp, fontWeight: FontWeight.w800, color: AppColors.primary, fontFamily: 'Poppins')),
+                      if (hasFare && charges > 0)
+                        Padding(
+                          padding: EdgeInsets.only(top: 2.h),
+                          child: Text('+ ₹$charges Charges and Taxes', style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                        ),
                     ],
                   ),
                 ),
+                SizedBox(width: 8.w),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('Your price', style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                    Text(hasFare ? '₹$fare - ₹$high' : 'On request', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                    if (isLowest)
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                        decoration: BoxDecoration(color: AppColors.warning, borderRadius: BorderRadius.circular(6.r)),
+                        child: Text('Lowest Price', style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+                      ),
+                    SizedBox(height: 6.h),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10.r),
+                      child: SizedBox(
+                        width: 110.r,
+                        child: AspectRatio(
+                          aspectRatio: 4 / 3,
+                          child: img.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: img,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Icon(Icons.directions_car_filled_rounded, size: 40.sp, color: AppColors.primary.withValues(alpha: 0.5)),
+                                  errorWidget: (_, __, ___) => Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
+                                )
+                              : Icon(Icons.directions_car_filled_rounded, size: 44.sp, color: AppColors.primary.withValues(alpha: 0.7)),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ],
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(spacing: 8.w, runSpacing: 8.h, children: [
-                  _chip(Icons.event_seat_rounded, '$seats Seats'),
-                  if (bags.isNotEmpty) _chip(Icons.luggage_rounded, bags),
-                  _chip(Icons.speed_rounded, kms),
-                ]),
-                _cardFuelChips(cat),
-                if (_isMinApplied)
-                  Padding(
-                    padding: EdgeInsets.only(top: 6.h),
-                    child: Text(
-                      'Minimum ${_minKm.round()} km billed (your trip is ${_distanceKm.round()} km).',
-                      style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
-                    ),
-                  ),
-              ],
+            SizedBox(height: 12.h),
+            // Feature lines.
+            _featureLine(Icons.badge_rounded, 'Driver allowance included'),
+            _featureLine(
+              Icons.speed_rounded,
+              extraKm > 0
+                  ? '${_billableKm.round()} kms included  |  Post limit: ₹$extraKm/km'
+                  : '${_billableKm.round()} kms included',
             ),
-          ),
-          SizedBox(height: 8.h),
-          if (expanded && hasFare)
-            Padding(
-              padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 0),
-              child: Container(
-                padding: EdgeInsets.all(10.w),
-                decoration: BoxDecoration(color: const Color(0xFFF9FAFB), borderRadius: BorderRadius.circular(10.r)),
-                child: Column(children: [
-                  _fareRow('Distance fare (${_billableKm.round()} km)', '₹$base'),
-                  if (_isMinApplied) _fareRow('Minimum ${_minKm.round()} km applied', ''),
-                  if (!_isBestPrice && _toll > 0) _fareRow('Toll (auto)', '₹${_toll.round()}'),
-                  const Divider(height: 14),
-                  _fareRow('Estimated total', '₹$fare', bold: true),
-                  SizedBox(height: 4.h),
-                  Text(_isBestPrice
-                      ? 'Best Price — toll & other charges paid directly to the driver.'
-                      : 'Final fare is confirmed by the driver offer. Pay the driver directly.',
-                    style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                ]),
+            if (bags.isNotEmpty) _featureLine(Icons.luggage_rounded, 'Luggage: $bags'),
+            if (_isMinApplied)
+              Padding(
+                padding: EdgeInsets.only(top: 2.h),
+                child: Text(
+                  'Minimum ${_minKm.round()} km billed (your trip is ${_distanceKm.round()} km).',
+                  style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w700, fontFamily: 'Poppins'),
+                ),
+              ),
+            // Select Fuel Type box.
+            _fuelBox(cat),
+            SizedBox(height: 14.h),
+            // Full-width SELECT CAR button.
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _openConfirm(cat),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 14.h), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r))),
+                child: Text(_isEdit ? 'SAVE' : 'SELECT CAR', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, letterSpacing: 0.5, fontFamily: 'Poppins')),
               ),
             ),
-          Divider(height: 20.h, color: AppColors.border),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => setState(() => expanded ? _expanded.remove(id) : _expanded.add(id)),
-                  child: Row(children: [
-                    Text('Fare breakup', style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.info, fontFamily: 'Poppins')),
-                    Icon(expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: AppColors.info, size: 20.sp),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _featureLine(IconData icon, String text) => Padding(
+        padding: EdgeInsets.only(bottom: 8.h),
+        child: Row(children: [
+          Icon(icon, size: 16.sp, color: AppColors.primary),
+          SizedBox(width: 10.w),
+          Expanded(child: Text(text, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+        ]),
+      );
+
+  // "Select Fuel Type" box with radio options (only the fuels the admin priced).
+  Widget _fuelBox(Map<String, dynamic> cat) {
+    final avail = _availableFuels(cat);
+    if (avail.isEmpty) return const SizedBox.shrink();
+    final selected = _fuelOf(cat);
+    final single = avail.length == 1;
+    return Container(
+      margin: EdgeInsets.only(top: 4.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      decoration: BoxDecoration(color: AppColors.info.withValues(alpha: 0.06), borderRadius: BorderRadius.circular(12.r)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Select Fuel Type', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+          SizedBox(height: 8.h),
+          Row(
+            children: avail.map((f) {
+              final sel = selected == f;
+              return Padding(
+                padding: EdgeInsets.only(right: 20.w),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: single ? null : () => setState(() => _cardFuel[_catId(cat)] = f),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 18.sp, color: sel ? AppColors.primary : AppColors.textHint),
+                    SizedBox(width: 6.w),
+                    Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: sel ? AppColors.textPrimary : AppColors.textSecondary, fontFamily: 'Poppins')),
                   ]),
                 ),
-                ElevatedButton(
-                  onPressed: () => _openConfirm(cat),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 11.h), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r))),
-                  child: Text(_isEdit ? 'Save' : 'Book Now', style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-                ),
-              ],
-            ),
+              );
+            }).toList(),
           ),
         ],
       ),
     );
   }
-
-  Widget _chip(IconData icon, String text) => Container(
-        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20.r), border: Border.all(color: AppColors.border)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 13.sp, color: AppColors.textSecondary),
-          SizedBox(width: 4.w),
-          Text(text, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-        ]),
-      );
-
-  Widget _fareRow(String k, String v, {bool bold = false}) => Padding(
-        padding: EdgeInsets.symmetric(vertical: 2.h),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(k, style: TextStyle(fontSize: 12.sp, fontWeight: bold ? FontWeight.w800 : FontWeight.w500, fontFamily: 'Poppins')),
-          Text(v, style: TextStyle(fontSize: 12.sp, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: bold ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
-        ]),
-      );
 }

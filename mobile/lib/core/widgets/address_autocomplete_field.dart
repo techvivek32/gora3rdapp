@@ -13,6 +13,10 @@ class AddressAutocompleteField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final IconData prefixIcon;
+  /// Optional custom prefix (e.g. a numbered badge); overrides [prefixIcon].
+  final Widget? prefixWidget;
+  /// Optional hint text shown inside the field (defaults to a generic prompt).
+  final String? hintText;
   final Widget? suffix;
   final String? Function(String?)? validator;
   final void Function(String address, double lat, double lng, String? city) onSelected;
@@ -23,6 +27,8 @@ class AddressAutocompleteField extends StatefulWidget {
     required this.label,
     required this.prefixIcon,
     required this.onSelected,
+    this.prefixWidget,
+    this.hintText,
     this.suffix,
     this.validator,
   });
@@ -108,8 +114,9 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
           onChanged: _onChanged,
           decoration: InputDecoration(
             labelText: widget.label,
-            hintText: 'Type an address or place…',
-            prefixIcon: Icon(widget.prefixIcon, color: AppColors.primary),
+            hintText: widget.hintText ?? 'Type an address or place…',
+            prefixIcon: widget.prefixWidget ?? Icon(widget.prefixIcon, color: AppColors.primary),
+            prefixIconConstraints: widget.prefixWidget != null ? BoxConstraints(minWidth: 44.w, minHeight: 44.w) : null,
             suffixIcon: _loading
                 ? Padding(
                     padding: const EdgeInsets.all(12),
