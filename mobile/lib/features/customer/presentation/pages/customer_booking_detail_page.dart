@@ -87,21 +87,6 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     }
   }
 
-  Future<void> _select(String offerId) async {
-    final ok = await _confirm('Select this driver?', 'The driver will be confirmed for your trip and other offers will be released.');
-    if (ok != true) return;
-    setState(() => _acting = true);
-    try {
-      await _repo.selectOffer(widget.bookingId, offerId);
-      await _load();
-      _snack('Driver confirmed! 🎉', ok: true);
-    } catch (e) {
-      _snack('Could not select: $e');
-    } finally {
-      if (mounted) setState(() => _acting = false);
-    }
-  }
-
   Future<void> _cancel() async {
     final ok = await _confirm('Cancel this booking?', 'This cannot be undone.');
     if (ok != true) return;
@@ -215,17 +200,12 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           const SizedBox(height: 16),
         ],
 
-        // OPEN → a driver will accept and be assigned directly (no offers now).
-        // Legacy offers (if any exist) are still shown so they can be picked.
-        if (status == 'open') ...[
-          if (offers.isEmpty)
-            _hint('Waiting for a driver to accept your booking… pull down to refresh.')
-          else ...[
-            const Text('Offers', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            ...offers.map((o) => _OfferCard(o, acting: _acting, onSelect: () => _select((o['offerId'] ?? o['_id']).toString()))),
-          ],
-        ],
+        // OPEN → drivers accept and our team assigns one. The customer no longer
+        // picks a driver, so we just show a waiting note (offers stay hidden).
+        if (status == 'open')
+          _hint(offers.isEmpty
+              ? 'Waiting for a driver to accept your booking… pull down to refresh.'
+              : 'A driver has accepted — our team is assigning your driver. Pull down to refresh.'),
 
         // Confirmed / ongoing / completed → show the chosen driver.
         if (status != 'open' && snapshot != null) ...[
@@ -782,113 +762,6 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           Expanded(child: Text(t, style: const TextStyle(fontSize: 12.5))),
         ]),
       );
-}
-
-class _OfferCard extends StatelessWidget {
-  final Map<String, dynamic> o;
-  final bool acting;
-  final VoidCallback onSelect;
-  const _OfferCard(this.o, {required this.acting, required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    // The backend flattens the driver's public profile onto the offer (it never
-    // exposes wallet balances). Fields: name, rating, totalRatings, isVerified…
-    final name = (o['name'] ?? 'Driver').toString();
-    final rating = (o['rating'] as num?)?.toDouble() ?? 0;
-    final ratings = (o['totalRatings'] ?? 0);
-    final verified = o['isVerified'] == true;
-    final img = (o['profileImage'] ?? '').toString();
-    final memberSince = o['memberSince'];
-    final fare = o['quotedFare'] ?? 0;
-    final vehicle = (o['vehicle'] ?? '').toString();
-    final vehicleNo = (o['vehicleNumber'] ?? '').toString();
-    final vehicleImg = (o['vehicleImage'] ?? '').toString();
-    final farePerSeat = (o['farePerSeat'] as num?)?.toInt() ?? 0;
-    final seatsAvail = (o['seatsAvailable'] as num?)?.toInt() ?? 0;
-    final message = (o['message'] ?? '').toString();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                backgroundImage: img.isNotEmpty ? NetworkImage(img) : null,
-                child: img.isEmpty ? const Icon(Icons.person_rounded, color: AppColors.primary) : null,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                      if (verified) ...[
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified_rounded, size: 15, color: AppColors.info),
-                      ],
-                    ]),
-                    Row(children: [
-                      const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                      Text(' ${rating.toStringAsFixed(1)}  •  $ratings ratings', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    ]),
-                    if (memberSince != null)
-                      Text('Member since $memberSince', style: const TextStyle(fontSize: 11.5, color: AppColors.textHint)),
-                  ],
-                ),
-              ),
-              Text('₹$fare', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary)),
-            ],
-          ),
-          if (vehicleImg.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(vehicleImg, height: 130, width: double.infinity, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink()),
-            ),
-          ],
-          if (vehicle.isNotEmpty || vehicleNo.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Row(children: [
-              const Icon(Icons.directions_car_rounded, size: 15, color: AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text('$vehicle ${vehicleNo.isNotEmpty ? '• $vehicleNo' : ''}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-            ]),
-          ],
-          if (farePerSeat > 0) ...[
-            const SizedBox(height: 8),
-            Row(children: [
-              const Icon(Icons.event_seat_rounded, size: 15, color: AppColors.primary),
-              const SizedBox(width: 6),
-              Text('₹$farePerSeat / seat${seatsAvail > 0 ? '  •  $seatsAvail seats free' : ''}',
-                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.primary)),
-            ]),
-          ],
-          if (message.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text('"$message"', style: const TextStyle(fontSize: 12.5, fontStyle: FontStyle.italic, color: AppColors.textSecondary)),
-          ],
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: acting ? null : onSelect,
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-              child: const Text('Select this driver'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _StatusBanner extends StatelessWidget {

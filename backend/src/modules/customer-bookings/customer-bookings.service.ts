@@ -154,20 +154,26 @@ export class CustomerBookingsService {
     const q: any = {};
     if (filters.status) q.status = filters.status;
     if (filters.serviceType) q.serviceType = filters.serviceType;
-    const data = await this.bookingModel
+    const rows = await this.bookingModel
       .find(q)
       .sort({ createdAt: -1 })
       .limit(500)
       .populate('customerId', 'fullName mobile city')
       .populate('selectedDriverId', 'fullName mobile')
       .lean();
+    // Expose how many drivers have accepted (so the list can badge OPEN rows) but
+    // never leak the offer array itself.
+    const data = rows.map((b: any) => ({
+      ...b,
+      acceptedCount: (b.offers ?? []).filter((o: any) => o.status !== 'released').length,
+      offers: undefined,
+    }));
     return { message: 'All customer bookings', data };
   }
 
   // ─── Customer side ─────────────────────────────────────────────────────────
 
   async create(customerId: string, dto: CreateCustomerBookingDto) {
-    const commitmentPercent = (await this.settings.getSettings())?.bookingCommitmentPercent ?? 5;
     const travelDate = dto.travelDate ? new Date(dto.travelDate) : undefined;
     // Always set an expiry so the auto-release cron can never leave holds stuck:
     // 24h after travel if known, else 7 days from creation as a safety net.
@@ -197,7 +203,6 @@ export class CustomerBookingsService {
       dailyKmLimit: dto.dailyKmLimit || 0,
       extraKmPrice: dto.extraKmPrice || 0,
       includedKm: dto.includedKm || 0,
-      commitmentPercent,
       status: CustomerBookingStatus.OPEN,
       expiresAt,
     });
@@ -423,10 +428,12 @@ export class CustomerBookingsService {
     return { buffer, filename: `Gora-Invoice-${booking.bookingId}.pdf` };
   }
 
+  /** Static cancellation policy shown to the customer (no longer admin-configurable). */
+  private static readonly CANCELLATION_POLICY =
+    'Free cancellation before the driver starts the trip. After the trip starts, charges may apply as per driver terms.';
+
   private async withOfferProfiles(booking: any) {
-    // Configurable cancellation policy shown to the customer before they pick.
-    const settings: any = await this.settings.getSettings().catch(() => null);
-    const cancellationPolicy = settings?.bookingCancellationPolicy || '';
+    const cancellationPolicy = CustomerBookingsService.CANCELLATION_POLICY;
     // Surface an active trip OTP to the customer only; strip the raw stored fields.
     const otpActive = booking.tripOtp && booking.tripOtpExpiresAt && new Date(booking.tripOtpExpiresAt).getTime() > Date.now();
     const tripOtp = otpActive ? booking.tripOtp : '';
@@ -785,9 +792,11 @@ export class CustomerBookingsService {
   }
 
   /**
-   * Golden driver/vendor directly ACCEPTS an open booking → assigned immediately
-   * (no offer, no customer selection). Holds the commitment then settles it, and
-   * releases any other applicants' holds. Atomic OPEN→CONFIRMED so only one wins.
+   * Golden driver/vendor ACCEPTS an open booking → registers their interest only.
+   * It does NOT assign the driver: the booking stays OPEN and an admin later picks
+   * one of the accepted drivers to assign (see `adminAssign`). Nothing is held or
+   * charged — the driver only needs the admin-set minimum wallet balance to be
+   * eligible. Multiple drivers can accept the same booking.
    */
   async acceptDirect(driverId: string, id: string) {
     const driver = await this.userModel
@@ -795,11 +804,11 @@ export class CustomerBookingsService {
       .select('isGolden membershipType membershipExpiresAt fullName agencyName mobile rating walletBalance')
       .lean();
     if (!this.isGoldenActive(driver)) {
-      throw new ForbiddenException('Only Golden members can accept customer bookings directly.');
+      throw new ForbiddenException('Only Golden members can accept customer bookings.');
     }
 
-    // No commission is held/charged on accept anymore. Instead the driver must
-    // simply keep a minimum wallet balance (set by admin) to be eligible.
+    // Eligibility only: the driver must keep a minimum wallet balance (set by
+    // admin). Nothing is deducted or held.
     const settings: any = await this.settings.getSettings();
     const minWallet = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
     const balance = (driver as any)?.walletBalance || 0;
@@ -817,24 +826,10 @@ export class CustomerBookingsService {
     const dId = new Types.ObjectId(driverId);
     const fare = booking.estimatedFare || 0;
 
-    // Atomically claim OPEN → CONFIRMED so two accepts can't both win.
-    const claimed = await this.bookingModel.findOneAndUpdate(
-      { _id: booking._id, status: CustomerBookingStatus.OPEN },
-      { $set: { status: CustomerBookingStatus.CONFIRMED } },
-    );
-    if (!claimed) {
-      throw new BadRequestException('This booking was just taken. Please pick another.');
-    }
-
-    // Release any earlier applicants' commitment holds (from the older apply flow).
-    for (const o of booking.offers as any[]) {
-      if (o.status === 'applied') {
-        await this.releaseHold(o.driverId, o.holdAmount, booking._id);
-        o.status = 'released';
-      }
-    }
-
-    booking.offers.push({
+    // Register interest with an ATOMIC conditional push: the offer is added only
+    // if the booking is still OPEN and this driver has no active offer already.
+    // This closes the concurrent double-accept race without any wallet hold.
+    const offer = {
       driverId: dId,
       quotedFare: fare,
       holdAmount: 0,
@@ -844,27 +839,147 @@ export class CustomerBookingsService {
       message: '',
       farePerSeat: 0,
       seatsAvailable: 0,
-      status: 'selected',
-    } as any);
+      status: 'applied',
+    };
+    const pushed = await this.bookingModel.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: CustomerBookingStatus.OPEN,
+        offers: { $not: { $elemMatch: { driverId: dId, status: { $ne: 'released' } } } },
+      },
+      { $push: { offers: offer as any } },
+    );
+    if (!pushed) {
+      throw new BadRequestException('This booking is no longer open, or you have already accepted it.');
+    }
 
-    booking.selectedDriverId = dId;
-    booking.finalFare = fare;
+    this.notifications.notifyUser(booking.customerId, '🚕 A driver accepted your booking',
+      `A partner accepted your ${booking.serviceType} booking ${booking.bookingId}. Our team will assign the driver shortly.`,
+      { type: 'customer_booking_offer', bookingId: booking.bookingId }).catch(() => {});
+
+    return { message: 'Accepted — our team will assign the driver shortly', data: { accepted: true } };
+  }
+
+  // ─── Admin assignment ────────────────────────────────────────────────────────
+
+  /**
+   * Admin view of ONE customer booking with the full review of every driver who
+   * accepted (rating, car/RC, membership, wallet, city, completed trips), so the
+   * admin can compare and assign one.
+   */
+  async getAdminBookingDetail(id: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const booking: any = await this.bookingModel
+      .findById(id)
+      .populate('customerId', 'fullName mobile city')
+      .populate('selectedDriverId', 'fullName mobile')
+      .lean();
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const activeOffers = (booking.offers ?? []).filter((o: any) => o.status !== 'released');
+    const ids = activeOffers.map((o: any) => o.driverId);
+    let acceptedDrivers: any[] = [];
+    if (ids.length) {
+      const drivers = await this.userModel
+        .find({ _id: { $in: ids } })
+        .select('fullName agencyName profileImage mobile city rating totalRatings membershipType isGolden isVerified walletBalance businessCities documents')
+        .lean();
+      const byId = new Map(drivers.map((d: any) => [d._id.toString(), d]));
+      acceptedDrivers = await Promise.all(
+        activeOffers.map(async (o: any) => {
+          const d: any = byId.get(o.driverId.toString()) || {};
+          const rc: any = d.documents?.vehicleRc || {};
+          const completedTrips = await this.bookingModel.countDocuments({
+            selectedDriverId: d._id,
+            status: CustomerBookingStatus.COMPLETED,
+          }).catch(() => 0);
+          return {
+            offerId: o._id,
+            driverId: o.driverId,
+            name: d.agencyName || d.fullName || 'Driver',
+            fullName: d.fullName || '',
+            profileImage: d.profileImage || '',
+            mobile: d.mobile || '',
+            city: d.city || '',
+            businessCities: d.businessCities || [],
+            rating: d.rating || 0,
+            totalRatings: d.totalRatings || 0,
+            membershipType: d.membershipType || 'new',
+            isGolden: !!d.isGolden,
+            isVerified: !!d.isVerified,
+            walletBalance: Math.round(d.walletBalance || 0),
+            vehicleNumber: rc.number || rc.documentNumber || '',
+            vehicleRcImage: rc.image || '',
+            completedTrips,
+            status: o.status,
+            acceptedAt: o.createdAt,
+          };
+        }),
+      );
+    }
+    delete booking.offers;
+    return { message: 'Booking detail', data: { ...booking, acceptedDrivers } };
+  }
+
+  /**
+   * Admin assigns one of the accepted drivers to an OPEN booking → CONFIRMED.
+   * The chosen driver's offer becomes 'selected', the rest 'released'. No wallet
+   * holds are involved. Both the driver and the customer are notified.
+   */
+  async adminAssign(id: string, driverId: string) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    if (!driverId || !Types.ObjectId.isValid(driverId)) throw new BadRequestException('Invalid driver');
+
+    const booking = await this.bookingModel.findById(id);
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.status !== CustomerBookingStatus.OPEN) {
+      throw new BadRequestException('Only an open booking can be assigned');
+    }
+    const chosen: any = (booking.offers as any[]).find(
+      (o) => o.driverId.toString() === driverId && o.status !== 'released',
+    );
+    if (!chosen) throw new BadRequestException('That driver has not accepted this booking');
+
+    // Atomically claim OPEN → CONFIRMED so a concurrent assign/cancel/expiry can't
+    // also run against the same booking.
+    const claimed = await this.bookingModel.findOneAndUpdate(
+      { _id: booking._id, status: CustomerBookingStatus.OPEN },
+      { $set: { status: CustomerBookingStatus.CONFIRMED } },
+    );
+    if (!claimed) throw new BadRequestException('This booking is no longer open');
+
+    const driver: any = await this.userModel
+      .findById(chosen.driverId)
+      .select('fullName agencyName mobile rating documents')
+      .lean();
+    const rc: any = driver?.documents?.vehicleRc || {};
+
+    // Mark the chosen offer selected, the rest released.
+    for (const o of booking.offers as any[]) {
+      o.status = o.driverId.toString() === driverId ? 'selected' : 'released';
+    }
+
+    booking.selectedDriverId = chosen.driverId;
+    booking.finalFare = chosen.quotedFare || booking.estimatedFare;
     booking.status = CustomerBookingStatus.CONFIRMED;
     booking.confirmedAt = new Date();
     booking.driverSnapshot = {
-      name: (driver as any)?.agencyName || (driver as any)?.fullName || 'Driver',
-      phone: (driver as any)?.mobile || '',
-      vehicle: '',
-      vehicleNumber: '',
-      rating: (driver as any)?.rating || 0,
+      name: driver?.agencyName || driver?.fullName || 'Driver',
+      phone: driver?.mobile || '',
+      vehicle: booking.vehicleType || '',
+      vehicleNumber: rc.number || rc.documentNumber || '',
+      rating: driver?.rating || 0,
     };
     await booking.save();
 
+    this.notifications.notifyUser(chosen.driverId, '🎉 You got the booking!',
+      `Our team assigned booking ${booking.bookingId} to you. Contact the customer and start the trip.`,
+      { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
     this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
-      `A partner accepted your ${booking.serviceType} booking ${booking.bookingId}. Contact them to coordinate.`,
+      `Your ${booking.serviceType} booking is confirmed with ${booking.driverSnapshot.name}.`,
       { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
 
-    return { message: 'Booking accepted — assigned to you', data: booking };
+    return { message: 'Driver assigned — booking confirmed', data: booking };
   }
 
   async getMyApplications(driverId: string) {
@@ -1034,22 +1149,8 @@ export class CustomerBookingsService {
     if ([CustomerBookingStatus.COMPLETED, CustomerBookingStatus.CANCELLED].includes(booking.status)) {
       throw new BadRequestException('Booking already closed');
     }
-    // Driver cancels after being selected. Their commitment was already settled;
-    // refund the non-penalty portion per the configurable penalty policy.
-    const penaltyPercent = (await this.settings.getSettings())?.driverCancelPenaltyPercent ?? 100;
-    const chosen: any = (booking.offers as any[]).find(
-      (o) => o.status === 'selected' && o.driverId.toString() === driverId,
-    );
-    if (chosen && chosen.holdAmount > 0 && penaltyPercent < 100) {
-      const refund = Math.round((chosen.holdAmount * (100 - penaltyPercent)) / 100);
-      if (refund > 0) {
-        await this.userModel.updateOne({ _id: chosen.driverId }, { $inc: { walletBalance: refund } });
-        await this.txModel.create({
-          userId: chosen.driverId, amount: refund, type: 'credit', status: 'success',
-          source: 'release', bookingRef: booking._id, note: 'Partial refund on driver cancel',
-        });
-      }
-    }
+    // No wallet holds/commitment on customer bookings anymore, so a driver cancel
+    // just releases the booking back — nothing to settle or refund.
     booking.status = CustomerBookingStatus.CANCELLED;
     booking.cancelledAt = new Date();
     booking.cancelledBy = 'driver';

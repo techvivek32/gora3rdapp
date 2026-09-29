@@ -92,28 +92,6 @@ export class PlatformSettings {
   viewsEnabled: boolean;
 
   /**
-   * Customer-booking commitment: the % of the fare a driver/vendor must HOLD in
-   * their wallet to apply for a customer booking (e.g. 5 → ₹500 hold on ₹10,000).
-   */
-  @Prop({ default: 5, min: 0, max: 100 })
-  bookingCommitmentPercent: number;
-
-  /**
-   * Customer-facing cancellation policy text, shown on offers and booking
-   * details so the customer knows the terms before selecting a driver.
-   */
-  @Prop({ default: 'Free cancellation before the driver starts the trip. After the trip starts, charges may apply as per driver terms.' })
-  bookingCancellationPolicy: string;
-
-  /**
-   * When a driver cancels AFTER being selected, this % of their settled
-   * commitment is kept as a penalty (not refunded). 100 = full forfeit (default),
-   * 0 = fully refunded.
-   */
-  @Prop({ default: 100, min: 0, max: 100 })
-  driverCancelPenaltyPercent: number;
-
-  /**
    * Minimum billable distance (km) for customer CAB bookings, applied to ALL cabs.
    * If a trip is shorter, the fare is charged for this many km. 0 = no minimum.
    */

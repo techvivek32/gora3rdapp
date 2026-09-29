@@ -34,8 +34,8 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   final _apiClient = getIt<ApiClient>();
   final Set<String> _vehicleFilters = {}; // top vehicle-type filter (empty = All)
   List<Map<String, dynamic>> _lastLoadedRequirements = [];
-  // Customer-mode bookings (from the customer side) merged into this feed so
-  // drivers can send offers here too.
+  // Customer-mode cab bookings shown in this feed so drivers can accept them
+  // (accepting only registers interest — an admin assigns the driver).
   List<Map<String, dynamic>> _customerBookings = [];
   List<Map<String, dynamic>> _banners = [];
 
@@ -87,15 +87,13 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   Future<void> _applyCustomer(Map<String, dynamic> b) async {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
     final fare = (b['estimatedFare'] as num?)?.toInt() ?? 0;
-    final pct = (b['commitmentPercent'] as num?)?.toInt() ?? 0;
-    final hold = (pct > 0 && fare != 0) ? (fare * pct / 100).round() : 0;
-    // Direct accept → the booking is assigned to this driver immediately (no offer,
-    // no customer selection). Golden-only is enforced server-side.
+    // Accepting only registers interest — an admin assigns the driver later.
+    // Golden-only + min-wallet eligibility are enforced server-side.
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Accept this booking?', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        content: SingleChildScrollView(child: acceptHoldContent(fare, pct, hold)),
+        content: SingleChildScrollView(child: acceptHoldContent(fare, 0, 0)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
           ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Accept')),
@@ -106,7 +104,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     try {
       await getIt<CustomerRepository>().accept(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking assigned to you! 🎉'), backgroundColor: AppColors.success));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Accepted! Our team will assign the driver soon. ✅'), backgroundColor: AppColors.success));
       _loadCustomerBookings();
     } catch (e) {
       if (!mounted) return;
@@ -114,7 +112,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     }
   }
 
-  /// Clean popup for accept failures (e.g. low wallet balance for the hold).
+  /// Clean popup for accept failures (e.g. low wallet balance for eligibility).
   void _showAcceptError(String message) {
     final lowBalance = message.toLowerCase().contains('wallet') || message.toLowerCase().contains('balance');
     showDialog<void>(
@@ -300,7 +298,7 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
                 }
                 final entry = item as Map<String, dynamic>;
                 final data = entry['data'] as Map<String, dynamic>;
-                // Customer-side booking → offer/apply card.
+                // Customer-side booking → accept card (registers interest; admin assigns).
                 if (entry['_kind'] == 'cust') {
                   return CustomerRequestCard(data, canAccept: data['canAccept'] != false, onApply: () => _applyCustomer(data));
                 }

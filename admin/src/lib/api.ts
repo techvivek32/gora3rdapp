@@ -236,6 +236,11 @@ export const adminApi = {
 
   // ─── Customer Bookings (rides) ─────────────────────────────────────────────
   getCustomerBookings: (params?: any) => apiClient.get('/customer-bookings/admin/all', { params }),
+  // One booking with the full review of every driver who accepted (for assign).
+  getCustomerBookingDetail: (id: string) => apiClient.get(`/customer-bookings/admin/${id}`),
+  // Assign one accepted driver to the booking.
+  assignCustomerBookingDriver: (id: string, driverId: string) =>
+    apiClient.post(`/customer-bookings/admin/${id}/assign`, { driverId }),
   // Returns the invoice PDF as a Blob (response interceptor passes res.data through).
   downloadCustomerBookingInvoice: (id: string) =>
     apiClient.get(`/customer-bookings/${id}/invoice`, { responseType: 'blob' }) as unknown as Promise<Blob>,
@@ -263,9 +268,6 @@ export const adminApi = {
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
-    bookingCommitmentPercent?: number;
-    driverCancelPenaltyPercent?: number;
-    bookingCancellationPolicy?: string;
     minBillKm?: number;
     tollTaxPerKm?: number;
     minWalletToAccept?: number;

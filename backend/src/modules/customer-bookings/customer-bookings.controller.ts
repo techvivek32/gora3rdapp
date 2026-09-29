@@ -51,6 +51,22 @@ export class CustomerBookingsController {
     return this.service.listAllForAdmin({ status, serviceType });
   }
 
+  @Get('admin/:id')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Admin: one booking with the full review of every accepted driver' })
+  adminDetail(@Param('id') id: string) {
+    return this.service.getAdminBookingDetail(id);
+  }
+
+  @Post('admin/:id/assign')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Admin: assign one of the accepted drivers to the booking' })
+  adminAssign(@Param('id') id: string, @Body('driverId') driverId: string) {
+    return this.service.adminAssign(id, driverId);
+  }
+
   // ── Customer actions ──
 
   @Post()
@@ -133,13 +149,13 @@ export class CustomerBookingsController {
   // ── Driver/Vendor actions ──
 
   @Post(':id/apply')
-  @ApiOperation({ summary: 'Driver/Vendor: apply/quote (holds wallet commitment)' })
+  @ApiOperation({ summary: 'Driver/Vendor: apply/quote (no wallet hold)' })
   apply(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: ApplyBookingDto) {
     return this.service.apply(userId, id, dto);
   }
 
   @Post(':id/accept')
-  @ApiOperation({ summary: 'Golden Driver/Vendor: directly accept a booking (instant assign)' })
+  @ApiOperation({ summary: 'Golden Driver/Vendor: accept a booking (registers interest; admin assigns)' })
   accept(@CurrentUser('sub') userId: string, @Param('id') id: string) {
     return this.service.acceptDirect(userId, id);
   }

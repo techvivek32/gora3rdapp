@@ -92,7 +92,6 @@ export default function CabCategoriesPage() {
   // ── Global cab settings (apply to ALL cabs) ───────────────────────────────────
   const [minBillKm, setMinBillKm] = useState<number>(0);
   const [tollTaxPerKm, setTollTaxPerKm] = useState<number>(0);
-  const [minWalletToAccept, setMinWalletToAccept] = useState<number>(0);
   const { data: settingsData } = useQuery({
     queryKey: ['admin-settings-cab'],
     queryFn: () => adminApi.getAdminSettings(),
@@ -101,10 +100,9 @@ export default function CabCategoriesPage() {
     const s = (settingsData as any)?.data;
     if (typeof s?.minBillKm === 'number') setMinBillKm(s.minBillKm);
     if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
-    if (typeof s?.minWalletToAccept === 'number') setMinWalletToAccept(s.minWalletToAccept);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, minWalletToAccept: Number(minWalletToAccept) || 0 }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0 }),
     onSuccess: () => {
       toast.success('Cab settings saved');
       queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
@@ -288,20 +286,6 @@ export default function CabCategoriesPage() {
             />
             <p className="text-xs text-gray-500 mt-1">
               Used for the “All Inclusive” fare only when Google has no toll amount for a route (long/inter-state trips + state tax). e.g. 1200 km × ₹1.5 = ₹1800.
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Wallet to Accept Booking (₹)</label>
-            <input
-              type="number"
-              min={0}
-              placeholder="e.g. 500 (0 = no minimum)"
-              value={minWalletToAccept}
-              onChange={(e) => setMinWalletToAccept(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              A Golden driver must have at least this much in their wallet to accept a customer booking. Nothing is deducted — it&apos;s only an eligibility check. 0 = no minimum.
             </p>
           </div>
         </div>

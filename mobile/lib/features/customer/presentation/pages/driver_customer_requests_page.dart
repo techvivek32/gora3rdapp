@@ -93,7 +93,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     if (ok != true) return;
     try {
       await _repo.accept(id);
-      _snack('Booking assigned to you! 🎉', ok: true);
+      _snack('Accepted! Our team will assign the driver soon. ✅', ok: true);
       _loadAvailable();
       _loadMine();
     } catch (e) {

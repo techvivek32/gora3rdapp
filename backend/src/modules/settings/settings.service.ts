@@ -126,9 +126,6 @@ export class SettingsService {
     whatsappAutoBookMinutes?: number;
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
-    bookingCommitmentPercent?: number;
-    bookingCancellationPolicy?: string;
-    driverCancelPenaltyPercent?: number;
     minBillKm?: number;
     tollTaxPerKm?: number;
     minWalletToAccept?: number;
