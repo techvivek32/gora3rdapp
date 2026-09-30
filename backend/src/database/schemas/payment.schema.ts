@@ -31,6 +31,10 @@ export class Payment {
   @Prop({ type: Types.ObjectId, ref: 'SubscriptionPlan' })
   planId: Types.ObjectId;
 
+  // Set when this payment is a customer-booking advance (instead of a plan).
+  @Prop({ type: Types.ObjectId, ref: 'CustomerBooking' })
+  bookingRef: Types.ObjectId;
+
   @Prop({ required: true, min: 0 })
   amount: number;
 

@@ -196,12 +196,18 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select a return date for the round trip');
       return;
     }
+    // Intermediate stops (with coords) so the route/distance goes THROUGH them.
+    final stops = _stops
+        .where((s) => s.ctrl.text.trim().isNotEmpty)
+        .map((s) => {'address': s.ctrl.text.trim(), 'lat': s.lat ?? 0, 'lng': s.lng ?? 0, if (s.city != null) 'city': s.city})
+        .toList();
     final trip = <String, dynamic>{
       'subType': _subType,
       'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
       'pickupCity': _pickupCity,
       'drop': {'address': _dropCtrl.text.trim(), 'lat': _dropLat ?? 0, 'lng': _dropLng ?? 0},
       'dropCity': _dropCity,
+      if (stops.isNotEmpty) 'stops': stops,
       'travelDate': ymdString(_date),
       'travelTime': _time.format(context),
       'passengers': _passengers,
@@ -632,19 +638,35 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               _localDurationChips(),
               SizedBox(height: 14.h),
             ],
-            // FROM → (swap) → TO / stops (Local = pickup only). The swap button
-            // sits IN-FLOW between From and To (right-aligned) — never overlaid —
-            // so it can't drift over the address suggestions. Hidden once stops exist.
-            Column(
-              children: [
-                AddressAutocompleteField(
-                  controller: _pickupCtrl,
-                  label: 'From',
-                  prefixIcon: Icons.location_on_rounded,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
-                ),
-                if (_subType != 'Local') ...[
+            // FROM → TO / stops (Local = pickup only).
+            if (_subType == 'Local')
+              _fromField()
+            else if (_stops.isEmpty)
+              // From + To share ONE Stack so the swap button can straddle the gap
+              // (half over From, half over To) AND still be tappable. A widget drawn
+              // outside its parent's bounds (the old `top: -25` overlay) is visible
+              // but never receives taps; here the border sits INSIDE the Stack, so
+              // centre-right lands exactly on the From↔To gap and works.
+              Stack(
+                alignment: Alignment.centerRight,
+                children: [
+                  Column(
+                    children: [
+                      _fromField(),
+                      SizedBox(height: 18.h),
+                      _toField(),
+                    ],
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(right: 6.w),
+                    child: _swapButton(),
+                  ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  _fromField(),
                   for (int i = 0; i < _stops.length; i++) ...[
                     SizedBox(height: 10.h),
                     Row(
@@ -668,31 +690,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                       ],
                     ),
                   ],
-                  SizedBox(height: 14.h),
-                  // TO with the swap button straddling the From↔To gap on the right.
-                  // The button is anchored to To's TOP (not the column centre), so it
-                  // moves with the layout and can't drift into the address suggestions.
-                  // Hidden once stops are added. clipBehavior:none lets it sit above To.
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      AddressAutocompleteField(
-                        controller: _dropCtrl,
-                        label: 'To',
-                        prefixIcon: Icons.location_on_rounded,
-                        onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
-                      ),
-                      if (_stops.isEmpty)
-                        Positioned(
-                          right: 6.w,
-                          top: -25.h,
-                          child: _swapButton(),
-                        ),
-                    ],
-                  ),
+                  SizedBox(height: 10.h),
+                  _toField(),
                 ],
-              ],
-            ),
+              ),
             // Add Stops only for point-to-point trips (not Local).
             if (_subType != 'Local') ...[
               SizedBox(height: 14.h),
@@ -786,6 +787,21 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
           ),
           child: Text('$n', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: AppColors.primary)),
         ),
+      );
+
+  Widget _fromField() => AddressAutocompleteField(
+        controller: _pickupCtrl,
+        label: 'From',
+        prefixIcon: Icons.location_on_rounded,
+        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+        onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
+      );
+
+  Widget _toField() => AddressAutocompleteField(
+        controller: _dropCtrl,
+        label: 'To',
+        prefixIcon: Icons.location_on_rounded,
+        onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
       );
 
   /// Swap the From and To locations (address + coords + city).

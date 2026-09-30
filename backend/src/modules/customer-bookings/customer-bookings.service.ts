@@ -11,6 +11,9 @@ import {
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { CabCategory, CabCategoryDocument } from '../../database/schemas/home-content.schema';
+import { Payment, PaymentDocument, PaymentStatus } from '../../database/schemas/payment.schema';
+import { generatePaymentOrderId } from '../../common/utils/booking-id.util';
+import Razorpay from 'razorpay';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
@@ -31,9 +34,143 @@ export class CustomerBookingsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     @InjectModel(CabCategory.name) private cabCategoryModel: Model<CabCategoryDocument>,
+    @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
   ) {}
+
+  // ─── Advance payment (customer pays 10% / 100% to the platform) ─────────────
+
+  /** Build the Razorpay client from the admin-set keys (env fallback). */
+  private async getRazorpay(): Promise<Razorpay> {
+    const keys = await this.settings.getRazorpayKeys();
+    if (!keys.keyId || !keys.keySecret) {
+      throw new BadRequestException('Payment gateway is not configured. Please contact support.');
+    }
+    return new Razorpay({ key_id: keys.keyId, key_secret: keys.keySecret });
+  }
+
+  /** Load a booking that belongs to this customer + compute the advance amount (₹). */
+  private async advanceContext(customerId: string, id: string, percent: number) {
+    const p = Math.round(percent);
+    if (![10, 100].includes(p)) throw new BadRequestException('Advance must be 10% or 100%');
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
+    const booking = await this.bookingModel.findById(id);
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.customerId.toString() !== customerId) throw new ForbiddenException('Not your booking');
+    if (booking.advanceStatus === 'paid') throw new BadRequestException('Advance already paid for this booking');
+    const fare = booking.finalFare || booking.estimatedFare || 0;
+    const rupees = Math.max(1, Math.round((fare * p) / 100));
+    return { booking, percent: p, rupees, amountPaise: rupees * 100 };
+  }
+
+  /** In-app Razorpay checkout order for a booking advance. */
+  async createAdvanceOrder(customerId: string, id: string, percent: number) {
+    const { booking, percent: p, rupees, amountPaise } = await this.advanceContext(customerId, id, percent);
+    const orderId = generatePaymentOrderId();
+    let order: any;
+    try {
+      order = await (await this.getRazorpay()).orders.create({
+        amount: amountPaise, currency: 'INR', receipt: orderId,
+        notes: { bookingId: booking.bookingId, customerId, percent: `${p}` },
+      });
+    } catch (e: any) {
+      const reason = e?.error?.description || e?.message || 'unknown error';
+      throw new BadRequestException(`Payment could not start: ${reason}`);
+    }
+    const payment = await this.paymentModel.create({
+      orderId, userId: new Types.ObjectId(customerId), bookingRef: booking._id,
+      amount: rupees, status: PaymentStatus.PENDING, razorpayOrderId: order.id,
+      metadata: { purpose: 'booking_advance', percent: p, bookingId: booking.bookingId },
+    });
+    const keys = await this.settings.getRazorpayKeys();
+    return { message: 'Advance order created', data: {
+      orderId: order.id, amount: amountPaise, currency: 'INR', keyId: keys.keyId,
+      paymentId: payment._id, percent: p, rupees,
+    } };
+  }
+
+  /** UPI QR for a booking advance (scan & pay from any UPI app). */
+  async createAdvanceQr(customerId: string, id: string, percent: number) {
+    const { booking, percent: p, rupees, amountPaise } = await this.advanceContext(customerId, id, percent);
+    const orderId = generatePaymentOrderId();
+    let qr: any;
+    try {
+      qr = await (await this.getRazorpay()).qrCode.create({
+        type: 'upi_qr', name: 'Gora Cabs', usage: 'single_use', fixed_amount: true,
+        payment_amount: amountPaise, description: `Advance ${p}% • ${booking.bookingId}`,
+        notes: { bookingId: booking.bookingId, customerId, orderId, percent: `${p}` },
+      } as any);
+    } catch (e: any) {
+      const reason = e?.error?.description || e?.message || 'unknown error';
+      throw new BadRequestException(`QR could not be created: ${reason}`);
+    }
+    const payment = await this.paymentModel.create({
+      orderId, userId: new Types.ObjectId(customerId), bookingRef: booking._id,
+      amount: rupees, status: PaymentStatus.PENDING, razorpayQrId: qr.id,
+      metadata: { purpose: 'booking_advance', percent: p, bookingId: booking.bookingId },
+    });
+    return { message: 'QR created', data: {
+      qrId: qr.id, imageUrl: qr.image_url, amount: amountPaise, currency: 'INR',
+      paymentId: payment._id, percent: p, rupees,
+    } };
+  }
+
+  /** Mark a paid advance payment onto its booking (idempotent). */
+  private async applyAdvanceToBooking(payment: PaymentDocument) {
+    if (!payment.bookingRef) return;
+    const percent = Number(payment.metadata?.percent) || 0;
+    await this.bookingModel.updateOne(
+      { _id: payment.bookingRef, advanceStatus: { $ne: 'paid' } },
+      { $set: { advanceStatus: 'paid', advanceAmount: payment.amount, advancePercent: percent, advancePaymentId: payment._id } },
+    );
+  }
+
+  /** Verify the in-app checkout signature, then credit the booking advance. */
+  async verifyAdvance(customerId: string, data: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
+    const keys = await this.settings.getRazorpayKeys();
+    const expected = crypto.createHmac('sha256', keys.keySecret)
+      .update(`${data.razorpayOrderId}|${data.razorpayPaymentId}`).digest('hex');
+    if (expected !== data.razorpaySignature) {
+      await this.paymentModel.findOneAndUpdate({ razorpayOrderId: data.razorpayOrderId }, { status: PaymentStatus.FAILED });
+      throw new BadRequestException('Payment verification failed');
+    }
+    const payment = await this.paymentModel.findOneAndUpdate(
+      { razorpayOrderId: data.razorpayOrderId, status: { $ne: PaymentStatus.SUCCESS } },
+      { status: PaymentStatus.SUCCESS, razorpayPaymentId: data.razorpayPaymentId, razorpaySignature: data.razorpaySignature },
+      { new: true },
+    );
+    if (!payment) {
+      const existing = await this.paymentModel.findOne({ razorpayOrderId: data.razorpayOrderId });
+      if (existing?.status === PaymentStatus.SUCCESS) return { message: 'Advance already paid' };
+      throw new NotFoundException('Payment not found');
+    }
+    await this.applyAdvanceToBooking(payment);
+    return { message: 'Advance paid', data: { advanceAmount: payment.amount } };
+  }
+
+  /** Poll a QR advance: reconcile with Razorpay, credit the booking when paid. */
+  async advancePaymentStatus(paymentId: string, customerId: string) {
+    if (!Types.ObjectId.isValid(paymentId)) throw new NotFoundException('Payment not found');
+    const payment = await this.paymentModel.findById(paymentId);
+    if (!payment || payment.userId?.toString() !== customerId) throw new NotFoundException('Payment not found');
+    if (payment.status === PaymentStatus.PENDING && payment.razorpayQrId) {
+      try {
+        const qr: any = await (await this.getRazorpay()).qrCode.fetch(payment.razorpayQrId);
+        const received = Number(qr?.payments_amount_received || 0);
+        const count = Number(qr?.payments_count_received || 0);
+        if (count > 0 || (received > 0 && received >= Number(payment.amount || 0) * 100)) {
+          payment.status = PaymentStatus.SUCCESS;
+          await payment.save();
+          await this.applyAdvanceToBooking(payment);
+        }
+      } catch (e: any) {
+        this.logger.warn(`Advance QR reconcile failed ${paymentId}: ${e?.message}`);
+      }
+    }
+    const fresh = await this.paymentModel.findById(paymentId).select('status').lean();
+    return { message: 'ok', data: { status: fresh?.status, paid: fresh?.status === PaymentStatus.SUCCESS } };
+  }
 
   private genBookingId(): string {
     return `CB${Date.now().toString().slice(-7)}${Math.floor(100 + Math.random() * 900)}`;
@@ -1122,6 +1259,16 @@ export class CustomerBookingsService {
         booking.extraKm = extraKm;
         booking.extraCharge = Math.round(extraKm * booking.extraKmPrice);
         booking.finalFare = Math.round((booking.finalFare || booking.estimatedFare || 0) + booking.extraCharge);
+      }
+      // Release the customer's advance (paid to the platform) into the driver's
+      // wallet now that the trip is complete. Guarded so it runs only once.
+      if (booking.advanceStatus === 'paid' && (booking.advanceAmount || 0) > 0 && booking.selectedDriverId && !booking.advanceReleasedAt) {
+        booking.advanceReleasedAt = new Date();
+        await this.refundToWallet(booking.selectedDriverId, booking.advanceAmount, booking._id,
+          `Advance released for completed booking ${booking.bookingId}`);
+        this.notifications.notifyUser(booking.selectedDriverId, '💰 Advance credited',
+          `₹${booking.advanceAmount} advance for booking ${booking.bookingId} has been added to your wallet.`,
+          { type: 'customer_booking_advance', bookingId: booking.bookingId }).catch(() => {});
       }
     }
     await booking.save();

@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
@@ -22,6 +26,12 @@ class CabConfirmPage extends StatefulWidget {
 class _CabConfirmPageState extends State<CabConfirmPage> {
   bool _busy = false;
   bool _tcOpen = false;
+
+  // Advance payment: 0 = book now / pay later, 10 = 10% advance, 100 = full.
+  int _payPercent = 0;
+  Razorpay? _razorpay;
+  String? _pendingBookingId; // booking created, awaiting advance payment
+  String _pendingHumanId = ''; // the human CB… id, for the confirmation screen
 
   // Contact details (pre-filled from the signed-in user). Editable.
   final _nameCtrl = TextEditingController();
@@ -47,10 +57,16 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     _nameCtrl.text = (user?['fullName'] ?? '').toString();
     _mobileCtrl.text = (user?['mobile'] ?? user?['phone'] ?? '').toString();
     _emailCtrl.text = (user?['email'] ?? '').toString();
+    if (!kIsWeb) {
+      _razorpay = Razorpay();
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
+    }
   }
 
   @override
   void dispose() {
+    _razorpay?.clear();
     _nameCtrl.dispose();
     _mobileCtrl.dispose();
     _emailCtrl.dispose();
@@ -73,6 +89,17 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   int get _extraKm => (_cat['extraKmPrice'] as num?)?.toInt() ?? 0;
   List<String> get _terms => ((_cat['terms'] as List?) ?? []).map((e) => e.toString()).toList();
 
+  // Shown when the admin hasn't set custom T&C for this cab category.
+  static const List<String> _defaultTerms = [
+    'Your trip has a KM limit. If your usage exceeds this limit, you will be charged for the extra KM used at the per-km rate shown.',
+    'The fare includes one pick-up in the pickup city and one drop in the destination city. It does not include within-city travel.',
+    'Airport entry / parking charges, if applicable, are not included in the fare and are charged extra.',
+    'On a Best Price fare, toll, state tax & parking are paid directly to the driver by you. On All Inclusive they are already included.',
+    'If your trip has hill climbs, the cab AC may be switched off during such climbs.',
+  ];
+
+  List<String> get _effectiveTerms => _terms.isNotEmpty ? _terms : _defaultTerms;
+
   String _cityOf(String cityKey, String addrKey) {
     final t = _trip;
     final city = (t[cityKey] ?? '').toString().trim();
@@ -81,14 +108,17 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     return addr.isEmpty ? '—' : addr.split(',').first.trim();
   }
 
-  Future<void> _confirm() async {
-    if (_busy) return;
-    void err(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating));
+  int _advanceRupees(int percent) => (_fare * percent / 100).round();
+
+  void _err(String m) => ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(m), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating));
+
+  /// Builds + posts (or updates) the booking. Returns its id, or null on failure.
+  Future<String?> _createBooking() async {
     if (_nameCtrl.text.trim().isEmpty || _mobileCtrl.text.trim().isEmpty) {
-      err('Please enter your name and mobile number');
-      return;
+      _err('Please enter your name and mobile number');
+      return null;
     }
-    setState(() => _busy = true);
     final t = _trip;
     final notes = <String>[];
     if (t['notes'] != null && (t['notes'] as String).isNotEmpty) notes.add(t['notes'].toString());
@@ -122,6 +152,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       'pickupCity': t['pickupCity'],
       'drop': t['drop'],
       'dropCity': t['dropCity'],
+      if (t['stops'] is List && (t['stops'] as List).isNotEmpty) 'stops': t['stops'],
       'travelDate': t['travelDate'],
       'travelTime': t['travelTime'],
       'passengers': t['passengers'] ?? 1,
@@ -135,24 +166,146 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     try {
       final repo = getIt<CustomerRepository>();
       final booking = _isEdit ? await repo.updateBooking(_editId, body) : await repo.createBooking(body);
-      if (!mounted) return;
       final id = (booking['_id'] ?? booking['id'] ?? _editId).toString();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(_isEdit ? 'Booking updated' : 'Booking confirmed — waiting for a driver to accept'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-      ));
-      context.go('/customer/bookings/$id');
+      _pendingHumanId = (booking['bookingId'] ?? '').toString();
+      return id.isEmpty ? null : id;
     } catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not ${_isEdit ? 'update' : 'book'}: ${e.toString().replaceFirst('Exception: ', '')}'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ));
-      }
+      if (mounted) _err('Could not ${_isEdit ? 'update' : 'book'}: ${e.toString().replaceFirst('Exception: ', '')}');
+      return null;
     }
+  }
+
+  /// After confirm/payment: show the "Booking Confirmation" (Thank You) screen
+  /// with the full summary — not the raw booking-details page.
+  void _goToBooking(String id, String msg) {
+    if (!mounted) return;
+    final t = _trip;
+    final date = (t['travelDate'] ?? '').toString();
+    final time = (t['travelTime'] ?? '').toString();
+    final exclusions = <String>[
+      if (_extraKm > 0) 'Pay ₹$_extraKm/km after ${_billedKm.round()} km',
+      if (_isBestPrice) 'Toll, state tax & parking (pay the driver directly)',
+      'Multiple pickups / drops',
+    ];
+    context.go('/customer/cab-confirmed', extra: {
+      'name': _nameCtrl.text.trim(),
+      'humanId': _pendingHumanId,
+      'bookingObjId': id,
+      'pickupCity': _cityOf('pickupCity', 'pickup'),
+      'totalFare': _fare,
+      'tripType': (t['subType'] ?? 'One Way').toString(),
+      'dateTime': [if (date.isNotEmpty) _prettyDate(date), if (time.isNotEmpty) time].join(' | '),
+      'carType': (_cat['name'] ?? 'Cab').toString(),
+      'amountPaid': _payPercent == 0 ? 0 : _advanceRupees(_payPercent),
+      'inclusions': _inclusions.isNotEmpty ? _inclusions : const ['Fuel Charges', 'Driver Allowance'],
+      'exclusions': exclusions,
+      'terms': _effectiveTerms,
+    });
+  }
+
+  /// Bottom action: create the booking, then navigate (pay later) or take the advance.
+  Future<void> _onPayNow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final id = _pendingBookingId ?? await _createBooking();
+    if (id == null) { if (mounted) setState(() => _busy = false); return; }
+    _pendingBookingId = id; // don't recreate the booking if payment is retried
+    if (_payPercent == 0) { _goToBooking(id, 'Booking confirmed — waiting for a driver to accept'); return; }
+    if (kIsWeb) {
+      if (mounted) setState(() => _busy = false);
+      _err('Payments are only supported on the mobile app.');
+      return;
+    }
+    if (mounted) setState(() => _busy = false);
+    _showPaymentMethodSheet(id);
+  }
+
+  /// Choose how to pay the advance: in-app checkout or a scannable UPI QR.
+  void _showPaymentMethodSheet(String bookingId) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Row(children: [
+              Text('Pay ₹${_advanceRupees(_payPercent)} advance', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+              const Spacer(),
+              IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+            ]),
+          ),
+          ListTile(
+            leading: CircleAvatar(backgroundColor: AppColors.primary.withValues(alpha: 0.15), child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary)),
+            title: const Text('Pay in App', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+            subtitle: const Text('UPI apps, Cards, Netbanking', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+            onTap: () { Navigator.pop(ctx); _payInApp(bookingId); },
+          ),
+          ListTile(
+            leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.qr_code_2_rounded, color: Color(0xFF25D366))),
+            title: const Text('Pay by QR', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+            subtitle: const Text('Scan & pay with any UPI app', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+            onTap: () { Navigator.pop(ctx); _startQrPayment(bookingId); },
+          ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _payInApp(String bookingId) async {
+    try {
+      final res = await getIt<ApiClient>().post('/customer-bookings/$bookingId/advance/order', data: {'percent': _payPercent});
+      _openRazorpay(Map<String, dynamic>.from(res.data['data'] as Map));
+    } catch (e) {
+      if (mounted) _err('Could not start payment: ${e.toString().replaceFirst('Exception: ', '')}');
+    }
+  }
+
+  void _openRazorpay(Map<String, dynamic> order) {
+    if (_razorpay == null) return;
+    _razorpay!.open({
+      'key': order['keyId'] ?? '',
+      'amount': order['amount'],
+      'currency': order['currency'] ?? 'INR',
+      'order_id': order['orderId'],
+      'name': 'Gora Cabs',
+      'description': 'Booking advance ($_payPercent%)',
+      'prefill': {'contact': _mobileCtrl.text.trim(), 'email': _emailCtrl.text.trim(), 'name': _nameCtrl.text.trim()},
+      'theme': {'color': '#F97316'},
+    });
+  }
+
+  Future<void> _onPaymentSuccess(PaymentSuccessResponse r) async {
+    try {
+      await getIt<ApiClient>().post('/customer-bookings/advance/verify', data: {
+        'razorpayOrderId': r.orderId, 'razorpayPaymentId': r.paymentId, 'razorpaySignature': r.signature,
+      });
+    } catch (_) {/* falls back to the Razorpay webhook */}
+    if (_pendingBookingId != null) _goToBooking(_pendingBookingId!, '✅ Advance paid — booking confirmed');
+  }
+
+  void _onPaymentError(PaymentFailureResponse r) {
+    if (mounted) _err('Payment failed: ${r.message ?? ''}');
+  }
+
+  Future<void> _startQrPayment(String bookingId) async {
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator(color: AppColors.primary)));
+    Map<String, dynamic> data;
+    try {
+      final res = await getIt<ApiClient>().post('/customer-bookings/$bookingId/advance/qr', data: {'percent': _payPercent});
+      data = Map<String, dynamic>.from(res.data['data'] as Map);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+      if (mounted) _err('Could not create QR. Please try again.');
+      return;
+    }
+    if (!mounted) return;
+    Navigator.pop(context);
+    final paid = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(fullscreenDialog: true, builder: (_) => _AdvanceQrPage(data: data)),
+    );
+    if (paid == true && _pendingBookingId != null) _goToBooking(_pendingBookingId!, '✅ Advance paid — booking confirmed');
   }
 
   @override
@@ -185,10 +338,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
           _contactCard(),
           SizedBox(height: 12.h),
           _incExcCard(),
-          if (_terms.isNotEmpty) ...[
-            SizedBox(height: 12.h),
-            _tcCard(),
-          ],
+          SizedBox(height: 12.h),
+          _tcCard(),
         ],
       ),
       bottomNavigationBar: _bottomBar(),
@@ -414,7 +565,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             if (_tcOpen) ...[
               Divider(height: 1, color: AppColors.border),
               SizedBox(height: 8.h),
-              ..._terms.map((e) => Padding(
+              ..._effectiveTerms.map((e) => Padding(
                     padding: EdgeInsets.only(bottom: 8.h),
                     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('•  ', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
@@ -427,40 +578,103 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
         ),
       );
 
-  // ── Bottom: total fare + confirm ────────────────────────────────────────────
-  Widget _bottomBar() => Container(
-        decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
-        child: SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(14.w, 10.h, 14.w, 10.h),
-            child: Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Total Fare', style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                    Text(_fare > 0 ? '₹$_fare' : 'On request', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+  // ── Bottom: Total Fare row on top, then options + Pay Now below ─────────────
+  Widget _bottomBar() {
+    final due = _payPercent == 0 ? 0 : _advanceRupees(_payPercent);
+    final showOptions = !_isEdit && _fare > 0;
+    return Container(
+      decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: AppColors.border))),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Total Fare — label + info on the left, amount on the right.
+            Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 10.h),
+              child: Row(
+                children: [
+                  Text('Total Fare', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                  SizedBox(width: 5.w),
+                  Icon(Icons.info_outline_rounded, size: 15.sp, color: AppColors.textSecondary),
+                  const Spacer(),
+                  Text(_fare > 0 ? '₹$_fare' : 'On request', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            // Options (Book at ₹0 / Pay 10% / Pay 100%) + the Pay Now button.
+            Padding(
+              padding: EdgeInsets.fromLTRB(10.w, 10.h, 10.w, 10.h),
+              child: Row(
+                children: [
+                  if (showOptions) ...[
+                    Expanded(flex: 3, child: _payChip(0, 'Book at ₹0', 'Pay later')),
+                    SizedBox(width: 6.w),
+                    Expanded(flex: 3, child: _payChip(10, 'Pay 10%', '₹${_advanceRupees(10)} now')),
+                    SizedBox(width: 6.w),
+                    Expanded(flex: 3, child: _payChip(100, 'Pay 100%', '₹$_fare')),
+                    SizedBox(width: 8.w),
                   ],
-                ),
-                SizedBox(width: 14.w),
-                Expanded(
-                  child: SizedBox(
-                    height: 50.h,
-                    child: ElevatedButton(
-                      onPressed: _busy ? null : _confirm,
-                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, disabledBackgroundColor: AppColors.textHint, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r))),
-                      child: _busy
-                          ? SizedBox(width: 22.w, height: 22.w, child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
-                          : Text(_isEdit ? 'SAVE BOOKING' : 'CONFIRM BOOKING', style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.w800, letterSpacing: 0.4, fontFamily: 'Poppins')),
+                  Expanded(
+                    flex: showOptions ? 4 : 1,
+                    child: SizedBox(
+                      height: 54.h,
+                      child: ElevatedButton(
+                        onPressed: _busy ? null : _onPayNow,
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, disabledBackgroundColor: AppColors.textHint, elevation: 0, padding: EdgeInsets.zero, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r))),
+                        child: _busy
+                            ? SizedBox(width: 20.w, height: 20.w, child: const CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                            : Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    _isEdit ? 'SAVE' : (_payPercent == 0 ? 'CONFIRM' : 'Pay Now'),
+                                    style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, letterSpacing: 0.3, fontFamily: 'Poppins'),
+                                  ),
+                                  if (showOptions && _payPercent != 0)
+                                    Text('₹$due', style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                                ],
+                              ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  /// One advance-payment option card (Book at ₹0 / Pay 10% / Pay 100%).
+  Widget _payChip(int percent, String title, String sub) {
+    final sel = _payPercent == percent;
+    return GestureDetector(
+      onTap: () => setState(() => _payPercent = percent),
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        height: 54.h,
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(horizontal: 3.w),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.primary.withValues(alpha: 0.10) : Colors.white,
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: sel ? AppColors.primary : AppColors.border, width: sel ? 1.5 : 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(title, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w800, color: sel ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
+            SizedBox(height: 2.h),
+            Text(sub, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w600, color: sel ? AppColors.primary : AppColors.textSecondary, fontFamily: 'Poppins')),
+          ],
+        ),
+      ),
+    );
+  }
 
   String _titleCase(String s) => s.isEmpty ? s : s;
 
@@ -473,5 +687,102 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (m >= 1 && m <= 12) return '${p[2]} ${months[m - 1]}';
     }
     return d;
+  }
+}
+
+/// Full-screen UPI QR for the booking advance. Polls the backend until the
+/// payment is credited (out-of-band via the qr_code.credited webhook / reconcile),
+/// stops after 15 minutes. Pops `true` when paid; close (✕) = cancel.
+class _AdvanceQrPage extends StatefulWidget {
+  final Map<String, dynamic> data;
+  const _AdvanceQrPage({required this.data});
+
+  @override
+  State<_AdvanceQrPage> createState() => _AdvanceQrPageState();
+}
+
+class _AdvanceQrPageState extends State<_AdvanceQrPage> {
+  Timer? _timer;
+  bool _checking = false;
+  int _elapsed = 0;
+  static const _timeoutSeconds = 15 * 60;
+
+  String get _paymentId => '${widget.data['paymentId']}';
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _poll());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _poll() async {
+    if (_checking) return;
+    _elapsed += 4;
+    if (_elapsed >= _timeoutSeconds) {
+      _timer?.cancel();
+      return;
+    }
+    _checking = true;
+    try {
+      final res = await getIt<ApiClient>().get('/customer-bookings/advance/status/$_paymentId');
+      if ((res.data['data']?['paid'] == true) && mounted) {
+        _timer?.cancel();
+        Navigator.pop(context, true);
+        return;
+      }
+    } catch (_) {
+      // transient — keep polling
+    } finally {
+      _checking = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = widget.data['imageUrl'] as String?;
+    final rupees = widget.data['rupees'];
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textPrimary,
+        elevation: 0.5,
+        title: Text('Scan & Pay${rupees != null ? '  ₹$rupees' : ''}', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
+        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context, false)),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(16.w),
+                child: (imageUrl != null && imageUrl.isNotEmpty)
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (c, w, p) => p == null ? w : const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                        errorBuilder: (c, e, s) => const Center(child: Text('Could not load QR')),
+                      )
+                    : const Center(child: Text('QR unavailable')),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(20.w, 0, 20.w, 16.h),
+              child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                SizedBox(width: 10.w),
+                Text('Waiting for payment…', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

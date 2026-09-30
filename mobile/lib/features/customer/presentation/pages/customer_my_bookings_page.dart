@@ -15,17 +15,16 @@ class CustomerMyBookingsPage extends StatefulWidget {
 }
 
 class _CustomerMyBookingsPageState extends State<CustomerMyBookingsPage> with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 4, vsync: this);
+  late final TabController _tabs = TabController(length: 3, vsync: this);
   final _repo = getIt<CustomerRepository>();
 
   // tab index → statuses to show
   static const _groups = <List<String>>[
-    ['open', 'confirmed'], // Upcoming
-    ['ongoing'],           // Ongoing
-    ['completed'],         // Completed
-    ['cancelled', 'expired'], // Cancelled
+    ['open', 'confirmed'],                 // Upcoming
+    ['ongoing'],                           // Ongoing
+    ['completed', 'cancelled', 'expired'], // History
   ];
-  static const _labels = ['Upcoming', 'Ongoing', 'Completed', 'Cancelled'];
+  static const _labels = ['Upcoming', 'Ongoing', 'History'];
 
   List<Map<String, dynamic>>? _all;
   bool _loading = true;
@@ -63,12 +62,12 @@ class _CustomerMyBookingsPageState extends State<CustomerMyBookingsPage> with Si
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('My Rides'),
+        title: const Text('My Bookings'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabs,
-          isScrollable: true,
+          isScrollable: false,
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
@@ -83,7 +82,7 @@ class _CustomerMyBookingsPageState extends State<CustomerMyBookingsPage> with Si
                   onRefresh: _load,
                   child: TabBarView(
                     controller: _tabs,
-                    children: List.generate(4, (i) => _list(_for(_groups[i]))),
+                    children: List.generate(3, (i) => _list(_for(_groups[i]))),
                   ),
                 ),
     );

@@ -64,13 +64,25 @@ class _CabResultsPageState extends State<CabResultsPage> {
       final pLng = (pk?['lng'] as num?)?.toDouble() ?? 0;
       final dLat = (dp?['lat'] as num?)?.toDouble() ?? 0;
       final dLng = (dp?['lng'] as num?)?.toDouble() ?? 0;
-      // Always call the route endpoint (for the toll estimate + fresh distance).
+      // Route endpoint is used for the fresh DISTANCE only. Toll is NOT taken from
+      // Google anymore — it comes solely from the admin ₹/km rate (see below).
+      // Intermediate stops are added as waypoints so the distance routes THROUGH
+      // them (pickup;stop1;stop2;drop) instead of pickup→drop direct.
       if (pLat != 0 && dLat != 0) {
-        final res = await _api.get('/places/route', params: {'points': '$pLat,$pLng;$dLat,$dLng'});
+        final stopPts = ((widget.trip['stops'] as List?) ?? [])
+            .whereType<Map>()
+            .map((s) {
+              final la = (s['lat'] as num?)?.toDouble() ?? 0;
+              final ln = (s['lng'] as num?)?.toDouble() ?? 0;
+              return (la != 0 && ln != 0) ? '$la,$ln' : null;
+            })
+            .whereType<String>()
+            .toList();
+        final points = ['$pLat,$pLng', ...stopPts, '$dLat,$dLng'].join(';');
+        final res = await _api.get('/places/route', params: {'points': points});
         final d = res.data['data'];
         final rd = (d?['distanceKm'] as num?)?.toDouble() ?? 0;
         if (rd > 0) dist = rd;
-        toll = (d?['tollInr'] as num?)?.toDouble() ?? 0;
       }
     } catch (_) {}
     try {
@@ -87,10 +99,10 @@ class _CabResultsPageState extends State<CabResultsPage> {
       minKm = ((res.data['data']?['minBillKm']) as num?)?.toDouble() ?? 0;
       tollTaxPerKm = ((res.data['data']?['tollTaxPerKm']) as num?)?.toDouble() ?? 0;
     } catch (_) {}
-    // When Google returns no toll amount (empty on many long/inter-state routes,
-    // and it never includes state tax), fall back to the admin ₹/km estimate for
-    // inter-city trips so "All Inclusive" still reflects toll + state tax.
-    if (toll <= 0 && tollTaxPerKm > 0 && dist >= 50) {
+    // Toll for "All Inclusive" = the admin per-km rate × distance (the single
+    // source of truth). 0 = no toll. Google toll auto-detect is intentionally
+    // not used (unreliable for Indian routes + never includes state tax).
+    if (tollTaxPerKm > 0) {
       toll = (dist * tollTaxPerKm).roundToDouble();
     }
     List<String> inc = [];

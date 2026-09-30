@@ -128,6 +128,14 @@ export class CustomerBooking {
   // Commitment snapshot (percent of fare a driver must hold to apply).
   @Prop({ default: 0 }) commitmentPercent: number;
 
+  // ── Advance payment (customer pays 10% / 100% to the platform on booking) ──
+  @Prop({ default: 0 }) advancePercent: number;   // 0 = pay later
+  @Prop({ default: 0 }) advanceAmount: number;     // ₹ actually paid
+  @Prop({ type: String, enum: ['none', 'paid'], default: 'none' }) advanceStatus: string;
+  @Prop({ type: Types.ObjectId, ref: 'Payment' }) advancePaymentId: Types.ObjectId;
+  // Set once the advance is released to the driver's wallet on trip completion.
+  @Prop() advanceReleasedAt: Date;
+
   // Driver contact snapshot shown to the customer after confirm.
   @Prop({ type: Object })
   driverSnapshot: { name?: string; phone?: string; vehicle?: string; vehicleNumber?: string; rating?: number };

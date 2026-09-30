@@ -44,6 +44,20 @@ export class CustomerBookingsController {
     return this.service.getMyApplications(userId);
   }
 
+  // ── Advance payment (literal routes before :id) ──
+
+  @Get('advance/status/:paymentId')
+  @ApiOperation({ summary: 'Poll an advance QR payment status' })
+  advanceStatus(@CurrentUser('sub') userId: string, @Param('paymentId') paymentId: string) {
+    return this.service.advancePaymentStatus(paymentId, userId);
+  }
+
+  @Post('advance/verify')
+  @ApiOperation({ summary: 'Verify an in-app advance payment' })
+  advanceVerify(@CurrentUser('sub') userId: string, @Body() data: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
+    return this.service.verifyAdvance(userId, data);
+  }
+
   @Get('admin/all')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
@@ -145,6 +159,18 @@ export class CustomerBookingsController {
   @ApiOperation({ summary: 'Customer: rate the driver after completion' })
   rate(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: RateBookingDto) {
     return this.service.rate(userId, id, dto);
+  }
+
+  @Post(':id/advance/order')
+  @ApiOperation({ summary: 'Customer: create an in-app Razorpay order for the booking advance' })
+  advanceOrder(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body('percent') percent: number) {
+    return this.service.createAdvanceOrder(userId, id, percent);
+  }
+
+  @Post(':id/advance/qr')
+  @ApiOperation({ summary: 'Customer: create a UPI QR for the booking advance' })
+  advanceQr(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body('percent') percent: number) {
+    return this.service.createAdvanceQr(userId, id, percent);
   }
 
   // ── Driver/Vendor actions ──
