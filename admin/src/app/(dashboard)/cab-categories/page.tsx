@@ -17,6 +17,8 @@ interface CabCategory {
   pricePerKmCng?: number;
   dailyKmLimit?: number;
   extraKmPrice?: number;
+  packageKmPerHour?: number;
+  extraHourPrice?: number;
   seats?: number;
   bags?: string;
   inclusions?: string[];
@@ -32,6 +34,7 @@ const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
   pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
   dailyKmLimit: 0, extraKmPrice: 0,
+  packageKmPerHour: 0, extraHourPrice: 0,
   seats: 0, bags: '',
   inclusions: [] as string[], exclusions: [] as string[], facilities: [] as string[], terms: [] as string[],
   order: 0, isActive: true,
@@ -124,6 +127,8 @@ export default function CabCategoriesPage() {
     pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
     dailyKmLimit: Number(form.dailyKmLimit) || 0,
     extraKmPrice: Number(form.extraKmPrice) || 0,
+    packageKmPerHour: Number(form.packageKmPerHour) || 0,
+    extraHourPrice: Number(form.extraHourPrice) || 0,
     seats: Number(form.seats) || 0,
     bags: form.bags.trim(),
     inclusions: form.inclusions,
@@ -192,6 +197,8 @@ export default function CabCategoriesPage() {
       pricePerKmCng: it.pricePerKmCng ?? 0,
       dailyKmLimit: it.dailyKmLimit ?? 0,
       extraKmPrice: it.extraKmPrice ?? 0,
+      packageKmPerHour: it.packageKmPerHour ?? 0,
+      extraHourPrice: it.extraHourPrice ?? 0,
       seats: it.seats ?? 0,
       bags: it.bags ?? '',
       inclusions: it.inclusions ?? [],
@@ -483,6 +490,35 @@ export default function CabCategoriesPage() {
           </div>
           <p className="text-xs text-gray-500 -mt-2">
             Round trip: included km = KM/day × days (e.g. 250 × 3 = 750). GPS measures the driver’s actual km; anything beyond is billed at the extra ₹/km.
+          </p>
+
+          {/* Local (in-city hourly package) pricing */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Local package KM / hour</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 10 (0 = no Local packages)"
+                value={form.packageKmPerHour}
+                onChange={(e) => setForm({ ...form, packageKmPerHour: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Extra hour price (₹/hr)</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 150"
+                value={form.extraHourPrice}
+                onChange={(e) => setForm({ ...form, extraHourPrice: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 -mt-2">
+            Local (in-city hourly): a 6/8/10/12-hour package includes KM/hour × hours (e.g. 10 × 8 = 80 km) at the per-km rate. Time used beyond the package is billed at the extra ₹/hr; km beyond the included allowance at the extra ₹/km above.
           </p>
 
           {/* Per-cab info tabs — shown on the customer Confirm Booking screen */}

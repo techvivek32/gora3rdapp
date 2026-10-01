@@ -66,6 +66,12 @@ export class CabCategory {
   @Prop({ default: 0 }) dailyKmLimit: number;
   // ₹ charged per km beyond the included allowance (GPS-measured on the trip).
   @Prop({ default: 0 }) extraKmPrice: number;
+  // ── Local (in-city hourly package) pricing ─────────────────────────────────
+  // Km included per hour of a Local package (e.g. 10 → an 8-hour package = 80 km).
+  // 0 = Local packages not offered for this cab. Package fare = includedKm × per-km rate.
+  @Prop({ default: 0 }) packageKmPerHour: number;
+  // ₹ charged per hour beyond the booked Local package (admin-managed).
+  @Prop({ default: 0 }) extraHourPrice: number;
   // Per-cab info shown as tabs on the customer Confirm Booking screen.
   @Prop({ type: [String], default: [] }) inclusions: string[];
   @Prop({ type: [String], default: [] }) exclusions: string[];

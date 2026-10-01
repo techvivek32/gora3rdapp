@@ -80,6 +80,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   double get _billedKm => (widget.data['billedKm'] as num?)?.toDouble() ?? _distanceKm;
   int get _fare => (widget.data['fare'] as num?)?.toInt() ?? 0;
   bool get _isRound => widget.data['isRound'] == true;
+  // Local hourly package.
+  bool get _isLocal => widget.data['isLocal'] == true;
+  int get _packageHours => (widget.data['packageHours'] as num?)?.toInt() ?? 0;
+  int get _extraHourPrice => (widget.data['extraHourPrice'] as num?)?.toInt() ?? 0;
   String get _editId => (widget.data['bookingId'] ?? '').toString();
   bool get _isEdit => _editId.isNotEmpty;
   List<String> get _inclusions => ((widget.data['inclusions'] as List?) ?? []).map((e) => e.toString()).toList();
@@ -125,42 +129,48 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     notes.add('Fuel: $_fuel');
     final contact = [_nameCtrl.text.trim(), _mobileCtrl.text.trim(), _emailCtrl.text.trim()].where((s) => s.isNotEmpty).join(', ');
     if (contact.isNotEmpty) notes.add('Contact: $contact');
-    if (_isBestPrice) {
+    if (_isLocal) {
+      notes.add('Local $_packageHours-hour package');
+    } else if (_isBestPrice) {
       notes.add('Best Price — toll/tax/parking paid directly by rider');
     } else {
       if (_toll > 0) notes.add('Toll included (auto): ₹$_toll');
       if (_inclusions.isNotEmpty) notes.add('All Inclusive: ${_inclusions.join(', ')}');
     }
-    // Round-trip rental: snapshot the cab's per-day km limit + extra ₹/km and the
-    // included allowance (km/day × days) so the driver's GPS km can be billed.
+    // Snapshot the extra-km rate + the included allowance so the driver's GPS km
+    // can be billed at trip end. The rider is shown "<billedKm> kms included ·
+    // Pay ₹X/km after <billedKm> km" and pays a fare for exactly that distance,
+    // so the included allowance IS that billed distance — one-way and round trip
+    // alike. (For round trip _billedKm already covers both legs, e.g. 2× the road
+    // distance.) Previously this stored `dailyKmLimit × days`, which decoupled the
+    // billing baseline from what the rider actually saw and paid for.
     final dailyKm = (_cat['dailyKmLimit'] as num?)?.toInt() ?? 0;
     final extraKmP = (_cat['extraKmPrice'] as num?)?.toInt() ?? 0;
-    int days = 1;
-    if (_isRound) {
-      final rd = DateTime.tryParse((t['returnDate'] ?? '').toString());
-      final sd = DateTime.tryParse((t['travelDate'] ?? '').toString());
-      if (rd != null && sd != null) {
-        days = (DateTime(rd.year, rd.month, rd.day).difference(DateTime(sd.year, sd.month, sd.day)).inDays + 1).clamp(1, 60);
-      }
-    }
-    final includedKm = (_isRound && dailyKm > 0) ? dailyKm * days : 0;
+    final includedKm = (extraKmP > 0 && _billedKm > 0) ? _billedKm.round() : 0;
     final body = <String, dynamic>{
       if (!_isEdit) 'serviceType': 'cab',
       if (t['subType'] != null) 'subType': t['subType'],
       'vehicleType': (_cat['name'] ?? 'Cab').toString(),
       'pickup': t['pickup'],
       'pickupCity': t['pickupCity'],
-      'drop': t['drop'],
-      'dropCity': t['dropCity'],
-      if (t['stops'] is List && (t['stops'] as List).isNotEmpty) 'stops': t['stops'],
+      // Local has no destination.
+      if (!_isLocal) 'drop': t['drop'],
+      if (!_isLocal) 'dropCity': t['dropCity'],
+      if (!_isLocal && t['stops'] is List && (t['stops'] as List).isNotEmpty) 'stops': t['stops'],
       'travelDate': t['travelDate'],
       'travelTime': t['travelTime'],
       'passengers': t['passengers'] ?? 1,
       if (_fare > 0) 'estimatedFare': _fare,
-      if (_distanceKm > 0) 'estimatedDistance': _distanceKm.round(),
+      // For Local, estimatedDistance holds the package's included km (billedKm).
+      if (_distanceKm > 0) 'estimatedDistance': _distanceKm.round()
+      else if (_isLocal && _billedKm > 0) 'estimatedDistance': _billedKm.round(),
       if (dailyKm > 0) 'dailyKmLimit': dailyKm,
       if (extraKmP > 0) 'extraKmPrice': extraKmP,
       if (includedKm > 0) 'includedKm': includedKm,
+      // Local hourly-package snapshot.
+      if (_isLocal) 'durationHours': _packageHours,
+      if (_isLocal && _packageHours > 0) 'packageHours': _packageHours,
+      if (_isLocal && _extraHourPrice > 0) 'extraHourPrice': _extraHourPrice,
       'notes': notes.join(' • '),
     };
     try {
@@ -362,7 +372,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
                   text: TextSpan(
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'),
                     children: [
-                      TextSpan(text: '$from → $to'),
+                      TextSpan(text: _isLocal ? from : '$from → $to'),
                       TextSpan(text: '  (${_titleCase(sub)})', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                     ],
                   ),
@@ -389,8 +399,15 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
           _kv('Car Type', (_cat['name'] ?? 'Cab').toString(), suffix: ' or similar'),
           _kv('Fuel Type', _fuel),
           _kv('Pickup Date', '${_prettyDate(date)}${time.isNotEmpty ? ', $time' : ''}'),
-          _kv('Kms included', '${_billedKm.round()} kms'),
-          if (_isRound && returnDate.isNotEmpty) _kv('Return', _prettyDate(returnDate)),
+          if (_isLocal) ...[
+            _kv('Package', '$_packageHours hours'),
+            _kv('Kms included', '${_billedKm.round()} kms'),
+            if (_extraHourPrice > 0) _kv('Extra hours', '₹$_extraHourPrice/hr beyond package'),
+            if (_extraKm > 0) _kv('Extra km', '₹$_extraKm/km beyond included'),
+          ] else ...[
+            _kv('Kms included', '${_billedKm.round()} kms'),
+            if (_isRound && returnDate.isNotEmpty) _kv('Return', _prettyDate(returnDate)),
+          ],
         ],
       ),
     );

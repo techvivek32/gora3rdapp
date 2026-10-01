@@ -30,6 +30,7 @@ import '../../features/training/presentation/pages/training_videos_page.dart';
 import '../../features/referral/presentation/pages/leaderboard_page.dart';
 import '../../features/support/presentation/pages/support_chat_page.dart';
 import '../../features/reports/presentation/pages/my_reports_page.dart';
+import '../../features/penalty/presentation/pages/penalty_page.dart';
 import '../../features/users/presentation/pages/user_profile_page.dart';
 import '../../features/chat/presentation/pages/chat_list_page.dart';
 import '../../features/chat/presentation/pages/chat_room_page.dart';
@@ -336,6 +337,10 @@ class AppRouter {
       GoRoute(
         path: '/my-reports',
         builder: (_, __) => const MyReportsPage(),
+      ),
+      GoRoute(
+        path: '/penalty',
+        builder: (_, __) => const PenaltyPage(),
       ),
       GoRoute(
         path: '/notifications',

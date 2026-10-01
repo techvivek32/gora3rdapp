@@ -36,6 +36,8 @@ export default function SettingsPage() {
 
   // Customer-booking acceptance: minimum wallet balance a Golden driver needs.
   const [minWalletToAccept, setMinWalletToAccept] = useState('');
+  // Hours before pickup when driver↔customer phone numbers become visible.
+  const [contactRevealHours, setContactRevealHours] = useState('');
   const [cbSaving, setCbSaving] = useState(false);
   const [cbSaved, setCbSaved] = useState(false);
   const [cbError, setCbError] = useState('');
@@ -67,6 +69,7 @@ export default function SettingsPage() {
         setMinTransfer(String(s.minTransfer ?? 1));
         setAutoBookMins(String(s.whatsappAutoBookMinutes ?? 0));
         setMinWalletToAccept(String(s.minWalletToAccept ?? 0));
+        setContactRevealHours(String(s.contactRevealHoursBeforePickup ?? 1));
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -133,10 +136,12 @@ export default function SettingsPage() {
   const handleSaveMinWallet = async () => {
     const minW = Math.round(Number(minWalletToAccept));
     if (!Number.isFinite(minW) || minW < 0) return setCbError('Enter a valid amount (0 = no minimum)');
+    const revealH = Math.round(Number(contactRevealHours));
+    if (!Number.isFinite(revealH) || revealH < 0) return setCbError('Enter valid contact-reveal hours (0 = show immediately)');
     setCbError('');
     setCbSaving(true);
     try {
-      await adminApi.updateSettings({ minWalletToAccept: minW });
+      await adminApi.updateSettings({ minWalletToAccept: minW, contactRevealHoursBeforePickup: revealH });
       setCbSaved(true);
       setTimeout(() => setCbSaved(false), 3000);
     } catch (e: any) {
@@ -410,6 +415,17 @@ export default function SettingsPage() {
                   className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                 />
                 <p className="text-xs text-gray-400 mt-1">A Golden driver must have at least this much in their wallet to accept a customer booking. Nothing is deducted — it is only an eligibility check. 0 = no minimum.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Show contact numbers (hours before pickup)</label>
+                <input
+                  type="number" min={0}
+                  value={contactRevealHours}
+                  onChange={(e) => { setContactRevealHours(e.target.value); setCbSaved(false); }}
+                  placeholder="e.g. 1 (0 = show immediately)"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">For one-way, round-trip & local bookings, the driver and customer only see each other&apos;s phone number this many hours before the pickup time. 0 = show as soon as the booking is confirmed.</p>
               </div>
               {cbError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{cbError}</p>}
               <button

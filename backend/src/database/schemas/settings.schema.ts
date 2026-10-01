@@ -113,6 +113,15 @@ export class PlatformSettings {
    */
   @Prop({ default: 0, min: 0 })
   minWalletToAccept: number;
+
+  /**
+   * How many hours BEFORE the pickup time the driver↔customer phone numbers are
+   * revealed to each other on a confirmed customer cab booking (one-way / round
+   * trip / local). Before this window the contact stays hidden for both sides.
+   * Default 1 hour. 0 = reveal immediately on confirmation.
+   */
+  @Prop({ default: 1, min: 0 })
+  contactRevealHoursBeforePickup: number;
 }
 
 export const PlatformSettingsSchema = SchemaFactory.createForClass(PlatformSettings);

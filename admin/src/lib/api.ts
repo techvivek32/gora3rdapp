@@ -271,6 +271,7 @@ export const adminApi = {
     minBillKm?: number;
     tollTaxPerKm?: number;
     minWalletToAccept?: number;
+    contactRevealHoursBeforePickup?: number;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

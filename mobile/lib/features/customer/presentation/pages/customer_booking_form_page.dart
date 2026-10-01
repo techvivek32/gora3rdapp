@@ -178,14 +178,26 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   // Cab "Explore Cabs": validate the route, then open the fare-estimate results
   // screen (the booking is created there when the customer picks a cab + Book Now).
   void _exploreCabs() {
-    // Local (hourly rental) has no destination — fare is by the chosen package,
-    // so we create the booking directly instead of the distance-based results.
+    // Local (hourly package) has no destination — the fare comes from the chosen
+    // cab's package (hours × per-km rate). It still goes through the results screen
+    // so the customer sees each cab's package price, included km and extra rates.
     if (_subType == 'Local') {
       if (_pickupCtrl.text.trim().isEmpty) {
         _snack('Please select a pickup location');
         return;
       }
-      _createLocalBooking();
+      final localTrip = <String, dynamic>{
+        'subType': 'Local',
+        'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
+        'pickupCity': _pickupCity,
+        'travelDate': ymdString(_date),
+        'travelTime': _time.format(context),
+        'passengers': _passengers,
+        'durationHours': _localHours,
+        if (_isEdit) 'bookingId': widget.bookingId,
+        if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
+      };
+      context.push('/customer/cab-results', extra: localTrip);
       return;
     }
     if (_pickupCtrl.text.trim().isEmpty || _dropCtrl.text.trim().isEmpty) {
@@ -218,38 +230,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
     };
     context.push('/customer/cab-results', extra: trip);
-  }
-
-  /// Local hourly rental → create the booking straight away (no destination /
-  /// distance step). Drivers accept and the fare is settled for the package.
-  Future<void> _createLocalBooking() async {
-    setState(() => _busy = true);
-    final body = <String, dynamic>{
-      if (!_isEdit) 'serviceType': 'cab',
-      'subType': 'Local',
-      if (_vehicle != null) 'vehicleType': _vehicle,
-      'pickup': {'address': _pickupCtrl.text.trim(), 'lat': _pickupLat ?? 0, 'lng': _pickupLng ?? 0},
-      'pickupCity': _pickupCity,
-      'travelDate': ymdString(_date),
-      'travelTime': _time.format(context),
-      'durationHours': _localHours,
-      'notes': 'Local $_localHours-hour package',
-    };
-    try {
-      final repo = getIt<CustomerRepository>();
-      final booking = _isEdit
-          ? await repo.updateBooking(widget.bookingId!, body)
-          : await repo.createBooking(body);
-      if (!mounted) return;
-      final id = (booking['_id'] ?? booking['id'] ?? widget.bookingId ?? '').toString();
-      _snack(_isEdit ? 'Booking updated' : 'Request posted — waiting for a driver to accept', ok: true);
-      context.go('/customer/bookings/$id');
-    } catch (e) {
-      if (mounted) {
-        setState(() => _busy = false);
-        _snack(_isEdit ? 'Could not update: $e' : 'Could not post request: $e');
-      }
-    }
   }
 
   Future<void> _submit() async {

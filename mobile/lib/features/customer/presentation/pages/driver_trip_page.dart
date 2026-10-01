@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -11,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../data/customer_repository.dart';
 import '../../data/trip_tracker.dart';
@@ -32,7 +34,14 @@ class _NavStep {
 /// swipe-to-confirm for Arrive → Start (OTP) → Complete (OTP) → summary.
 class DriverTripPage extends StatefulWidget {
   final Map<String, dynamic> booking;
-  const DriverTripPage({super.key, required this.booking});
+
+  /// Regular Requirement mode: uses /requirements trip endpoints, has NO GPS
+  /// extra-km tracking, NO "arrived" step, and NO fare/extra-km summary on
+  /// completion (just Start → navigate → Complete). Customer-ride mode (default)
+  /// keeps the full flow (arrive, GPS extra-km, summary + invoice).
+  final bool isRequirement;
+
+  const DriverTripPage({super.key, required this.booking, this.isRequirement = false});
 
   @override
   State<DriverTripPage> createState() => _DriverTripPageState();
@@ -47,6 +56,8 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   late String _status;
   bool _arrived = false;
   bool _busy = false;
+  // Round trip only: true once the driver has started the drop→pickup return leg.
+  bool _returning = false;
 
   GoogleMapController? _map;
   StreamSubscription<Position>? _posSub;
@@ -54,13 +65,18 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   double _bearing = 0;
   BitmapDescriptor? _carIcon;
 
-  // Smooth-motion animation: the raw GPS fixes set a target; a per-frame ticker
-  // glides the displayed car (and camera) toward it so there are no jumps.
+  // Butter-smooth motion: each GPS fix defines a segment (start→end) and the
+  // ticker linearly interpolates the displayed car across it at constant speed
+  // over the real GPS interval — no rubber-banding, no jumps.
   Ticker? _ticker;
   LatLng? _animPos; // currently displayed position
-  LatLng? _targetPos; // latest GPS fix to glide toward
+  LatLng? _segStart; // segment start (where the car was)
+  LatLng? _segEnd; // segment end (latest GPS fix)
+  double _segStartMs = 0; // when the segment began
+  double _segDurMs = 1000; // how long to glide across it (= real GPS interval)
+  double _lastGpsMs = 0;
+  double _lastProgMs = 0; // throttle route-consume/ETA recompute
   double _targetBearing = 0;
-  Duration _lastRender = Duration.zero;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
 
@@ -83,7 +99,22 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   // Camera follow: nav always auto-follows the car.
   bool _following = true;
 
+  bool get _isReq => widget.isRequirement;
   String get _id => (_b['_id'] ?? _b['id'] ?? '').toString();
+
+  // Round trip = a customer cab booking whose subType is "Round Trip". The driver
+  // must go pickup→drop AND back drop→pickup, completing only at the pickup.
+  bool get _isRound => !_isReq && (_b['subType'] ?? '').toString() == 'Round Trip';
+  // Local = in-city hourly package. No fixed destination once the trip starts —
+  // the driver stays with the customer for the booked hours, then completes.
+  bool get _isLocal => !_isReq && (_b['subType'] ?? '').toString() == 'Local';
+  int get _packageHours => (_b['packageHours'] as num?)?.toInt() ?? (_b['durationHours'] as num?)?.toInt() ?? 0;
+
+  // Round-trip return date, carried in notes as "Return date: dd-MM-yyyy".
+  String get _returnDateLabel {
+    final m = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((_b['notes'] ?? '').toString());
+    return m == null ? '' : '${m.group(1)}-${m.group(2)}-${m.group(3)}';
+  }
 
   LatLng? _ll(Map? m) {
     final lat = (m?['lat'] as num?)?.toDouble() ?? 0;
@@ -91,26 +122,48 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     return (lat != 0 && lng != 0) ? LatLng(lat, lng) : null;
   }
 
-  LatLng? get _pickup => _ll(_b['pickup'] as Map?);
-  LatLng? get _drop => _ll(_b['drop'] as Map?);
-  LatLng? get _dest => _status == 'ongoing' ? _drop : _pickup;
-  String get _destLabel => _status == 'ongoing' ? 'Drop' : 'Pickup';
-  String get _destAddr => (((_status == 'ongoing' ? _b['drop'] : _b['pickup']) as Map?)?['address'] ?? '').toString();
-  String get _custName => (((_b['customer'] as Map?)?['name']) ?? (_b['driverSnapshot'] as Map?)?['name'] ?? 'Customer').toString();
-  String get _custMobile => (((_b['customer'] as Map?)?['mobile']) ?? '').toString();
+  Map? get _pickupMap => (_isReq ? _b['pickupCoordinates'] : _b['pickup']) as Map?;
+  Map? get _dropMap => (_isReq ? _b['dropCoordinates'] : _b['drop']) as Map?;
+  LatLng? get _pickup => _ll(_pickupMap);
+  LatLng? get _drop => _ll(_dropMap);
+  // On the round-trip return leg the destination flips back to the pickup.
+  // Local has no destination once ongoing (hourly, driver stays with the rider).
+  LatLng? get _dest => _status == 'ongoing'
+      ? (_isLocal ? null : (_returning ? _pickup : _drop))
+      : _pickup;
+  String get _destLabel => _status == 'ongoing'
+      ? (_isLocal ? 'In progress' : (_returning ? 'Pickup' : 'Drop'))
+      : 'Pickup';
+  String get _destAddr => (_isLocal && _status == 'ongoing')
+      ? ''
+      : ((_status == 'ongoing' ? (_returning ? _pickupMap : _dropMap) : _pickupMap)?['address'] ?? '').toString();
+  String get _custName => (_isReq
+          ? ((_b['postedBy'] as Map?)?['fullName'] ?? (_b['postedBy'] as Map?)?['agencyName'] ?? 'Customer')
+          : (((_b['customer'] as Map?)?['name']) ?? (_b['driverSnapshot'] as Map?)?['name'] ?? 'Customer'))
+      .toString();
+  String get _custMobile => (_isReq
+          ? (_b['contactMobile'] ?? (_b['postedBy'] as Map?)?['mobile'] ?? '')
+          : (((_b['customer'] as Map?)?['mobile']) ?? ''))
+      .toString();
 
   @override
   void initState() {
     super.initState();
     _b = Map<String, dynamic>.from(widget.booking);
-    _status = (_b['status'] ?? 'confirmed').toString();
-    _arrived = _b['driverArrivedAt'] != null;
+    if (_isReq) {
+      // Requirement uses tripStatus (pending→started→completed); no "arrive" step.
+      _status = (_b['tripStatus'] == 'started') ? 'ongoing' : 'confirmed';
+      _arrived = true; // skip the arrive step → slider goes straight to Start
+    } else {
+      _status = (_b['status'] ?? 'confirmed').toString();
+      _arrived = _b['driverArrivedAt'] != null;
+    }
     _buildCarIcon();
     _buildMarkers();
     _startLocation();
     _fetchRoute();
     _ticker = createTicker(_onTick)..start();
-    if (_status == 'ongoing') TripTracker.instance.resumeIfActive(ongoingBookingId: _id);
+    if (!_isReq && _status == 'ongoing') TripTracker.instance.resumeIfActive(ongoingBookingId: _id);
   }
 
   @override
@@ -162,10 +215,10 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       drawWheel(-31, 30);
       drawWheel(31, 30);
 
-      // Extruded side walls (darker body, offset down = the car's height).
-      c.drawRRect(bodyAt(depth), Paint()..color = const Color(0xFF0B3E86));
+      // Extruded side walls (darker orange body, offset down = the car's height).
+      c.drawRRect(bodyAt(depth), Paint()..color = const Color(0xFF9A3412));
 
-      // Top face with a vertical gradient (lit from the front) + white rim.
+      // Top face with a vertical orange gradient (theme colour) + white rim.
       final topRR = bodyAt(0);
       c.drawRRect(
         topRR,
@@ -173,7 +226,7 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
           ..shader = ui.Gradient.linear(
             const Offset(cx, cy - bh / 2),
             const Offset(cx, cy + bh / 2),
-            const [Color(0xFF57A0FF), Color(0xFF1466C4)],
+            const [Color(0xFFFDBA74), Color(0xFFEA580C)],
           ),
       );
       c.drawRRect(topRR, Paint()
@@ -245,51 +298,61 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   void _onPos(Position p, {bool first = false}) {
     if (!mounted) return;
     final d = LatLng(p.latitude, p.longitude);
-    // Set the direction to face (from GPS heading, else from movement).
-    final prev = _targetPos ?? _driver;
+    final now = DateTime.now().millisecondsSinceEpoch.toDouble();
+    // Direction to face (from GPS heading, else from the segment we're drawing).
+    final prev = _segEnd ?? _driver;
     if (p.speed > 0.5 && p.heading >= 0) {
       _targetBearing = p.heading;
-    } else if (prev != null && _distanceM(prev, d) > 1.5) {
+    } else if (prev != null && _distanceM(prev, d) > 1.2) {
       _targetBearing = _bearingBetween(prev, d);
     }
-    _targetPos = d; // the ticker glides _animPos toward this — no teleport
     if (first || _animPos == null) {
       _animPos = d;
       _driver = d;
       _bearing = _targetBearing;
+      _segStart = d;
+      _segEnd = d;
+      _segStartMs = now;
+      _segDurMs = 1000;
+      _lastGpsMs = now;
+      if (first) _fetchRoute();
+      return;
     }
-    if (first) _fetchRoute();
+    // Start a new glide segment from where the car is NOW to the fresh fix,
+    // lasting exactly the real interval since the last fix → constant speed.
+    final dt = now - _lastGpsMs;
+    _lastGpsMs = now;
+    _segStart = _animPos;
+    _segEnd = d;
+    _segStartMs = now;
+    _segDurMs = dt.clamp(350.0, 2500.0);
   }
 
-  /// Per-frame smoothing: glide the displayed car + camera toward the latest GPS
-  /// fix so motion is continuous (no jumping between fixes), like Google Maps.
+  /// Constant-speed linear interpolation across the current segment, every frame
+  /// (~60fps) → butter-smooth car + camera. Route/ETA recompute is throttled.
   void _onTick(Duration elapsed) {
-    if (!mounted || _targetPos == null) return;
-    _animPos ??= _targetPos;
-    // Exponential glide toward the target (≈catches up within ~1s at 60fps).
-    const f = 0.12;
+    if (!mounted || _segEnd == null || _segStart == null) return;
+    final now = DateTime.now().millisecondsSinceEpoch.toDouble();
+    final t = _segDurMs <= 0 ? 1.0 : ((now - _segStartMs) / _segDurMs).clamp(0.0, 1.0);
     final np = LatLng(
-      _animPos!.latitude + (_targetPos!.latitude - _animPos!.latitude) * f,
-      _animPos!.longitude + (_targetPos!.longitude - _animPos!.longitude) * f,
+      _segStart!.latitude + (_segEnd!.latitude - _segStart!.latitude) * t,
+      _segStart!.longitude + (_segEnd!.longitude - _segStart!.longitude) * t,
     );
-    final moved = _distanceM(_animPos!, np);
     _animPos = np;
-    _bearing = _lerpAngle(_bearing, _targetBearing, f);
-    final bDiff = (((_targetBearing - _bearing + 540) % 360) - 180).abs();
+    _driver = np;
+    _bearing = _lerpAngle(_bearing, _targetBearing, 0.18);
 
-    // Idle when parked (nothing to render) to save the emulator/battery.
-    if (moved < 0.08 && bDiff < 0.4) return;
-    // Render at ~30fps (position keeps interpolating every frame regardless).
-    if (elapsed - _lastRender < const Duration(milliseconds: 33)) return;
-    _lastRender = elapsed;
-
-    _driver = _animPos;
-    _updateProgress(_animPos!);
+    // Route consumption + ETA/steps are recomputed at ~10Hz (imperceptible),
+    // while the car marker + camera update every frame for smoothness.
+    if (now - _lastProgMs > 100) {
+      _lastProgMs = now;
+      _updateProgress(np);
+    }
     _buildMarkers();
     setState(() {});
     if (_following && _map != null) {
       _map!.moveCamera(CameraUpdate.newCameraPosition(
-        CameraPosition(target: _animPos!, zoom: 18.4, tilt: 60, bearing: _bearing),
+        CameraPosition(target: np, zoom: 18.4, tilt: 60, bearing: _bearing),
       ));
     }
   }
@@ -542,7 +605,11 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   void _snack(String m, {bool ok = false}) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text(m), backgroundColor: ok ? AppColors.success : AppColors.error, behavior: SnackBarBehavior.floating));
 
-  String _clean(Object e) => e.toString().replaceFirst('Exception: ', '');
+  // DioException → the backend's one-sentence message (e.g. "Incorrect OTP"),
+  // never the stack-trace-flavoured dump. Other errors keep their plain text.
+  String _clean(Object e) => e is DioException
+      ? serverMessage(e, fallback: 'Something went wrong')
+      : e.toString().replaceFirst('Exception: ', '');
 
   Future<void> _arrive() async {
     setState(() => _busy = true);
@@ -590,10 +657,28 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     );
   }
 
+  // Trip OTP endpoints — customer bookings vs regular requirements.
+  Future<void> _apiRequestOtp(String action) async {
+    if (_isReq) {
+      await _api.post('/requirements/$_id/trip/request-otp', data: {'action': action});
+    } else {
+      await _repo.requestTripOtp(_id, action);
+    }
+  }
+
+  Future<Map<String, dynamic>?> _apiVerifyOtp(String action, String otp) async {
+    if (_isReq) {
+      final res = await _api.post('/requirements/$_id/trip/verify-otp', data: {'action': action, 'otp': otp});
+      final d = res.data is Map ? res.data['data'] : null;
+      return d is Map ? Map<String, dynamic>.from(d) : null;
+    }
+    return _repo.verifyTripOtp(_id, action, otp);
+  }
+
   Future<void> _otpTransition(String action) async {
     setState(() => _busy = true);
     try {
-      await _repo.requestTripOtp(_id, action);
+      await _apiRequestOtp(action);
       if (!mounted) return;
       setState(() => _busy = false);
       _snack('OTP sent to the customer', ok: true);
@@ -603,10 +688,10 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
         return;
       }
       setState(() => _busy = true);
-      final updated = await _repo.verifyTripOtp(_id, action, otp);
+      final updated = await _apiVerifyOtp(action, otp);
       if (!mounted) return;
       if (action == 'start') {
-        TripTracker.instance.start(_id);
+        if (!_isReq) TripTracker.instance.start(_id); // no GPS extra-km for requirements
         setState(() {
           _status = 'ongoing';
           _b['status'] = 'ongoing';
@@ -617,9 +702,15 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
         _fetchRoute(); // re-route to the drop with fresh turn-by-turn steps
         _snack('Trip started 🚀', ok: true);
       } else {
-        TripTracker.instance.stop();
-        final b = updated ?? _b;
-        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: b)));
+        if (!_isReq) TripTracker.instance.stop();
+        if (_isReq) {
+          // Requirements: no fare/extra-km summary — just confirm and return.
+          _snack('Trip completed 🎉', ok: true);
+          Navigator.of(context).pop(true);
+        } else {
+          final b = updated ?? _b;
+          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: b)));
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -628,6 +719,21 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
         _snack('Failed: ${_clean(e)}');
       }
     }
+  }
+
+  /// Round trip: the driver has reached the drop and now heads back to the pickup.
+  /// The trip stays ONGOING (so GPS keeps counting both legs) and the map re-routes
+  /// drop→pickup. No OTP here — the customer is already aboard; the OTP handshake
+  /// happens once, on final completion back at the pickup.
+  Future<void> _startReturn() async {
+    setState(() {
+      _returning = true;
+      _following = true;
+      _buildMarkers();
+    });
+    _snack('Heading back to pickup 🔄', ok: true);
+    _fetchRoute(); // re-route to the pickup with fresh turn-by-turn steps
+    _slideKey.currentState?.reset();
   }
 
   IconData _maneuverIcon(String m) {
@@ -745,7 +851,9 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     final next = _stepIndex + 1 < _steps.length ? _steps[_stepIndex + 1] : null;
     final then = _stepIndex + 2 < _steps.length ? _steps[_stepIndex + 2] : null;
     final arriving = next == null;
-    final primaryText = arriving ? 'Arrive at $_destLabel' : next.instruction;
+    final primaryText = (_isLocal && _status == 'ongoing')
+        ? 'Local trip in progress'
+        : (arriving ? 'Arrive at $_destLabel' : next.instruction);
     final maneuver = arriving ? 'arrive' : next.maneuver;
     final distToTurn = _distToTurnKm;
 
@@ -855,7 +963,10 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                   decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20.r)),
-                  child: Text(_status == 'ongoing' ? 'To Drop' : (_arrived ? 'At Pickup' : 'To Pickup'),
+                  child: Text(
+                      _status == 'ongoing'
+                          ? (_isLocal ? 'Local · In progress' : (_returning ? 'Return · To Pickup' : 'To Drop'))
+                          : (_arrived ? 'At Pickup' : 'To Pickup'),
                       style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w800, color: AppColors.primary, fontFamily: 'Poppins')),
                 ),
               ]),
@@ -879,6 +990,54 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
                   ],
                 ]),
               ),
+              if (_isRound) ...[
+                SizedBox(height: 8.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.sync_rounded, size: 16.sp, color: AppColors.primary),
+                    SizedBox(width: 6.w),
+                    Expanded(
+                      child: Text(
+                        _returning
+                            ? 'Round trip — driving back to the pickup point'
+                            : 'Round trip — drop, then bring the customer back to the pickup${_returnDateLabel.isNotEmpty ? ' (return $_returnDateLabel)' : ''}',
+                        style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary, fontFamily: 'Poppins'),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
+              if (_isLocal) ...[
+                SizedBox(height: 8.h),
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.timelapse_rounded, size: 16.sp, color: AppColors.primary),
+                    SizedBox(width: 6.w),
+                    Expanded(
+                      child: Text(
+                        _status == 'ongoing'
+                            ? 'Local $_packageHours-hour package — complete when the hours are done'
+                            : 'Local $_packageHours-hour in-city package — reach the pickup to begin',
+                        style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary, fontFamily: 'Poppins'),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
               SizedBox(height: 12.h),
               _slider(),
             ],
@@ -902,9 +1061,16 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     late Color color;
     late Future<void> Function() action;
     if (_status == 'ongoing') {
-      text = 'Swipe to Complete Trip';
-      color = AppColors.success;
-      action = () => _otpTransition('end');
+      if (_isRound && !_returning) {
+        // Reached the drop on a round trip → head back before completing.
+        text = 'Swipe to Start Return';
+        color = AppColors.primary;
+        action = _startReturn;
+      } else {
+        text = 'Swipe to Complete Trip';
+        color = AppColors.success;
+        action = () => _otpTransition('end');
+      }
     } else if (_arrived) {
       text = 'Swipe to Start Trip';
       color = AppColors.primary;

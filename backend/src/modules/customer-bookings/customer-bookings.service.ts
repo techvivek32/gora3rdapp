@@ -340,6 +340,9 @@ export class CustomerBookingsService {
       dailyKmLimit: dto.dailyKmLimit || 0,
       extraKmPrice: dto.extraKmPrice || 0,
       includedKm: dto.includedKm || 0,
+      // Local hourly-package snapshot (0 = not a Local package booking).
+      packageHours: dto.packageHours || 0,
+      extraHourPrice: dto.extraHourPrice || 0,
       status: CustomerBookingStatus.OPEN,
       expiresAt,
     });
@@ -393,7 +396,19 @@ export class CustomerBookingsService {
     const filter: any = { customerId: new Types.ObjectId(customerId) };
     if (status) filter.status = status;
     const data = await this.bookingModel.find(filter).sort({ createdAt: -1 }).lean();
-    return { message: 'My bookings', data };
+    // Hide the assigned driver's phone until the reveal window (admin setting).
+    const revealHours = await this.getContactRevealHours();
+    const gated = (data as any[]).map((b) => {
+      if (!b.driverSnapshot || !b.selectedDriverId) return b;
+      const revealed = this.contactRevealed(b, revealHours);
+      return {
+        ...b,
+        driverSnapshot: { ...b.driverSnapshot, phone: revealed ? (b.driverSnapshot.phone || '') : '' },
+        contactLocked: !revealed,
+        contactRevealHours: revealHours,
+      };
+    });
+    return { message: 'My bookings', data: gated };
   }
 
   /** Full booking with offer driver profiles resolved (customer view). */
@@ -500,6 +515,9 @@ export class CustomerBookingsService {
     // category name) and read its class/seats/bags/per-km rate from the admin panel.
     const fuelMatch = /fuel[:\s-]*([a-zA-Z]+)/i.exec(booking.notes || '');
     const fuel = fuelMatch ? fuelMatch[1] : '';
+    // Round-trip return date lives only in notes ("Return date: dd-MM-yyyy").
+    const retMatch = /Return date:\s*(\d{2}-\d{2}-\d{4})/i.exec(booking.notes || '');
+    const returnDate = retMatch ? retMatch[1] : '';
     let carClass = '';
     let carSeats = 0;
     let carBags = '';
@@ -547,6 +565,7 @@ export class CustomerBookingsService {
       dropCity: booking.dropCity || '',
       travelDate: booking.travelDate,
       travelTime: booking.travelTime,
+      returnDate,
       startedAt: booking.startedAt,
       completedAt: booking.completedAt,
       distanceKm: booking.estimatedDistance || 0,
@@ -559,6 +578,11 @@ export class CustomerBookingsService {
       extraKm: booking.extraKm || 0,
       extraKmPrice: booking.extraKmPrice || 0,
       extraCharge: booking.extraCharge || 0,
+      // Local hourly package.
+      packageHours: booking.packageHours || 0,
+      extraHourPrice: booking.extraHourPrice || 0,
+      extraHours: booking.extraHours || 0,
+      extraHourCharge: booking.extraHourCharge || 0,
       paymentMode: 'Cash — paid directly to the driver',
     });
 
@@ -569,6 +593,47 @@ export class CustomerBookingsService {
   private static readonly CANCELLATION_POLICY =
     'Free cancellation before the driver starts the trip. After the trip starts, charges may apply as per driver terms.';
 
+  /**
+   * Pickup instant for a customer booking. travelDate is stored at UTC-midnight of
+   * the pickup day; travelTime is a free-form IST display string ("5:30 PM" or
+   * "17:30"). Combine them into a real instant; null if unparseable.
+   */
+  private pickupInstant(booking: any): Date | null {
+    if (!booking?.travelDate) return null;
+    const d = new Date(booking.travelDate);
+    if (isNaN(d.getTime())) return null;
+    let hours = 0;
+    let mins = 0;
+    const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?/i.exec((booking.travelTime || '').trim());
+    if (m) {
+      hours = parseInt(m[1], 10) % 24;
+      mins = parseInt(m[2], 10);
+      const ap = m[3] ? m[3].toUpperCase() : '';
+      if (ap === 'PM' && hours < 12) hours += 12;
+      if (ap === 'AM' && hours === 12) hours = 0;
+    }
+    const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+    const istWall = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hours, mins);
+    return new Date(istWall - IST_OFFSET);
+  }
+
+  /**
+   * Whether the driver↔customer phone numbers may be shown for this booking yet.
+   * Hidden until `contactRevealHoursBeforePickup` hours before pickup (admin setting).
+   * 0 hours = always revealed; an unparseable pickup time also reveals (don't block).
+   */
+  private contactRevealed(booking: any, revealHours: number): boolean {
+    if (!revealHours || revealHours <= 0) return true;
+    const pickup = this.pickupInstant(booking);
+    if (!pickup) return true;
+    return Date.now() >= pickup.getTime() - revealHours * 3600000;
+  }
+
+  private async getContactRevealHours(): Promise<number> {
+    const s: any = await this.settings.getSettings();
+    return s?.contactRevealHoursBeforePickup ?? 1;
+  }
+
   private async withOfferProfiles(booking: any) {
     const cancellationPolicy = CustomerBookingsService.CANCELLATION_POLICY;
     // Surface an active trip OTP to the customer only; strip the raw stored fields.
@@ -577,6 +642,18 @@ export class CustomerBookingsService {
     const tripOtpAction = otpActive ? booking.tripOtpAction : '';
     delete booking.tripOtp; delete booking.tripOtpExpiresAt;
     booking = { ...booking, tripOtp, tripOtpAction };
+    // Hide the assigned driver's phone from the customer until the reveal window
+    // (admin: contactRevealHoursBeforePickup). The driver's name/vehicle still show.
+    const revealHours = await this.getContactRevealHours();
+    const revealed = this.contactRevealed(booking, revealHours);
+    if (booking.driverSnapshot && booking.selectedDriverId) {
+      booking = {
+        ...booking,
+        driverSnapshot: { ...booking.driverSnapshot, phone: revealed ? (booking.driverSnapshot.phone || '') : '' },
+        contactLocked: !revealed,
+        contactRevealHours: revealHours,
+      };
+    }
     const ids = (booking.offers ?? []).map((o: any) => o.driverId);
     if (!ids.length) return { ...booking, offers: [], cancellationPolicy };
     const drivers = await this.userModel
@@ -706,6 +783,12 @@ export class CustomerBookingsService {
     if (dto.notes !== undefined) booking.notes = dto.notes;
     if (dto.estimatedFare !== undefined) booking.estimatedFare = dto.estimatedFare;
     if (dto.estimatedDistance !== undefined) booking.estimatedDistance = dto.estimatedDistance;
+    // Pricing snapshots (round-trip km + Local hourly) must follow an edit too.
+    if (dto.dailyKmLimit !== undefined) booking.dailyKmLimit = dto.dailyKmLimit;
+    if (dto.extraKmPrice !== undefined) booking.extraKmPrice = dto.extraKmPrice;
+    if (dto.includedKm !== undefined) booking.includedKm = dto.includedKm;
+    if (dto.packageHours !== undefined) booking.packageHours = dto.packageHours;
+    if (dto.extraHourPrice !== undefined) booking.extraHourPrice = dto.extraHourPrice;
     if (dto.travelDate !== undefined) {
       const td = dto.travelDate ? new Date(dto.travelDate) : undefined;
       booking.travelDate = td as any;
@@ -984,6 +1067,43 @@ export class CustomerBookingsService {
       seatsAvailable: 0,
       status: 'applied',
     };
+    // Local (in-city hourly): accept = INSTANT assign to this driver. There's no
+    // admin-assign step for Local — the first Golden driver to accept gets it and
+    // the booking is confirmed straight away. Atomic OPEN→CONFIRMED so a concurrent
+    // accept loses the race cleanly.
+    if (booking.subType === 'Local') {
+      const snapshot = {
+        name: selection?.driverName || (driver as any)?.agencyName || (driver as any)?.fullName || 'Driver',
+        phone: selection?.driverPhone || (driver as any)?.mobile || '',
+        vehicle: selection?.vehicle || booking.vehicleType || '',
+        vehicleNumber: selection?.vehicleNumber || '',
+        rating: (driver as any)?.rating || 0,
+      };
+      const claimed = await this.bookingModel.findOneAndUpdate(
+        { _id: booking._id, status: CustomerBookingStatus.OPEN },
+        {
+          $set: {
+            status: CustomerBookingStatus.CONFIRMED,
+            selectedDriverId: dId,
+            confirmedAt: new Date(),
+            finalFare: fare,
+            driverSnapshot: snapshot,
+          },
+          $push: { offers: { ...offer, status: 'selected' } as any },
+        },
+      );
+      if (!claimed) {
+        throw new BadRequestException('This booking is no longer open, or you have already accepted it.');
+      }
+      this.notifications.notifyUser(dId, '🎉 You got the booking!',
+        `Local booking ${booking.bookingId} is assigned to you. Contact the customer and start the trip.`,
+        { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
+      this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
+        `Your local booking ${booking.bookingId} is confirmed with ${snapshot.name}.`,
+        { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
+      return { message: 'Booking confirmed — assigned to you', data: { accepted: true, confirmed: true } };
+    }
+
     const pushed = await this.bookingModel.findOneAndUpdate(
       {
         _id: booking._id,
@@ -1140,19 +1260,24 @@ export class CustomerBookingsService {
       .sort({ createdAt: -1 })
       .populate('customerId', 'fullName mobile')
       .lean();
-    // Attach this driver's own offer/status; hide other applicants' offers.
+    // Reveal the customer's contact ONLY to the selected driver, AND only once the
+    // reveal window opens (admin: contactRevealHoursBeforePickup before pickup).
+    const revealHours = await this.getContactRevealHours();
     const mapped = data.map((b: any) => {
       const mine = (b.offers ?? []).find((o: any) => o.driverId.toString() === driverId);
       const isSelected = b.selectedDriverId && b.selectedDriverId.toString() === driverId;
-      // Reveal the customer's contact ONLY to the selected driver (privacy).
+      const revealed = isSelected && this.contactRevealed(b, revealHours);
       const c: any = b.customerId;
-      const customer = isSelected && c && typeof c === 'object'
+      const customer = revealed && c && typeof c === 'object'
         ? { name: c.fullName || 'Customer', mobile: c.mobile || '' }
         : null;
       return {
         ...b,
         customerId: c && typeof c === 'object' ? c._id : c,
         customer,
+        // Selected driver, but the number isn't shown yet → let the app explain why.
+        contactLocked: isSelected && !revealed,
+        contactRevealHours: revealHours,
         myOffer: mine || null,
         offers: undefined,
       };
@@ -1253,13 +1378,26 @@ export class CustomerBookingsService {
     } else {
       booking.status = CustomerBookingStatus.COMPLETED;
       booking.completedAt = new Date();
-      // Round-trip extra-km billing: GPS-measured km beyond the included allowance.
+      // Finalise the fare: base + any extra-km (round trip) + any extra-hours (Local).
+      let finalFare = booking.finalFare || booking.estimatedFare || 0;
+      // Round-trip / rental extra-km billing: GPS-measured km beyond the included allowance.
       if ((booking.includedKm || 0) > 0 && (booking.extraKmPrice || 0) > 0) {
         const extraKm = Math.max(0, Math.round((booking.trackedKm || 0) - booking.includedKm));
         booking.extraKm = extraKm;
         booking.extraCharge = Math.round(extraKm * booking.extraKmPrice);
-        booking.finalFare = Math.round((booking.finalFare || booking.estimatedFare || 0) + booking.extraCharge);
+        finalFare += booking.extraCharge;
       }
+      // Local hourly-package extra-hours billing: wall-clock hours beyond the package,
+      // measured start→complete and rounded UP to the next hour.
+      if ((booking.packageHours || 0) > 0 && (booking.extraHourPrice || 0) > 0 && booking.startedAt) {
+        const usedMs = booking.completedAt.getTime() - new Date(booking.startedAt).getTime();
+        const usedHours = Math.max(0, Math.ceil(usedMs / 3600000));
+        const extraHours = Math.max(0, usedHours - booking.packageHours);
+        booking.extraHours = extraHours;
+        booking.extraHourCharge = Math.round(extraHours * booking.extraHourPrice);
+        finalFare += booking.extraHourCharge;
+      }
+      booking.finalFare = Math.round(finalFare);
       // Release the customer's advance (paid to the platform) into the driver's
       // wallet now that the trip is complete. Guarded so it runs only once.
       if (booking.advanceStatus === 'paid' && (booking.advanceAmount || 0) > 0 && booking.selectedDriverId && !booking.advanceReleasedAt) {

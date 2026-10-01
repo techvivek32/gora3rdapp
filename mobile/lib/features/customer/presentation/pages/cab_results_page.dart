@@ -47,6 +47,18 @@ class _CabResultsPageState extends State<CabResultsPage> {
   }
 
   bool get _isRound => (widget.trip['subType'] ?? '').toString() == 'Round Trip';
+  // Local = in-city hourly package (no destination; fare is per the chosen package).
+  bool get _isLocal => (widget.trip['subType'] ?? '').toString() == 'Local';
+  int get _localHours => (widget.trip['durationHours'] as num?)?.toInt() ?? 8;
+
+  // Km included in a Local package for this cab = hours × the cab's km/hour.
+  int _localIncludedKm(Map<String, dynamic> cat) {
+    final perHr = (cat['packageKmPerHour'] as num?)?.toDouble() ?? 0;
+    return (perHr * _localHours).round();
+  }
+
+  // True when this cab offers Local packages (admin set a km/hour rate).
+  bool _localOffered(Map<String, dynamic> cat) => ((cat['packageKmPerHour'] as num?)?.toDouble() ?? 0) > 0;
 
   // When a bookingId is passed in, this screen edits that booking instead of
   // creating a new one (the Edit Booking flow reuses the cab-class picker).
@@ -127,7 +139,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
   bool get _isBestPrice => _incMode == 'Best Price';
 
   // Distance-only fare (Best Price). All Inclusive adds the route toll.
-  int _fareFor(Map<String, dynamic> cat) => _baseFare(cat) + (_isBestPrice ? 0 : _toll.round());
+  // Local has no toll (in-city) — the package price stands alone.
+  int _fareFor(Map<String, dynamic> cat) => _baseFare(cat) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
 
   String _catId(Map<String, dynamic> cat) => (cat['_id'] ?? cat['name'] ?? '').toString();
 
@@ -166,7 +179,10 @@ class _CabResultsPageState extends State<CabResultsPage> {
   /// True when the trip is shorter than the minimum, so the fare is bumped up.
   bool get _isMinApplied => _minKm > 0 && _distanceKm < _minKm;
 
-  int _baseFare(Map<String, dynamic> cat) => (_billableKm * _rate(cat)).round();
+  // Local package fare = included km (hours × km/hr) × per-km rate. Otherwise
+  // distance-based (at least the global minimum km).
+  int _baseFare(Map<String, dynamic> cat) =>
+      _isLocal ? (_localIncludedKm(cat) * _rate(cat)).round() : (_billableKm * _rate(cat)).round();
 
   // Book Now → open the confirmation/review page. The booking is only posted
   // there when the customer taps "Confirm Booking".
@@ -177,15 +193,19 @@ class _CabResultsPageState extends State<CabResultsPage> {
       'trip': t,
       'cat': cat,
       'fuel': fuel.isEmpty ? 'Standard' : fuel,
-      'distanceKm': _distanceKm,
-      // Distance the fare is billed on (>= global minimum) + minimum info.
-      'billedKm': _billableKm,
+      'distanceKm': _isLocal ? 0 : _distanceKm,
+      // Distance the fare is billed on. For Local it's the package's included km.
+      'billedKm': _isLocal ? _localIncludedKm(cat).toDouble() : _billableKm,
       'minKm': _minKm,
       'fare': _fareFor(cat),
       'baseFare': _baseFare(cat),
-      'toll': _isBestPrice ? 0 : _toll.round(),
+      'toll': (_isBestPrice || _isLocal) ? 0 : _toll.round(),
       'incMode': _incMode,
       'isRound': _isRound,
+      // Local hourly package.
+      'isLocal': _isLocal,
+      'packageHours': _isLocal ? _localHours : 0,
+      'extraHourPrice': _isLocal ? ((cat['extraHourPrice'] as num?)?.toInt() ?? 0) : 0,
       'bookingId': _editId,
       'inclusions': _isBestPrice ? <String>[] : _inclusions,
     });
@@ -206,6 +226,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final date = (t['travelDate'] ?? '').toString();
     final time = (t['travelTime'] ?? '').toString();
     final returnDate = (t['returnDate'] ?? '').toString();
+    // Local: only cabs the admin configured for hourly packages are shown.
+    final cats = _isLocal ? _cats.where(_localOffered).toList() : _cats;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -218,8 +240,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('$from → $to', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-            Text('$sub  •  $date${time.isNotEmpty ? ', $time' : ''}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            Text(_isLocal ? '$from · Local' : '$from → $to', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+            Text(
+                _isLocal
+                    ? '$_localHours-hour package  •  $date${time.isNotEmpty ? ', $time' : ''}'
+                    : '$sub  •  $date${time.isNotEmpty ? ', $time' : ''}',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
             if (_isRound && returnDate.isNotEmpty)
               Text('Return  •  $returnDate', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary, fontFamily: 'Poppins')),
           ],
@@ -227,16 +253,29 @@ class _CabResultsPageState extends State<CabResultsPage> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 20.h),
-              children: [
-                _modeToggle(),
-                SizedBox(height: 12.h),
-                _inclusionsCard(),
-                SizedBox(height: 12.h),
-                ..._cats.map(_cabCard),
-              ],
-            ),
+          : cats.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24.w),
+                    child: Text(
+                      _isLocal ? 'No cabs offer Local hourly packages yet.' : 'No cabs available.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 20.h),
+                  children: [
+                    if (!_isLocal) ...[
+                      _modeToggle(),
+                      SizedBox(height: 12.h),
+                    ],
+                    _inclusionsCard(),
+                    SizedBox(height: 12.h),
+                    ...cats.map(_cabCard),
+                  ],
+                ),
     );
   }
 
@@ -268,7 +307,37 @@ class _CabResultsPageState extends State<CabResultsPage> {
 
   // Fare-mode info card. All Inclusive lists what's covered + the auto toll;
   // Best Price notes that it's distance-only and extras are paid directly.
+  // Local hourly-package info card (shown instead of the Best/All-Inclusive card).
+  Widget _localInfoCard() {
+    const accent = AppColors.primary;
+    return Container(
+      padding: EdgeInsets.fromLTRB(14.w, 12.h, 14.w, 12.h),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(Icons.timelapse_rounded, color: accent, size: 18.sp),
+            SizedBox(width: 6.w),
+            Text('$_localHours-Hour Local Package',
+                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: accent, fontFamily: 'Poppins')),
+          ]),
+          SizedBox(height: 8.h),
+          Text(
+            'In-city hourly rental from your pickup. Each cab below shows the included km and the extra ₹/hour and ₹/km if you go over. Extra time is measured from trip start to end.',
+            style: TextStyle(fontSize: 11.5.sp, height: 1.35, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _inclusionsCard() {
+    if (_isLocal) return _localInfoCard();
     final best = _isBestPrice;
     final accent = best ? AppColors.warning : AppColors.success;
     return Container(
@@ -423,14 +492,21 @@ class _CabResultsPageState extends State<CabResultsPage> {
             SizedBox(height: 12.h),
             // Feature lines.
             _featureLine(Icons.badge_rounded, 'Driver allowance included'),
-            _featureLine(
-              Icons.speed_rounded,
-              extraKm > 0
-                  ? '${_billableKm.round()} kms included  |  Post limit: ₹$extraKm/km'
-                  : '${_billableKm.round()} kms included',
-            ),
+            if (_isLocal) ...[
+              _featureLine(Icons.timelapse_rounded,
+                  '$_localHours hrs · ${_localIncludedKm(cat)} km included'),
+              _featureLine(Icons.more_time_rounded,
+                  'Extra: ₹${(cat['extraHourPrice'] as num?)?.toInt() ?? 0}/hr'
+                  '${extraKm > 0 ? '  ·  ₹$extraKm/km' : ''}'),
+            ] else
+              _featureLine(
+                Icons.speed_rounded,
+                extraKm > 0
+                    ? '${_billableKm.round()} kms included  |  Post limit: ₹$extraKm/km'
+                    : '${_billableKm.round()} kms included',
+              ),
             if (bags.isNotEmpty) _featureLine(Icons.luggage_rounded, 'Luggage: $bags'),
-            if (_isMinApplied)
+            if (!_isLocal && _isMinApplied)
               Padding(
                 padding: EdgeInsets.only(top: 2.h),
                 child: Text(

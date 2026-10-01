@@ -52,6 +52,7 @@ const Map<String, Map<String, String>> _translations = {
     'Invite Friends': 'दोस्तों को आमंत्रित करें',
     'KYC Verification': 'केवाईसी सत्यापन',
     'My Reports': 'मेरी रिपोर्ट',
+    'Penalty': 'पेनल्टी',
     'Notifications': 'सूचनाएं',
     'Privacy Policy': 'गोपनीयता नीति',
     'Terms & Conditions': 'नियम और शर्तें',
@@ -235,6 +236,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'अभी तक कोई प्रशिक्षण वीडियो नहीं।',
   },
   'gu': {
+    'Penalty': 'પેનલ્ટી',
     'Settings': 'સેટિંગ્સ',
     'Membership': 'સભ્યપદ',
     'Free Plan': 'ફ્રી પ્લાન',
@@ -428,6 +430,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'હજી કોઈ તાલીમ વીડિયો નથી.',
   },
   'mr': {
+    'Penalty': 'पेनल्टी',
     'Settings': 'सेटिंग्ज',
     'Membership': 'सदस्यत्व',
     'Free Plan': 'फ्री प्लॅन',
@@ -589,6 +592,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'अजून कोणतेही प्रशिक्षण व्हिडिओ नाहीत.',
   },
   'bn': {
+    'Penalty': 'পেনাল্টি',
     'Settings': 'সেটিংস',
     'Membership': 'সদস্যপদ',
     'Free Plan': 'ফ্রি প্ল্যান',
@@ -750,6 +754,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'এখনও কোনো প্রশিক্ষণ ভিডিও নেই।',
   },
   'pa': {
+    'Penalty': 'ਪੈਨਲਟੀ',
     'Settings': 'ਸੈਟਿੰਗਾਂ',
     'Membership': 'ਮੈਂਬਰਸ਼ਿਪ',
     'Free Plan': 'ਫ੍ਰੀ ਪਲਾਨ',
@@ -911,6 +916,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ਹਾਲੇ ਕੋਈ ਸਿਖਲਾਈ ਵੀਡੀਓ ਨਹੀਂ।',
   },
   'ta': {
+    'Penalty': 'அபராதம்',
     'Settings': 'அமைப்புகள்',
     'Membership': 'உறுப்பினர்',
     'Free Plan': 'இலவசத் திட்டம்',
@@ -1072,6 +1078,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'இதுவரை பயிற்சி வீடியோக்கள் இல்லை.',
   },
   'te': {
+    'Penalty': 'పెనాల్టీ',
     'Settings': 'సెట్టింగ్‌లు',
     'Membership': 'సభ్యత్వం',
     'Free Plan': 'ఉచిత ప్లాన్',
@@ -1233,6 +1240,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ఇంకా శిక్షణ వీడియోలు లేవు.',
   },
   'kn': {
+    'Penalty': 'ದಂಡ',
     'Settings': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
     'Membership': 'ಸದಸ್ಯತ್ವ',
     'Free Plan': 'ಉಚಿತ ಯೋಜನೆ',
@@ -1394,6 +1402,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ಇನ್ನೂ ತರಬೇತಿ ವೀಡಿಯೊಗಳಿಲ್ಲ.',
   },
   'ml': {
+    'Penalty': 'പിഴ',
     'Settings': 'ക്രമീകരണങ്ങൾ',
     'Membership': 'അംഗത്വം',
     'Free Plan': 'സൗജന്യ പ്ലാൻ',
@@ -1555,6 +1564,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ഇതുവരെ പരിശീലന വീഡിയോകളൊന്നുമില്ല.',
   },
   'or': {
+    'Penalty': 'ପେନାଲ୍ଟି',
     'Settings': 'ସେଟିଂସ୍',
     'Membership': 'ସଦସ୍ୟତା',
     'Free Plan': 'ମାଗଣା ପ୍ଲାନ୍',
@@ -1716,6 +1726,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ତାଲିମ ଭିଡିଓ ନାହିଁ।',
   },
   'ur': {
+    'Penalty': 'پینلٹی',
     'Settings': 'ترتیبات',
     'Membership': 'رکنیت',
     'Free Plan': 'مفت پلان',
@@ -1877,6 +1888,7 @@ const Map<String, Map<String, String>> _translations = {
     'No training videos yet.': 'ابھی تک کوئی تربیتی ویڈیو نہیں۔',
   },
   'as': {
+    'Penalty': 'পেনাল্টি',
     'Settings': 'ছেটিংছ',
     'Membership': 'সদস্যতা',
     'Free Plan': 'বিনামূলীয়া আঁচনি',

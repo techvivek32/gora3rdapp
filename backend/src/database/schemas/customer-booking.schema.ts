@@ -115,6 +115,15 @@ export class CustomerBooking {
   @Prop({ default: 0 }) extraKm: number;
   @Prop({ default: 0 }) extraCharge: number;
 
+  // ── Local (in-city hourly package) billing ─────────────────────────────────
+  // Booked package length in hours (6/8/10/12). 0 = not a Local package booking.
+  @Prop({ default: 0 }) packageHours: number;
+  // ₹ charged per hour beyond the package (snapshot from the cab at booking time).
+  @Prop({ default: 0 }) extraHourPrice: number;
+  // Finalised at completion: hours used beyond the package × extraHourPrice.
+  @Prop({ default: 0 }) extraHours: number;
+  @Prop({ default: 0 }) extraHourCharge: number;
+
   @Prop({ type: String, enum: CustomerBookingStatus, default: CustomerBookingStatus.OPEN, index: true })
   status: CustomerBookingStatus;
 

@@ -32,6 +32,9 @@ export class CreateCustomerBookingDto {
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() includedKm?: number;
+  // Local hourly-package snapshot (from the chosen cab category).
+  @IsOptional() @IsNumber() packageHours?: number;
+  @IsOptional() @IsNumber() extraHourPrice?: number;
 }
 
 /** Customer edits an OPEN booking. serviceType cannot change (that's a new booking). */
@@ -54,6 +57,9 @@ export class UpdateCustomerBookingDto {
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() includedKm?: number;
+  // Local hourly-package snapshot (from the chosen cab category).
+  @IsOptional() @IsNumber() packageHours?: number;
+  @IsOptional() @IsNumber() extraHourPrice?: number;
 }
 
 export class ApplyBookingDto {

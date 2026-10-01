@@ -36,6 +36,14 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
     final total = _num(_b['finalFare'] ?? _b['fare'] ?? _b['estimatedFare'] ?? _b['totalFare']);
     final advance = (_b['advanceStatus']?.toString() == 'paid') ? _num(_b['advanceAmount']) : 0.0;
     final collected = (total - advance).clamp(0, double.infinity).toDouble();
+    final isRound = (_b['subType'] ?? '').toString() == 'Round Trip';
+    final retM = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((_b['notes'] ?? '').toString());
+    final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
+    final isLocal = (_b['subType'] ?? '').toString() == 'Local';
+    final packageHours = _num(_b['packageHours']);
+    final extraHours = _num(_b['extraHours']);
+    final extraHourCharge = _num(_b['extraHourCharge']);
+    final extraHourPrice = _num(_b['extraHourPrice']);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -67,7 +75,36 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
             child: Text('Booking ID: ${(_b['humanId'] ?? _b['bookingId'] ?? _id).toString()}',
                 style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
           ),
+          if (isRound || isLocal) ...[
+            SizedBox(height: 8.h),
+            Center(
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20.r)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(isLocal ? Icons.timelapse_rounded : Icons.sync_rounded, size: 13.sp, color: AppColors.primary),
+                  SizedBox(width: 5.w),
+                  Text(
+                    isLocal
+                        ? 'Local · ${packageHours.toStringAsFixed(0)}-hour package'
+                        : (returnLabel.isNotEmpty ? 'Round Trip · Return $returnLabel' : 'Round Trip'),
+                    style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Poppins'),
+                  ),
+                ]),
+              ),
+            ),
+          ],
           SizedBox(height: 20.h),
+
+          // Duration (Local hourly packages)
+          if (isLocal) ...[
+            _card('Duration', [
+              _row('Package', '${packageHours.toStringAsFixed(0)} hours'),
+              if (extraHourPrice > 0) _row('Extra hour rate', '₹${extraHourPrice.toStringAsFixed(0)}/hr'),
+              if (extraHours > 0) _row('Extra hours', '${extraHours.toStringAsFixed(0)} hr', highlight: true),
+            ]),
+            SizedBox(height: 12.h),
+          ],
 
           // Distance
           _card('Distance', [
@@ -79,8 +116,9 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
 
           // Fare
           _card('Fare Summary', [
-            _row('Base fare', '₹${(total - extraCharge).toStringAsFixed(0)}'),
+            _row('Base fare', '₹${(total - extraCharge - extraHourCharge).toStringAsFixed(0)}'),
             if (extraCharge > 0) _row('Extra km charge', '₹${extraCharge.toStringAsFixed(0)}', highlight: true),
+            if (extraHourCharge > 0) _row('Extra hours charge', '₹${extraHourCharge.toStringAsFixed(0)}', highlight: true),
             const Divider(height: 20),
             _row('Total fare', '₹${total.toStringAsFixed(0)}', bold: true),
             if (advance > 0) _row('Advance paid (to platform)', '- ₹${advance.toStringAsFixed(0)}'),

@@ -24,6 +24,7 @@ export interface InvoiceData {
   dropCity?: string;
   travelDate?: Date | string;
   travelTime?: string;
+  returnDate?: string; // round trip only, "dd-MM-yyyy"
   startedAt?: Date | string;
   completedAt?: Date | string;
   distanceKm?: number;
@@ -38,6 +39,11 @@ export interface InvoiceData {
   extraKm?: number;
   extraKmPrice?: number;
   extraCharge?: number;
+  // Local hourly package (optional).
+  packageHours?: number;
+  extraHourPrice?: number;
+  extraHours?: number;
+  extraHourCharge?: number;
 }
 
 const ORANGE = '#F26522';
@@ -123,7 +129,17 @@ export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
     ['Drop', data.drop || data.dropCity || '-'],
     ['Trip start', fmtDate(data.startedAt)],
     ['Trip end', fmtDate(data.completedAt)],
-    ['Distance', data.distanceKm ? `${data.distanceKm} km` : '-'],
+    ...(data.returnDate ? ([['Return date', data.returnDate]] as [string, string][]) : []),
+    ...((data.packageHours && data.packageHours > 0)
+      ? ([
+          ['Package', `${data.packageHours} hours${data.includedKm ? ` · ${data.includedKm} km` : ''}`],
+          ...((data.extraHourPrice && data.extraHourPrice > 0) ? ([['Extra hour rate', `Rs.${data.extraHourPrice}/hr`]] as [string, string][]) : []),
+          ...((data.extraHours && data.extraHours > 0) ? ([['Extra hours', `${data.extraHours} hr`]] as [string, string][]) : []),
+        ] as [string, string][])
+      : []),
+    ...((!data.packageHours || data.packageHours <= 0)
+      ? ([['Distance', data.distanceKm ? `${data.distanceKm} km${data.subType === 'Round Trip' ? ' (round)' : ''}` : '-']] as [string, string][])
+      : []),
     ['Passengers', data.passengers ? String(data.passengers) : '-'],
     ...((data.includedKm && data.includedKm > 0)
       ? ([
@@ -147,10 +163,12 @@ export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
   y += 22;
 
   const extraCharge = data.extraCharge && data.extraCharge > 0 ? data.extraCharge : 0;
-  const base = Math.max(0, Math.round((data.fare || 0) - (data.tollAmount || 0) - extraCharge));
+  const extraHourCharge = data.extraHourCharge && data.extraHourCharge > 0 ? data.extraHourCharge : 0;
+  const base = Math.max(0, Math.round((data.fare || 0) - (data.tollAmount || 0) - extraCharge - extraHourCharge));
   const items: [string, number][] = [['Ride fare' + (data.fareMode ? ` (${data.fareMode})` : ''), base]];
   if (data.tollAmount && data.tollAmount > 0) items.push(['Toll / taxes', data.tollAmount]);
   if (extraCharge > 0) items.push([`Extra ${data.extraKm} km @ Rs.${data.extraKmPrice}/km`, extraCharge]);
+  if (extraHourCharge > 0) items.push([`Extra ${data.extraHours} hr @ Rs.${data.extraHourPrice}/hr`, extraHourCharge]);
 
   // header row
   doc.rect(M, y, contentW, 26).fill(DARK);

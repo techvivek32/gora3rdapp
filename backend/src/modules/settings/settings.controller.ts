@@ -60,6 +60,7 @@ export class SettingsController {
     minBillKm?: number;
     tollTaxPerKm?: number;
     minWalletToAccept?: number;
+    contactRevealHoursBeforePickup?: number;
   }) {
     return this.settingsService.updateSettings(body);
   }

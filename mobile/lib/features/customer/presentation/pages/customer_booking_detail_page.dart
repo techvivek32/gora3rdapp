@@ -420,10 +420,21 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
               onPressed: () => callNumber(phone),
               icon: const Icon(Icons.phone_rounded, color: AppColors.success),
               tooltip: 'Call $phone',
+            )
+          else if (b['contactLocked'] == true)
+            Tooltip(
+              message: 'Driver number shows ${_revealHoursText(b)} before pickup',
+              child: const Icon(Icons.lock_clock_rounded, color: AppColors.textHint),
             ),
         ],
       ),
     );
+  }
+
+  /// "1 hour" / "N hours" before pickup, from the booking's contactRevealHours.
+  String _revealHoursText(Map<String, dynamic> b) {
+    final h = (b['contactRevealHours'] as num?)?.toInt() ?? 1;
+    return h == 1 ? '1 hour' : '$h hours';
   }
 
   Widget _actions(String status, Map<String, dynamic> b) {

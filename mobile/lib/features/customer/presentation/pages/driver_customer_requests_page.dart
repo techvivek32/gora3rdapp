@@ -83,7 +83,14 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     if (selection == null) return;
     try {
       await _repo.accept(id, selection: selection);
-      _snack('Accepted! Our team will assign the driver soon. ✅', ok: true);
+      // Local is assigned instantly to the accepting driver (no admin step).
+      final isLocal = (b['subType'] ?? '').toString() == 'Local';
+      _snack(
+        isLocal
+            ? 'Booking confirmed — it\'s yours! Find it under Assigned. ✅'
+            : 'Accepted! Our team will assign the driver soon. ✅',
+        ok: true,
+      );
       _loadAvailable();
       _loadMine();
     } catch (e) {
@@ -324,6 +331,12 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
 }
 
 
+/// "1 hour" / "N hours" before pickup, from the booking's contactRevealHours.
+String _revealHoursText(Map b) {
+  final h = (b['contactRevealHours'] as num?)?.toInt() ?? 1;
+  return h == 1 ? '1 hour' : '$h hours';
+}
+
 class MyOfferCard extends StatelessWidget {
   final Map<String, dynamic> b;
   final void Function(String id) onStart;
@@ -344,6 +357,15 @@ class MyOfferCard extends StatelessWidget {
     final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
     final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
     final status = (b['status'] ?? '').toString();
+    // Round-trip context — carried on the booking (subType) + return date in notes.
+    // Must stay visible AFTER a driver is selected (the win card is what they work
+    // from), so they know to bring the customer back.
+    final subType = (b['subType'] ?? '').toString();
+    final isRound = subType == 'Round Trip';
+    final isLocal = subType == 'Local';
+    final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
+    final retM = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
+    final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
     // myOffer is injected by backend for the driver's own offer on this booking.
     final myOffer = b['myOffer'] as Map? ?? {};
     final quoted = myOffer['quotedFare'] ?? b['finalFare'] ?? 0;
@@ -387,9 +409,40 @@ class MyOfferCard extends StatelessWidget {
                   ],
                 ),
               ),
-              filledChip('₹$quoted', barColor),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  filledChip('₹$quoted', barColor),
+                  if (isRound) ...[
+                    SizedBox(height: 4.h),
+                    filledChip('ROUND TRIP', AppColors.primary),
+                  ],
+                  if (isLocal) ...[
+                    SizedBox(height: 4.h),
+                    filledChip('LOCAL${packageHours > 0 ? ' · ${packageHours}H' : ''}', AppColors.primary),
+                  ],
+                ],
+              ),
             ],
           ),
+          if (isRound && returnLabel.isNotEmpty) ...[
+            SizedBox(height: 6.h),
+            Row(children: [
+              Icon(Icons.event_repeat_rounded, size: 14.sp, color: AppColors.primary),
+              SizedBox(width: 5.w),
+              Text('Return: $returnLabel · bring customer back to pickup',
+                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            ]),
+          ],
+          if (isLocal) ...[
+            SizedBox(height: 6.h),
+            Row(children: [
+              Icon(Icons.timelapse_rounded, size: 14.sp, color: AppColors.primary),
+              SizedBox(width: 5.w),
+              Text('In-city hourly package${packageHours > 0 ? ' · $packageHours hours' : ''}',
+                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            ]),
+          ],
           SizedBox(height: 10.h),
           const Divider(height: 1, color: Colors.black26),
           SizedBox(height: 10.h),
@@ -439,8 +492,29 @@ class MyOfferCard extends StatelessWidget {
               ]),
             ),
           ],
+          // Selected, but the reveal window hasn't opened yet — explain the wait.
+          if (won && b['contactLocked'] == true) ...[
+            SizedBox(height: 10.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(10.r),
+              decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10.r)),
+              child: Row(children: [
+                Icon(Icons.lock_clock_rounded, size: 16.sp, color: AppColors.warning),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    'Customer number shows ${_revealHoursText(b)} before pickup',
+                    style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                  ),
+                ),
+              ]),
+            ),
+          ],
           // Full-screen map navigation flow (arrive → start → complete via swipe + OTP).
-          if (onOpenTrip != null && won && (status == 'confirmed' || status == 'ongoing')) ...[
+          // Local is an in-city hourly package — no route/direction — so it uses the
+          // simple inline OTP buttons below instead of the map navigation.
+          if (onOpenTrip != null && !isLocal && won && (status == 'confirmed' || status == 'ongoing')) ...[
             SizedBox(height: 12.h),
             SizedBox(width: double.infinity, child: ElevatedButton.icon(
               onPressed: () => onOpenTrip!(b),
@@ -449,7 +523,7 @@ class MyOfferCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
             )),
           ],
-          if (onOpenTrip == null && won && status == 'confirmed') ...[
+          if ((onOpenTrip == null || isLocal) && won && status == 'confirmed') ...[
             SizedBox(height: 12.h),
             Row(children: [
               Expanded(child: OutlinedButton.icon(
@@ -467,7 +541,7 @@ class MyOfferCard extends StatelessWidget {
               )),
             ]),
           ],
-          if (onOpenTrip == null && won && status == 'ongoing') ...[
+          if ((onOpenTrip == null || isLocal) && won && status == 'ongoing') ...[
             SizedBox(height: 12.h),
             SizedBox(width: double.infinity, child: ElevatedButton.icon(
               onPressed: () => onComplete(id),
