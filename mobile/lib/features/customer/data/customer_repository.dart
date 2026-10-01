@@ -112,8 +112,11 @@ class CustomerRepository {
   }
 
   /// Driver submits the OTP the customer gave them → starts/completes the trip.
-  Future<void> verifyTripOtp(String id, String action, String otp) async {
-    await _api.post('/customer-bookings/$id/trip/verify-otp', data: {'action': action, 'otp': otp});
+  /// Returns the updated booking (with final trackedKm / extraKm / finalFare).
+  Future<Map<String, dynamic>?> verifyTripOtp(String id, String action, String otp) async {
+    final res = await _api.post('/customer-bookings/$id/trip/verify-otp', data: {'action': action, 'otp': otp});
+    final data = res.data is Map ? res.data['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : null;
   }
 
   Future<void> driverCancel(String id, {String? reason}) async {

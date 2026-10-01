@@ -6,6 +6,7 @@ import '../../../../core/utils/api_error.dart';
 import '../../data/customer_repository.dart';
 import '../../data/trip_tracker.dart';
 import '../pages/driver_customer_requests_page.dart' show MyOfferCard;
+import '../pages/driver_trip_page.dart';
 import '../utils/invoice_actions.dart';
 
 /// The driver/vendor's WON customer trips (their accepted offers), rendered as a
@@ -55,6 +56,11 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
 
   void _snack(String m, {bool ok = false}) => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(m), backgroundColor: ok ? AppColors.success : AppColors.error));
+
+  Future<void> _openTrip(Map<String, dynamic> booking) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => DriverTripPage(booking: booking)));
+    if (mounted) _load(); // refresh statuses when returning from the trip screen
+  }
 
   Future<void> _arrived(String id) async {
     try {
@@ -203,6 +209,7 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
                 onArrived: _arrived,
                 onCancel: _driverCancel,
                 onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
+                onOpenTrip: _openTrip,
               ),
             )),
       ],

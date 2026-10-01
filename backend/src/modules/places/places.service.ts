@@ -55,6 +55,46 @@ export class PlacesService {
    * 214 vs 222 km). `pointsRaw` is "lat,lng;lat,lng;..." in visit order
    * (pickup -> stops -> drop). Returns total metres/km/seconds across all legs.
    */
+  /** Strip HTML tags/entities + noisy POI tokens from Google's turn-by-turn
+   *  instructions so the app shows a clean line like "Turn left onto Kuvadva Rd". */
+  private stripHtml(s: string): string {
+    let out = (s || '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&#39;/g, "'")
+      .replace(/&quot;/g, '"')
+      // Google embeds emoji/pictographs + variation selectors from local POI names.
+      .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{1F1E6}-\u{1F1FF}\u{2190}-\u{21FF}\u{FE00}-\u{FE0F}\u{200D}]/gu, '');
+    // Drop a noisy landmark clause that starts with a house/POI number, e.g.
+    // "Turn left at 1099 … onto Kuvadva Rd" -> "Turn left onto Kuvadva Rd".
+    out = out.replace(/\s+at\s+\d[^]*?\s+onto\s+/gi, ' onto ');
+    // Trailing "at 1099 …" with no road -> just drop the number clause.
+    out = out.replace(/\s+at\s+\d\S*(\s+\S+){0,3}\s*$/i, '');
+    return out
+      .replace(/\s*\/\s*/g, ' / ')
+      .replace(/\s+([,.])/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
+  /** Decode a Google "encoded polyline" string into [{lat,lng}] points. */
+  private decodePolyline(encoded: string): { lat: number; lng: number }[] {
+    if (!encoded) return [];
+    const points: { lat: number; lng: number }[] = [];
+    let index = 0, lat = 0, lng = 0;
+    while (index < encoded.length) {
+      let b: number, shift = 0, result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+      shift = 0; result = 0;
+      do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+      points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+    }
+    return points;
+  }
+
   async route(pointsRaw: string) {
     const parts = (pointsRaw || '')
       .split(';')
@@ -96,6 +136,22 @@ export class PlacesService {
       const meters = legs.reduce((sum, l) => sum + (l.distance?.value ?? 0), 0);
       const seconds = legs.reduce((sum, l) => sum + (l.duration?.value ?? 0), 0);
       const tollInr = await this.fetchToll(origin, destination, waypoints);
+      // Decoded route geometry so the app can draw the polyline on a map.
+      const encoded = body.routes?.[0]?.overview_polyline?.points ?? '';
+      const points = this.decodePolyline(encoded);
+      // Turn-by-turn steps (across all legs) for in-app navigation guidance.
+      const steps = legs
+        .flatMap((l: any) => l.steps ?? [])
+        .map((s: any) => ({
+          instruction: this.stripHtml(s.html_instructions || ''),
+          maneuver: s.maneuver || '',
+          distanceM: s.distance?.value ?? 0,
+          durationS: s.duration?.value ?? 0,
+          startLat: s.start_location?.lat ?? 0,
+          startLng: s.start_location?.lng ?? 0,
+          endLat: s.end_location?.lat ?? 0,
+          endLng: s.end_location?.lng ?? 0,
+        }));
       return {
         message: 'ok',
         data: {
@@ -103,6 +159,8 @@ export class PlacesService {
           distanceKm: Math.round((meters / 1000) * 10) / 10,
           durationSeconds: seconds,
           tollInr, // estimated toll (₹) from Google Routes API; 0 if unavailable
+          points, // [{lat,lng}] route geometry for drawing the map polyline
+          steps, // turn-by-turn guidance for in-app navigation
         },
       };
     } catch (e: any) {

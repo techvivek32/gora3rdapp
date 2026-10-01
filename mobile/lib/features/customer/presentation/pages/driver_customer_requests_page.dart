@@ -10,6 +10,7 @@ import '../../data/trip_tracker.dart';
 import '../utils/invoice_actions.dart';
 import '../widgets/booking_card_ui.dart';
 import '../widgets/customer_request_card.dart';
+import 'driver_trip_page.dart';
 
 /// Driver / vendor side of Customer Mode: browse customer requests in your
 /// city, quote a fare (which places a small wallet commitment hold), and manage
@@ -294,9 +295,15 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
             onComplete: (id) => _tripOtpFlow(id, 'end'),
             onArrived: _arrived,
             onCancel: _driverCancel,
-            onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id)),
+            onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
+            onOpenTrip: _openTrip),
       ),
     );
+  }
+
+  Future<void> _openTrip(Map<String, dynamic> booking) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => DriverTripPage(booking: booking)));
+    if (mounted) _loadMine();
   }
 
   Widget _retry(String e, VoidCallback onRetry) => Center(
@@ -324,7 +331,11 @@ class MyOfferCard extends StatelessWidget {
   final void Function(String id) onArrived;
   final void Function(String id) onCancel;
   final void Function(String id) onInvoice;
-  const MyOfferCard(this.b, {super.key, required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice});
+  /// When provided, confirmed/ongoing won trips show a single "Open Trip" button
+  /// that launches the full-screen map navigation flow (arrive/start/complete via
+  /// swipe + OTP) instead of the inline buttons.
+  final void Function(Map<String, dynamic> booking)? onOpenTrip;
+  const MyOfferCard(this.b, {super.key, required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice, this.onOpenTrip});
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +439,17 @@ class MyOfferCard extends StatelessWidget {
               ]),
             ),
           ],
-          if (won && status == 'confirmed') ...[
+          // Full-screen map navigation flow (arrive → start → complete via swipe + OTP).
+          if (onOpenTrip != null && won && (status == 'confirmed' || status == 'ongoing')) ...[
+            SizedBox(height: 12.h),
+            SizedBox(width: double.infinity, child: ElevatedButton.icon(
+              onPressed: () => onOpenTrip!(b),
+              icon: Icon(Icons.navigation_rounded, size: 18.sp),
+              label: Text(status == 'ongoing' ? 'Resume Trip' : 'Open Trip & Navigate'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
+            )),
+          ],
+          if (onOpenTrip == null && won && status == 'confirmed') ...[
             SizedBox(height: 12.h),
             Row(children: [
               Expanded(child: OutlinedButton.icon(
@@ -446,7 +467,7 @@ class MyOfferCard extends StatelessWidget {
               )),
             ]),
           ],
-          if (won && status == 'ongoing') ...[
+          if (onOpenTrip == null && won && status == 'ongoing') ...[
             SizedBox(height: 12.h),
             SizedBox(width: double.infinity, child: ElevatedButton.icon(
               onPressed: () => onComplete(id),
