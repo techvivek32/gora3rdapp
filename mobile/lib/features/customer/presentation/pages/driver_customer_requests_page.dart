@@ -366,6 +366,20 @@ class MyOfferCard extends StatelessWidget {
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final retM = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
     final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
+    // Round trip: inclusive day count (travel day → return day), shown under the tag.
+    int? roundDays;
+    if (isRound && retM != null) {
+      final td = tripDate(b['travelDate']);
+      if (td != null) {
+        final rdt = DateTime(int.parse(retM.group(3)!), int.parse(retM.group(2)!), int.parse(retM.group(1)!));
+        final d = rdt.difference(DateTime(td.year, td.month, td.day)).inDays + 1;
+        if (d >= 1) roundDays = d;
+      }
+    }
+    // Trip-type tag shown for every type (One Way / Round Trip / Local).
+    final tripTag = isLocal
+        ? 'LOCAL${packageHours > 0 ? ' · ${packageHours}H' : ''}'
+        : subType.toUpperCase();
     // myOffer is injected by backend for the driver's own offer on this booking.
     final myOffer = b['myOffer'] as Map? ?? {};
     final quoted = myOffer['quotedFare'] ?? b['finalFare'] ?? 0;
@@ -412,14 +426,12 @@ class MyOfferCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  filledChip('₹$quoted', barColor),
-                  if (isRound) ...[
+                  if (subType.isNotEmpty)
+                    filledChip(tripTag, AppColors.primary),
+                  if (isRound && roundDays != null) ...[
                     SizedBox(height: 4.h),
-                    filledChip('ROUND TRIP', AppColors.primary),
-                  ],
-                  if (isLocal) ...[
-                    SizedBox(height: 4.h),
-                    filledChip('LOCAL${packageHours > 0 ? ' · ${packageHours}H' : ''}', AppColors.primary),
+                    Text('$roundDays day${roundDays == 1 ? '' : 's'}',
+                        style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                   ],
                 ],
               ),

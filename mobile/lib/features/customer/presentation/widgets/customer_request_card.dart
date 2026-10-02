@@ -53,6 +53,10 @@ class CustomerRequestCard extends StatelessWidget {
     final isInclusive = RegExp(r'all\s*inclusive', caseSensitive: false).hasMatch(notes);
     final includedKm = (b['includedKm'] as num?)?.toInt() ?? 0;
     final extraKmPrice = (b['extraKmPrice'] as num?)?.toInt() ?? 0;
+    // Local (in-city hourly package): show the package hours + extra ₹/hr.
+    final isLocal = subType == 'Local';
+    final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
+    final extraHourPrice = (b['extraHourPrice'] as num?)?.toInt() ?? 0;
 
     return brandCard(
       stamp: stamp?.$1,
@@ -90,6 +94,11 @@ class CustomerRequestCard extends StatelessWidget {
                     if (days != null) ...[
                       SizedBox(height: 4.h),
                       Text('$days day${days == 1 ? '' : 's'}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                    ],
+                    // Local: show the package hours under the LOCAL tag.
+                    if (isLocal && packageHours > 0) ...[
+                      SizedBox(height: 4.h),
+                      Text('$packageHours hours', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                     ],
                   ],
                 ),
@@ -141,13 +150,13 @@ class CustomerRequestCard extends StatelessWidget {
               ),
             ),
           ]),
-          // Included-km / extra-km terms — outside, no white background.
-          if (includedKm > 0 || extraKmPrice > 0) ...[
+          // Included-km / extra-km (+ extra ₹/hr for Local) — one clean line.
+          if (includedKm > 0 || extraKmPrice > 0 || (isLocal && extraHourPrice > 0)) ...[
             SizedBox(height: 8.h),
-            Row(children: [
+            Wrap(spacing: 16.w, runSpacing: 6.h, children: [
               if (includedKm > 0) _kmInfo(Icons.speed_rounded, 'Included $includedKm km'),
-              if (includedKm > 0 && extraKmPrice > 0) SizedBox(width: 16.w),
               if (extraKmPrice > 0) _kmInfo(Icons.add_road_rounded, 'Extra ₹$extraKmPrice/km'),
+              if (isLocal && extraHourPrice > 0) _kmInfo(Icons.more_time_rounded, 'Extra ₹$extraHourPrice/hr'),
             ]),
           ],
           // Accept only while still open; once booked the stamp says it all.

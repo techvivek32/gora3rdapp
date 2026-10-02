@@ -395,37 +395,56 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     final phone = (snapshot['mobile'] ?? snapshot['phone'] ?? '').toString();
     final vehicle = (snapshot['vehicle'] ?? '').toString();
     final vehicleNo = (snapshot['vehicleNumber'] ?? '').toString();
+    final locked = phone.isEmpty && b['contactLocked'] == true;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.primary.withValues(alpha: 0.3))),
-      child: Row(
+      child: Column(
         children: [
-          CircleAvatar(radius: 26, backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-              child: const Icon(Icons.person_rounded, color: AppColors.primary, size: 28)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
-                if (vehicle.isNotEmpty || vehicleNo.isNotEmpty)
-                  Text('$vehicle ${vehicleNo.isNotEmpty ? '• $vehicleNo' : ''}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-                if ((b['finalFare'] ?? 0) != 0)
-                  Padding(padding: const EdgeInsets.only(top: 2), child: Text('Fare: ₹${b['finalFare']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary))),
-              ],
-            ),
+          Row(
+            children: [
+              CircleAvatar(radius: 26, backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                  child: const Icon(Icons.person_rounded, color: AppColors.primary, size: 28)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
+                    if (vehicle.isNotEmpty || vehicleNo.isNotEmpty)
+                      Text('$vehicle ${vehicleNo.isNotEmpty ? '• $vehicleNo' : ''}', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                    if ((b['finalFare'] ?? 0) != 0)
+                      Padding(padding: const EdgeInsets.only(top: 2), child: Text('Fare: ₹${b['finalFare']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary))),
+                  ],
+                ),
+              ),
+              if (phone.isNotEmpty)
+                IconButton(
+                  onPressed: () => callNumber(phone),
+                  icon: const Icon(Icons.phone_rounded, color: AppColors.success),
+                  tooltip: 'Call $phone',
+                ),
+            ],
           ),
-          if (phone.isNotEmpty)
-            IconButton(
-              onPressed: () => callNumber(phone),
-              icon: const Icon(Icons.phone_rounded, color: AppColors.success),
-              tooltip: 'Call $phone',
-            )
-          else if (b['contactLocked'] == true)
-            Tooltip(
-              message: 'Driver number shows ${_revealHoursText(b)} before pickup',
-              child: const Icon(Icons.lock_clock_rounded, color: AppColors.textHint),
+          // Tell the customer exactly WHEN the driver's number unlocks.
+          if (locked) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: AppColors.warning.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+              child: Row(children: [
+                const Icon(Icons.lock_clock_rounded, size: 18, color: AppColors.warning),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "You'll get the driver's number ${_revealHoursText(b)} before pickup.",
+                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  ),
+                ),
+              ]),
             ),
+          ],
         ],
       ),
     );

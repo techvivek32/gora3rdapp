@@ -641,9 +641,8 @@ class RequirementCardWidget extends StatelessWidget {
                                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Contact number not available'.tr)));
                                           }
                                         }),
-                                        if (!mine && postedBy?['_id'] != null)
-                                          _action(Icon(Icons.chat_bubble, color: AppColors.primary, size: 28), 'Chat',
-                                              () => _openChat(context, postedBy!['_id'].toString(), requirement['_id']?.toString())),
+                                        // Chat shows ONLY on secure / hide-profile bookings
+                                        // (handled by the hiddenProfile branch above) — not here.
                                         _action(const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366), size: 28), 'Whatsapp', () {
                                           if (mobile != null && mobile.isNotEmpty) {
                                             openWhatsApp(mobile, message: _buildWhatsAppMessage());

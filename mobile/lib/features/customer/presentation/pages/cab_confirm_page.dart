@@ -372,7 +372,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
                   text: TextSpan(
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'),
                     children: [
-                      TextSpan(text: _isLocal ? from : '$from → $to'),
+                      TextSpan(text: _isLocal ? from : (_isRound ? '$from → $to → $from' : '$from → $to')),
                       TextSpan(text: '  (${_titleCase(sub)})', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                     ],
                   ),
@@ -443,8 +443,11 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             _field(_emailCtrl, 'Email ID (optional)', Icons.email_rounded, keyboard: TextInputType.emailAddress),
             SizedBox(height: 14.h),
             _readonlyLoc('Pickup Location', Icons.my_location_rounded, AppColors.success, _pickupAddr),
-            SizedBox(height: 10.h),
-            _readonlyLoc('Drop Location', Icons.location_on_rounded, AppColors.error, _dropAddr),
+            // Local (in-city hourly) has no fixed drop.
+            if (!_isLocal) ...[
+              SizedBox(height: 10.h),
+              _readonlyLoc('Drop Location', Icons.location_on_rounded, AppColors.error, _dropAddr),
+            ],
           ],
         ),
       );
@@ -574,7 +577,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 10.h),
                 child: Row(children: [
-                  Expanded(child: Text('Read Terms and Conditions', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins'))),
+                  Icon(Icons.description_rounded, size: 18.sp, color: AppColors.primary),
+                  SizedBox(width: 8.w),
+                  Expanded(child: Text('Terms & Conditions', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins'))),
                   Icon(_tcOpen ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: AppColors.info, size: 22.sp),
                 ]),
               ),
