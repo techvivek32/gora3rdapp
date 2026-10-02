@@ -35,12 +35,25 @@ export class CarPoolService {
     return new Types.ObjectId(id);
   }
 
+  /** A user is an active Golden member (flag or tier, and not expired). */
+  private isGoldenActive(u: any): boolean {
+    if (!u) return false;
+    const golden = u.isGolden === true || u.membershipType === 'golden';
+    if (!golden) return false;
+    if (u.membershipExpiresAt && new Date(u.membershipExpiresAt) <= new Date()) return false;
+    return true;
+  }
+
   // ─── Driver: create / manage ────────────────────────────────────────────────
 
   async createRide(driverId: string, dto: CreatePoolRideDto) {
     if (dto.pricePerSeat < 0 || dto.totalSeats < 1) throw new BadRequestException('Invalid seats or price');
-    const driver = await this.userModel.findById(driverId).select('fullName mobile rating').lean();
+    const driver = await this.userModel.findById(driverId).select('fullName mobile rating isGolden membershipType membershipExpiresAt').lean();
     if (!driver) throw new NotFoundException('Driver not found');
+    // Posting a pool ride is a Golden-member feature.
+    if (!this.isGoldenActive(driver)) {
+      throw new ForbiddenException('Only Golden members can post pool rides.');
+    }
 
     const travelDate = dto.travelDate ? new Date(dto.travelDate) : undefined;
     const expiresAt = travelDate

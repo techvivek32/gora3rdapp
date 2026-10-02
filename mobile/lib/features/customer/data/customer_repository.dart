@@ -123,6 +123,16 @@ class CustomerRepository {
     await _api.post('/customer-bookings/$id/driver-cancel', data: {if (reason != null) 'reason': reason});
   }
 
+  /// Driver records trip-end toll/parking/other charges on the final-bill screen.
+  /// Returns the updated booking (with recomputed finalFare).
+  Future<Map<String, dynamic>?> updateTripCharges(String id,
+      {num toll = 0, num parking = 0, num other = 0}) async {
+    final res = await _api.post('/customer-bookings/$id/trip/charges',
+        data: {'toll': toll, 'parking': parking, 'other': other});
+    final data = res.data is Map ? res.data['data'] : null;
+    return data is Map ? Map<String, dynamic>.from(data) : null;
+  }
+
   // ── Help & Support (complaints) ──
   Future<void> createComplaint(String category, {String? message, String? bookingRef, String? bookingId}) async {
     await _api.post('/customer-complaints', data: {

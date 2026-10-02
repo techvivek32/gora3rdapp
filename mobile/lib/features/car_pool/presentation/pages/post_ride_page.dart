@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/car_pool_repository.dart';
 
 /// Driver: post (or edit) a car-pool ride — from/to, date, time, seats, price.
@@ -95,8 +97,23 @@ class _PostRidePageState extends State<PostRidePage> {
 
   void _snack(String m, {bool ok = false}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: ok ? AppColors.success : AppColors.error, behavior: SnackBarBehavior.floating));
 
+  // Posting a pool ride is a Golden-member feature (backend enforces it too).
+  bool get _isGolden {
+    final st = context.read<AuthBloc>().state;
+    final u = st is AuthAuthenticated ? (st.user as Map?) : null;
+    if (u == null) return false;
+    final golden = u['isGolden'] == true || u['membershipType'] == 'golden';
+    if (!golden) return false;
+    final exp = DateTime.tryParse('${u['membershipExpiresAt'] ?? ''}');
+    return exp == null || exp.isAfter(DateTime.now());
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_isGolden) {
+      _snack('Golden membership required to post a pool ride');
+      return;
+    }
     if (_fromCtrl.text.trim().isEmpty || _toCtrl.text.trim().isEmpty) {
       _snack('Please select From and To locations');
       return;

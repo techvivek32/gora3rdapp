@@ -7,6 +7,7 @@ import '../../data/customer_repository.dart';
 import '../../data/trip_tracker.dart';
 import '../pages/driver_customer_requests_page.dart' show MyOfferCard;
 import '../pages/driver_trip_page.dart';
+import '../pages/driver_trip_summary_page.dart';
 import '../utils/invoice_actions.dart';
 
 /// The driver/vendor's WON customer trips (their accepted offers), rendered as a
@@ -60,6 +61,11 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
   Future<void> _openTrip(Map<String, dynamic> booking) async {
     await Navigator.of(context).push(MaterialPageRoute(builder: (_) => DriverTripPage(booking: booking)));
     if (mounted) _load(); // refresh statuses when returning from the trip screen
+  }
+
+  Future<void> _openSummary(Map<String, dynamic> booking) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: booking)));
+    if (mounted) _load();
   }
 
   Future<void> _arrived(String id) async {
@@ -131,7 +137,7 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
     final otp = await _askOtp(action);
     if (otp == null || otp.trim().isEmpty) return;
     try {
-      await _repo.verifyTripOtp(id, action, otp.trim());
+      final updated = await _repo.verifyTripOtp(id, action, otp.trim());
       // Start/stop GPS distance tracking with the trip.
       if (action == 'start') {
         final ok = await TripTracker.instance.start(id);
@@ -140,6 +146,11 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
         await TripTracker.instance.stop();
       }
       _snack(action == 'start' ? 'Trip started 🚕' : 'Trip completed 🎉', ok: true);
+      // After the drop OTP, open the final-bill screen so the driver can add
+      // toll/parking/other charges and download the invoice.
+      if (action == 'end' && mounted && updated != null) {
+        await _openSummary(updated);
+      }
       _load();
     } catch (e) {
       _snack('Could not $label: ${serverMessage(e)}');
@@ -210,6 +221,7 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
                 onCancel: _driverCancel,
                 onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
                 onOpenTrip: _openTrip,
+                onBill: _openSummary,
               ),
             )),
       ],

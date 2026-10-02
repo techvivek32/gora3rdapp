@@ -216,6 +216,16 @@ export class CustomerBookingsController {
     return this.service.trackTrip(userId, id, km);
   }
 
+  @Post(':id/trip/charges')
+  @ApiOperation({ summary: 'Driver: record trip-end toll/parking/other charges on the final bill' })
+  tripCharges(
+    @CurrentUser('sub') userId: string,
+    @Param('id') id: string,
+    @Body() dto: { toll?: number; parking?: number; other?: number },
+  ) {
+    return this.service.updateTripCharges(userId, id, dto);
+  }
+
   @Post(':id/driver-cancel')
   @ApiOperation({ summary: 'Driver: cancel after being selected' })
   driverCancel(@CurrentUser('sub') userId: string, @Param('id') id: string, @Body() dto: CancelBookingDto) {

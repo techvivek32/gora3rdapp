@@ -504,11 +504,13 @@ export class CustomerBookingsService {
       .lean();
 
     const fare = booking.finalFare || booking.estimatedFare || 0;
-    // Toll was concatenated into `notes` client-side (there's no discrete field);
-    // best-effort extract so the breakdown can show it, otherwise it's folded in.
-    let tollAmount = 0;
-    const m = /toll[^0-9]{0,12}(\d+)/i.exec(booking.notes || '');
-    if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
+    // Toll: prefer the structured charge the driver entered on the bill screen;
+    // fall back to the legacy value concatenated into `notes` for old bookings.
+    let tollAmount = Math.max(0, Math.round(booking.tollCharge || 0));
+    if (!tollAmount) {
+      const m = /toll[^0-9]{0,12}(\d+)/i.exec(booking.notes || '');
+      if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
+    }
     const fareMode = /all\s*inclusive/i.test(booking.notes || '') ? 'All Inclusive' : undefined;
 
     // Car details for the invoice: match the booked class (vehicleType is the cab
@@ -572,6 +574,8 @@ export class CustomerBookingsService {
       passengers: booking.passengers || 0,
       fare,
       tollAmount,
+      parkingCharge: Math.max(0, Math.round(booking.parkingCharge || 0)),
+      otherCharge: Math.max(0, Math.round(booking.otherCharge || 0)),
       fareMode,
       includedKm: booking.includedKm || 0,
       trackedKm: booking.trackedKm || 0,
@@ -583,6 +587,7 @@ export class CustomerBookingsService {
       extraHourPrice: booking.extraHourPrice || 0,
       extraHours: booking.extraHours || 0,
       extraHourCharge: booking.extraHourCharge || 0,
+      advanceAmount: booking.advanceStatus === 'paid' ? (booking.advanceAmount || 0) : 0,
       paymentMode: 'Cash — paid directly to the driver',
     });
 
@@ -1379,7 +1384,11 @@ export class CustomerBookingsService {
       booking.status = CustomerBookingStatus.COMPLETED;
       booking.completedAt = new Date();
       // Finalise the fare: base + any extra-km (round trip) + any extra-hours (Local).
-      let finalFare = booking.finalFare || booking.estimatedFare || 0;
+      const baseFare = booking.finalFare || booking.estimatedFare || 0;
+      // Remember the agreed base so re-submitting trip-end charges later recomputes
+      // finalFare deterministically (base + extras + toll + parking + other).
+      booking.tripFare = Math.round(baseFare);
+      let finalFare = baseFare;
       // Round-trip / rental extra-km billing: GPS-measured km beyond the included allowance.
       if ((booking.includedKm || 0) > 0 && (booking.extraKmPrice || 0) > 0) {
         const extraKm = Math.max(0, Math.round((booking.trackedKm || 0) - booking.includedKm));
@@ -1397,6 +1406,9 @@ export class CustomerBookingsService {
         booking.extraHourCharge = Math.round(extraHours * booking.extraHourPrice);
         finalFare += booking.extraHourCharge;
       }
+      // Driver-entered trip-end charges (toll/parking/other). Normally 0 here and
+      // added afterwards on the bill screen, but fold in anything already set.
+      finalFare += (booking.tollCharge || 0) + (booking.parkingCharge || 0) + (booking.otherCharge || 0);
       booking.finalFare = Math.round(finalFare);
       // Release the customer's advance (paid to the platform) into the driver's
       // wallet now that the trip is complete. Guarded so it runs only once.
@@ -1440,6 +1452,43 @@ export class CustomerBookingsService {
       await booking.save();
     }
     return { message: 'ok', data: { trackedKm: booking.trackedKm, includedKm: booking.includedKm } };
+  }
+
+  /**
+   * Driver records the trip-end extra charges (toll / parking / other approved)
+   * on the final-bill screen after the drop OTP. Each is added to the balance the
+   * customer pays in cash. No tax line. Recomputes finalFare deterministically
+   * from the agreed base + GPS extras, so re-submitting corrects rather than
+   * stacks. Only the selected driver, only on a completed trip.
+   */
+  async updateTripCharges(
+    driverId: string,
+    id: string,
+    charges: { toll?: number; parking?: number; other?: number },
+  ) {
+    const booking = await this.bookingModel.findById(id);
+    if (!booking) throw new NotFoundException('Booking not found');
+    this.assertSelectedDriver(booking, driverId);
+    if (booking.status !== CustomerBookingStatus.COMPLETED) {
+      throw new BadRequestException('Add charges after the trip is completed');
+    }
+    const clean = (v: any) => Math.max(0, Math.round(Number(v) || 0));
+    booking.tollCharge = clean(charges.toll);
+    booking.parkingCharge = clean(charges.parking);
+    booking.otherCharge = clean(charges.other);
+    // Agreed base: tripFare captured at completion, with a fallback for bookings
+    // completed before this field existed.
+    const base = (booking.tripFare || 0) > 0
+      ? booking.tripFare
+      : Math.max(0, Math.round((booking.finalFare || 0) - (booking.extraCharge || 0) - (booking.extraHourCharge || 0)));
+    // Persist the base once so re-submitting charges stays idempotent (never stacks).
+    if (!((booking.tripFare || 0) > 0)) booking.tripFare = base;
+    booking.finalFare = Math.round(
+      base + (booking.extraCharge || 0) + (booking.extraHourCharge || 0) +
+      booking.tollCharge + booking.parkingCharge + booking.otherCharge,
+    );
+    await booking.save();
+    return { message: 'Charges updated', data: booking };
   }
 
   async cancelByDriver(driverId: string, id: string, reason?: string) {

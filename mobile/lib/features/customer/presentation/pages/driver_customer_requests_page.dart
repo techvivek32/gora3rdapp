@@ -11,6 +11,7 @@ import '../utils/invoice_actions.dart';
 import '../widgets/booking_card_ui.dart';
 import '../widgets/customer_request_card.dart';
 import 'driver_trip_page.dart';
+import 'driver_trip_summary_page.dart';
 
 /// Driver / vendor side of Customer Mode: browse customer requests in your
 /// city, quote a fare (which places a small wallet commitment hold), and manage
@@ -186,7 +187,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     final otp = await _askOtp(action);
     if (otp == null || otp.trim().isEmpty) return;
     try {
-      await _repo.verifyTripOtp(id, action, otp.trim());
+      final updated = await _repo.verifyTripOtp(id, action, otp.trim());
       if (action == 'start') {
         final ok = await TripTracker.instance.start(id);
         if (!ok && mounted) _snack('Enable location to record trip distance.');
@@ -194,10 +195,20 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
         await TripTracker.instance.stop();
       }
       _snack(action == 'start' ? 'Trip started 🚕' : 'Trip completed 🎉', ok: true);
+      // After the drop OTP, open the final-bill screen so the driver can add
+      // toll/parking/other charges and download the invoice.
+      if (action == 'end' && mounted && updated != null) {
+        await _openSummary(updated);
+      }
       _loadMine();
     } catch (e) {
       _snack('Could not $label: ${_clean(e)}');
     }
+  }
+
+  Future<void> _openSummary(Map<String, dynamic> booking) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: booking)));
+    if (mounted) _loadMine();
   }
 
   Future<String?> _askOtp(String action) {
@@ -303,7 +314,8 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
             onArrived: _arrived,
             onCancel: _driverCancel,
             onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
-            onOpenTrip: _openTrip),
+            onOpenTrip: _openTrip,
+            onBill: _openSummary),
       ),
     );
   }
@@ -348,7 +360,9 @@ class MyOfferCard extends StatelessWidget {
   /// that launches the full-screen map navigation flow (arrive/start/complete via
   /// swipe + OTP) instead of the inline buttons.
   final void Function(Map<String, dynamic> booking)? onOpenTrip;
-  const MyOfferCard(this.b, {super.key, required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice, this.onOpenTrip});
+  /// Opens the final-bill screen (charges + invoice) for a completed trip.
+  final void Function(Map<String, dynamic> booking)? onBill;
+  const MyOfferCard(this.b, {super.key, required this.onStart, required this.onComplete, required this.onArrived, required this.onCancel, required this.onInvoice, this.onOpenTrip, this.onBill});
 
   @override
   Widget build(BuildContext context) {
@@ -567,9 +581,9 @@ class MyOfferCard extends StatelessWidget {
           if (won && status == 'completed') ...[
             SizedBox(height: 12.h),
             SizedBox(width: double.infinity, child: OutlinedButton.icon(
-              onPressed: () => onInvoice(id),
+              onPressed: () => onBill != null ? onBill!(b) : onInvoice(id),
               icon: Icon(Icons.receipt_long_rounded, size: 18.sp),
-              label: const Text('Download Invoice'),
+              label: Text(onBill != null ? 'View Bill & Invoice' : 'Download Invoice'),
               style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary, side: const BorderSide(color: AppColors.primary), padding: EdgeInsets.symmetric(vertical: 11.h)),
             )),
           ],

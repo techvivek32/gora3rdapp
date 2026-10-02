@@ -124,6 +124,16 @@ export class CustomerBooking {
   @Prop({ default: 0 }) extraHours: number;
   @Prop({ default: 0 }) extraHourCharge: number;
 
+  // ── Driver-entered trip-end charges (cab bookings) ─────────────────────────
+  // Entered by the driver on the final-bill screen after the drop OTP; each is
+  // added to the balance the customer pays in cash. No tax line.
+  @Prop({ default: 0 }) tollCharge: number;
+  @Prop({ default: 0 }) parkingCharge: number;
+  @Prop({ default: 0 }) otherCharge: number;
+  // Agreed base fare captured at completion (before trip extras & driver charges)
+  // so re-submitting charges recomputes finalFare deterministically.
+  @Prop({ default: 0 }) tripFare: number;
+
   @Prop({ type: String, enum: CustomerBookingStatus, default: CustomerBookingStatus.OPEN, index: true })
   status: CustomerBookingStatus;
 

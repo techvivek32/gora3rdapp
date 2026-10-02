@@ -31,6 +31,9 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
   bool _acting = false;
   String? _error;
   Timer? _poll;
+  // After the trip completes, keep refreshing a few more times so the driver's
+  // final toll/parking/other charges (added on their bill screen) show up here.
+  int _completedPolls = 0;
 
   List<String> _infoList(String key) => ((_cat?[key] as List?) ?? []).map((e) => e.toString()).toList();
 
@@ -55,8 +58,16 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     // Live-ish updates: pull new offers and the trip OTP while the booking is
     // still active, so the customer doesn't have to refresh by hand.
     _poll = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (_acting) return;
       final s = (_b?['status'] ?? '').toString();
-      if (!_acting && (s == 'open' || s == 'confirmed' || s == 'ongoing')) _load();
+      if (s == 'open' || s == 'confirmed' || s == 'ongoing') {
+        _completedPolls = 0;
+        _load();
+      } else if (s == 'completed' && _completedPolls < 10) {
+        // Grace window (~2 min) to pick up the driver's final charges, then stop.
+        _completedPolls++;
+        _load();
+      }
     });
   }
 
