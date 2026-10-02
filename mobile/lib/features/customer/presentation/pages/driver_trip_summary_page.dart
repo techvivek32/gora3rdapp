@@ -50,6 +50,8 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
   Map<String, dynamic> get _b => widget.booking;
   String get _id => (_b['_id'] ?? _b['id'] ?? '').toString();
   bool get _isCab => (_b['serviceType'] ?? 'cab').toString() == 'cab';
+  // Charges can be entered only once; locked after the first save.
+  bool get _chargesLocked => (_b['tripChargesSavedAt'] ?? '').toString().isNotEmpty;
 
   double _num(dynamic v) => v is num ? v.toDouble() : (double.tryParse('$v') ?? 0);
 
@@ -65,6 +67,24 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
 
   Future<void> _saveCharges() async {
     FocusScope.of(context).unfocus();
+    // One-time save — warn the driver it cannot be edited afterwards.
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save charges?'),
+        content: const Text(
+            'You can add these charges only once. After saving, Toll / Parking / Other cannot be edited. Double-check the amounts.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Review again')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: const Text('Save & lock'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     setState(() => _savingCharges = true);
     try {
       final updated = await _repo.updateTripCharges(
@@ -277,31 +297,53 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
           Text('Additional Charges',
               style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
           SizedBox(height: 2.h),
-          Text('Add any toll, parking or other approved charges — these are added to the cash the customer pays.',
+          Text(
+              _chargesLocked
+                  ? 'Toll / parking / other charges were saved for this trip. They can be added only once and cannot be edited.'
+                  : 'Add any toll, parking or other approved charges — these are added to the cash the customer pays. You can save them only ONCE.',
               style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
           SizedBox(height: 12.h),
-          _chargeField('Toll', _tollC),
-          SizedBox(height: 10.h),
-          _chargeField('Parking', _parkingC),
-          SizedBox(height: 10.h),
-          _chargeField('Other charges', _otherC),
-          SizedBox(height: 14.h),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _savingCharges ? null : _saveCharges,
-              icon: _savingCharges
-                  ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Icon(Icons.save_rounded, size: 18.sp),
-              label: Text(_savingCharges ? 'Saving…' : 'Save charges'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 12.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          if (_chargesLocked) ...[
+            // Read-only once saved.
+            _row('Toll', '₹${_num(_b['tollCharge']).toStringAsFixed(0)}'),
+            _row('Parking', '₹${_num(_b['parkingCharge']).toStringAsFixed(0)}'),
+            _row('Other charges', '₹${_num(_b['otherCharge']).toStringAsFixed(0)}'),
+            SizedBox(height: 10.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+              decoration: BoxDecoration(color: AppColors.success.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10.r)),
+              child: Row(children: [
+                Icon(Icons.lock_rounded, size: 16.sp, color: AppColors.success),
+                SizedBox(width: 8.w),
+                Expanded(child: Text('Charges saved — cannot be edited.',
+                    style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, color: AppColors.success, fontFamily: 'Poppins'))),
+              ]),
+            ),
+          ] else ...[
+            _chargeField('Toll', _tollC),
+            SizedBox(height: 10.h),
+            _chargeField('Parking', _parkingC),
+            SizedBox(height: 10.h),
+            _chargeField('Other charges', _otherC),
+            SizedBox(height: 14.h),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _savingCharges ? null : _saveCharges,
+                icon: _savingCharges
+                    ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : Icon(Icons.save_rounded, size: 18.sp),
+                label: Text(_savingCharges ? 'Saving…' : 'Save charges (one time)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                ),
               ),
             ),
-          ),
+          ],
         ]),
       );
 

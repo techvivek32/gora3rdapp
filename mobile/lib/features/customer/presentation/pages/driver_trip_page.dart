@@ -287,8 +287,11 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       var perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
       if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
-      final pos = await Geolocator.getCurrentPosition();
-      _onPos(pos, first: true);
+      // Seed the camera from the cached last fix — getLastKnownPosition does NOT
+      // open a GNSS session, so it avoids the main-thread NMEA teardown
+      // (removeNmeaListener) that hangs under the emulator's flooding GPS.
+      final pos = await Geolocator.getLastKnownPosition();
+      if (pos != null) _onPos(pos, first: true);
       _posSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 8),
       ).listen((p) => _onPos(p));

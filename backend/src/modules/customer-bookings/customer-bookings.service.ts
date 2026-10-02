@@ -1472,10 +1472,15 @@ export class CustomerBookingsService {
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('Add charges after the trip is completed');
     }
+    // Charges can be entered only ONCE — reject any later edit.
+    if (booking.tripChargesSavedAt) {
+      throw new BadRequestException('Charges were already saved for this trip and cannot be changed.');
+    }
     const clean = (v: any) => Math.max(0, Math.round(Number(v) || 0));
     booking.tollCharge = clean(charges.toll);
     booking.parkingCharge = clean(charges.parking);
     booking.otherCharge = clean(charges.other);
+    booking.tripChargesSavedAt = new Date();
     // Agreed base: tripFare captured at completion, with a fallback for bookings
     // completed before this field existed.
     const base = (booking.tripFare || 0) > 0

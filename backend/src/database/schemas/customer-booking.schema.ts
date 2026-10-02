@@ -133,6 +133,9 @@ export class CustomerBooking {
   // Agreed base fare captured at completion (before trip extras & driver charges)
   // so re-submitting charges recomputes finalFare deterministically.
   @Prop({ default: 0 }) tripFare: number;
+  // Set when the driver saves the trip-end charges. Charges can be saved ONCE —
+  // once this is set, further edits are rejected and the app shows them read-only.
+  @Prop() tripChargesSavedAt: Date;
 
   @Prop({ type: String, enum: CustomerBookingStatus, default: CustomerBookingStatus.OPEN, index: true })
   status: CustomerBookingStatus;
