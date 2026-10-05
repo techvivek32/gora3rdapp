@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -40,11 +42,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   // Admin-managed dynamic home content (per-city hero + travel/offers/explore).
   Map<String, dynamic>? _home;
   final _explorePage = PageController();
+  final _travelCtrl = ScrollController();
+  final _offersCtrl = ScrollController();
   int _exploreIndex = 0;
+  // Shuffled once on load so the first item shown is random each time, then the
+  // carousels auto-advance on a timer.
+  List<Map<String, dynamic>> _exploreItems = [];
+  List<Map<String, dynamic>> _travelItems = [];
+  List<Map<String, dynamic>> _offersItems = [];
+  Timer? _autoTimer;
 
   @override
   void dispose() {
+    _autoTimer?.cancel();
     _explorePage.dispose();
+    _travelCtrl.dispose();
+    _offersCtrl.dispose();
     super.dispose();
   }
 
@@ -64,13 +77,57 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
       final city = (user?['city'] ?? '').toString();
       final d = await getIt<CustomerRepository>().homeContent(city);
-      if (mounted) setState(() => _home = d);
+      if (!mounted) return;
+      List<Map<String, dynamic>> pick(String key) {
+        final v = d[key];
+        final list = v is List ? v.map((e) => Map<String, dynamic>.from(e as Map)).toList() : <Map<String, dynamic>>[];
+        list.shuffle(Random()); // random first item each load
+        return list;
+      }
+      setState(() {
+        _home = d;
+        _exploreItems = pick('explore');
+        _travelItems = pick('travel');
+        _offersItems = pick('offers');
+        _exploreIndex = 0;
+      });
+      _startAuto();
     } catch (_) {}
   }
 
-  List<Map<String, dynamic>> _section(String key) {
-    final v = _home?[key];
-    return v is List ? v.map((e) => Map<String, dynamic>.from(e as Map)).toList() : <Map<String, dynamic>>[];
+  // Auto-advance all three carousels on a timer so the page feels alive.
+  void _startAuto() {
+    _autoTimer?.cancel();
+    if (_exploreItems.length <= 1 && _travelItems.length <= 1 && _offersItems.length <= 1) return;
+    _autoTimer = Timer.periodic(const Duration(seconds: 4), (_) => _autoAdvance());
+  }
+
+  void _autoAdvance() {
+    if (!mounted) return;
+    // Explore (full-width PageView) → next page, looping.
+    if (_explorePage.hasClients && _exploreItems.length > 1) {
+      final next = (_exploreIndex + 1) % _exploreItems.length;
+      _explorePage.animateToPage(next, duration: const Duration(milliseconds: 550), curve: Curves.easeInOut);
+    }
+    // Horizontal lists → scroll forward by one card, snapping back to start at the end.
+    _advanceList(_travelCtrl, (150 + 10).w, _travelItems.length);
+    _advanceList(_offersCtrl, (240 + 10).w, _offersItems.length);
+  }
+
+  void _advanceList(ScrollController c, double step, int count) {
+    if (!c.hasClients || count <= 1) return;
+    final max = c.position.maxScrollExtent;
+    if (max <= 0) return; // content fits — nothing to scroll
+    // Already at (or near) the end → loop back to the start. Otherwise advance by
+    // one card, but never past the end. (When a short list's step is larger than
+    // the whole scroll extent we scroll straight to the end, then loop.)
+    final atEnd = c.offset >= max - 2;
+    final double next = atEnd ? 0 : (c.offset + step).clamp(0, max).toDouble();
+    c.animateTo(
+      next,
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+    );
   }
 
   void _openItem(Map<String, dynamic> item) {
@@ -121,19 +178,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: 8.h),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _serviceCard('Cab Booking', 'Book a Cab', 'assets/images/cab-booking.png', AppColors.info, () => context.push('/customer/book/cab'), iconSize: 124)),
-                        SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Car Pooling', 'Share a Ride', 'assets/images/car-pooling.png', AppColors.primary, () => context.push('/car-pool/search'))),
-                        SizedBox(width: 10.w),
-                        Expanded(child: _serviceCard('Hire a Driver', 'Hourly • Full Day', 'assets/images/hire-a-driver.png', _navy, () => context.push('/customer/book/hire_driver'))),
-                      ],
-                    ),
-                  ),
+                  _serviceGrid(),
                   SizedBox(height: 14.h),
                   ..._exploreSection(),
                   ..._travelSection(),
@@ -315,56 +360,156 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         ),
       );
 
-  // ─── Service cards (white card, tinted icon badge, corner arrow) ─────────────
-  Widget _serviceCard(String title, String subtitle, String asset, Color color, VoidCallback onTap, {double iconSize = 80}) {
+  // ─── Services: a clean light-card grid (big Cab tile + two stacked tiles) ────
+  Widget _serviceGrid() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      child: SizedBox(
+        height: 172.h,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Big primary tile — Cab Booking.
+            Expanded(
+              child: _lightCard(
+                title: 'Cab Booking',
+                subtitle: 'One Way · Round · Local',
+                asset: 'assets/images/cab-booking.png',
+                bg: const Color(0xFFEAF1FF),
+                onTap: () => context.push('/customer/book/cab'),
+                big: true,
+              ),
+            ),
+            SizedBox(width: 8.w),
+            // Right column — Car Pool + Book a Driver.
+            Expanded(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: _lightCard(
+                      title: 'Car Pool',
+                      subtitle: 'Share & save',
+                      asset: 'assets/images/car-pooling.png',
+                      bg: const Color(0xFFFFF1E6),
+                      onTap: () => context.push('/car-pool/search'),
+                      horizontal: true,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Expanded(
+                    child: _lightCard(
+                      title: 'Book a Driver',
+                      subtitle: 'Hourly · Full day',
+                      asset: 'assets/images/hire-a-driver.png',
+                      bg: const Color(0xFFF1ECFF),
+                      onTap: () => context.push('/customer/book/hire_driver'),
+                      horizontal: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Clean, light service tile: soft-tinted background, bold dark title, grey
+  // subtitle and a colourful illustration tucked into the bottom-right corner.
+  Widget _lightCard({
+    required String title,
+    required String subtitle,
+    required String asset,
+    required Color bg,
+    required VoidCallback onTap,
+    bool big = false,
+    bool horizontal = false,
+  }) {
+    final decoration = BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(20.r),
+      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6))],
+    );
+
+    // Horizontal variant: text on the left, illustration on the right.
+    if (horizontal) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: decoration,
+          child: Row(
+            children: [
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: _navy, height: 1.1, fontFamily: 'Poppins')),
+                    SizedBox(height: 2.h),
+                    Text(subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w500, color: Colors.black.withValues(alpha: 0.45), fontFamily: 'Poppins')),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(right: 10.w, left: 6.w),
+                child: Image.asset(
+                  asset,
+                  width: 56.r,
+                  height: 52.r,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.fromLTRB(8.w, 10.h, 8.w, 10.h),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20.r),
-          boxShadow: [
-            BoxShadow(color: color.withValues(alpha: 0.14), blurRadius: 16, offset: const Offset(0, 8)),
-            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 1)),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
+        clipBehavior: Clip.antiAlias,
+        decoration: decoration,
+        child: Stack(
           children: [
-            // Centered tinted badge with the brand illustration (larger).
-            Container(
-              width: 80.r,
-              height: 80.r,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [color.withValues(alpha: 0.20), color.withValues(alpha: 0.07)],
-                ),
-                borderRadius: BorderRadius.circular(20.r),
-              ),
-              child: Center(
-                child: Image.asset(asset, width: 62.r, height: 62.r, fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, color: color, size: 38.sp)),
+            // Illustration in the bottom-right corner.
+            Positioned(
+              right: big ? 10.w : -2.w,
+              bottom: big ? 6.h : -2.h,
+              child: Image.asset(
+                asset,
+                width: big ? 128.r : 56.r,
+                height: big ? 128.r : 56.r,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
-            SizedBox(height: 8.h),
-            Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-            SizedBox(height: 2.h),
-            Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w500, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-            SizedBox(height: 8.h),
-            // Arrow button on the right (compact, no extra gap).
-            Align(
-              alignment: Alignment.centerRight,
-              child: Container(
-                width: 26.r,
-                height: 26.r,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
-                child: Icon(Icons.arrow_forward_rounded, size: 15.sp, color: color),
+            Padding(
+              padding: EdgeInsets.all(big ? 14.w : 10.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: big ? 18.sp : 12.5.sp, fontWeight: FontWeight.w800, color: _navy, height: 1.1, fontFamily: 'Poppins')),
+                  SizedBox(height: 3.h),
+                  Text(subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: big ? 11.sp : 8.5.sp, fontWeight: FontWeight.w500, color: Colors.black.withValues(alpha: 0.45), fontFamily: 'Poppins')),
+                ],
               ),
             ),
           ],
@@ -382,7 +527,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   // ─── Explore — admin-managed clickable banner carousel (per city) ────────────
   List<Widget> _exploreSection() {
-    final items = _section('explore');
+    final items = _exploreItems;
     if (items.isEmpty) return [];
     if (_exploreIndex >= items.length) _exploreIndex = 0;
     return [
@@ -460,7 +605,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   // ─── Travel Made Better — admin-managed cards ────────────────────────────────
   List<Widget> _travelSection() {
-    final items = _section('travel');
+    final items = _travelItems;
     if (items.isEmpty) return [];
     return [
       _sectionHeader('Travel Made Better'),
@@ -468,6 +613,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       SizedBox(
         height: 120.h,
         child: ListView.separated(
+          controller: _travelCtrl,
           scrollDirection: Axis.horizontal,
           padding: EdgeInsets.symmetric(horizontal: 14.w),
           itemCount: items.length,
@@ -481,7 +627,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   // ─── Special Offers — admin-managed cards ────────────────────────────────────
   List<Widget> _offersSection() {
-    final items = _section('offers');
+    final items = _offersItems;
     if (items.isEmpty) return [];
     return [
       _sectionHeader('Special Offers'),
@@ -489,6 +635,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
       SizedBox(
         height: 130.h,
         child: ListView.separated(
+          controller: _offersCtrl,
           scrollDirection: Axis.horizontal,
           padding: EdgeInsets.symmetric(horizontal: 14.w),
           itemCount: items.length,

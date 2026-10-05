@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
@@ -67,10 +68,28 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   @override
   void dispose() {
     _razorpay?.clear();
+    // If the user leaves while an advance booking is still awaiting payment,
+    // cancel that pending booking so no unpaid (0-advance) booking is left live.
+    final pending = _pendingBookingId;
+    if (pending != null && !_isEdit) {
+      getIt<CustomerRepository>().cancelBooking(pending, reason: 'Advance payment not completed').catchError((_) {});
+    }
     _nameCtrl.dispose();
     _mobileCtrl.dispose();
     _emailCtrl.dispose();
     super.dispose();
+  }
+
+  /// Cancel the just-created booking that is still awaiting its advance payment,
+  /// so an abandoned/cancelled payment never leaves a live 0-advance booking.
+  Future<void> _cancelPendingBooking() async {
+    final id = _pendingBookingId;
+    if (id == null || _isEdit) return;
+    _pendingBookingId = null;
+    _pendingHumanId = '';
+    try {
+      await getIt<CustomerRepository>().cancelBooking(id, reason: 'Advance payment not completed');
+    } catch (_) {/* best-effort */}
   }
 
   Map<String, dynamic> get _trip => Map<String, dynamic>.from(widget.data['trip'] as Map? ?? {});
@@ -180,7 +199,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       _pendingHumanId = (booking['bookingId'] ?? '').toString();
       return id.isEmpty ? null : id;
     } catch (e) {
-      if (mounted) _err('Could not ${_isEdit ? 'update' : 'book'}: ${e.toString().replaceFirst('Exception: ', '')}');
+      if (mounted) _err('Could not ${_isEdit ? 'update' : 'book'}: ${serverMessage(e, fallback: 'please try again')}');
       return null;
     }
   }
@@ -219,8 +238,15 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     setState(() => _busy = true);
     final id = _pendingBookingId ?? await _createBooking();
     if (id == null) { if (mounted) setState(() => _busy = false); return; }
-    _pendingBookingId = id; // don't recreate the booking if payment is retried
-    if (_payPercent == 0) { _goToBooking(id, 'Booking confirmed — waiting for a driver to accept'); return; }
+    if (_payPercent == 0) {
+      // Pay later: the booking is committed right away — nothing is pending payment.
+      _pendingBookingId = null;
+      _goToBooking(id, 'Booking confirmed — waiting for a driver to accept');
+      return;
+    }
+    // Advance flow: keep the id so retries reuse it, but it's "pending payment" —
+    // if the user cancels/abandons the payment it gets cancelled (see cleanup).
+    _pendingBookingId = id;
     if (kIsWeb) {
       if (mounted) setState(() => _busy = false);
       _err('Payments are only supported on the mobile app.');
@@ -231,8 +257,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   }
 
   /// Choose how to pay the advance: in-app checkout or a scannable UPI QR.
-  void _showPaymentMethodSheet(String bookingId) {
-    showModalBottomSheet(
+  Future<void> _showPaymentMethodSheet(String bookingId) async {
+    var chosen = false;
+    await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => SafeArea(
@@ -249,18 +276,21 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             leading: CircleAvatar(backgroundColor: AppColors.primary.withValues(alpha: 0.15), child: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary)),
             title: const Text('Pay in App', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
             subtitle: const Text('UPI apps, Cards, Netbanking', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
-            onTap: () { Navigator.pop(ctx); _payInApp(bookingId); },
+            onTap: () { chosen = true; Navigator.pop(ctx); _payInApp(bookingId); },
           ),
           ListTile(
             leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.qr_code_2_rounded, color: Color(0xFF25D366))),
             title: const Text('Pay by QR', style: TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
             subtitle: const Text('Scan & pay with any UPI app', style: TextStyle(fontSize: 12, fontFamily: 'Poppins')),
-            onTap: () { Navigator.pop(ctx); _startQrPayment(bookingId); },
+            onTap: () { chosen = true; Navigator.pop(ctx); _startQrPayment(bookingId); },
           ),
           const SizedBox(height: 8),
         ]),
       ),
     );
+    // Dismissed without picking a method → the user backed out of paying the
+    // advance, so cancel the pending booking instead of leaving it live.
+    if (!chosen) await _cancelPendingBooking();
   }
 
   Future<void> _payInApp(String bookingId) async {
@@ -268,7 +298,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       final res = await getIt<ApiClient>().post('/customer-bookings/$bookingId/advance/order', data: {'percent': _payPercent});
       _openRazorpay(Map<String, dynamic>.from(res.data['data'] as Map));
     } catch (e) {
-      if (mounted) _err('Could not start payment: ${e.toString().replaceFirst('Exception: ', '')}');
+      // The payment couldn't even start → don't leave a live 0-advance booking.
+      await _cancelPendingBooking();
+      if (mounted) _err('${serverMessage(e, fallback: 'Could not start payment')}. Booking not placed — tap Pay Now to try again.');
     }
   }
 
@@ -287,16 +319,22 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   }
 
   Future<void> _onPaymentSuccess(PaymentSuccessResponse r) async {
+    // Paid — clear the pending id so the dispose cleanup never cancels a paid booking.
+    final id = _pendingBookingId;
+    _pendingBookingId = null;
     try {
       await getIt<ApiClient>().post('/customer-bookings/advance/verify', data: {
         'razorpayOrderId': r.orderId, 'razorpayPaymentId': r.paymentId, 'razorpaySignature': r.signature,
       });
     } catch (_) {/* falls back to the Razorpay webhook */}
-    if (_pendingBookingId != null) _goToBooking(_pendingBookingId!, '✅ Advance paid — booking confirmed');
+    if (id != null) _goToBooking(id, '✅ Advance paid — booking confirmed');
   }
 
   void _onPaymentError(PaymentFailureResponse r) {
-    if (mounted) _err('Payment failed: ${r.message ?? ''}');
+    // Payment cancelled/failed → cancel the pending booking so no 0-advance
+    // booking is left live. The user can tap Pay Now again to retry.
+    _cancelPendingBooking();
+    if (mounted) _err('Payment cancelled — booking not placed. Tap Pay Now to try again.');
   }
 
   Future<void> _startQrPayment(String bookingId) async {
@@ -307,7 +345,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       data = Map<String, dynamic>.from(res.data['data'] as Map);
     } catch (e) {
       if (mounted) Navigator.pop(context);
-      if (mounted) _err('Could not create QR. Please try again.');
+      await _cancelPendingBooking(); // QR couldn't be created → don't leave a live booking
+      if (mounted) _err('Could not create QR. Booking not placed — tap Pay Now to try again.');
       return;
     }
     if (!mounted) return;
@@ -315,7 +354,14 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     final paid = await Navigator.of(context).push<bool>(
       MaterialPageRoute(fullscreenDialog: true, builder: (_) => _AdvanceQrPage(data: data)),
     );
-    if (paid == true && _pendingBookingId != null) _goToBooking(_pendingBookingId!, '✅ Advance paid — booking confirmed');
+    if (paid == true) {
+      final id = _pendingBookingId;
+      _pendingBookingId = null; // paid — don't let cleanup cancel it
+      if (id != null) _goToBooking(id, '✅ Advance paid — booking confirmed');
+    } else {
+      // QR screen closed without paying → cancel the pending booking.
+      await _cancelPendingBooking();
+    }
   }
 
   @override
