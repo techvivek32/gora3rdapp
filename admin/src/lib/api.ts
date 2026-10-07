@@ -280,6 +280,7 @@ export const adminApi = {
     minBillKm?: number;
     tollTaxPerKm?: number;
     gstPercent?: number;
+    driverHirePerDay?: number;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;
   }) => apiClient.put('/settings', data),

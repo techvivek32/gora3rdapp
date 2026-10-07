@@ -110,6 +110,10 @@ export class PlatformSettings {
   @Prop({ default: 0, min: 0, max: 100 })
   gstPercent: number;
 
+  /** Hire-a-Driver per-day rate (₹). Total = this × number of days. 0 = not set. */
+  @Prop({ default: 0, min: 0 })
+  driverHirePerDay: number;
+
   /**
    * Minimum wallet balance (₹) a Golden driver/vendor must have to ACCEPT a
    * customer booking. Nothing is deducted — it's only an eligibility check.

@@ -44,7 +44,7 @@ const _meta = <String, _ServiceMeta>{
   'cab': _ServiceMeta('Cabs Booking', 'Book a taxi to your destination', Icons.local_taxi_rounded,
       subTypes: ['One Way', 'Round Trip', 'Local'], vehicles: ['Sedan', 'SUV', 'Hatchback', 'Any']),
   'hire_driver': _ServiceMeta('Hire a Driver', 'A driver for your own car', Icons.badge_rounded,
-      needsDrop: false, needsDuration: false, needsPassengers: false, subTypes: ['6 Hours', '8 Hours', '12 Hours']),
+      needsDrop: true, needsDuration: false, needsPassengers: false, subTypes: ['One Way', 'Round Trip'], vehicles: ['Sedan', 'SUV']),
   'luxury': _ServiceMeta('Luxury Car', 'Premium cars for every occasion', Icons.workspace_premium_rounded,
       subTypes: ['Sedan', 'SUV', 'Wedding', 'Event'], vehicles: ['Luxury Sedan', 'Luxury SUV', 'Premium', 'Any']),
   'car_pool': _ServiceMeta('Car Pooling', 'Share a ride on your route', Icons.groups_rounded, subTypes: []),
@@ -83,6 +83,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   List<Map<String, dynamic>> _offers = [];
   // Representative Local package km-per-hour (for the "X km included" chip hint).
   double _localKmPerHour = 0;
+  // Hire a Driver: transmission + admin-set per-day rate (total = rate × days).
+  String _transmission = 'Automatic';
+  double _hirePerDay = 0;
 
   // Accent colour for the cab layout (orange to match the app brand).
   static const _teal = AppColors.primary;
@@ -90,6 +93,104 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   _ServiceMeta get _m => _meta[widget.serviceType] ?? const _ServiceMeta('Booking', '', Icons.directions_car_rounded);
 
   bool get _isEdit => widget.bookingId != null;
+  bool get _isHire => widget.serviceType == 'hire_driver';
+
+  // Combined start date + time picker (Hire a Driver "When" box).
+  Future<void> _pickStartDateTime() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _date,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 180)),
+    );
+    if (d == null || !mounted) return;
+    final t = await showTimePicker(context: context, initialTime: _time);
+    setState(() {
+      _date = d;
+      if (t != null) _time = t;
+    });
+  }
+
+  // ── Hire a Driver: trip type → start → end → route → vehicle → price ─────────
+  Widget _buildHireDriver() {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(_isEdit ? 'Edit Booking' : 'Hire a Driver', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 17.sp)),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      bottomNavigationBar: _bottomBar(),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 20.h),
+          children: [
+            // 1. Trip type + date/time + From/To — all in ONE box.
+            _plainCard(Column(children: [
+              _segmentTabs(const [('One Way', 'Drop off only'), ('Round Trip', 'Return in same cab')]),
+              SizedBox(height: 12.h),
+              _tile(Icons.calendar_today_rounded, 'Start', '${DateFormat('EEE, d MMM').format(_date)}  ·  ${_time.format(context)}', _pickStartDateTime),
+              SizedBox(height: 10.h),
+              _tile(Icons.event_available_rounded, 'End', _endDate == null ? 'Select' : '${DateFormat('EEE, d MMM').format(_endDate!)}  ·  ${(_endTime ?? _time).format(context)}', _pickEndDateTime),
+              SizedBox(height: 12.h),
+              AddressAutocompleteField(
+                controller: _pickupCtrl,
+                label: 'From',
+                prefixIcon: Icons.my_location_rounded,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                onSelected: (a, lat, lng, city) { _pickupLat = lat; _pickupLng = lng; _pickupCity = city; },
+              ),
+              SizedBox(height: 12.h),
+              AddressAutocompleteField(
+                controller: _dropCtrl,
+                label: 'To',
+                prefixIcon: Icons.location_on_rounded,
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                onSelected: (a, lat, lng, city) { _dropLat = lat; _dropLng = lng; _dropCity = city; },
+              ),
+            ])),
+
+            // 2. Transmission + car type (Sedan / SUV with car images).
+            _card(
+              'Vehicle',
+              Icons.directions_car_rounded,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _chips(const ['Manual', 'Automatic'], _transmission, (v) => setState(() => _transmission = v)),
+                  SizedBox(height: 14.h),
+                  Text('Car type', style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                  SizedBox(height: 8.h),
+                  Row(children: [
+                    _carCard('Sedan', 'assets/images/sedan-r.png'),
+                    SizedBox(width: 10.w),
+                    _carCard('SUV', 'assets/images/suv-r.png'),
+                  ]),
+                ],
+              ),
+            ),
+
+            // 6. Price
+            _card(
+              'Price',
+              Icons.currency_rupee_rounded,
+              _hirePerDay > 0
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('₹${_hirePerDay.round()} / day  ×  $_hireDays day${_hireDays > 1 ? 's' : ''}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                        Text('₹$_hireTotal', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.primary, fontFamily: 'Poppins')),
+                      ],
+                    )
+                  : Text('Daily rate not set — the driver will quote on accept.', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -101,6 +202,11 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     if (widget.serviceType == 'cab' && !_isEdit) {
       _loadExtras();
       if (widget.existing == null) _restoreLastSearch();
+    }
+    // Hire a Driver: default the end date to the next day and fetch the per-day rate.
+    if (widget.serviceType == 'hire_driver') {
+      _endDate ??= _date.add(const Duration(days: 1));
+      _loadHireRate();
     }
     // Pre-fill from the existing booking when editing.
     final e = widget.existing;
@@ -174,6 +280,26 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       }
     } catch (_) {}
   }
+
+  // Hire a Driver: admin-set per-day rate.
+  Future<void> _loadHireRate() async {
+    try {
+      final res = await getIt<ApiClient>().get('/settings');
+      final d = (res.data['data'] as Map?) ?? const {};
+      final r = (d['driverHirePerDay'] as num?)?.toDouble() ?? 0;
+      if (mounted) setState(() => _hirePerDay = r);
+    } catch (_) {}
+  }
+
+  // Number of days for Hire a Driver (start date → end date, inclusive, min 1).
+  int get _hireDays {
+    final e = _endDate;
+    if (e == null) return 1;
+    final diff = DateTime(e.year, e.month, e.day).difference(DateTime(_date.year, _date.month, _date.day)).inDays;
+    return diff < 0 ? 1 : diff + 1;
+  }
+
+  int get _hireTotal => (_hirePerDay * _hireDays).round();
 
   void _addStop() {
     if (_stops.length >= 3) {
@@ -386,6 +512,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select the trip end (return) date');
       return;
     }
+    if (_isHire && _endDate == null) {
+      _snack('Please select the end date');
+      return;
+    }
     setState(() => _busy = true);
     final notes = <String>[];
     if (_notesCtrl.text.trim().isNotEmpty) notes.add(_notesCtrl.text.trim());
@@ -393,6 +523,12 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     if (stopTexts.isNotEmpty) notes.add('Via: ${stopTexts.join(', ')}');
     if (_subType == 'Round Trip' && _endDate != null) {
       notes.add('Return date: ${DateFormat('dd-MM-yyyy').format(_endDate!)}');
+    }
+    // Hire a Driver: record transmission + the per-day × days breakdown for the driver.
+    if (_isHire) {
+      notes.add('Transmission: $_transmission');
+      if (_endDate != null) notes.add('$_hireDays day${_hireDays > 1 ? 's' : ''} (to ${DateFormat('dd-MM-yyyy').format(_endDate!)})');
+      if (_hirePerDay > 0) notes.add('Rate: ₹${_hirePerDay.round()}/day → ₹$_hireTotal');
     }
     final body = <String, dynamic>{
       // serviceType is fixed on edit (backend rejects it in the update DTO).
@@ -409,10 +545,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_endDate != null && _endTime != null) 'tripEndTime': _endTime!.format(context),
       if (_m.needsPassengers) 'passengers': _passengers,
       if (_m.needsDuration) 'durationHours': _durationHours,
-      // Hire a Driver: duration comes from the selected "6/8/12 Hours" chip.
-      if (widget.serviceType == 'hire_driver' && _subType != null)
-        'durationHours': int.tryParse(_subType!.split(' ').first) ?? 0,
-      if (_fareCtrl.text.trim().isNotEmpty) 'estimatedFare': num.tryParse(_fareCtrl.text.trim()),
+      // Hire a Driver: total = admin per-day rate × number of days.
+      if (_isHire) 'durationHours': _hireDays,
+      if (_isHire && _hireTotal > 0) 'estimatedFare': _hireTotal,
+      if (!_isHire && _fareCtrl.text.trim().isNotEmpty) 'estimatedFare': num.tryParse(_fareCtrl.text.trim()),
       if (notes.isNotEmpty) 'notes': notes.join(' • '),
     };
     try {
@@ -439,6 +575,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   Widget build(BuildContext context) {
     // The cab service uses the dedicated "Outstation Cabs" layout for new bookings.
     if (widget.serviceType == 'cab') return _buildCab();
+    if (_isHire) return _buildHireDriver();
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -458,6 +595,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
 
             if (_m.vehicles.isNotEmpty)
               _card('Vehicle', Icons.directions_car_rounded, _chips(_m.vehicles, _vehicle, (v) => setState(() => _vehicle = v))),
+
+            if (_isHire)
+              _card('Transmission', Icons.settings_rounded, _chips(const ['Automatic', 'Manual'], _transmission, (v) => setState(() => _transmission = v))),
 
             _card(
               'Route',
@@ -484,41 +624,93 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               ),
             ),
 
-            _card(
-              'When',
-              Icons.schedule_rounded,
-              Row(
-                children: [
-                  Expanded(child: _tile(Icons.calendar_today_rounded, 'Date', DateFormat('EEE, d MMM').format(_date), _pickDate)),
-                  SizedBox(width: 12.w),
-                  Expanded(child: _tile(Icons.access_time_rounded, 'Time', _time.format(context), _pickTime)),
-                ],
+            // When: Hire a Driver uses a date range (start → end) + pickup time.
+            if (_isHire)
+              _card(
+                'When',
+                Icons.schedule_rounded,
+                Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _tile(Icons.calendar_today_rounded, 'Start date', DateFormat('EEE, d MMM').format(_date), _pickDate)),
+                        SizedBox(width: 12.w),
+                        Expanded(child: _tile(Icons.event_available_rounded, 'End date', _endDate == null ? 'Select' : DateFormat('EEE, d MMM').format(_endDate!), _pickEndDateTime)),
+                      ],
+                    ),
+                    SizedBox(height: 12.h),
+                    _tile(Icons.access_time_rounded, 'Pickup time', _time.format(context), _pickTime),
+                  ],
+                ),
+              )
+            else
+              _card(
+                'When',
+                Icons.schedule_rounded,
+                Row(
+                  children: [
+                    Expanded(child: _tile(Icons.calendar_today_rounded, 'Date', DateFormat('EEE, d MMM').format(_date), _pickDate)),
+                    SizedBox(width: 12.w),
+                    Expanded(child: _tile(Icons.access_time_rounded, 'Time', _time.format(context), _pickTime)),
+                  ],
+                ),
               ),
-            ),
 
-            _card(
-              'Details',
-              Icons.list_alt_rounded,
-              Column(
-                children: [
-                  if (_m.needsPassengers) _stepper('Passengers', Icons.people_rounded, _passengers, (v) => setState(() => _passengers = v), min: 1, max: 10),
-                  if (_m.needsDuration) _stepper('Duration (hours)', Icons.timelapse_rounded, _durationHours, (v) => setState(() => _durationHours = v), min: 1, max: 24),
-                  if (_m.needsPassengers || _m.needsDuration) SizedBox(height: 12.h),
-                  TextFormField(
-                    controller: _fareCtrl,
-                    keyboardType: TextInputType.number,
-                    style: TextStyle(fontSize: 14.sp),
-                    decoration: _dec('Your budget / offer fare (optional)', Icons.currency_rupee_rounded),
-                  ),
-                  SizedBox(height: 12.h),
-                  TextFormField(
-                    controller: _notesCtrl,
-                    maxLines: 3,
-                    style: TextStyle(fontSize: 14.sp),
-                    decoration: _dec('Notes for the driver (optional)', Icons.notes_rounded),
-                  ),
-                ],
-              ),
+            // Amount: Hire a Driver shows the admin per-day rate × days = total.
+            if (_isHire)
+              _card(
+                'Amount',
+                Icons.currency_rupee_rounded,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_hirePerDay > 0) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('₹${_hirePerDay.round()} / day  ×  $_hireDays day${_hireDays > 1 ? 's' : ''}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                          Text('₹$_hireTotal', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.primary, fontFamily: 'Poppins')),
+                        ],
+                      ),
+                      SizedBox(height: 10.h),
+                    ] else
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 10.h),
+                        child: Text('Daily rate not set — the driver will quote on accept.', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                      ),
+                    TextFormField(
+                      controller: _notesCtrl,
+                      maxLines: 3,
+                      style: TextStyle(fontSize: 14.sp),
+                      decoration: _dec('Notes for the driver (optional)', Icons.notes_rounded),
+                    ),
+                  ],
+                ),
+              )
+            else
+              _card(
+                'Details',
+                Icons.list_alt_rounded,
+                Column(
+                  children: [
+                    if (_m.needsPassengers) _stepper('Passengers', Icons.people_rounded, _passengers, (v) => setState(() => _passengers = v), min: 1, max: 10),
+                    if (_m.needsDuration) _stepper('Duration (hours)', Icons.timelapse_rounded, _durationHours, (v) => setState(() => _durationHours = v), min: 1, max: 24),
+                    if (_m.needsPassengers || _m.needsDuration) SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _fareCtrl,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(fontSize: 14.sp),
+                      decoration: _dec('Your budget / offer fare (optional)', Icons.currency_rupee_rounded),
+                    ),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: _notesCtrl,
+                      maxLines: 3,
+                      style: TextStyle(fontSize: 14.sp),
+                      decoration: _dec('Notes for the driver (optional)', Icons.notes_rounded),
+                    ),
+                  ],
+                ),
             ),
           ],
         ),
@@ -527,6 +719,46 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   }
 
   // ── Building blocks ──────────────────────────────────────────────────────
+
+  // Selectable car-type card with the vehicle image as its icon.
+  Widget _carCard(String label, String asset) {
+    final sel = _vehicle == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _vehicle = label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 8.w),
+          decoration: BoxDecoration(
+            color: sel ? AppColors.primary.withValues(alpha: 0.08) : AppColors.background,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: sel ? AppColors.primary : AppColors.border, width: sel ? 1.6 : 1),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(asset, height: 34.h, fit: BoxFit.contain, errorBuilder: (_, __, ___) => Icon(Icons.directions_car_rounded, size: 28.sp, color: AppColors.primary)),
+              SizedBox(width: 8.w),
+              Text(label, style: TextStyle(fontSize: 12.5.sp, fontWeight: sel ? FontWeight.w800 : FontWeight.w600, color: sel ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Card without a title/header (used by Hire a Driver sections).
+  Widget _plainCard(Widget child) => Container(
+        margin: EdgeInsets.only(bottom: 14.h),
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 6, offset: const Offset(0, 2))],
+        ),
+        child: child,
+      );
 
   Widget _card(String title, IconData icon, Widget child) => Container(
         margin: EdgeInsets.only(bottom: 14.h),
@@ -888,6 +1120,46 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
           ],
         ),
       );
+
+  // Reusable segmented trip-type tabs (used by Hire a Driver; same look as the cab).
+  Widget _segmentTabs(List<(String, String)> types) {
+    return Container(
+      padding: EdgeInsets.all(4.r),
+      decoration: BoxDecoration(color: const Color(0xFFEFF3F6), borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: types.map((t) {
+          final sel = _subType == t.$1;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() {
+                _subType = t.$1;
+                if (t.$1 == 'Round Trip' && _endDate == null) {
+                  _endDate = _date.add(const Duration(days: 1));
+                  _endTime ??= _time;
+                }
+              }),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: 46.h,
+                alignment: Alignment.center,
+                padding: EdgeInsets.symmetric(horizontal: 3.w),
+                decoration: BoxDecoration(color: sel ? AppColors.primary : Colors.transparent, borderRadius: BorderRadius.circular(10.r)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(t.$1, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                    SizedBox(height: 2.h),
+                    Text(t.$2, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.sp, height: 1.1, fontWeight: FontWeight.w500, color: sel ? Colors.white.withValues(alpha: 0.9) : AppColors.textSecondary, fontFamily: 'Poppins')),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
   // Trip-type selector at the TOP of the card: title + short description, no icon.
   Widget _tripTypeTabs() {
