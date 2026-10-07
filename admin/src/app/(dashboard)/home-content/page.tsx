@@ -30,7 +30,7 @@ const SECTION_LABELS: Record<Section, string> = {
 
 const EMPTY_FORM = {
   section: 'travel' as Section,
-  title: '', subtitle: '', category: '', city: '',
+  city: '',
   imageUrl: '', actionUrl: '', order: 0, isActive: true,
 };
 
@@ -57,9 +57,6 @@ export default function HomeContentPage() {
 
   const buildPayload = () => ({
     section: form.section,
-    title: form.title.trim(),
-    subtitle: form.subtitle.trim(),
-    category: form.category.trim(),
     city: form.city.trim(),
     imageUrl: form.imageUrl.trim(),
     actionUrl: form.actionUrl.trim(),
@@ -116,9 +113,6 @@ export default function HomeContentPage() {
     setEditingId(it._id);
     setForm({
       section: it.section,
-      title: it.title,
-      subtitle: it.subtitle ?? '',
-      category: it.category ?? '',
       city: it.city ?? '',
       imageUrl: it.imageUrl ?? '',
       actionUrl: it.actionUrl ?? '',
@@ -148,7 +142,7 @@ export default function HomeContentPage() {
   };
 
   const handleSubmit = () => {
-    if (!form.title.trim()) return toast.error('A title is required');
+    if (!form.imageUrl.trim()) return toast.error('An image is required');
     if (editingId) updateMutation.mutate();
     else createMutation.mutate();
   };
@@ -268,36 +262,6 @@ export default function HomeContentPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-              <input
-                type="text"
-                placeholder="e.g. Hotels"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subtitle</label>
-              <input
-                type="text"
-                placeholder="e.g. Book the best stays"
-                value={form.subtitle}
-                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
-              <input
-                type="text"
-                placeholder="e.g. Business"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
               <input
                 type="text"
@@ -332,7 +296,7 @@ export default function HomeContentPage() {
 
           <button
             onClick={handleSubmit}
-            disabled={isBusy || !form.title.trim()}
+            disabled={isBusy || !form.imageUrl.trim()}
             className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
           >
             {isBusy ? (
@@ -379,8 +343,6 @@ export default function HomeContentPage() {
                 <tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   <th className="px-4 py-3">Image</th>
                   <th className="px-4 py-3">Section</th>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">City</th>
                   <th className="px-4 py-3">Order</th>
                   <th className="px-4 py-3">Active</th>
@@ -406,11 +368,6 @@ export default function HomeContentPage() {
                     <td className="px-4 py-3">
                       <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{SECTION_LABELS[it.section] ?? it.section}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-gray-900 dark:text-white">{it.title}</div>
-                      {it.subtitle && <div className="text-xs text-gray-400">{it.subtitle}</div>}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.category || '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.city ? it.city : <span className="text-gray-400">All</span>}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.order}</td>
                     <td className="px-4 py-3">

@@ -3,7 +3,7 @@ import { HomeSectionType } from '../../../database/schemas/home-content.schema';
 
 export class CreateShowcaseDto {
   @IsEnum(HomeSectionType) section: HomeSectionType;
-  @IsString() title: string;
+  @IsOptional() @IsString() title?: string;
   @IsOptional() @IsString() subtitle?: string;
   @IsOptional() @IsString() imageUrl?: string;
   @IsOptional() @IsString() actionUrl?: string;

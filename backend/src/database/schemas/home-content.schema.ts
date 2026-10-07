@@ -24,7 +24,7 @@ export class HomeShowcase {
   @Prop({ type: String, enum: HomeSectionType, required: true, index: true })
   section: HomeSectionType;
 
-  @Prop({ required: true }) title: string;
+  @Prop({ default: '' }) title: string;
   @Prop({ default: '' }) subtitle: string;
   @Prop({ default: '' }) imageUrl: string;
   @Prop({ default: '' }) actionUrl: string; // deep link / URL opened on tap

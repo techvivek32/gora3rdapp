@@ -539,42 +539,14 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           onPageChanged: (i) => setState(() => _exploreIndex = i),
           itemBuilder: (_, i) {
             final it = items[i];
-            final title = (it['title'] ?? '').toString();
-            final subtitle = (it['subtitle'] ?? '').toString();
+            // Image-only banner (the artwork carries its own text).
             return Padding(
               padding: EdgeInsets.symmetric(horizontal: 14.w),
               child: GestureDetector(
                 onTap: () => _openItem(it),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18.r),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      _netImg((it['imageUrl'] ?? '').toString(), fallback: _navy),
-                      if (title.isNotEmpty || subtitle.isNotEmpty)
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(begin: Alignment.centerLeft, end: Alignment.centerRight, colors: [Colors.black.withValues(alpha: 0.55), Colors.black.withValues(alpha: 0.05)]),
-                          ),
-                        ),
-                      if (title.isNotEmpty || subtitle.isNotEmpty)
-                        Padding(
-                          padding: EdgeInsets.all(16.w),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (title.isNotEmpty)
-                                Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w900, color: Colors.white, height: 1.1, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 6)])),
-                              if (subtitle.isNotEmpty) ...[
-                                SizedBox(height: 4.h),
-                                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.95), fontFamily: 'Poppins')),
-                              ],
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                  child: _netImg((it['imageUrl'] ?? '').toString(), fallback: _navy),
                 ),
               ),
             );
@@ -640,65 +612,23 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
           padding: EdgeInsets.symmetric(horizontal: 14.w),
           itemCount: items.length,
           separatorBuilder: (_, __) => SizedBox(width: 10.w),
-          itemBuilder: (_, i) => _showcaseCard(items[i], width: 240.w, showTag: true),
+          itemBuilder: (_, i) => _showcaseCard(items[i], width: 240.w),
         ),
       ),
       SizedBox(height: 12.h),
     ];
   }
 
-  // Shared image card for travel + offers showcase items.
-  Widget _showcaseCard(Map<String, dynamic> it, {required double width, bool showTag = false}) {
-    final title = (it['title'] ?? '').toString();
-    final subtitle = (it['subtitle'] ?? '').toString();
-    final category = (it['category'] ?? '').toString();
+  // Shared image-only card for travel + offers showcase items (the artwork
+  // carries its own text — no title/category overlay).
+  Widget _showcaseCard(Map<String, dynamic> it, {required double width}) {
     return GestureDetector(
       onTap: () => _openItem(it),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14.r),
         child: SizedBox(
           width: width,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              _netImg((it['imageUrl'] ?? '').toString(), fallback: _navy),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.72), Colors.black.withValues(alpha: 0.12)]),
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(10.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (showTag)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6.r)),
-                        child: Text(category.isEmpty ? 'OFFER' : category.toUpperCase(), style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
-                      )
-                    else if (category.isNotEmpty)
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(6.r)),
-                        child: Text(category, style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w700, color: AppColors.primaryDark, fontFamily: 'Poppins')),
-                      ),
-                    const Spacer(),
-                    Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.white, height: 1.1, fontFamily: 'Poppins')),
-                    if (subtitle.isNotEmpty) ...[
-                      SizedBox(height: 2.h),
-                      Row(children: [
-                        Flexible(child: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: Colors.white.withValues(alpha: 0.9), fontFamily: 'Poppins'))),
-                        SizedBox(width: 4.w),
-                        Icon(Icons.chevron_right_rounded, color: Colors.white, size: 16.sp),
-                      ]),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
+          child: _netImg((it['imageUrl'] ?? '').toString(), fallback: _navy),
         ),
       ),
     );

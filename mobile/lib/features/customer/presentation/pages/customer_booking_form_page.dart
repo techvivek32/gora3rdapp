@@ -3,7 +3,10 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/action_url.dart';
+import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
 import '../../data/customer_repository.dart';
 import '../widgets/booking_card_ui.dart';
@@ -71,6 +74,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   DateTime? _returnDate; // round-trip return (cab layout)
   bool _busy = false;
 
+  // Cab page extras: admin-managed promo banners + the support number to call.
+  String _supportPhone = '';
+  List<Map<String, dynamic>> _offers = [];
+
   // Accent colour for the cab layout (orange to match the app brand).
   static const _teal = AppColors.primary;
 
@@ -83,6 +90,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     super.initState();
     if (_m.subTypes.isNotEmpty) _subType = _m.subTypes.first;
     if (_m.vehicles.isNotEmpty) _vehicle = _m.vehicles.first;
+    // Cab page only: load the promo banners + support number for the help card.
+    if (widget.serviceType == 'cab' && !_isEdit) _loadExtras();
     // Pre-fill from the existing booking when editing.
     final e = widget.existing;
     if (e != null) {
@@ -117,6 +126,22 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       s.ctrl.dispose();
     }
     super.dispose();
+  }
+
+  /// Fetch the admin-managed promo banners (home "offers") and the support
+  /// number (per-city franchise, else global) for the cab page's help card.
+  Future<void> _loadExtras() async {
+    try {
+      final res = await getIt<ApiClient>().get('/settings/support-contact');
+      final d = (res.data['data'] as Map?) ?? const {};
+      final phone = (d['phone'] ?? '').toString().trim();
+      if (mounted && phone.isNotEmpty) setState(() => _supportPhone = phone);
+    } catch (_) {}
+    try {
+      final d = await getIt<CustomerRepository>().homeContent(null);
+      final list = (d['offers'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? <Map<String, dynamic>>[];
+      if (mounted) setState(() => _offers = list);
+    } catch (_) {}
   }
 
   void _addStop() {
@@ -582,6 +607,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
           padding: EdgeInsets.fromLTRB(14.w, 14.h, 14.w, 20.h),
           children: [
             _cabCard(isRound),
+            if (!_isEdit) ...[
+              _offersBanner(),
+              _supportCard(),
+            ],
           ],
         ),
       ),
@@ -715,12 +744,12 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
         ),
       );
 
-  // Trip-type selector at the TOP of the card (One Way / Round Trip / Local / Airport).
+  // Trip-type selector at the TOP of the card: title + short description, no icon.
   Widget _tripTypeTabs() {
     const types = [
-      ('One Way', Icons.trending_flat_rounded),
-      ('Round Trip', Icons.sync_rounded),
-      ('Local', Icons.location_city_rounded),
+      ('One Way', 'Drop off only'),
+      ('Round Trip', 'Return in same cab'),
+      ('Local', 'Hourly rental'),
     ];
     return Container(
       padding: EdgeInsets.all(4.r),
@@ -736,19 +765,131 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 2.w),
+                height: 46.h,
+                alignment: Alignment.center,
+                padding: EdgeInsets.symmetric(horizontal: 3.w),
                 decoration: BoxDecoration(color: sel ? _teal : Colors.transparent, borderRadius: BorderRadius.circular(10.r)),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(t.$2, size: 18.sp, color: sel ? Colors.white : AppColors.textSecondary),
-                    SizedBox(height: 3.h),
-                    Text(t.$1, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, fontWeight: sel ? FontWeight.w800 : FontWeight.w600, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                    Text(t.$1, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                    SizedBox(height: 2.h),
+                    Text(t.$2, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.sp, height: 1.1, fontWeight: FontWeight.w500, color: sel ? Colors.white.withValues(alpha: 0.9) : AppColors.textSecondary, fontFamily: 'Poppins')),
                   ],
                 ),
               ),
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  // Admin-managed promotional banners (reuses home "offers") shown below the card.
+  Widget _offersBanner() {
+    if (_offers.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h),
+      child: SizedBox(
+        height: 120.h,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _offers.length,
+          separatorBuilder: (_, __) => SizedBox(width: 10.w),
+          itemBuilder: (_, i) {
+            final it = _offers[i];
+            final img = (it['imageUrl'] ?? '').toString();
+            final title = (it['title'] ?? '').toString();
+            return GestureDetector(
+              onTap: () {
+                final url = (it['actionUrl'] ?? '').toString().trim();
+                if (url.isNotEmpty) openActionUrl(context, url);
+              },
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16.r),
+                child: SizedBox(
+                  width: 240.w,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (img.isNotEmpty)
+                        Image.network(img, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: _teal))
+                      else
+                        Container(color: _teal),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, Color(0xB3000000)]),
+                        ),
+                      ),
+                      if (title.isNotEmpty)
+                        Positioned(
+                          left: 12.w,
+                          right: 12.w,
+                          bottom: 10.h,
+                          child: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins', shadows: const [Shadow(color: Colors.black54, blurRadius: 4)])),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // 24×7 "Your Travel Expert" help card — dials the admin-configured number.
+  Widget _supportCard() {
+    if (_supportPhone.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h),
+      child: Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF4FF),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: const Color(0xFFBFDCFF)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46.w,
+              height: 46.w,
+              decoration: const BoxDecoration(color: Color(0xFF1E88E5), shape: BoxShape.circle),
+              child: Icon(Icons.headset_mic_rounded, color: Colors.white, size: 24.sp),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Your Travel Expert', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                  SizedBox(height: 2.h),
+                  Text('Get expert advice for smarter travel plans', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                ],
+              ),
+            ),
+            SizedBox(width: 10.w),
+            GestureDetector(
+              onTap: () => callNumber(_supportPhone),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
+                decoration: BoxDecoration(color: const Color(0xFF1E88E5), borderRadius: BorderRadius.circular(24.r)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.call_rounded, color: Colors.white, size: 14.sp),
+                    SizedBox(width: 5.w),
+                    Text('Call 24×7', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
