@@ -71,12 +71,15 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   int _localHours = 8; // Local (hourly rental) package length
   String? _subType;
   String? _vehicle;
-  DateTime? _returnDate; // round-trip return (cab layout)
+  DateTime? _endDate; // trip end (round-trip return / general trip end)
+  TimeOfDay? _endTime;
   bool _busy = false;
 
   // Cab page extras: admin-managed promo banners + the support number to call.
   String _supportPhone = '';
   List<Map<String, dynamic>> _offers = [];
+  // Representative Local package km-per-hour (for the "X km included" chip hint).
+  double _localKmPerHour = 0;
 
   // Accent colour for the cab layout (orange to match the app brand).
   static const _teal = AppColors.primary;
@@ -113,6 +116,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _notesCtrl.text = (e['notes'] ?? '').toString();
       final d = tripDate(e['travelDate']);
       if (d != null) _date = d;
+      final ed = tripDate(e['tripEndDate']);
+      if (ed != null) _endDate = ed;
     }
   }
 
@@ -141,6 +146,25 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       final d = await getIt<CustomerRepository>().homeContent(null);
       final list = (d['offers'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? <Map<String, dynamic>>[];
       if (mounted) setState(() => _offers = list);
+    } catch (_) {}
+    // Representative Local package km/hour — the most common value among the
+    // active cabs that offer a Local package, used to show "X km included".
+    try {
+      final res = await getIt<ApiClient>().get('/home-content/cab-categories');
+      final cats = (res.data['data'] as List?) ?? const [];
+      final perHrs = cats
+          .map((e) => ((e as Map)['packageKmPerHour'] as num?)?.toDouble() ?? 0)
+          .where((v) => v > 0)
+          .toList();
+      if (perHrs.isNotEmpty) {
+        // mode (most frequent); ties → the first seen
+        final counts = <double, int>{};
+        for (final v in perHrs) {
+          counts[v] = (counts[v] ?? 0) + 1;
+        }
+        final mode = counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
+        if (mounted) setState(() => _localKmPerHour = mode);
+      }
     } catch (_) {}
   }
 
@@ -190,14 +214,20 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     });
   }
 
-  Future<void> _pickReturnDate() async {
+  Future<void> _pickEndDateTime() async {
     final d = await showDatePicker(
       context: context,
-      initialDate: _returnDate ?? _date.add(const Duration(days: 1)),
+      initialDate: _endDate ?? _date.add(const Duration(days: 1)),
       firstDate: _date,
       lastDate: DateTime.now().add(const Duration(days: 180)),
     );
-    if (d != null) setState(() => _returnDate = d);
+    if (d == null) return;
+    if (!mounted) return;
+    final t = await showTimePicker(context: context, initialTime: _endTime ?? _time);
+    setState(() {
+      _endDate = d;
+      if (t != null) _endTime = t;
+    });
   }
 
   // Cab "Explore Cabs": validate the route, then open the fare-estimate results
@@ -229,8 +259,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select From and To locations');
       return;
     }
-    if (_subType == 'Round Trip' && _returnDate == null) {
-      _snack('Please select a return date for the round trip');
+    if (_subType == 'Round Trip' && _endDate == null) {
+      _snack('Please select the trip end (return) date');
       return;
     }
     // Intermediate stops (with coords) so the route/distance goes THROUGH them.
@@ -248,8 +278,11 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       'travelDate': ymdString(_date),
       'travelTime': _time.format(context),
       'passengers': _passengers,
-      if (_subType == 'Round Trip' && _returnDate != null) 'returnDate': ymdString(_returnDate!),
-      if (_subType == 'Round Trip' && _returnDate != null) 'notes': 'Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}',
+      // Trip end (saved to DB). For Round Trip it is the return; optional otherwise.
+      if (_endDate != null) 'tripEndDate': ymdString(_endDate!),
+      if (_endDate != null && _endTime != null) 'tripEndTime': _endTime!.format(context),
+      if (_subType == 'Round Trip' && _endDate != null) 'returnDate': ymdString(_endDate!),
+      if (_subType == 'Round Trip' && _endDate != null) 'notes': 'Return date: ${DateFormat('dd-MM-yyyy').format(_endDate!)}',
       // Editing an existing booking: cab-results will UPDATE instead of create.
       if (_isEdit) 'bookingId': widget.bookingId,
       if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
@@ -267,19 +300,17 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select a drop location');
       return;
     }
-    if (_subType == 'Round Trip' && _returnDate == null) {
-      _snack('Please select a return date for the round trip');
+    if (_subType == 'Round Trip' && _endDate == null) {
+      _snack('Please select the trip end (return) date');
       return;
     }
     setState(() => _busy = true);
-    // Round-trip return date is carried in notes so it works without a backend
-    // schema change (notes is already whitelisted server-side).
     final notes = <String>[];
     if (_notesCtrl.text.trim().isNotEmpty) notes.add(_notesCtrl.text.trim());
     final stopTexts = _stops.map((s) => s.ctrl.text.trim()).where((t) => t.isNotEmpty).toList();
     if (stopTexts.isNotEmpty) notes.add('Via: ${stopTexts.join(', ')}');
-    if (_subType == 'Round Trip' && _returnDate != null) {
-      notes.add('Return date: ${DateFormat('dd-MM-yyyy').format(_returnDate!)}');
+    if (_subType == 'Round Trip' && _endDate != null) {
+      notes.add('Return date: ${DateFormat('dd-MM-yyyy').format(_endDate!)}');
     }
     final body = <String, dynamic>{
       // serviceType is fixed on edit (backend rejects it in the update DTO).
@@ -292,6 +323,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_m.needsDrop) 'dropCity': _dropCity,
       'travelDate': ymdString(_date),
       'travelTime': _time.format(context),
+      if (_endDate != null) 'tripEndDate': ymdString(_endDate!),
+      if (_endDate != null && _endTime != null) 'tripEndTime': _endTime!.format(context),
       if (_m.needsPassengers) 'passengers': _passengers,
       if (_m.needsDuration) 'durationHours': _durationHours,
       // Hire a Driver: duration comes from the selected "6/8/12 Hours" chip.
@@ -717,11 +750,41 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               ),
             ],
             SizedBox(height: 14.h),
-            _dtBox('TRIP START', Icons.calendar_today_rounded, DateFormat('dd-MM-yyyy').format(_date), _time.format(context), _pickDateTime),
-            if (isRound) ...[
-              SizedBox(height: 12.h),
-              _dtBox('RETURN *', Icons.event_repeat_rounded, _returnDate == null ? 'Select return date (required)' : DateFormat('dd-MM-yyyy').format(_returnDate!), null, _pickReturnDate),
-            ],
+            // Local (hourly rental) returns to the same place, so there's no trip
+            // end/return date — only Trip Start. Other types get Start + End in a row.
+            if (_subType == 'Local')
+              _dtBoxCompact(
+                'TRIP START',
+                Icons.calendar_today_rounded,
+                DateFormat('dd-MM-yyyy').format(_date),
+                _time.format(context),
+                _pickDateTime,
+              )
+            else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _dtBoxCompact(
+                      'TRIP START',
+                      Icons.calendar_today_rounded,
+                      DateFormat('dd-MM-yyyy').format(_date),
+                      _time.format(context),
+                      _pickDateTime,
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  Expanded(
+                    child: _dtBoxCompact(
+                      isRound ? 'TRIP END *' : 'TRIP END',
+                      Icons.event_available_rounded,
+                      _endDate == null ? 'Select date' : DateFormat('dd-MM-yyyy').format(_endDate!),
+                      _endTime?.format(context),
+                      _pickEndDateTime,
+                    ),
+                  ),
+                ],
+              ),
             SizedBox(height: 16.h),
             SizedBox(
               width: double.infinity,
@@ -761,7 +824,6 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
             child: GestureDetector(
               onTap: () => setState(() {
                 _subType = t.$1;
-                if (t.$1 != 'Round Trip') _returnDate = null;
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
@@ -977,8 +1039,11 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                     ),
                     child: Column(
                       children: [
-                        Text('$h', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
-                        Text('hour', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w600, color: sel ? Colors.white : AppColors.textSecondary, fontFamily: 'Poppins')),
+                        Text('$h hrs', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
+                        if (_localKmPerHour > 0) ...[
+                          SizedBox(height: 3.h),
+                          Text('${(_localKmPerHour * h).round()} km', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.primary, fontFamily: 'Poppins')),
+                        ],
                       ],
                     ),
                   ),
@@ -991,35 +1056,34 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     );
   }
 
-  Widget _dtBox(String label, IconData icon, String value, String? sub, VoidCallback onTap) => InkWell(
+  // Compact date/time box used two-per-row (Trip Start | Trip End). Label + icon
+  // on top, date below, time under it — fits in half the card width.
+  Widget _dtBoxCompact(String label, IconData icon, String value, String? sub, VoidCallback onTap) => InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
           decoration: BoxDecoration(color: const Color(0xFFEAF6FC), borderRadius: BorderRadius.circular(12.r), border: Border.all(color: _teal.withValues(alpha: 0.3))),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: _teal, size: 20.sp),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, letterSpacing: 0.3, fontFamily: 'Poppins')),
-                    SizedBox(height: 2.h),
-                    Row(
-                      children: [
-                        Text(value, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                        if (sub != null) ...[
-                          SizedBox(width: 8.w),
-                          Text(sub, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
+              Row(
+                children: [
+                  Icon(icon, color: _teal, size: 15.sp),
+                  SizedBox(width: 6.w),
+                  Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 9.5.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, letterSpacing: 0.3, fontFamily: 'Poppins'))),
+                ],
               ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 22.sp),
+              SizedBox(height: 6.h),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+              SizedBox(height: 1.h),
+              Text(
+                (sub == null || sub.isEmpty) ? '—' : sub,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins'),
+              ),
             ],
           ),
         ),

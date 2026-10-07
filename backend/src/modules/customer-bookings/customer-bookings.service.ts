@@ -330,6 +330,8 @@ export class CustomerBookingsService {
       dropCity: dto.dropCity || dto.drop?.address || '',
       travelDate,
       travelTime: dto.travelTime || '',
+      tripEndDate: dto.tripEndDate ? new Date(dto.tripEndDate) : undefined,
+      tripEndTime: dto.tripEndTime || '',
       passengers: dto.passengers || 1,
       vehicleType: dto.vehicleType || '',
       durationHours: dto.durationHours || 0,
@@ -782,6 +784,8 @@ export class CustomerBookingsService {
     if (dto.pickupCity !== undefined) booking.pickupCity = dto.pickupCity;
     if (dto.dropCity !== undefined) booking.dropCity = dto.dropCity;
     if (dto.travelTime !== undefined) booking.travelTime = dto.travelTime;
+    if (dto.tripEndDate !== undefined) booking.tripEndDate = (dto.tripEndDate ? new Date(dto.tripEndDate) : undefined) as any;
+    if (dto.tripEndTime !== undefined) booking.tripEndTime = dto.tripEndTime;
     if (dto.passengers !== undefined) booking.passengers = dto.passengers;
     if (dto.vehicleType !== undefined) booking.vehicleType = dto.vehicleType;
     if (dto.durationHours !== undefined) booking.durationHours = dto.durationHours;

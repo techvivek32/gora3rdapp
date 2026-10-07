@@ -94,6 +94,10 @@ export class CustomerBooking {
   @Prop() travelDate: Date;
   @Prop() travelTime: string;
 
+  // Trip end (round-trip return / general trip end). Optional.
+  @Prop() tripEndDate: Date;
+  @Prop() tripEndTime: string;
+
   @Prop({ default: 1 }) passengers: number;
   @Prop({ default: '' }) vehicleType: string;
   @Prop({ default: 0 }) durationHours: number; // Hire-a-Driver

@@ -178,6 +178,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (!_isLocal && t['stops'] is List && (t['stops'] as List).isNotEmpty) 'stops': t['stops'],
       'travelDate': t['travelDate'],
       'travelTime': t['travelTime'],
+      if (t['tripEndDate'] != null) 'tripEndDate': t['tripEndDate'],
+      if (t['tripEndTime'] != null) 'tripEndTime': t['tripEndTime'],
       'passengers': t['passengers'] ?? 1,
       if (_fare > 0) 'estimatedFare': _fare,
       // For Local, estimatedDistance holds the package's included km (billedKm).

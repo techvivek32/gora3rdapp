@@ -21,6 +21,8 @@ export class CreateCustomerBookingDto {
 
   @IsOptional() @IsString() travelDate?: string;
   @IsOptional() @IsString() travelTime?: string;
+  @IsOptional() @IsString() tripEndDate?: string;
+  @IsOptional() @IsString() tripEndTime?: string;
 
   @IsOptional() @IsInt() @Min(1) passengers?: number;
   @IsOptional() @IsString() vehicleType?: string;
@@ -47,6 +49,8 @@ export class UpdateCustomerBookingDto {
   @IsOptional() @IsString() dropCity?: string;
   @IsOptional() @IsString() travelDate?: string;
   @IsOptional() @IsString() travelTime?: string;
+  @IsOptional() @IsString() tripEndDate?: string;
+  @IsOptional() @IsString() tripEndTime?: string;
   @IsOptional() @IsInt() @Min(1) passengers?: number;
   @IsOptional() @IsString() vehicleType?: string;
   @IsOptional() @IsNumber() durationHours?: number;
