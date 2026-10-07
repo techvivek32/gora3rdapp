@@ -489,7 +489,10 @@ export default function CabCategoriesPage() {
             </div>
           </div>
           <p className="text-xs text-gray-500 -mt-2">
-            Round trip: included km = KM/day × days (e.g. 250 × 3 = 750). GPS measures the driver’s actual km; anything beyond is billed at the extra ₹/km.
+            <b>Round trip only</b>: included km = max(route distance, KM/day × days), where days are counted from the
+            trip start to the trip end date (e.g. 250 × 2 days = 500 km min; a longer route bills the actual km).
+            The return leg is counted in the route. One Way uses the global minimum km. GPS measures the driver’s
+            actual km; anything beyond the included km is billed at the extra ₹/km.
           </p>
 
           {/* Local (in-city hourly package) pricing */}

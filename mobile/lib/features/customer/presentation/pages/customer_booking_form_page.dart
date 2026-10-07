@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -93,8 +96,12 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     super.initState();
     if (_m.subTypes.isNotEmpty) _subType = _m.subTypes.first;
     if (_m.vehicles.isNotEmpty) _vehicle = _m.vehicles.first;
-    // Cab page only: load the promo banners + support number for the help card.
-    if (widget.serviceType == 'cab' && !_isEdit) _loadExtras();
+    // Cab page only: load the promo banners + support number for the help card,
+    // and auto-fill the last search the customer ran (new bookings only).
+    if (widget.serviceType == 'cab' && !_isEdit) {
+      _loadExtras();
+      if (widget.existing == null) _restoreLastSearch();
+    }
     // Pre-fill from the existing booking when editing.
     final e = widget.existing;
     if (e != null) {
@@ -259,6 +266,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _snack('Please select From and To locations');
       return;
     }
+    // Trip end is required only for Round Trip (needed to count the days for the
+    // per-day minimum included-km). One Way and Local use only the start date.
     if (_subType == 'Round Trip' && _endDate == null) {
       _snack('Please select the trip end (return) date');
       return;
@@ -287,7 +296,80 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       if (_isEdit) 'bookingId': widget.bookingId,
       if (_isEdit && _vehicle != null) 'currentVehicle': _vehicle,
     };
+    if (!_isEdit) _saveLastSearch();
     context.push('/customer/cab-results', extra: trip);
+  }
+
+  static const _kLastCabSearch = 'last_cab_search';
+
+  // Persist the current cab search so it auto-fills when the app is reopened.
+  void _saveLastSearch() {
+    try {
+      final data = {
+        'subType': _subType,
+        'pickup': _pickupCtrl.text.trim(),
+        'pickupLat': _pickupLat,
+        'pickupLng': _pickupLng,
+        'pickupCity': _pickupCity,
+        'drop': _dropCtrl.text.trim(),
+        'dropLat': _dropLat,
+        'dropLng': _dropLng,
+        'dropCity': _dropCity,
+        'stops': _stops
+            .where((s) => s.ctrl.text.trim().isNotEmpty)
+            .map((s) => {'address': s.ctrl.text.trim(), 'lat': s.lat, 'lng': s.lng, 'city': s.city})
+            .toList(),
+        'date': _date.toIso8601String(),
+        'timeH': _time.hour,
+        'timeM': _time.minute,
+        'endDate': _endDate?.toIso8601String(),
+        'endH': _endTime?.hour,
+        'endM': _endTime?.minute,
+        'passengers': _passengers,
+        'localHours': _localHours,
+      };
+      getIt<SharedPreferences>().setString(_kLastCabSearch, jsonEncode(data));
+    } catch (_) {}
+  }
+
+  // Restore the last cab search (controllers + state) on a fresh form open.
+  void _restoreLastSearch() {
+    try {
+      final raw = getIt<SharedPreferences>().getString(_kLastCabSearch);
+      if (raw == null || raw.isEmpty) return;
+      final d = jsonDecode(raw) as Map<String, dynamic>;
+      final st = (d['subType'] ?? '').toString();
+      if (st.isNotEmpty && _m.subTypes.contains(st)) _subType = st;
+      _pickupCtrl.text = (d['pickup'] ?? '').toString();
+      _pickupLat = (d['pickupLat'] as num?)?.toDouble();
+      _pickupLng = (d['pickupLng'] as num?)?.toDouble();
+      _pickupCity = (d['pickupCity'])?.toString();
+      _dropCtrl.text = (d['drop'] ?? '').toString();
+      _dropLat = (d['dropLat'] as num?)?.toDouble();
+      _dropLng = (d['dropLng'] as num?)?.toDouble();
+      _dropCity = (d['dropCity'])?.toString();
+      for (final s in (d['stops'] as List? ?? [])) {
+        final m = Map<String, dynamic>.from(s as Map);
+        final f = _StopField()
+          ..lat = (m['lat'] as num?)?.toDouble()
+          ..lng = (m['lng'] as num?)?.toDouble()
+          ..city = m['city']?.toString();
+        f.ctrl.text = (m['address'] ?? '').toString();
+        _stops.add(f);
+      }
+      final dt = DateTime.tryParse((d['date'] ?? '').toString());
+      if (dt != null && dt.isAfter(DateTime.now().subtract(const Duration(days: 1)))) {
+        _date = dt;
+        if (d['timeH'] is int) _time = TimeOfDay(hour: d['timeH'] as int, minute: (d['timeM'] as int?) ?? 0);
+      }
+      final edt = DateTime.tryParse((d['endDate'] ?? '').toString());
+      if (edt != null && edt.isAfter(DateTime.now().subtract(const Duration(days: 1)))) {
+        _endDate = edt;
+        if (d['endH'] is int) _endTime = TimeOfDay(hour: d['endH'] as int, minute: (d['endM'] as int?) ?? 0);
+      }
+      _passengers = (d['passengers'] as num?)?.toInt() ?? _passengers;
+      _localHours = (d['localHours'] as num?)?.toInt() ?? _localHours;
+    } catch (_) {}
   }
 
   Future<void> _submit() async {
@@ -750,17 +832,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
               ),
             ],
             SizedBox(height: 14.h),
-            // Local (hourly rental) returns to the same place, so there's no trip
-            // end/return date — only Trip Start. Other types get Start + End in a row.
-            if (_subType == 'Local')
-              _dtBoxCompact(
-                'TRIP START',
-                Icons.calendar_today_rounded,
-                DateFormat('dd-MM-yyyy').format(_date),
-                _time.format(context),
-                _pickDateTime,
-              )
-            else
+            // Only Round Trip has a trip end (return) date — used to count days for
+            // the per-day minimum km. One Way and Local show just the Trip Start.
+            if (isRound)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -776,7 +850,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                   SizedBox(width: 10.w),
                   Expanded(
                     child: _dtBoxCompact(
-                      isRound ? 'TRIP END *' : 'TRIP END',
+                      'TRIP END *',
                       Icons.event_available_rounded,
                       _endDate == null ? 'Select date' : DateFormat('dd-MM-yyyy').format(_endDate!),
                       _endTime?.format(context),
@@ -784,6 +858,14 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                     ),
                   ),
                 ],
+              )
+            else
+              _dtBoxCompact(
+                'TRIP START',
+                Icons.calendar_today_rounded,
+                DateFormat('dd-MM-yyyy').format(_date),
+                _time.format(context),
+                _pickDateTime,
               ),
             SizedBox(height: 16.h),
             SizedBox(
@@ -824,6 +906,11 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
             child: GestureDetector(
               onTap: () => setState(() {
                 _subType = t.$1;
+                // Default the return/trip-end to the next day so it isn't blank.
+                if (t.$1 == 'Round Trip' && _endDate == null) {
+                  _endDate = _date.add(const Duration(days: 1));
+                  _endTime ??= _time;
+                }
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),

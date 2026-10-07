@@ -51,6 +51,18 @@ class _CabResultsPageState extends State<CabResultsPage> {
   bool get _isLocal => (widget.trip['subType'] ?? '').toString() == 'Local';
   int get _localHours => (widget.trip['durationHours'] as num?)?.toInt() ?? 8;
 
+  DateTime? _parseTripDate(dynamic v) => v == null ? null : DateTime.tryParse(v.toString());
+
+  // Number of days the trip spans: trip-start date → trip-end date, inclusive
+  // (same day = 1, next day = 2, …). Used for included km = KM/day × days.
+  int get _days {
+    final s = _parseTripDate(widget.trip['travelDate']);
+    final e = _parseTripDate(widget.trip['tripEndDate']);
+    if (s == null || e == null) return 1;
+    final diff = DateTime(e.year, e.month, e.day).difference(DateTime(s.year, s.month, s.day)).inDays;
+    return diff < 0 ? 1 : diff + 1;
+  }
+
   // Km included in a Local package for this cab = hours × the cab's km/hour.
   int _localIncludedKm(Map<String, dynamic> cat) {
     final perHr = (cat['packageKmPerHour'] as num?)?.toDouble() ?? 0;
@@ -170,19 +182,33 @@ class _CabResultsPageState extends State<CabResultsPage> {
     return r > 0 ? r : ((cat['pricePerKm'] as num?)?.toDouble() ?? 0);
   }
 
-  /// Global minimum billable distance for ALL cabs (platform setting; 0 = none).
-  double get _minKm => _minBillKm;
+  /// Minimum included km for this cab.
+  /// Round Trip → the cab's KM/day × trip days. One Way (and round trips with no
+  /// KM/day set) → the global flat minimum, exactly as before.
+  double _minKmFor(Map<String, dynamic> cat) {
+    if (_isRound) {
+      final daily = (cat['dailyKmLimit'] as num?)?.toDouble() ?? 0;
+      if (daily > 0) return daily * _days;
+    }
+    return _minBillKm;
+  }
 
-  /// The distance actually charged: at least the global minimum km.
-  double get _billableKm => _distanceKm < _minKm ? _minKm : _distanceKm;
+  /// The distance actually charged for this cab: at least the per-day minimum.
+  double _billableKmFor(Map<String, dynamic> cat) {
+    final m = _minKmFor(cat);
+    return _distanceKm < m ? m : _distanceKm;
+  }
 
-  /// True when the trip is shorter than the minimum, so the fare is bumped up.
-  bool get _isMinApplied => _minKm > 0 && _distanceKm < _minKm;
+  /// True when the route is shorter than this cab's minimum, so the fare is bumped.
+  bool _isMinAppliedFor(Map<String, dynamic> cat) {
+    final m = _minKmFor(cat);
+    return m > 0 && _distanceKm < m;
+  }
 
   // Local package fare = included km (hours × km/hr) × per-km rate. Otherwise
-  // distance-based (at least the global minimum km).
+  // distance-based (at least the per-day minimum included km).
   int _baseFare(Map<String, dynamic> cat) =>
-      _isLocal ? (_localIncludedKm(cat) * _rate(cat)).round() : (_billableKm * _rate(cat)).round();
+      _isLocal ? (_localIncludedKm(cat) * _rate(cat)).round() : (_billableKmFor(cat) * _rate(cat)).round();
 
   // Per-fuel fare so the next screen can show a price for each fuel the admin set.
   double _rateForFuel(Map<String, dynamic> cat, String fuel) {
@@ -193,7 +219,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
   }
 
   int _baseFareForFuel(Map<String, dynamic> cat, String fuel) =>
-      _isLocal ? (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round() : (_billableKm * _rateForFuel(cat, fuel)).round();
+      _isLocal ? (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round() : (_billableKmFor(cat) * _rateForFuel(cat, fuel)).round();
 
   int _fareForFuel(Map<String, dynamic> cat, String fuel) =>
       _baseFareForFuel(cat, fuel) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
@@ -221,8 +247,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
       'defaultFuel': _fuelOf(cat),
       'distanceKm': _isLocal ? 0 : _distanceKm,
       // Distance the fare is billed on. For Local it's the package's included km.
-      'billedKm': _isLocal ? _localIncludedKm(cat).toDouble() : _billableKm,
-      'minKm': _minKm,
+      'billedKm': _isLocal ? _localIncludedKm(cat).toDouble() : _billableKmFor(cat),
+      'minKm': _minKmFor(cat),
       'noFuelFare': _fareFor(cat), // fallback when the cab has no per-fuel pricing
       'toll': (_isBestPrice || _isLocal) ? 0 : _toll.round(),
       'incMode': _incMode,
@@ -441,7 +467,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final vclass = (cat['vehicleClass'] ?? '').toString().trim();
     final extraKm = (cat['extraKmPrice'] as num?)?.toInt() ?? 0;
     final isLowest = hasFare && fare == _minFare;
-    final kmLabel = _isLocal ? '${_localIncludedKm(cat)} km' : '${_billableKm.round()} km';
+    final kmLabel = _isLocal ? '${_localIncludedKm(cat)} km' : '${_billableKmFor(cat).round()} km';
 
     return Container(
       margin: EdgeInsets.only(bottom: 14.h),
@@ -519,10 +545,10 @@ class _CabResultsPageState extends State<CabResultsPage> {
               SizedBox(width: 8.w),
               _greenChip('No hidden charges'),
             ]),
-            if (!_isLocal && _isMinApplied)
+            if (!_isLocal && _isMinAppliedFor(cat))
               Padding(
                 padding: EdgeInsets.only(top: 8.h),
-                child: Text('Minimum ${_minKm.round()} km billed (your trip is ${_distanceKm.round()} km).',
+                child: Text('Minimum ${_minKmFor(cat).round()} km billed (your trip is ${_distanceKm.round()} km).',
                     style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
               ),
             SizedBox(height: 14.h),
