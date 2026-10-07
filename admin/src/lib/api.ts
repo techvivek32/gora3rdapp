@@ -139,6 +139,15 @@ export const adminApi = {
     });
   },
 
+  // Home-content showcase: stored as-is (no resize/crop) to keep original quality.
+  uploadShowcaseImage: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiClient.post('/storage/upload/showcase', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
   // Cab thumbnail: server trims white space + fits to 4:3 (600×450).
   uploadCabImage: (file: File) => {
     const fd = new FormData();

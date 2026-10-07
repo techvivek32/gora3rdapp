@@ -182,6 +182,14 @@ export class StorageService {
     return this.uploadFile(file, 'banners', { resize: { width: 1080, height: 528 }, quality: 90, baseUrl });
   }
 
+  async uploadShowcaseImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
+    // Home-content showcase (explore / travel / offers) images are stored AS-IS —
+    // no resize, crop or re-encode — so the admin's artwork keeps its original
+    // quality and aspect ratio. Each section has its own recommended ratio
+    // (explore ≈ 2.7:1, travel 5:4, offers 16:9) shown in the admin form.
+    return this.uploadFile(file, 'showcase', { baseUrl });
+  }
+
   async uploadNotificationImage(file: Express.Multer.File, baseUrl?: string): Promise<string> {
     // 1024×512 (2:1) is the aspect ratio Android's "big picture" notification style
     // and the iOS attachment preview both render at, so it lands uncropped.

@@ -82,4 +82,12 @@ export class StorageController {
     const url = await this.storageService.uploadAd(file, this.baseUrl(req));
     return { url };
   }
+
+  @Post('upload/showcase')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Upload a home-content showcase image (stored as-is, original quality)' })
+  async uploadShowcase(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+    const url = await this.storageService.uploadShowcaseImage(file, this.baseUrl(req));
+    return { url };
+  }
 }

@@ -28,6 +28,14 @@ const SECTION_LABELS: Record<Section, string> = {
   explore: 'Explore (category chips)',
 };
 
+// Recommended upload aspect ratio per section — the app renders each section at a
+// different size, so uploading at the right ratio means the image shows uncropped.
+const SECTION_RATIO: Record<Section, string> = {
+  explore: 'Wide banner · 2.7:1 (recommended 1080 × 400 px)',
+  travel: 'Square-ish · 5:4 (recommended 600 × 480 px)',
+  offers: 'Landscape · 16:9 (recommended 800 × 450 px)',
+};
+
 const EMPTY_FORM = {
   section: 'travel' as Section,
   city: '',
@@ -127,7 +135,7 @@ export default function HomeContentPage() {
     if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
     setUploading(true);
     try {
-      const res = await adminApi.uploadBannerImage(file) as any;
+      const res = await adminApi.uploadShowcaseImage(file) as any;
       // Interceptor: { data: { url } } or { url } depending on nesting
       const url = res?.data?.url ?? res?.url ?? res?.data?.data?.url;
       if (!url) throw new Error('No URL returned');
@@ -172,7 +180,13 @@ export default function HomeContentPage() {
 
           {/* Image upload + URL */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Image</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Image</label>
+            <div className="mb-2 flex items-center gap-2 rounded-lg bg-brand-50 dark:bg-brand-900/20 border border-brand-200 dark:border-brand-800 px-3 py-2">
+              <svg className="w-4 h-4 text-brand-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span className="text-xs font-medium text-brand-700 dark:text-brand-300">
+                Recommended size for <b>{SECTION_LABELS[form.section]}</b>: {SECTION_RATIO[form.section]}. Uploaded as-is at full quality — no resize or crop.
+              </span>
+            </div>
 
             {/* Hidden file input */}
             <input
