@@ -67,6 +67,13 @@ export class CabCategory {
   statePricing: { state: string; petrol: number; diesel: number; cng: number }[];
   // Per-cab discount shown in the app (original fare struck through + discounted).
   @Prop({ default: 0 }) discountPercent: number; // 0–100
+  // ── Driver allowance (added to the One Way / Round Trip fare total) ──────────
+  // Round Trip: allowance = trip days × allowanceDailyRate (distance ignored).
+  @Prop({ default: 0 }) allowanceDailyRate: number;
+  // One Way: distance ≤ threshold → base rate; distance > threshold → max rate.
+  @Prop({ default: 0 }) allowanceDistanceThreshold: number; // km
+  @Prop({ default: 0 }) allowanceBaseRate: number;  // flat, short one-way
+  @Prop({ default: 0 }) allowanceMaxRate: number;   // flat cap, long one-way
   @Prop({ default: 4 }) seats: number;
   @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
   // Round-trip rental: included km PER DAY (0 = no per-day limit / unlimited).

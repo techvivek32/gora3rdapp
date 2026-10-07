@@ -49,6 +49,10 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
   @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
+  @IsOptional() @IsNumber() allowanceDailyRate?: number;
+  @IsOptional() @IsNumber() allowanceDistanceThreshold?: number;
+  @IsOptional() @IsNumber() allowanceBaseRate?: number;
+  @IsOptional() @IsNumber() allowanceMaxRate?: number;
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;
@@ -73,6 +77,10 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmCng?: number;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
   @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
+  @IsOptional() @IsNumber() allowanceDailyRate?: number;
+  @IsOptional() @IsNumber() allowanceDistanceThreshold?: number;
+  @IsOptional() @IsNumber() allowanceBaseRate?: number;
+  @IsOptional() @IsNumber() allowanceMaxRate?: number;
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;

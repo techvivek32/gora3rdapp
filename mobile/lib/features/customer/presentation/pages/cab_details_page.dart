@@ -2,7 +2,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/contact_launcher.dart';
 
 /// Shown AFTER the customer taps "Book Now" on a cab and BEFORE the Review /
 /// Confirm screen. It shows the trip, the cab's full details, lets the rider pick
@@ -44,17 +47,43 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
   // Original (pre-discount) fare + discount %, for the struck-through price.
   Map<String, dynamic> get _fuelFaresRaw => Map<String, dynamic>.from(widget.data['fuelFaresRaw'] as Map? ?? {});
   double get _discountPct => (widget.data['discountPercent'] as num?)?.toDouble() ?? 0;
+  int get _driverAllowance => (widget.data['driverAllowance'] as num?)?.toInt() ?? 0;
+
+  // Fare breakdown parts for the selected fuel (base+toll and GST, discounted).
+  Map<String, dynamic> get _fuelBreakdown => Map<String, dynamic>.from(widget.data['fuelBreakdown'] as Map? ?? {});
+  int get _gstPart {
+    final b = _fuelBreakdown[_fuel];
+    if (b is Map && b['gst'] is num) return (b['gst'] as num).toInt();
+    return (widget.data['noFuelGst'] as num?)?.toInt() ?? 0;
+  }
+  int get _basePart {
+    final b = _fuelBreakdown[_fuel];
+    if (b is Map && b['base'] is num) return (b['base'] as num).toInt();
+    return (widget.data['noFuelBase'] as num?)?.toInt() ?? (_fare - _driverAllowance - _gstPart);
+  }
   int get _rawFare {
     final f = _fuelFaresRaw[_fuel];
     if (f is num) return f.toInt();
     return (widget.data['noFuelFareRaw'] as num?)?.toInt() ?? _fare;
   }
 
+  String _supportPhone = '';
+
   @override
   void initState() {
     super.initState();
     final def = (widget.data['defaultFuel'] ?? '').toString();
     _fuel = def.isNotEmpty ? def : (_fuels.isNotEmpty ? _fuels.first : '');
+    _loadSupport();
+  }
+
+  Future<void> _loadSupport() async {
+    try {
+      final res = await getIt<ApiClient>().get('/settings/support-contact');
+      final d = (res.data['data'] as Map?) ?? const {};
+      final phone = (d['phone'] ?? '').toString().trim();
+      if (mounted && phone.isNotEmpty) setState(() => _supportPhone = phone);
+    } catch (_) {}
   }
 
   List<String> _arr(String key) => ((_cat[key] as List?) ?? []).map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList();
@@ -108,7 +137,9 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
       'billedKm': _billedKm,
       'minKm': widget.data['minKm'] ?? 0,
       'fare': _fare,
-      'baseFare': _fare - _toll,
+      'baseFare': _basePart,
+      'driverAllowance': _driverAllowance,
+      'gstAmount': _gstPart,
       'toll': _toll,
       'incMode': widget.data['incMode'] ?? 'All Inclusive',
       'isRound': widget.data['isRound'] == true,
@@ -138,9 +169,13 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
           SizedBox(height: 12.h),
           _cabCard(),
           SizedBox(height: 12.h),
+          _breakdownCard(),
+          SizedBox(height: 12.h),
           _benefitsRow(),
           SizedBox(height: 12.h),
           _tabsCard(),
+          SizedBox(height: 12.h),
+          _supportCard(),
         ],
       ),
     );
@@ -243,7 +278,7 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
             ),
           ]),
           SizedBox(height: 14.h),
-          _featureLine(Icons.badge_rounded, 'Driver allowance included'),
+          _featureLine(Icons.badge_rounded, _driverAllowance > 0 ? 'Driver allowance: ₹$_driverAllowance (included)' : 'Driver allowance included'),
           if (_isLocal)
             _featureLine(Icons.timelapse_rounded, '$_packageHours hrs · ${_billedKm.round()} km included${_extraHourPrice > 0 ? '  |  Extra ₹$_extraHourPrice/hr' : ''}')
           else
@@ -267,6 +302,75 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
     );
   }
 
+  // Fare breakdown — Base Fare / Driver Allowance / GST, summing to the total.
+  Widget _breakdownCard() {
+    final base = _basePart;
+    final allowance = _driverAllowance;
+    final gst = _gstPart;
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14.r), border: Border.all(color: AppColors.border)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Fare Breakdown', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+          SizedBox(height: 10.h),
+          _brRow('Base Fare', base),
+          if (allowance > 0) _brRow('Driver Allowance', allowance),
+          if (gst > 0) _brRow('GST', gst),
+          Padding(padding: EdgeInsets.symmetric(vertical: 6.h), child: Divider(height: 1, color: AppColors.border)),
+          _brRow('Total Fare', _fare, bold: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _brRow(String label, int amount, {bool bold = false}) => Padding(
+        padding: EdgeInsets.symmetric(vertical: 3.h),
+        child: Row(children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: bold ? 13.sp : 12.sp, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: bold ? AppColors.textPrimary : AppColors.textSecondary, fontFamily: 'Poppins'))),
+          Text('₹$amount', style: TextStyle(fontSize: bold ? 14.sp : 12.5.sp, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, color: bold ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
+        ]),
+      );
+
+  // 24×7 "Your Travel Expert" card — dials the admin-configured support number.
+  Widget _supportCard() {
+    if (_supportPhone.isEmpty) return const SizedBox.shrink();
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(color: const Color(0xFFEAF4FF), borderRadius: BorderRadius.circular(14.r), border: Border.all(color: const Color(0xFFBFDCFF))),
+      child: Row(children: [
+        Container(
+          width: 46.w,
+          height: 46.w,
+          decoration: const BoxDecoration(color: Color(0xFF1E88E5), shape: BoxShape.circle),
+          child: Icon(Icons.headset_mic_rounded, color: Colors.white, size: 24.sp),
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            Text('Your Travel Expert', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+            SizedBox(height: 2.h),
+            Text('Get expert advice for smarter travel plans', maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+          ]),
+        ),
+        SizedBox(width: 10.w),
+        GestureDetector(
+          onTap: () => callNumber(_supportPhone),
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h),
+            decoration: BoxDecoration(color: const Color(0xFF1E88E5), borderRadius: BorderRadius.circular(24.r)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.call_rounded, color: Colors.white, size: 14.sp),
+              SizedBox(width: 5.w),
+              Text('Call 24×7', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
   Widget _featureLine(IconData icon, String text) => Padding(
         padding: EdgeInsets.only(bottom: 8.h),
         child: Row(children: [
@@ -286,24 +390,24 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
         children: [
           Text('Select Fuel Type', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
           SizedBox(height: 8.h),
-          ..._fuels.map((f) {
-            final sel = _fuel == f;
-            final fare = _fuelFares[f];
-            return InkWell(
-              onTap: single ? null : () => setState(() => _fuel = f),
-              borderRadius: BorderRadius.circular(8.r),
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 5.h),
-                child: Row(children: [
-                  Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 18.sp, color: sel ? AppColors.primary : AppColors.textHint),
-                  SizedBox(width: 8.w),
-                  Expanded(child: Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: sel ? AppColors.textPrimary : AppColors.textSecondary, fontFamily: 'Poppins'))),
-                  if (fare is num)
-                    Text('₹${fare.toInt()}', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: sel ? AppColors.primary : AppColors.textSecondary, fontFamily: 'Poppins')),
-                ]),
-              ),
-            );
-          }),
+          // Fuels on a single line (side by side).
+          Row(
+            children: _fuels.map((f) {
+              final sel = _fuel == f;
+              return Padding(
+                padding: EdgeInsets.only(right: 16.w),
+                child: InkWell(
+                  onTap: single ? null : () => setState(() => _fuel = f),
+                  borderRadius: BorderRadius.circular(8.r),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(sel ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded, size: 18.sp, color: sel ? AppColors.primary : AppColors.textHint),
+                    SizedBox(width: 6.w),
+                    Text(f, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: sel ? AppColors.textPrimary : AppColors.textSecondary, fontFamily: 'Poppins')),
+                  ]),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
@@ -340,7 +444,6 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
     final List<List<String>> content = [_inclusions, _exclusions, _facilities, _terms];
     final isExcl = _tab == 1;
     final accent = isExcl ? AppColors.primary : AppColors.success;
-    final icon = _tab == 3 ? Icons.description_rounded : (isExcl ? Icons.cancel_rounded : Icons.check_circle_rounded);
     return Container(
       padding: EdgeInsets.all(12.w),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16.r), border: Border.all(color: AppColors.border)),
@@ -376,7 +479,12 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
             ...content[_tab].map((e) => Padding(
                   padding: EdgeInsets.symmetric(vertical: 6.h),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Icon(icon, size: 17.sp, color: accent),
+                    Container(
+                      margin: EdgeInsets.only(top: 7.h),
+                      width: 5.w,
+                      height: 5.w,
+                      decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                    ),
                     SizedBox(width: 10.w),
                     Expanded(child: Text(e, style: TextStyle(fontSize: 12.5.sp, height: 1.4, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
                   ]),

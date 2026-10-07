@@ -23,6 +23,7 @@ export default function CabCategoriesPage() {
   // ── Global cab settings (apply to ALL cabs) ───────────────────────────────────
   const [minBillKm, setMinBillKm] = useState<number>(0);
   const [tollTaxPerKm, setTollTaxPerKm] = useState<number>(0);
+  const [gstPercent, setGstPercent] = useState<number>(0);
   const { data: settingsData } = useQuery({
     queryKey: ['admin-settings-cab'],
     queryFn: () => adminApi.getAdminSettings(),
@@ -31,9 +32,10 @@ export default function CabCategoriesPage() {
     const s = (settingsData as any)?.data;
     if (typeof s?.minBillKm === 'number') setMinBillKm(s.minBillKm);
     if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
+    if (typeof s?.gstPercent === 'number') setGstPercent(s.gstPercent);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0 }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0 }),
     onSuccess: () => {
       toast.success('Cab settings saved');
       queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
@@ -73,7 +75,7 @@ export default function CabCategoriesPage() {
 
       {/* Global cab settings — apply to every cab */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Minimum Bill KM (all cabs)</label>
             <input
@@ -101,6 +103,22 @@ export default function CabCategoriesPage() {
             />
             <p className="text-xs text-gray-500 mt-1">
               Used for the “All Inclusive” fare only when Google has no toll amount for a route (long/inter-state trips + state tax). e.g. 1200 km × ₹1.5 = ₹1800.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">GST (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.5"
+              placeholder="e.g. 5 (0 = no GST)"
+              value={gstPercent}
+              onChange={(e) => setGstPercent(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Added to the “All Inclusive” fare for all cabs. e.g. 5% on a ₹1,000 fare → +₹50.
             </p>
           </div>
         </div>

@@ -107,6 +107,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   bool get _isEdit => _editId.isNotEmpty;
   List<String> get _inclusions => ((widget.data['inclusions'] as List?) ?? []).map((e) => e.toString()).toList();
   int get _toll => (widget.data['toll'] as num?)?.toInt() ?? 0;
+  // Fare breakdown parts (from the details screen).
+  int get _driverAllowance => (widget.data['driverAllowance'] as num?)?.toInt() ?? 0;
+  int get _gstAmount => (widget.data['gstAmount'] as num?)?.toInt() ?? 0;
+  int get _baseFarePart => (widget.data['baseFare'] as num?)?.toInt() ?? (_fare - _driverAllowance - _gstAmount);
   String get _incMode => (widget.data['incMode'] ?? 'All Inclusive').toString();
   bool get _isBestPrice => _incMode == 'Best Price';
   int get _extraKm => (_cat['extraKmPrice'] as num?)?.toInt() ?? 0;
@@ -132,6 +136,54 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   }
 
   int _advanceRupees(int percent) => (_fare * percent / 100).round();
+
+  // Fare-breakdown sheet opened from the "Total Fare (i)" row.
+  void _showFareBreakdown() {
+    final advance = _advanceRupees(_payPercent);
+    final payToDriver = (_fare - advance).clamp(0, _fare);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 18.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+              SizedBox(height: 14.h),
+              Text('Fare Breakdown', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+              SizedBox(height: 12.h),
+              _bdRow('Base Fare', _baseFarePart),
+              if (_driverAllowance > 0) _bdRow('Driver Allowance', _driverAllowance),
+              if (_gstAmount > 0) _bdRow('GST', _gstAmount),
+              Padding(padding: EdgeInsets.symmetric(vertical: 6.h), child: Divider(height: 1, color: AppColors.border)),
+              _bdRow('Total Fare', _fare, bold: true),
+              SizedBox(height: 14.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                decoration: BoxDecoration(color: AppColors.info.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12.r)),
+                child: Column(children: [
+                  _bdRow('Pay Now', advance, accent: true),
+                  _bdRow('Pay to Driver', payToDriver.toInt(), accent: true),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bdRow(String label, int amount, {bool bold = false, bool accent = false}) => Padding(
+        padding: EdgeInsets.symmetric(vertical: 4.h),
+        child: Row(children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: bold ? 14.sp : 12.5.sp, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: accent ? AppColors.textPrimary : (bold ? AppColors.textPrimary : AppColors.textSecondary), fontFamily: 'Poppins'))),
+          Text('₹$amount', style: TextStyle(fontSize: bold ? 15.sp : 13.sp, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, color: (bold || accent) ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
+        ]),
+      );
 
   void _err(String m) => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(m), backgroundColor: AppColors.error, behavior: SnackBarBehavior.floating));
@@ -658,17 +710,20 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Total Fare — label + info on the left, amount on the right.
-            Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 10.h),
-              child: Row(
-                children: [
-                  Text('Total Fare', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                  SizedBox(width: 5.w),
-                  Icon(Icons.info_outline_rounded, size: 15.sp, color: AppColors.textSecondary),
-                  const Spacer(),
-                  Text(_fare > 0 ? '₹$_fare' : 'On request', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                ],
+            // Total Fare — tap the label/info to see the full breakdown.
+            InkWell(
+              onTap: _fare > 0 ? _showFareBreakdown : null,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 10.h),
+                child: Row(
+                  children: [
+                    Text('Total Fare', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                    SizedBox(width: 5.w),
+                    Icon(Icons.info_outline_rounded, size: 15.sp, color: AppColors.primary),
+                    const Spacer(),
+                    Text(_fare > 0 ? '₹$_fare' : 'On request', style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                  ],
+                ),
               ),
             ),
             Divider(height: 1, color: AppColors.border),

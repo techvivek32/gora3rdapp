@@ -279,6 +279,7 @@ export const adminApi = {
     viewsEnabled?: boolean;
     minBillKm?: number;
     tollTaxPerKm?: number;
+    gstPercent?: number;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;
   }) => apiClient.put('/settings', data),

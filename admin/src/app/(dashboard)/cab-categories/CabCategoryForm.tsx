@@ -20,6 +20,10 @@ export interface CabCategory {
   pricePerKmCng?: number;
   statePricing?: StatePrice[];
   discountPercent?: number;
+  allowanceDailyRate?: number;
+  allowanceDistanceThreshold?: number;
+  allowanceBaseRate?: number;
+  allowanceMaxRate?: number;
   dailyKmLimit?: number;
   extraKmPrice?: number;
   packageKmPerHour?: number;
@@ -39,6 +43,7 @@ const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
   pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
   discountPercent: 0,
+  allowanceDailyRate: 0, allowanceDistanceThreshold: 0, allowanceBaseRate: 0, allowanceMaxRate: 0,
   dailyKmLimit: 0, extraKmPrice: 0,
   packageKmPerHour: 0, extraHourPrice: 0,
   seats: 0, bags: '',
@@ -49,11 +54,12 @@ const EMPTY_FORM = {
 type Fuel = 'petrol' | 'diesel' | 'cng';
 type StateMap = Record<string, { petrol?: number; diesel?: number; cng?: number }>;
 
-type SectionKey = 'details' | 'pricing' | 'km' | 'discount' | 'info';
+type SectionKey = 'details' | 'pricing' | 'km' | 'allowance' | 'discount' | 'info';
 const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'details', label: 'Cab Details' },
   { key: 'pricing', label: 'Pricing (₹/km)' },
   { key: 'km', label: 'KM & Rental' },
+  { key: 'allowance', label: 'Driver Allowance' },
   { key: 'discount', label: 'Discount' },
   { key: 'info', label: 'Booking Info' },
 ];
@@ -133,6 +139,10 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
       pricePerKmDiesel: it.pricePerKmDiesel ?? 0,
       pricePerKmCng: it.pricePerKmCng ?? 0,
       discountPercent: it.discountPercent ?? 0,
+      allowanceDailyRate: it.allowanceDailyRate ?? 0,
+      allowanceDistanceThreshold: it.allowanceDistanceThreshold ?? 0,
+      allowanceBaseRate: it.allowanceBaseRate ?? 0,
+      allowanceMaxRate: it.allowanceMaxRate ?? 0,
       dailyKmLimit: it.dailyKmLimit ?? 0,
       extraKmPrice: it.extraKmPrice ?? 0,
       packageKmPerHour: it.packageKmPerHour ?? 0,
@@ -213,6 +223,10 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
       cng: statePrices[st]?.cng ?? base('cng'),
     })),
     discountPercent: Math.min(100, Math.max(0, Number(form.discountPercent) || 0)),
+    allowanceDailyRate: Number(form.allowanceDailyRate) || 0,
+    allowanceDistanceThreshold: Number(form.allowanceDistanceThreshold) || 0,
+    allowanceBaseRate: Number(form.allowanceBaseRate) || 0,
+    allowanceMaxRate: Number(form.allowanceMaxRate) || 0,
     dailyKmLimit: Number(form.dailyKmLimit) || 0,
     extraKmPrice: Number(form.extraKmPrice) || 0,
     packageKmPerHour: Number(form.packageKmPerHour) || 0,
@@ -472,6 +486,40 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── Driver Allowance ─────────────────────────────────────── */}
+            {section === 'allowance' && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Round Trip</h3>
+                  <p className="text-xs text-gray-500 mb-2">Allowance = trip days × daily rate (distance is ignored).</p>
+                  <div className="max-w-xs">
+                    <label className={labelCls}>Daily rate (₹/day)</label>
+                    <input type="number" min={0} placeholder="e.g. 300" value={form.allowanceDailyRate} onChange={(e) => setForm({ ...form, allowanceDailyRate: Number(e.target.value) })} className={inputCls} />
+                  </div>
+                </div>
+
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">One Way</h3>
+                  <p className="text-xs text-gray-500 mb-2">Distance ≤ threshold → base rate; distance &gt; threshold → max (cap) rate.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className={labelCls}>Distance threshold (km)</label>
+                      <input type="number" min={0} placeholder="e.g. 300" value={form.allowanceDistanceThreshold} onChange={(e) => setForm({ ...form, allowanceDistanceThreshold: Number(e.target.value) })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Base rate (₹, short)</label>
+                      <input type="number" min={0} placeholder="e.g. 300" value={form.allowanceBaseRate} onChange={(e) => setForm({ ...form, allowanceBaseRate: Number(e.target.value) })} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Max rate (₹, long)</label>
+                      <input type="number" min={0} placeholder="e.g. 600" value={form.allowanceMaxRate} onChange={(e) => setForm({ ...form, allowanceMaxRate: Number(e.target.value) })} className={inputCls} />
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">The driver allowance is added to the One Way / Round Trip fare total (not applied to Local). Set 0 to charge no allowance.</p>
               </div>
             )}
 

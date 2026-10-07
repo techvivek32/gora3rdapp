@@ -106,6 +106,10 @@ export class PlatformSettings {
   @Prop({ default: 0, min: 0 })
   tollTaxPerKm: number;
 
+  /** GST percent added to the "All Inclusive" cab fare (0 = no GST). */
+  @Prop({ default: 0, min: 0, max: 100 })
+  gstPercent: number;
+
   /**
    * Minimum wallet balance (₹) a Golden driver/vendor must have to ACCEPT a
    * customer booking. Nothing is deducted — it's only an eligibility check.

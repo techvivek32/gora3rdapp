@@ -59,6 +59,7 @@ export class SettingsController {
     viewsEnabled?: boolean;
     minBillKm?: number;
     tollTaxPerKm?: number;
+    gstPercent?: number;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;
   }) {
