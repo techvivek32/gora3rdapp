@@ -1,88 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import toast from 'react-hot-toast';
-
-interface CabCategory {
-  _id: string;
-  name: string;
-  vehicleClass?: string;
-  imageUrl?: string;
-  pricePerKm: number;
-  pricePerKmPetrol?: number;
-  pricePerKmDiesel?: number;
-  pricePerKmCng?: number;
-  dailyKmLimit?: number;
-  extraKmPrice?: number;
-  packageKmPerHour?: number;
-  extraHourPrice?: number;
-  seats?: number;
-  bags?: string;
-  inclusions?: string[];
-  exclusions?: string[];
-  facilities?: string[];
-  terms?: string[];
-  order: number;
-  isActive: boolean;
-  createdAt?: string;
-}
-
-const EMPTY_FORM = {
-  name: '', vehicleClass: '', imageUrl: '',
-  pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
-  dailyKmLimit: 0, extraKmPrice: 0,
-  packageKmPerHour: 0, extraHourPrice: 0,
-  seats: 0, bags: '',
-  inclusions: [] as string[], exclusions: [] as string[], facilities: [] as string[], terms: [] as string[],
-  order: 0, isActive: true,
-};
-
-// A simple add/remove editor for a per-cab string list, held in the form state.
-function ArrayField({ label, placeholder, values, onChange }: { label: string; placeholder: string; values: string[]; onChange: (v: string[]) => void }) {
-  const [val, setVal] = useState('');
-  const add = () => { const t = val.trim(); if (t) { onChange([...values, t]); setVal(''); } };
-  return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
-      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">{label}</h3>
-      <div className="flex gap-2 mb-2">
-        <input
-          type="text"
-          placeholder={placeholder}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-        />
-        <button type="button" onClick={add} disabled={!val.trim()}
-          className="px-3 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-50">Add</button>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {values.length === 0 && <span className="text-xs text-gray-400">No items yet.</span>}
-        {values.map((v, i) => (
-          <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 dark:bg-gray-800 dark:text-gray-300">
-            {v}
-            <button type="button" onClick={() => onChange(values.filter((_, j) => j !== i))} className="text-gray-500 hover:text-red-600 font-bold leading-none">×</button>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
+import type { CabCategory } from './CabCategoryForm';
 
 export default function CabCategoriesPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
-
-  const [showForm, setShowForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  // Which fuels are offered for this category (shows its price input when on).
-  const [fuelActive, setFuelActive] = useState({ petrol: false, diesel: false, cng: false });
-  const [imgError, setImgError] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['cab-categories'],
@@ -113,55 +41,6 @@ export default function CabCategoriesPage() {
     onError: () => toast.error('Failed to save cab settings'),
   });
 
-  const buildPayload = () => ({
-    name: form.name.trim(),
-    vehicleClass: form.vehicleClass.trim(),
-    imageUrl: form.imageUrl.trim(),
-    // Base rate = the first active fuel's price (kept as a safe fallback).
-    pricePerKm:
-      (fuelActive.petrol && Number(form.pricePerKmPetrol)) ||
-      (fuelActive.diesel && Number(form.pricePerKmDiesel)) ||
-      (fuelActive.cng && Number(form.pricePerKmCng)) || 0,
-    pricePerKmPetrol: fuelActive.petrol ? (Number(form.pricePerKmPetrol) || 0) : 0,
-    pricePerKmDiesel: fuelActive.diesel ? (Number(form.pricePerKmDiesel) || 0) : 0,
-    pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
-    dailyKmLimit: Number(form.dailyKmLimit) || 0,
-    extraKmPrice: Number(form.extraKmPrice) || 0,
-    packageKmPerHour: Number(form.packageKmPerHour) || 0,
-    extraHourPrice: Number(form.extraHourPrice) || 0,
-    seats: Number(form.seats) || 0,
-    bags: form.bags.trim(),
-    inclusions: form.inclusions,
-    exclusions: form.exclusions,
-    facilities: form.facilities,
-    terms: form.terms,
-    order: Number(form.order) || 0,
-    isActive: form.isActive,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: () => adminApi.createCabCategory(buildPayload()),
-    onSuccess: () => {
-      toast.success('Category created');
-      setForm(EMPTY_FORM);
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['cab-categories'] });
-    },
-    onError: () => toast.error('Failed to create category'),
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: () => adminApi.updateCabCategory(editingId!, buildPayload()),
-    onSuccess: () => {
-      toast.success('Category updated');
-      setEditingId(null);
-      setForm(EMPTY_FORM);
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['cab-categories'] });
-    },
-    onError: () => toast.error('Failed to update category'),
-  });
-
   const toggleMutation = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       adminApi.updateCabCategory(id, { isActive }),
@@ -177,77 +56,6 @@ export default function CabCategoriesPage() {
     onError: () => toast.error('Failed to delete category'),
   });
 
-  const openCreate = () => {
-    setEditingId(null);
-    setForm(EMPTY_FORM);
-    setFuelActive({ petrol: false, diesel: false, cng: false });
-    setImgError(false);
-    setShowForm(true);
-  };
-
-  const openEdit = (it: CabCategory) => {
-    setEditingId(it._id);
-    setForm({
-      name: it.name,
-      vehicleClass: it.vehicleClass ?? '',
-      imageUrl: it.imageUrl ?? '',
-      pricePerKm: it.pricePerKm ?? 0,
-      pricePerKmPetrol: it.pricePerKmPetrol ?? 0,
-      pricePerKmDiesel: it.pricePerKmDiesel ?? 0,
-      pricePerKmCng: it.pricePerKmCng ?? 0,
-      dailyKmLimit: it.dailyKmLimit ?? 0,
-      extraKmPrice: it.extraKmPrice ?? 0,
-      packageKmPerHour: it.packageKmPerHour ?? 0,
-      extraHourPrice: it.extraHourPrice ?? 0,
-      seats: it.seats ?? 0,
-      bags: it.bags ?? '',
-      inclusions: it.inclusions ?? [],
-      exclusions: it.exclusions ?? [],
-      facilities: it.facilities ?? [],
-      terms: it.terms ?? [],
-      order: it.order ?? 0,
-      isActive: it.isActive,
-    });
-    setFuelActive({
-      petrol: (it.pricePerKmPetrol ?? 0) > 0,
-      diesel: (it.pricePerKmDiesel ?? 0) > 0,
-      cng: (it.pricePerKmCng ?? 0) > 0,
-    });
-    setImgError(false);
-    setShowForm(true);
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!file.type.startsWith('image/')) return toast.error('Please select an image file');
-    setUploading(true);
-    try {
-      const res = await adminApi.uploadCabImage(file) as any;
-      // Interceptor: { data: { url } } or { url } depending on nesting
-      const url = res?.data?.url ?? res?.url ?? res?.data?.data?.url;
-      if (!url) throw new Error('No URL returned');
-      setForm((f) => ({ ...f, imageUrl: url }));
-      setImgError(false);
-      toast.success('Image uploaded');
-    } catch {
-      toast.error('Upload failed — check storage config or paste a URL instead');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!form.name.trim()) return toast.error('A name is required');
-    const anyFuel =
-      (fuelActive.petrol && Number(form.pricePerKmPetrol) > 0) ||
-      (fuelActive.diesel && Number(form.pricePerKmDiesel) > 0) ||
-      (fuelActive.cng && Number(form.pricePerKmCng) > 0);
-    if (!anyFuel) return toast.error('Add at least one fuel with a price per km');
-    if (editingId) updateMutation.mutate();
-    else createMutation.mutate();
-  };
-
-  const isBusy = createMutation.isPending || updateMutation.isPending || uploading;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -256,10 +64,10 @@ export default function CabCategoriesPage() {
           <p className="text-gray-500 mt-1">Manage the vehicle classes shown on the customer app&apos;s Explore Cabs results</p>
         </div>
         <button
-          onClick={showForm ? () => { setShowForm(false); setEditingId(null); } : openCreate}
+          onClick={() => router.push('/cab-categories/new')}
           className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors"
         >
-          {showForm ? 'Cancel' : '+ Add Category'}
+          + Add Category
         </button>
       </div>
 
@@ -304,261 +112,6 @@ export default function CabCategoriesPage() {
           {saveMinKmMutation.isPending ? 'Saving…' : 'Save'}
         </button>
       </div>
-
-      {/* Form */}
-      {showForm && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-5">
-          <h2 className="font-semibold text-lg text-gray-900 dark:text-white">{editingId ? 'Edit Category' : 'New Category'}</h2>
-
-          {/* Image upload + URL */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Image <span className="font-normal text-gray-400">— recommended 400 × 300 px (4:3), same size for all cabs</span>
-            </label>
-
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = ''; }}
-            />
-
-            {/* Preview / upload area */}
-            <div
-              onClick={() => !uploading && fileInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFileUpload(f); }}
-              className={`relative rounded-2xl overflow-hidden aspect-[4/3] w-full max-w-xs mx-auto cursor-pointer border-2 border-dashed transition-colors ${uploading ? 'border-brand-400 opacity-70' : 'border-gray-300 hover:border-brand-500'}`}
-            >
-              {form.imageUrl && !imgError ? (
-                <>
-                  <img
-                    src={form.imageUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                    onError={() => setImgError(true)}
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    <span className="text-white text-sm font-medium">Click to change</span>
-                  </div>
-                </>
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-orange-100 to-orange-200 flex flex-col items-center justify-center gap-2">
-                  {uploading ? (
-                    <>
-                      <div className="w-8 h-8 border-4 border-brand-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-brand-700 text-sm font-medium">Uploading...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                      <span className="text-gray-600 dark:text-gray-400 text-sm font-medium">Click or drag to upload image</span>
-                      <span className="text-gray-400 text-xs">PNG, JPG, WebP · Recommended 400 × 300 px (4:3)</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Or paste URL */}
-            <div className="mt-2 flex items-center gap-2">
-              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-              <span className="text-xs text-gray-400 whitespace-nowrap">or paste URL</span>
-              <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-            </div>
-            <input
-              type="url"
-              placeholder="https://example.com/image.jpg"
-              value={form.imageUrl}
-              onChange={(e) => { setForm({ ...form, imageUrl: e.target.value }); setImgError(false); }}
-              className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-            {form.imageUrl && imgError && (
-              <p className="text-red-500 text-xs mt-1">Could not load image from this URL</p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Wagon R or equivalent"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vehicle Class</label>
-              <input
-                type="text"
-                placeholder="e.g. Compact / Sedan / SUV"
-                value={form.vehicleClass}
-                onChange={(e) => setForm({ ...form, vehicleClass: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Available fuels &amp; price/km (₹)</label>
-              <p className="text-xs text-gray-500 mb-2">Tick a fuel to offer it, then set its per-km rate. Only ticked fuels show in the app.</p>
-              <div className="space-y-2">
-                {([
-                  { key: 'petrol', label: 'Petrol', field: 'pricePerKmPetrol' as const },
-                  { key: 'diesel', label: 'Diesel', field: 'pricePerKmDiesel' as const },
-                  { key: 'cng', label: 'CNG', field: 'pricePerKmCng' as const },
-                ] as const).map((f) => {
-                  const active = fuelActive[f.key as keyof typeof fuelActive];
-                  return (
-                    <div key={f.key} className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 w-28 shrink-0 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={active}
-                          onChange={(e) => setFuelActive({ ...fuelActive, [f.key]: e.target.checked })}
-                          className="w-4 h-4 accent-brand-600"
-                        />
-                        <span className="text-sm text-gray-700 dark:text-gray-300">{f.label}</span>
-                      </label>
-                      <input
-                        type="number"
-                        placeholder={`₹/km for ${f.label}`}
-                        disabled={!active}
-                        value={form[f.field]}
-                        onChange={(e) => setForm({ ...form, [f.field]: Number(e.target.value) })}
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Seats</label>
-              <input
-                type="number"
-                placeholder="e.g. 4"
-                value={form.seats}
-                onChange={(e) => setForm({ ...form, seats: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bags</label>
-              <input
-                type="text"
-                placeholder="e.g. 1 Small bag"
-                value={form.bags}
-                onChange={(e) => setForm({ ...form, bags: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Order</label>
-              <input
-                type="number"
-                value={form.order}
-                onChange={(e) => setForm({ ...form, order: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Round-trip KM / day</label>
-              <input
-                type="number"
-                min={0}
-                placeholder="e.g. 250 (0 = no limit)"
-                value={form.dailyKmLimit}
-                onChange={(e) => setForm({ ...form, dailyKmLimit: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Extra KM price (₹/km)</label>
-              <input
-                type="number"
-                min={0}
-                placeholder="e.g. 10"
-                value={form.extraKmPrice}
-                onChange={(e) => setForm({ ...form, extraKmPrice: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 -mt-2">
-            <b>Round trip only</b>: included km = max(route distance, KM/day × days), where days are counted from the
-            trip start to the trip end date (e.g. 250 × 2 days = 500 km min; a longer route bills the actual km).
-            The return leg is counted in the route. One Way uses the global minimum km. GPS measures the driver’s
-            actual km; anything beyond the included km is billed at the extra ₹/km.
-          </p>
-
-          {/* Local (in-city hourly package) pricing */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Local package KM / hour</label>
-              <input
-                type="number"
-                min={0}
-                placeholder="e.g. 10 (0 = no Local packages)"
-                value={form.packageKmPerHour}
-                onChange={(e) => setForm({ ...form, packageKmPerHour: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Extra hour price (₹/hr)</label>
-              <input
-                type="number"
-                min={0}
-                placeholder="e.g. 150"
-                value={form.extraHourPrice}
-                onChange={(e) => setForm({ ...form, extraHourPrice: Number(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              />
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 -mt-2">
-            Local (in-city hourly): a 6/8/10/12-hour package includes KM/hour × hours (e.g. 10 × 8 = 80 km) at the per-km rate. Time used beyond the package is billed at the extra ₹/hr; km beyond the included allowance at the extra ₹/km above.
-          </p>
-
-          {/* Per-cab info tabs — shown on the customer Confirm Booking screen */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Booking Info (shows as tabs in the app for this cab)</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <ArrayField label="Inclusions" placeholder="e.g. Toll tax" values={form.inclusions} onChange={(v) => setForm({ ...form, inclusions: v })} />
-              <ArrayField label="Exclusions" placeholder="e.g. Parking beyond 2 hrs" values={form.exclusions} onChange={(v) => setForm({ ...form, exclusions: v })} />
-              <ArrayField label="Facilities" placeholder="e.g. AC, Music, Luggage carrier" values={form.facilities} onChange={(v) => setForm({ ...form, facilities: v })} />
-              <ArrayField label="Terms & Conditions" placeholder="e.g. Waiting charge ₹100/hr" values={form.terms} onChange={(v) => setForm({ ...form, terms: v })} />
-            </div>
-          </div>
-
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-              className="w-4 h-4 text-brand-600 rounded"
-            />
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Active (visible in app)</span>
-          </label>
-
-          <button
-            onClick={handleSubmit}
-            disabled={isBusy || !form.name.trim()}
-            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
-          >
-            {isBusy ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Saving...
-              </>
-            ) : editingId ? 'Update Category' : 'Create Category'}
-          </button>
-        </div>
-      )}
 
       {/* Categories table */}
       {isLoading ? (
@@ -626,7 +179,7 @@ export default function CabCategoriesPage() {
                     <td className="px-4 py-3">
                       <div className="flex gap-2 justify-end">
                         <button
-                          onClick={() => openEdit(it)}
+                          onClick={() => router.push(`/cab-categories/${it._id}/edit`)}
                           className="px-3 py-1.5 text-xs font-semibold border border-gray-300 dark:border-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         >
                           Edit
