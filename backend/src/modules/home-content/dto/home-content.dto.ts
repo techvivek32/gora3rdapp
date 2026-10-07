@@ -1,5 +1,13 @@
-import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { HomeSectionType } from '../../../database/schemas/home-content.schema';
+
+export class StatePriceDto {
+  @IsString() state: string;
+  @IsOptional() @IsNumber() petrol?: number;
+  @IsOptional() @IsNumber() diesel?: number;
+  @IsOptional() @IsNumber() cng?: number;
+}
 
 export class CreateShowcaseDto {
   @IsEnum(HomeSectionType) section: HomeSectionType;
@@ -39,6 +47,8 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmPetrol?: number;
   @IsOptional() @IsNumber() pricePerKmDiesel?: number;
   @IsOptional() @IsNumber() pricePerKmCng?: number;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
+  @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;
@@ -61,6 +71,8 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmPetrol?: number;
   @IsOptional() @IsNumber() pricePerKmDiesel?: number;
   @IsOptional() @IsNumber() pricePerKmCng?: number;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
+  @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
   @IsOptional() @IsNumber() dailyKmLimit?: number;
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;

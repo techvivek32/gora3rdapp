@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/indian_states.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -152,7 +153,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
 
   // Distance-only fare (Best Price). All Inclusive adds the route toll.
   // Local has no toll (in-city) — the package price stands alone.
-  int _fareFor(Map<String, dynamic> cat) => _baseFare(cat) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
+  int _rawFareFor(Map<String, dynamic> cat) => _baseFare(cat) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
+  int _fareFor(Map<String, dynamic> cat) => _discounted(_rawFareFor(cat), cat);
 
   String _catId(Map<String, dynamic> cat) => (cat['_id'] ?? cat['name'] ?? '').toString();
 
@@ -173,14 +175,45 @@ class _CabResultsPageState extends State<CabResultsPage> {
     return (sel != null && avail.contains(sel)) ? sel : avail.first;
   }
 
-  /// Per-km rate for the card's selected fuel; falls back to pricePerKm.
-  double _rate(Map<String, dynamic> cat) {
-    final f = _fuelOf(cat);
-    if (f.isEmpty) return (cat['pricePerKm'] as num?)?.toDouble() ?? 0;
-    final key = f == 'Diesel' ? 'pricePerKmDiesel' : f == 'CNG' ? 'pricePerKmCng' : 'pricePerKmPetrol';
-    final r = (cat[key] as num?)?.toDouble() ?? 0;
-    return r > 0 ? r : ((cat['pricePerKm'] as num?)?.toDouble() ?? 0);
+  // The pickup's state (for state-wise fuel pricing), derived from the pickup
+  // address/city the customer selected. Empty = no state → use the base rate.
+  String? _pickupStateCache;
+  String get _pickupState {
+    _pickupStateCache ??= stateFromText(
+      '${((widget.trip['pickup'] as Map?)?['address'] ?? '')} ${widget.trip['pickupCity'] ?? ''}',
+    );
+    return _pickupStateCache!;
   }
+
+  /// State-wise ₹/km override for this cab + fuel, or 0 when none applies.
+  double _stateRate(Map<String, dynamic> cat, String fuel) {
+    if (_pickupState.isEmpty) return 0;
+    final sp = cat['statePricing'];
+    if (sp is! List) return 0;
+    final key = fuel == 'Diesel' ? 'diesel' : fuel == 'CNG' ? 'cng' : 'petrol';
+    for (final e in sp) {
+      if (e is Map && (e['state'] ?? '').toString().toLowerCase() == _pickupState.toLowerCase()) {
+        return (e[key] as num?)?.toDouble() ?? 0;
+      }
+    }
+    return 0;
+  }
+
+  /// Per-cab discount percent (0–100).
+  double _discountPct(Map<String, dynamic> cat) {
+    final p = (cat['discountPercent'] as num?)?.toDouble() ?? 0;
+    return p.clamp(0, 100).toDouble();
+  }
+
+  /// Apply the cab's discount to a fare (rounded).
+  int _discounted(int fare, Map<String, dynamic> cat) {
+    final p = _discountPct(cat);
+    return p > 0 ? (fare * (1 - p / 100)).round() : fare;
+  }
+
+  /// Per-km rate for the card's selected fuel; prefers the pickup state's rate,
+  /// then the base fuel rate, then pricePerKm.
+  double _rate(Map<String, dynamic> cat) => _rateForFuel(cat, _fuelOf(cat));
 
   /// Minimum included km for this cab.
   /// Round Trip → the cab's KM/day × trip days. One Way (and round trips with no
@@ -210,9 +243,11 @@ class _CabResultsPageState extends State<CabResultsPage> {
   int _baseFare(Map<String, dynamic> cat) =>
       _isLocal ? (_localIncludedKm(cat) * _rate(cat)).round() : (_billableKmFor(cat) * _rate(cat)).round();
 
-  // Per-fuel fare so the next screen can show a price for each fuel the admin set.
+  // Per-fuel rate: pickup state's rate first, then the base fuel rate, then pricePerKm.
   double _rateForFuel(Map<String, dynamic> cat, String fuel) {
     if (fuel.isEmpty) return (cat['pricePerKm'] as num?)?.toDouble() ?? 0;
+    final sr = _stateRate(cat, fuel);
+    if (sr > 0) return sr;
     final key = fuel == 'Diesel' ? 'pricePerKmDiesel' : fuel == 'CNG' ? 'pricePerKmCng' : 'pricePerKmPetrol';
     final r = (cat[key] as num?)?.toDouble() ?? 0;
     return r > 0 ? r : ((cat['pricePerKm'] as num?)?.toDouble() ?? 0);
@@ -221,14 +256,25 @@ class _CabResultsPageState extends State<CabResultsPage> {
   int _baseFareForFuel(Map<String, dynamic> cat, String fuel) =>
       _isLocal ? (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round() : (_billableKmFor(cat) * _rateForFuel(cat, fuel)).round();
 
-  int _fareForFuel(Map<String, dynamic> cat, String fuel) =>
+  // Original (pre-discount) per-fuel fare, and the discounted fare actually charged.
+  int _rawFareForFuel(Map<String, dynamic> cat, String fuel) =>
       _baseFareForFuel(cat, fuel) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
 
-  /// Price range across the fuels the admin priced (for the card's "₹X – ₹Y").
+  int _fareForFuel(Map<String, dynamic> cat, String fuel) => _discounted(_rawFareForFuel(cat, fuel), cat);
+
+  /// Discounted price range across the fuels (for the card's "₹X – ₹Y").
   (int, int) _fareRange(Map<String, dynamic> cat) {
     final fuels = _availableFuels(cat);
     if (fuels.isEmpty) return (_fareFor(cat), _fareFor(cat));
     final fares = fuels.map((f) => _fareForFuel(cat, f)).toList()..sort();
+    return (fares.first, fares.last);
+  }
+
+  /// Original (pre-discount) price range — shown struck through when discounted.
+  (int, int) _rawFareRange(Map<String, dynamic> cat) {
+    final fuels = _availableFuels(cat);
+    if (fuels.isEmpty) return (_rawFareFor(cat), _rawFareFor(cat));
+    final fares = fuels.map((f) => _rawFareForFuel(cat, f)).toList()..sort();
     return (fares.first, fares.last);
   }
 
@@ -238,11 +284,16 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final t = widget.trip;
     final fuels = _availableFuels(cat);
     final fuelFares = {for (final f in fuels) f: _fareForFuel(cat, f)};
+    final fuelFaresRaw = {for (final f in fuels) f: _rawFareForFuel(cat, f)};
     context.push('/customer/cab-details', extra: {
       'trip': t,
       'cat': cat,
       'fuels': fuels,
       'fuelFares': fuelFares,
+      // Original (pre-discount) fares + discount %, for the struck-through price.
+      'fuelFaresRaw': fuelFaresRaw,
+      'noFuelFareRaw': _rawFareFor(cat),
+      'discountPercent': _discountPct(cat),
       'isLowest': _fareFor(cat) > 0 && _fareFor(cat) == _minFare,
       'defaultFuel': _fuelOf(cat),
       'distanceKm': _isLocal ? 0 : _distanceKm,
@@ -461,6 +512,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final fare = _fareFor(cat);
     final hasFare = fare > 0;
     final (loFare, hiFare) = _fareRange(cat);
+    final (loRaw, hiRaw) = _rawFareRange(cat);
+    final disc = _discountPct(cat);
     final img = (cat['imageUrl'] ?? '').toString();
     final seats = (cat['seats'] as num?)?.toInt() ?? 4;
     final bags = (cat['bags'] ?? '').toString();
@@ -520,10 +573,26 @@ class _CabResultsPageState extends State<CabResultsPage> {
                       Text('$seats seater ${vclass.isEmpty ? '' : '$vclass '}AC Cab',
                           style: TextStyle(fontSize: 11.5.sp, color: AppColors.primary, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
                       SizedBox(height: 8.h),
-                      if (hasFare)
+                      if (hasFare) ...[
+                        if (disc > 0) ...[
+                          Row(children: [
+                            Flexible(
+                              child: Text(loRaw == hiRaw ? '₹$loRaw' : '₹$loRaw – ₹$hiRaw',
+                                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, decoration: TextDecoration.lineThrough, fontFamily: 'Poppins')),
+                            ),
+                            SizedBox(width: 6.w),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 1.h),
+                              decoration: BoxDecoration(color: AppColors.success, borderRadius: BorderRadius.circular(4.r)),
+                              child: Text('${disc.round()}% OFF', style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+                            ),
+                          ]),
+                          SizedBox(height: 2.h),
+                        ],
                         Text(loFare == hiFare ? '₹$loFare' : '₹$loFare – ₹$hiFare',
-                            style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.textPrimary, fontFamily: 'Poppins'))
-                      else
+                            style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                      ] else
                         Text('On request', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textSecondary, fontFamily: 'Poppins')),
                     ],
                   ),

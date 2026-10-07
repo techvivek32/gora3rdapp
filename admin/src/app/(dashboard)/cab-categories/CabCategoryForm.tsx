@@ -4,7 +4,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
+import { INDIAN_STATES } from '@/lib/indian-states';
 import toast from 'react-hot-toast';
+
+export interface StatePrice { state: string; petrol?: number; diesel?: number; cng?: number }
 
 export interface CabCategory {
   _id: string;
@@ -15,6 +18,8 @@ export interface CabCategory {
   pricePerKmPetrol?: number;
   pricePerKmDiesel?: number;
   pricePerKmCng?: number;
+  statePricing?: StatePrice[];
+  discountPercent?: number;
   dailyKmLimit?: number;
   extraKmPrice?: number;
   packageKmPerHour?: number;
@@ -33,6 +38,7 @@ export interface CabCategory {
 const EMPTY_FORM = {
   name: '', vehicleClass: '', imageUrl: '',
   pricePerKm: 0, pricePerKmPetrol: 0, pricePerKmDiesel: 0, pricePerKmCng: 0,
+  discountPercent: 0,
   dailyKmLimit: 0, extraKmPrice: 0,
   packageKmPerHour: 0, extraHourPrice: 0,
   seats: 0, bags: '',
@@ -40,11 +46,15 @@ const EMPTY_FORM = {
   order: 0, isActive: true,
 };
 
-type SectionKey = 'details' | 'pricing' | 'km' | 'info';
+type Fuel = 'petrol' | 'diesel' | 'cng';
+type StateMap = Record<string, { petrol?: number; diesel?: number; cng?: number }>;
+
+type SectionKey = 'details' | 'pricing' | 'km' | 'discount' | 'info';
 const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'details', label: 'Cab Details' },
   { key: 'pricing', label: 'Pricing (₹/km)' },
   { key: 'km', label: 'KM & Rental' },
+  { key: 'discount', label: 'Discount' },
   { key: 'info', label: 'Booking Info' },
 ];
 
@@ -94,6 +104,10 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
   const [form, setForm] = useState(EMPTY_FORM);
   // Which fuels are offered for this category (shows its price input when on).
   const [fuelActive, setFuelActive] = useState({ petrol: false, diesel: false, cng: false });
+  // Explicit per-state fuel overrides. Empty for a state/fuel = uses the base rate.
+  const [statePrices, setStatePrices] = useState<StateMap>({});
+  const [stateFuel, setStateFuel] = useState<Fuel>('petrol'); // which fuel column is being edited
+  const [applyAll, setApplyAll] = useState<string>('');       // "apply to all states" input
   const [imgError, setImgError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +132,7 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
       pricePerKmPetrol: it.pricePerKmPetrol ?? 0,
       pricePerKmDiesel: it.pricePerKmDiesel ?? 0,
       pricePerKmCng: it.pricePerKmCng ?? 0,
+      discountPercent: it.discountPercent ?? 0,
       dailyKmLimit: it.dailyKmLimit ?? 0,
       extraKmPrice: it.extraKmPrice ?? 0,
       packageKmPerHour: it.packageKmPerHour ?? 0,
@@ -136,21 +151,68 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
       diesel: (it.pricePerKmDiesel ?? 0) > 0,
       cng: (it.pricePerKmCng ?? 0) > 0,
     });
+    const sp: StateMap = {};
+    for (const r of it.statePricing ?? []) {
+      sp[r.state] = { petrol: r.petrol, diesel: r.diesel, cng: r.cng };
+    }
+    setStatePrices(sp);
     setPrefilled(true);
   }, [data, editing, categoryId, prefilled]);
+
+  // Representative per-fuel rate, derived from the state prices (the first state
+  // with a value). Used as the app's fallback + the "which fuels" (>0) signal.
+  const stateBase = (fuel: Fuel): number => {
+    for (const st of INDIAN_STATES) {
+      const v = statePrices[st]?.[fuel];
+      if (v && v > 0) return v;
+    }
+    return 0;
+  };
+  const isFuelOn = (fuel: Fuel) => fuel === 'petrol' ? fuelActive.petrol : fuel === 'diesel' ? fuelActive.diesel : fuelActive.cng;
+  const base = (fuel: Fuel) => (isFuelOn(fuel) ? stateBase(fuel) : 0);
+
+  const activeFuels: Fuel[] = [
+    ...(fuelActive.petrol ? ['petrol' as const] : []),
+    ...(fuelActive.diesel ? ['diesel' as const] : []),
+    ...(fuelActive.cng ? ['cng' as const] : []),
+  ];
+
+  // Keep the selected state-pricing fuel tab pointed at an active fuel.
+  useEffect(() => {
+    const af: Fuel[] = [];
+    if (fuelActive.petrol) af.push('petrol');
+    if (fuelActive.diesel) af.push('diesel');
+    if (fuelActive.cng) af.push('cng');
+    if (af.length && !af.includes(stateFuel)) setStateFuel(af[0]);
+  }, [fuelActive.petrol, fuelActive.diesel, fuelActive.cng, stateFuel]);
+
+  const applyToAllStates = () => {
+    const v = applyAll === '' ? undefined : Number(applyAll);
+    setStatePrices((m) => {
+      const next = { ...m };
+      for (const st of INDIAN_STATES) next[st] = { ...next[st], [stateFuel]: v };
+      return next;
+    });
+  };
 
   const buildPayload = () => ({
     name: form.name.trim(),
     vehicleClass: form.vehicleClass.trim(),
     imageUrl: form.imageUrl.trim(),
-    // Base rate = the first active fuel's price (kept as a safe fallback).
-    pricePerKm:
-      (fuelActive.petrol && Number(form.pricePerKmPetrol)) ||
-      (fuelActive.diesel && Number(form.pricePerKmDiesel)) ||
-      (fuelActive.cng && Number(form.pricePerKmCng)) || 0,
-    pricePerKmPetrol: fuelActive.petrol ? (Number(form.pricePerKmPetrol) || 0) : 0,
-    pricePerKmDiesel: fuelActive.diesel ? (Number(form.pricePerKmDiesel) || 0) : 0,
-    pricePerKmCng: fuelActive.cng ? (Number(form.pricePerKmCng) || 0) : 0,
+    // Base/fallback per-fuel rate = representative from the state prices (also the
+    // "which fuels offered" signal for the app, which checks pricePerKm<Fuel> > 0).
+    pricePerKm: base('petrol') || base('diesel') || base('cng') || 0,
+    pricePerKmPetrol: base('petrol'),
+    pricePerKmDiesel: base('diesel'),
+    pricePerKmCng: base('cng'),
+    // Every state gets a rate: its explicit override, else the base for that fuel.
+    statePricing: INDIAN_STATES.map((st) => ({
+      state: st,
+      petrol: statePrices[st]?.petrol ?? base('petrol'),
+      diesel: statePrices[st]?.diesel ?? base('diesel'),
+      cng: statePrices[st]?.cng ?? base('cng'),
+    })),
+    discountPercent: Math.min(100, Math.max(0, Number(form.discountPercent) || 0)),
     dailyKmLimit: Number(form.dailyKmLimit) || 0,
     extraKmPrice: Number(form.extraKmPrice) || 0,
     packageKmPerHour: Number(form.packageKmPerHour) || 0,
@@ -202,11 +264,8 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
 
   const handleSubmit = () => {
     if (!form.name.trim()) { setSection('details'); return toast.error('A name is required'); }
-    const anyFuel =
-      (fuelActive.petrol && Number(form.pricePerKmPetrol) > 0) ||
-      (fuelActive.diesel && Number(form.pricePerKmDiesel) > 0) ||
-      (fuelActive.cng && Number(form.pricePerKmCng) > 0);
-    if (!anyFuel) { setSection('pricing'); return toast.error('Add at least one fuel with a price per km'); }
+    const anyFuel = base('petrol') > 0 || base('diesel') > 0 || base('cng') > 0;
+    if (!anyFuel) { setSection('pricing'); return toast.error('Tick a fuel and set at least one state price'); }
     if (editing) updateMutation.mutate();
     else createMutation.mutate();
   };
@@ -340,28 +399,93 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
 
             {/* ── Pricing (₹/km) ───────────────────────────────────────── */}
             {section === 'pricing' && (
-              <div>
-                <label className={labelCls}>Available fuels &amp; price/km (₹)</label>
-                <p className="text-xs text-gray-500 mb-2">Tick a fuel to offer it, then set its per-km rate. Only ticked fuels show in the app.</p>
-                <div className="space-y-2">
-                  {([
-                    { key: 'petrol', label: 'Petrol', field: 'pricePerKmPetrol' as const },
-                    { key: 'diesel', label: 'Diesel', field: 'pricePerKmDiesel' as const },
-                    { key: 'cng', label: 'CNG', field: 'pricePerKmCng' as const },
-                  ] as const).map((f) => {
-                    const active = fuelActive[f.key as keyof typeof fuelActive];
-                    return (
-                      <div key={f.key} className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 w-28 shrink-0 cursor-pointer">
-                          <input type="checkbox" checked={active} onChange={(e) => setFuelActive({ ...fuelActive, [f.key]: e.target.checked })} className="w-4 h-4 accent-brand-600" />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">{f.label}</span>
-                        </label>
-                        <input type="number" placeholder={`₹/km for ${f.label}`} disabled={!active} value={form[f.field]} onChange={(e) => setForm({ ...form, [f.field]: Number(e.target.value) })} className={`${inputCls} disabled:opacity-40 disabled:cursor-not-allowed`} />
-                      </div>
-                    );
-                  })}
+              <div className="space-y-5">
+                <div>
+                  <label className={labelCls}>Fuels offered</label>
+                  <p className="text-xs text-gray-500 mb-2">Tick the fuel types this cab offers. Set each fuel&apos;s per-km price state-wise below.</p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: 'petrol', label: 'Petrol' },
+                      { key: 'diesel', label: 'Diesel' },
+                      { key: 'cng', label: 'CNG' },
+                    ] as const).map((f) => {
+                      const active = fuelActive[f.key as keyof typeof fuelActive];
+                      return (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => setFuelActive({ ...fuelActive, [f.key]: !active })}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${active ? 'bg-brand-600 text-white border-brand-600' : 'border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        >
+                          {active ? '✓ ' : ''}{f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-3">The One Way fare = distance × the selected fuel&apos;s ₹/km (One Way uses the global Minimum Bill KM when the route is shorter).</p>
+
+                {/* State-wise prices */}
+                {activeFuels.length === 0 ? (
+                  <p className="text-xs text-gray-400 border-t border-gray-200 dark:border-gray-700 pt-4">Tick a fuel above to set its state-wise prices.</p>
+                ) : (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
+                    <div>
+                      <label className={labelCls}>State-wise price/km (₹)</label>
+                      <p className="text-xs text-gray-500">The app uses the pickup state&apos;s rate. Pick a fuel, then set each state (or use &quot;Apply to all&quot;).</p>
+                    </div>
+                    {/* Fuel sub-tabs (only active fuels) */}
+                    <div className="flex flex-wrap gap-2">
+                      {activeFuels.map((f) => (
+                        <button key={f} type="button" onClick={() => setStateFuel(f)}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-colors ${stateFuel === f ? 'bg-brand-600 text-white' : 'border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Apply to all states */}
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 max-w-[220px]">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Apply to all states (₹/km for {stateFuel})</label>
+                        <input type="number" min={0} placeholder={`e.g. ${base(stateFuel) || 100}`} value={applyAll} onChange={(e) => setApplyAll(e.target.value)} className={inputCls} />
+                      </div>
+                      <button type="button" onClick={applyToAllStates}
+                        className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors">Apply to all</button>
+                    </div>
+                    {/* Per-state inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 max-h-80 overflow-y-auto pr-1">
+                      {INDIAN_STATES.map((st) => (
+                        <div key={st} className="flex items-center gap-2">
+                          <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 truncate" title={st}>{st}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            placeholder={`${base(stateFuel)}`}
+                            value={statePrices[st]?.[stateFuel] ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setStatePrices((m) => ({ ...m, [st]: { ...m[st], [stateFuel]: v === '' ? undefined : Number(v) } }));
+                            }}
+                            className="w-24 px-2 py-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Discount ─────────────────────────────────────────────── */}
+            {section === 'discount' && (
+              <div className="space-y-3 max-w-sm">
+                <div>
+                  <label className={labelCls}>Discount (%)</label>
+                  <input type="number" min={0} max={100} placeholder="e.g. 10 (0 = no discount)" value={form.discountPercent} onChange={(e) => setForm({ ...form, discountPercent: Number(e.target.value) })} className={inputCls} />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Shown on the cab details screen as the original fare struck through, with the discounted fare below.
+                  E.g. 10% off a ₹1,000 fare → <span className="line-through">₹1,000</span> ₹900.
+                </p>
               </div>
             )}
 

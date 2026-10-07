@@ -57,9 +57,16 @@ export class CabCategory {
   @Prop({ default: '' }) imageUrl: string;
   @Prop({ default: 0 }) pricePerKm: number; // fallback / default rate
   // Per-km rate by fuel type (customer picks fuel; 0 = fall back to pricePerKm).
+  // These are the DEFAULT/base rates; per-state overrides live in statePricing.
   @Prop({ default: 0 }) pricePerKmPetrol: number;
   @Prop({ default: 0 }) pricePerKmDiesel: number;
   @Prop({ default: 0 }) pricePerKmCng: number;
+  // State-wise per-km fuel rates. The app uses the PICKUP state's rate; a state
+  // not listed (or a 0) falls back to the base pricePerKm<Fuel> above.
+  @Prop({ type: [{ state: String, petrol: Number, diesel: Number, cng: Number }], default: [] })
+  statePricing: { state: string; petrol: number; diesel: number; cng: number }[];
+  // Per-cab discount shown in the app (original fare struck through + discounted).
+  @Prop({ default: 0 }) discountPercent: number; // 0–100
   @Prop({ default: 4 }) seats: number;
   @Prop({ default: '' }) bags: string; // e.g. "1 Small bag"
   // Round-trip rental: included km PER DAY (0 = no per-day limit / unlimited).

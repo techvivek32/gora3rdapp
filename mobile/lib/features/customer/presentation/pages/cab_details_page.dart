@@ -41,6 +41,15 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
     return (widget.data['noFuelFare'] as num?)?.toInt() ?? 0;
   }
 
+  // Original (pre-discount) fare + discount %, for the struck-through price.
+  Map<String, dynamic> get _fuelFaresRaw => Map<String, dynamic>.from(widget.data['fuelFaresRaw'] as Map? ?? {});
+  double get _discountPct => (widget.data['discountPercent'] as num?)?.toDouble() ?? 0;
+  int get _rawFare {
+    final f = _fuelFaresRaw[_fuel];
+    if (f is num) return f.toInt();
+    return (widget.data['noFuelFareRaw'] as num?)?.toInt() ?? _fare;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -197,6 +206,20 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
                 SizedBox(height: 4.h),
                 Text('$seats seater ${vclass.isEmpty ? '' : '$vclass '}AC Cab', style: TextStyle(fontSize: 12.sp, fontStyle: FontStyle.italic, color: AppColors.textSecondary, fontFamily: 'Poppins')),
                 SizedBox(height: 10.h),
+                if (_discountPct > 0 && _rawFare > _fare)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: 2.h),
+                    child: Row(children: [
+                      Text('₹$_rawFare',
+                          style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, decoration: TextDecoration.lineThrough, fontFamily: 'Poppins')),
+                      SizedBox(width: 7.w),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 7.w, vertical: 2.h),
+                        decoration: BoxDecoration(color: AppColors.success, borderRadius: BorderRadius.circular(5.r)),
+                        child: Text('${_discountPct.round()}% OFF', style: TextStyle(fontSize: 9.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+                      ),
+                    ]),
+                  ),
                 Text('₹$_fare', style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.w900, color: AppColors.primary, fontFamily: 'Poppins')),
                 if (_toll > 0)
                   Padding(
