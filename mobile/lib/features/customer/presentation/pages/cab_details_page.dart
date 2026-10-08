@@ -48,6 +48,9 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
   Map<String, dynamic> get _fuelFaresRaw => Map<String, dynamic>.from(widget.data['fuelFaresRaw'] as Map? ?? {});
   double get _discountPct => (widget.data['discountPercent'] as num?)?.toDouble() ?? 0;
   int get _driverAllowance => (widget.data['driverAllowance'] as num?)?.toInt() ?? 0;
+  // Global GST %, for the "GST (5%)" label.
+  double get _gstPercent => (widget.data['gstPercent'] as num?)?.toDouble() ?? 0;
+  String get _gstLabel => _gstPercent > 0 ? 'GST (${_gstPercent.round()}%)' : 'GST';
 
   // Fare breakdown parts for the selected fuel (base+toll and GST, discounted).
   Map<String, dynamic> get _fuelBreakdown => Map<String, dynamic>.from(widget.data['fuelBreakdown'] as Map? ?? {});
@@ -140,6 +143,7 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
       'baseFare': _basePart,
       'driverAllowance': _driverAllowance,
       'gstAmount': _gstPart,
+      'gstPercent': _gstPercent,
       'toll': _toll,
       'incMode': widget.data['incMode'] ?? 'All Inclusive',
       'isRound': widget.data['isRound'] == true,
@@ -317,7 +321,7 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
           SizedBox(height: 10.h),
           _brRow('Base Fare', base),
           if (allowance > 0) _brRow('Driver Allowance', allowance),
-          if (gst > 0) _brRow('GST', gst),
+          if (gst > 0) _brRow(_gstLabel, gst),
           Padding(padding: EdgeInsets.symmetric(vertical: 6.h), child: Divider(height: 1, color: AppColors.border)),
           _brRow('Total Fare', _fare, bold: true),
         ],

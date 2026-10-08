@@ -33,6 +33,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
   // Selected fuel per cab card (keyed by category id/name). Only fuels the admin
   // priced for that category are offered; the fare uses the selected fuel's rate.
   final Map<String, String> _cardFuel = {};
+  // Cards whose inline "Fare breakup" section is currently expanded (keyed by cat id).
+  final Set<String> _expandedFare = {};
 
   // Fallback classes if the admin hasn't added any yet (so the screen still works).
   static const _defaultCats = <Map<String, dynamic>>[
@@ -155,33 +157,40 @@ class _CabResultsPageState extends State<CabResultsPage> {
 
   bool get _isBestPrice => _incMode == 'Best Price';
 
-  // Distance-only fare (Best Price). All Inclusive adds the route toll.
-  // Local has no toll (in-city) — the package price stands alone.
-  // Toll (All-Inclusive only) + GST (applies in BOTH modes — it's a tax on the fare).
-  int _taxOn(int baseFareAmount) {
-    final toll = (_isBestPrice || _isLocal) ? 0 : _toll.round();
-    final gst = _gstPercent > 0 ? ((baseFareAmount + toll) * _gstPercent / 100).round() : 0;
-    return toll + gst;
-  }
+  // Route toll (₹) applied only to the All-Inclusive mode (Local has none).
+  int get _tollRound => (_isBestPrice || _isLocal) ? 0 : _toll.round();
+
+  // GST is a tax on what the customer actually pays — i.e. on the (net base + toll)
+  // PLUS the driver allowance. e.g. ₹18000 base + ₹300 allowance → GST on ₹18300.
+  int _gstOnParts(int netBaseToll, int allowance) =>
+      _gstPercent > 0 ? ((netBaseToll + allowance) * _gstPercent / 100).round() : 0;
 
   // ── Fare breakdown parts (for the details/confirm "Base / GST / Allowance") ──
   // Ride fare + toll (pre-GST, pre-discount) for a fuel. Toll is All-Inclusive only.
   int _baseTollForFuel(Map<String, dynamic> cat, String fuel) =>
-      _baseFareForFuel(cat, fuel) + ((_isBestPrice || _isLocal) ? 0 : _toll.round());
-  int _gstForFuel(Map<String, dynamic> cat, String fuel) {
-    if (_gstPercent <= 0) return 0;
-    return (_baseTollForFuel(cat, fuel) * _gstPercent / 100).round();
-  }
+      _baseFareForFuel(cat, fuel) + _tollRound;
+  // Net base+toll the customer pays (after the cab discount).
+  int _netBaseForFuel(Map<String, dynamic> cat, String fuel) => _discounted(_baseTollForFuel(cat, fuel), cat);
+  // GST shown/charged: on (net base+toll + allowance). Already final — not re-discounted.
+  int _gstForFuel(Map<String, dynamic> cat, String fuel) =>
+      _gstOnParts(_netBaseForFuel(cat, fuel), _allowanceFor(cat));
 
-  // Discountable part (distance fare + toll + GST); the driver allowance is added
-  // AFTER the discount so the driver always receives their full allowance.
-  int _discountableBase(Map<String, dynamic> cat) {
-    final b = _baseFare(cat);
-    return b + _taxOn(b);
-  }
+  // No-fuel (single selected-fuel rate) equivalents.
+  int _baseTollNoFuel(Map<String, dynamic> cat) => _baseFare(cat) + _tollRound;
+  int _netBaseNoFuel(Map<String, dynamic> cat) => _discounted(_baseTollNoFuel(cat), cat);
 
-  int _rawFareFor(Map<String, dynamic> cat) => _discountableBase(cat) + _allowanceFor(cat);
-  int _fareFor(Map<String, dynamic> cat) => _discounted(_discountableBase(cat), cat) + _allowanceFor(cat);
+  // Final fare = net base+toll + driver allowance + GST (on net base + allowance).
+  // The allowance is added AFTER the discount so the driver gets their full amount.
+  int _rawFareFor(Map<String, dynamic> cat) {
+    final rb = _baseTollNoFuel(cat);
+    final al = _allowanceFor(cat);
+    return rb + al + _gstOnParts(rb, al);
+  }
+  int _fareFor(Map<String, dynamic> cat) {
+    final nb = _netBaseNoFuel(cat);
+    final al = _allowanceFor(cat);
+    return nb + al + _gstOnParts(nb, al);
+  }
 
   String _catId(Map<String, dynamic> cat) => (cat['_id'] ?? cat['name'] ?? '').toString();
 
@@ -298,15 +307,19 @@ class _CabResultsPageState extends State<CabResultsPage> {
   int _baseFareForFuel(Map<String, dynamic> cat, String fuel) =>
       _isLocal ? (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round() : (_billableKmFor(cat) * _rateForFuel(cat, fuel)).round();
 
-  // Original (pre-discount) per-fuel fare, and the discounted fare actually charged.
-  int _discountableBaseForFuel(Map<String, dynamic> cat, String fuel) {
-    final b = _baseFareForFuel(cat, fuel);
-    return b + _taxOn(b);
+  // Original (pre-discount) per-fuel fare = base+toll + allowance + GST(on base+allowance).
+  int _rawFareForFuel(Map<String, dynamic> cat, String fuel) {
+    final rb = _baseTollForFuel(cat, fuel);
+    final al = _allowanceFor(cat);
+    return rb + al + _gstOnParts(rb, al);
   }
 
-  int _rawFareForFuel(Map<String, dynamic> cat, String fuel) => _discountableBaseForFuel(cat, fuel) + _allowanceFor(cat);
-
-  int _fareForFuel(Map<String, dynamic> cat, String fuel) => _discounted(_discountableBaseForFuel(cat, fuel), cat) + _allowanceFor(cat);
+  // Discounted fare actually charged = net base+toll + allowance + GST(on net+allowance).
+  int _fareForFuel(Map<String, dynamic> cat, String fuel) {
+    final nb = _netBaseForFuel(cat, fuel);
+    final al = _allowanceFor(cat);
+    return nb + al + _gstOnParts(nb, al);
+  }
 
   /// Discounted price range across the fuels (for the card's "₹X – ₹Y").
   (int, int) _fareRange(Map<String, dynamic> cat) {
@@ -331,12 +344,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final fuels = _availableFuels(cat);
     final fuelFares = {for (final f in fuels) f: _fareForFuel(cat, f)};
     final fuelFaresRaw = {for (final f in fuels) f: _rawFareForFuel(cat, f)};
-    // Per-fuel breakdown (discounted base+toll, and discounted GST) so the details
-    // and review screens can show Base Fare / GST / Driver Allowance split.
+    // Per-fuel breakdown (net base+toll, and final GST on net base + allowance) so
+    // the details and review screens can show Base Fare / GST / Driver Allowance split.
     final fuelBreakdown = {
       for (final f in fuels) f: {
-        'base': _discounted(_baseTollForFuel(cat, f), cat),
-        'gst': _discounted(_gstForFuel(cat, f), cat),
+        'base': _netBaseForFuel(cat, f),
+        'gst': _gstForFuel(cat, f),
       }
     };
     context.push('/customer/cab-details', extra: {
@@ -349,10 +362,11 @@ class _CabResultsPageState extends State<CabResultsPage> {
       'noFuelFareRaw': _rawFareFor(cat),
       'discountPercent': _discountPct(cat),
       'driverAllowance': _allowanceFor(cat),
+      'gstPercent': _gstPercent,
       // Fare-breakdown parts (base+toll and GST), per fuel + no-fuel fallback.
       'fuelBreakdown': fuelBreakdown,
-      'noFuelBase': _discounted(_baseTollForFuel(cat, ''), cat),
-      'noFuelGst': _discounted(_gstForFuel(cat, ''), cat),
+      'noFuelBase': _netBaseNoFuel(cat),
+      'noFuelGst': _gstOnParts(_netBaseNoFuel(cat), _allowanceFor(cat)),
       'isLowest': _fareFor(cat) > 0 && _fareFor(cat) == _minFare,
       'defaultFuel': _fuelOf(cat),
       'distanceKm': _isLocal ? 0 : _distanceKm,
@@ -678,73 +692,99 @@ class _CabResultsPageState extends State<CabResultsPage> {
                 child: Text('Minimum ${_minKmFor(cat).round()} km billed (your trip is ${_distanceKm.round()} km).',
                     style: TextStyle(fontSize: 10.5.sp, color: AppColors.warning, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
               ),
-            SizedBox(height: 14.h),
-            // Fare breakdown (left) + Book Now (right).
-            Row(
-              children: [
-                if (hasFare)
-                  OutlinedButton.icon(
-                    onPressed: () => _showFareBreakdown(cat),
-                    icon: Icon(Icons.receipt_long_rounded, size: 15.sp, color: AppColors.primary),
-                    label: Text('Fare Breakdown', style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Poppins')),
-                    style: OutlinedButton.styleFrom(side: BorderSide(color: AppColors.primary, width: 1.2), padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 9.h), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r))),
+            if (hasFare) ...[
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 10.h),
+                child: Divider(height: 1, color: AppColors.border),
+              ),
+              // Fare breakup toggle (left) + Book Now (right) — the breakup
+              // expands INLINE inside the card (no popup sheet).
+              Row(
+                children: [
+                  InkWell(
+                    onTap: () => setState(() {
+                      final id = _catId(cat);
+                      _expandedFare.contains(id) ? _expandedFare.remove(id) : _expandedFare.add(id);
+                    }),
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 2.w, vertical: 6.h),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text('Fare breakup', style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.primary, fontFamily: 'Poppins')),
+                        SizedBox(width: 2.w),
+                        Icon(_expandedFare.contains(_catId(cat)) ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, size: 18.sp, color: AppColors.primary),
+                      ]),
+                    ),
                   ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: hasFare ? () => _openDetails(cat) : null,
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: () => _openDetails(cat),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 11.h), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r))),
+                    child: Text(_isEdit ? 'Save' : 'Book Now', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, letterSpacing: 0.2, fontFamily: 'Poppins')),
+                  ),
+                ],
+              ),
+              if (_expandedFare.contains(_catId(cat))) _fareBreakupInline(cat, loFare, hiFare),
+            ] else
+              Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton(
+                  onPressed: null,
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, disabledBackgroundColor: AppColors.textHint, padding: EdgeInsets.symmetric(horizontal: 22.w, vertical: 11.h), elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r))),
                   child: Text(_isEdit ? 'Save' : 'Book Now', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, letterSpacing: 0.2, fontFamily: 'Poppins')),
                 ),
-              ],
-            ),
+              ),
           ],
         ),
       ),
     );
   }
 
-  // Fare-breakdown sheet for a cab (uses its default fuel for the amounts).
-  void _showFareBreakdown(Map<String, dynamic> cat) {
+  // Inline fare breakup shown inside the card when "Fare breakup" is expanded.
+  // Uses the card's default fuel for the line items; the total shows the same
+  // range as the card headline.
+  Widget _fareBreakupInline(Map<String, dynamic> cat, int loFare, int hiFare) {
     final fuel = _fuelOf(cat);
-    final base = _discounted(_baseTollForFuel(cat, fuel), cat);
-    final gst = _discounted(_gstForFuel(cat, fuel), cat);
+    final base = _netBaseForFuel(cat, fuel);
+    final gst = _gstForFuel(cat, fuel);
     final allowance = _allowanceFor(cat);
-    final total = _fareForFuel(cat, fuel);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(18.w, 12.h, 18.w, 18.h),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-              SizedBox(height: 14.h),
-              Text('${cat['name'] ?? 'Cab'} — Fare Breakdown', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-              SizedBox(height: 12.h),
-              _bdRow('Base Fare', base),
-              if (allowance > 0) _bdRow('Driver Allowance', allowance),
-              if (gst > 0) _bdRow('GST', gst),
-              Padding(padding: EdgeInsets.symmetric(vertical: 6.h), child: Divider(height: 1, color: AppColors.border)),
-              _bdRow('Total Fare', total, bold: true),
-              SizedBox(height: 6.h),
-              Text(_isBestPrice ? 'Best Price — toll, state tax & parking paid directly to the driver.' : 'All Inclusive — toll & state tax included.',
-                  style: TextStyle(fontSize: 10.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-            ],
-          ),
-        ),
+    final totalLabel = loFare == hiFare ? '₹$loFare' : '₹$loFare – ₹$hiFare';
+    return Container(
+      margin: EdgeInsets.only(top: 6.h),
+      padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 12.h),
+      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12.r), border: Border.all(color: AppColors.border)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _bkRow('Base fare', '₹$base'),
+          if (allowance > 0) _bkRow('Driver allowance', '₹$allowance'),
+          if (!_isBestPrice && _toll > 0) _bkRow('Toll & state tax', 'Included', valueColor: AppColors.success),
+          if (gst > 0) _bkRow('GST (${_gstPercent.round()}%)', '₹$gst'),
+          Padding(padding: EdgeInsets.symmetric(vertical: 8.h), child: Divider(height: 1, color: AppColors.border)),
+          Row(children: [
+            Expanded(child: Text('Estimated total fare', style: TextStyle(fontSize: 13.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+            Text(totalLabel, style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w900, color: AppColors.primary, fontFamily: 'Poppins')),
+          ]),
+          SizedBox(height: 6.h),
+          Text(_isBestPrice ? 'Best Price — toll, state tax & parking paid directly to the driver.' : 'All Inclusive — toll & state tax included.',
+              style: TextStyle(fontSize: 9.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+        ],
       ),
     );
   }
 
-  Widget _bdRow(String label, int amount, {bool bold = false}) => Padding(
-        padding: EdgeInsets.symmetric(vertical: 4.h),
-        child: Row(children: [
-          Expanded(child: Text(label, style: TextStyle(fontSize: bold ? 14.sp : 12.5.sp, fontWeight: bold ? FontWeight.w800 : FontWeight.w600, color: bold ? AppColors.textPrimary : AppColors.textSecondary, fontFamily: 'Poppins'))),
-          Text('₹$amount', style: TextStyle(fontSize: bold ? 15.sp : 13.sp, fontWeight: bold ? FontWeight.w900 : FontWeight.w700, color: bold ? AppColors.primary : AppColors.textPrimary, fontFamily: 'Poppins')),
+  // One line of the inline fare breakup (label + optional ₹/km subtitle, value).
+  Widget _bkRow(String label, String value, {String? subtitle, Color? valueColor}) => Padding(
+        padding: EdgeInsets.symmetric(vertical: 5.h),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label, style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+              if (subtitle != null)
+                Text(subtitle, style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w500, color: AppColors.textHint, fontFamily: 'Poppins')),
+            ]),
+          ),
+          Text(value, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: valueColor ?? AppColors.textPrimary, fontFamily: 'Poppins')),
         ]),
       );
 

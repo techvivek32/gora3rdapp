@@ -37,11 +37,12 @@ const _features = [
   [Icons.apartment_outlined, 'Business Cities Filter', false, true, true, true],
   [Icons.star_border, 'Featured Listings', false, false, true, true],
   [Icons.headset_mic_outlined, 'Priority Support', false, false, true, true],
+  [Icons.groups_outlined, 'Customer Booking', false, false, false, true],
+  [Icons.airport_shuttle_outlined, 'Car Pooling', false, false, false, true],
+  [Icons.drive_eta_outlined, 'Self Driver Booking', false, false, false, true],
+  [Icons.storefront_outlined, 'Vendors Booking', false, false, false, true],
   [Icons.all_inclusive, 'Unlimited Listings', false, false, false, true],
   [Icons.verified_user_outlined, 'Golden Verified Badge', false, false, false, true],
-  [Icons.badge_outlined, 'V-Card Ad Post', false, false, false, true],
-  [Icons.block_outlined, 'Ad-Free Experience', false, false, false, true],
-  [Icons.bookmark_border, '10 Booking Reference', false, false, false, true],
 ];
 
 const _membershipCol = {'new': 0, 'active': 1, 'verified': 1, 'premium': 2, 'golden': 3};
@@ -735,7 +736,11 @@ class _SubscriptionPlansPageState extends State<SubscriptionPlansPage> {
                   SizedBox(width: 8.w),
                   Expanded(
                     child: Text(row[1] as String,
-                        style: TextStyle(fontSize: 11.5.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                        style: TextStyle(
+                            fontSize: 11.5.sp,
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary)),
                   ),
                 ],
               ),

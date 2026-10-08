@@ -11,6 +11,7 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../customer/presentation/role_switch.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -123,7 +124,6 @@ class ProfilePage extends StatelessWidget {
                       
                       _ProfileAction(icon: Icons.account_balance_wallet_outlined, label: 'My Wallet'.tr, onTap: () => context.push('/wallet')),
                       _ProfileAction(icon: Icons.directions_car_outlined, label: 'My Vehicles & Drivers'.tr, onTap: () => context.push('/my-vehicles-garage')),
-                      _ProfileAction(icon: Icons.swap_horiz_rounded, label: 'Change Role'.tr, onTap: () => context.push('/role-select')),
                       _ProfileAction(icon: Icons.card_giftcard_outlined, label: 'Invite Friends'.tr, onTap: () => context.push('/invite')),
                       _ProfileAction(icon: Icons.verified_user_outlined, label: 'KYC Verification'.tr, onTap: () => context.push('/kyc')),
                       _ProfileAction(icon: Icons.flag_outlined, label: 'My Reports'.tr, onTap: () => context.push('/my-reports')),
@@ -138,6 +138,15 @@ class ProfilePage extends StatelessWidget {
                       _ProfileAction(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy'.tr, onTap: () => context.push('/policy/privacy')),
                       _ProfileAction(icon: Icons.description_outlined, label: 'Terms & Conditions'.tr, onTap: () => context.push('/policy/terms')),
                       _ProfileAction(icon: Icons.info_outline, label: 'About Us'.tr, onTap: () => context.push('/policy/about')),
+                      SizedBox(height: 12.h),
+
+                      // You're in Driver mode here, so the only other side to go
+                      // to is Customer — switch straight there, no chooser screen.
+                      _ProfileAction(
+                        icon: Icons.swap_horiz_rounded,
+                        label: 'Switch to Customer'.tr,
+                        onTap: () => switchRole(context, 'customer'),
+                      ),
                       SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.logout,

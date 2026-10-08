@@ -3,8 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../role_switch.dart';
 
-/// Customer profile: identity, Change Role, help, sign out. Kept intentionally
+/// Customer profile: identity, switch to Driver/Vendor, help, sign out. Kept intentionally
 /// light — customers don't have KYC/wallet screens.
 class CustomerProfilePage extends StatelessWidget {
   const CustomerProfilePage({super.key});
@@ -65,9 +66,13 @@ class CustomerProfilePage extends StatelessWidget {
               _action(Icons.receipt_long_rounded, 'My Rides', 'View your bookings', () => context.go('/customer/bookings')),
               _action(Icons.bookmark_border_rounded, 'Saved Locations', 'Home, work & frequent places', () => context.push('/customer/saved-locations')),
               _action(Icons.notifications_none_rounded, 'Notifications', 'Booking & trip updates', () => context.push('/notifications')),
-              _action(Icons.swap_horiz_rounded, 'Change Role', 'Switch to Driver / Vendor mode', () => context.push('/role-select')),
               _action(Icons.help_outline_rounded, 'Help & Support', 'Raise a complaint', () => context.push('/customer/support')),
               _action(Icons.privacy_tip_outlined, 'Privacy Policy', '', () => context.push('/policy/privacy')),
+              const SizedBox(height: 12),
+              // You're in Customer mode here, so the only other side to go to is
+              // Driver / Vendor — switch straight there, no chooser screen.
+              _action(Icons.swap_horiz_rounded, 'Switch to Driver / Vendor', 'Post duties, get bookings & leads',
+                  () => switchRole(context, 'driver')),
               const SizedBox(height: 12),
               _action(Icons.logout_rounded, 'Sign Out', '', () => _signOut(context), danger: true),
             ],

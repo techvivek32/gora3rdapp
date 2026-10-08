@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
+import '../role_switch.dart';
 
 /// First-time customer setup for a logged-in driver/vendor switching to Customer
 /// Mode. Name & mobile already exist on the account, so we only collect City
@@ -71,7 +72,10 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
         email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       );
       if (!mounted) return;
-      context.read<AuthBloc>().add(const AuthReloadProfileEvent());
+      // Wait for the new role to reach the router before navigating, otherwise
+      // its redirect still sees the old one and flashes the driver home.
+      await applyRoleAndWait(context.read<AuthBloc>(), 'customer');
+      if (!mounted) return;
       context.go('/customer');
     } catch (e) {
       if (mounted) {

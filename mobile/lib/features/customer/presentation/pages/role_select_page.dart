@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
+import '../role_switch.dart';
 
 /// "How do you want to use Gora Taxi Partner?" — shown on first open (from
 /// welcome) and reachable from Profile → Change Role. If the user is already
@@ -42,7 +43,10 @@ class _RoleSelectPageState extends State<RoleSelectPage> {
     try {
       await getIt<CustomerRepository>().changeRole(role);
       if (!mounted) return;
-      context.read<AuthBloc>().add(const AuthReloadProfileEvent());
+      // Wait for the new role to reach the router before navigating, otherwise
+      // its redirect still sees the old one and flashes the wrong home.
+      await applyRoleAndWait(context.read<AuthBloc>(), role);
+      if (!mounted) return;
       context.go(role == 'customer' ? '/customer' : '/');
     } catch (e) {
       final msg = e.toString();

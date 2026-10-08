@@ -7,6 +7,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
+import '../role_switch.dart';
 
 /// First-time driver setup for a logged-in (customer-first) account switching to
 /// Driver Mode. Name & mobile already exist; we collect city (+ optional business
@@ -48,7 +49,10 @@ class _DriverOnboardingPageState extends State<DriverOnboardingPage> {
         agencyName: _agencyCtrl.text.trim().isEmpty ? null : _agencyCtrl.text.trim(),
       );
       if (!mounted) return;
-      context.read<AuthBloc>().add(const AuthReloadProfileEvent());
+      // Wait for the new role to reach the router before navigating, otherwise
+      // its redirect still sees the old one and flashes the customer home.
+      await applyRoleAndWait(context.read<AuthBloc>(), 'driver');
+      if (!mounted) return;
       context.go('/');
     } catch (e) {
       if (mounted) {

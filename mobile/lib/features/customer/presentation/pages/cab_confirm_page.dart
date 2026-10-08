@@ -110,6 +110,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   // Fare breakdown parts (from the details screen).
   int get _driverAllowance => (widget.data['driverAllowance'] as num?)?.toInt() ?? 0;
   int get _gstAmount => (widget.data['gstAmount'] as num?)?.toInt() ?? 0;
+  double get _gstPercent => (widget.data['gstPercent'] as num?)?.toDouble() ?? 0;
+  String get _gstLabel => _gstPercent > 0 ? 'GST (${_gstPercent.round()}%)' : 'GST';
   int get _baseFarePart => (widget.data['baseFare'] as num?)?.toInt() ?? (_fare - _driverAllowance - _gstAmount);
   String get _incMode => (widget.data['incMode'] ?? 'All Inclusive').toString();
   bool get _isBestPrice => _incMode == 'Best Price';
@@ -158,7 +160,7 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
               SizedBox(height: 12.h),
               _bdRow('Base Fare', _baseFarePart),
               if (_driverAllowance > 0) _bdRow('Driver Allowance', _driverAllowance),
-              if (_gstAmount > 0) _bdRow('GST', _gstAmount),
+              if (_gstAmount > 0) _bdRow(_gstLabel, _gstAmount),
               Padding(padding: EdgeInsets.symmetric(vertical: 6.h), child: Divider(height: 1, color: AppColors.border)),
               _bdRow('Total Fare', _fare, bold: true),
               SizedBox(height: 14.h),
