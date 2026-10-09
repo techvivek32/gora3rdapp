@@ -140,7 +140,6 @@ class AppRouter {
         builder: (context, state, child) => MainNavPage(child: child),
         routes: [
           GoRoute(path: '/', builder: (_, __) => const HomePage()),
-          GoRoute(path: '/requirements', builder: (_, __) => const RequirementsFeedPage()),
           // "My Bookings" is a bottom-nav tab (Booking) — lives in the shell so it
           // shows the bottom nav and has no back button. ?tab=2 deep-links Assigned.
           GoRoute(
@@ -149,7 +148,6 @@ class AppRouter {
               initialTab: int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0,
             ),
           ),
-          GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
           // Chat list is a bottom-nav tab → lives in the shell (shows the nav bar).
           GoRoute(path: '/chats', builder: (_, __) => const ChatListPage()),
           GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
@@ -248,6 +246,12 @@ class AppRouter {
       ),
 
       // Detail Routes
+      // Available Cars feed — same as the Booking feed: full screen, no bottom
+      // nav, back button instead.
+      GoRoute(path: '/vehicles', builder: (_, __) => const VehiclesFeedPage()),
+      // Booking feed — full screen on purpose: pushed outside the shell so it
+      // has no bottom nav, and gets a back button instead.
+      GoRoute(path: '/requirements', builder: (_, __) => const RequirementsFeedPage()),
       GoRoute(
         path: '/requirements/create',
         builder: (_, __) => const CreateRequirementPage(),

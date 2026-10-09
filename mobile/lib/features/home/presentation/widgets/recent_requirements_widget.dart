@@ -19,7 +19,7 @@ class RecentRequirementsWidget extends StatelessWidget {
             children: [
               const Text('Recent Bookings', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               GestureDetector(
-                onTap: () => context.go('/requirements'),
+                onTap: () => context.push('/requirements'),
                 child: Text('See All', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.w600)),
               ),
             ],

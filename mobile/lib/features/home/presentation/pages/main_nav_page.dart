@@ -11,7 +11,6 @@ class MainNavPage extends StatelessWidget {
   int _getSelectedIndex(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     if (location.startsWith('/my-requirements')) return 1;
-    if (location.startsWith('/requirements')) return 1;
     if (location.startsWith('/chats')) return 2;
     if (location.startsWith('/profile')) return 3;
     return 0;

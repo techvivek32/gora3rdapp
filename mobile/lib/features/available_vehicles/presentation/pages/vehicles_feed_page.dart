@@ -200,7 +200,6 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 4,
-        automaticallyImplyLeading: false,
         title: Text('Available Cars'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(

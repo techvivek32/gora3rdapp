@@ -188,7 +188,6 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 4,
-        automaticallyImplyLeading: false,
         title: Text('Booking'.tr, style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold, color: Colors.white)),
         actions: [
           IconButton(
