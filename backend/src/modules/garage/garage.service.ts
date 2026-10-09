@@ -4,12 +4,10 @@ import { Model, Types } from 'mongoose';
 import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
 import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garage-driver.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
-import { UserRole } from '../../common/enums/user-role.enum';
 import { CreateGarageVehicleDto, UpdateGarageVehicleDto } from './dto/garage-vehicle.dto';
 import { CreateGarageDriverDto, UpdateGarageDriverDto } from './dto/garage-driver.dto';
 
 // A saved driver's number must belong to a real driver/vendor account in the app.
-const DRIVER_VENDOR_ROLES = [UserRole.DRIVER, UserRole.TRAVEL_AGENCY, UserRole.FLEET_OWNER];
 
 @Injectable()
 export class GarageService {
@@ -20,27 +18,15 @@ export class GarageService {
   ) {}
 
   /**
-   * A saved driver can only be added if their phone belongs to a real
-   * driver/vendor account in the app. Matches on the last 10 digits so spaces,
-   * a +91 prefix or the "91" country code all resolve to the same number.
+   * A saved driver's number just needs to be a valid 10-digit mobile — it does
+   * NOT have to be a registered account. The driver can be assigned by number and
+   * will see the booking in their own "My Bookings" as soon as they install the
+   * app and sign in with that number (matched by phone on the booking).
    */
-  private async assertRegisteredDriverOrVendor(phone?: string): Promise<void> {
-    const digits = (phone || '').replace(/\D/g, '');
-    const last10 = digits.slice(-10);
+  private assertValidPhone(phone?: string): void {
+    const last10 = (phone || '').replace(/\D/g, '').slice(-10);
     if (last10.length !== 10) {
       throw new BadRequestException('Enter a valid 10-digit mobile number.');
-    }
-    const user = await this.userModel
-      .findOne({ mobile: last10, role: { $in: DRIVER_VENDOR_ROLES } })
-      .select('_id isActive isBlocked')
-      .lean();
-    if (!user) {
-      throw new BadRequestException(
-        'This number is not registered as a driver/vendor in the app. Ask them to register first.',
-      );
-    }
-    if (user.isBlocked || user.isActive === false) {
-      throw new BadRequestException('This driver/vendor account is inactive or blocked.');
     }
   }
 
@@ -121,7 +107,7 @@ export class GarageService {
 
   async createDriver(userId: string, dto: CreateGarageDriverDto) {
     // Only allow saving a driver whose number is a registered driver/vendor.
-    await this.assertRegisteredDriverOrVendor(dto.phone);
+    this.assertValidPhone(dto.phone);
     // ...and not one this account already saved.
     await this.assertPhoneNotDuplicate(userId, dto.phone);
     const driver = await this.driverModel.create({
@@ -135,7 +121,7 @@ export class GarageService {
     const driver = await this.ownedDriver(userId, id);
     // Re-validate whenever the phone is being set/changed.
     if (dto.phone !== undefined && dto.phone !== driver.phone) {
-      await this.assertRegisteredDriverOrVendor(dto.phone);
+      this.assertValidPhone(dto.phone);
       await this.assertPhoneNotDuplicate(userId, dto.phone, id);
     }
     Object.assign(driver, dto);

@@ -159,6 +159,11 @@ export class CustomerBooking {
 
   // Set once the customer picks a driver.
   @Prop({ type: Types.ObjectId, ref: 'User' }) selectedDriverId: Types.ObjectId;
+  // Last-10 digits of the actual driver's phone (the garage driver the owner
+  // assigned — may differ from the accepting account, and may not have an account
+  // yet). Lets that driver see & run the trip from their own login, matched by
+  // phone, even if they register only after being assigned.
+  @Prop({ default: '', index: true }) assignedDriverPhone: string;
   @Prop() finalFare: number;
 
   // Commitment snapshot (percent of fare a driver must hold to apply).

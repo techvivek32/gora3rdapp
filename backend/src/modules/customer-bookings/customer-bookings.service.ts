@@ -476,15 +476,15 @@ export class CustomerBookingsService {
     const booking: any = await this.bookingModel.findById(id).lean();
     if (!booking) throw new NotFoundException('Booking not found');
 
-    this.assertInvoiceAccess(booking, userId, roles);
-    return this.buildInvoiceForBooking(booking, this.invoiceShowsBreakdown(booking, userId, roles));
+    await this.assertInvoiceAccess(booking, userId, roles);
+    return this.buildInvoiceForBooking(booking, await this.invoiceShowsBreakdown(booking, userId, roles));
   }
 
   /** Access check shared by the direct download and the tokenized link. */
-  private assertInvoiceAccess(booking: any, userId: string, roles: string[]) {
+  private async assertInvoiceAccess(booking: any, userId: string, roles: string[]) {
     const isAdmin = (roles || []).some((r) => r === UserRole.ADMIN || r === UserRole.SUPER_ADMIN);
     const isCustomer = booking.customerId?.toString() === userId;
-    const isDriver = booking.selectedDriverId?.toString() === userId;
+    const isDriver = await this.canOperateBooking(booking, userId);
     if (!isAdmin && !isCustomer && !isDriver) throw new ForbiddenException('Not allowed');
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('Invoice is available only after the trip is completed');
@@ -493,12 +493,12 @@ export class CustomerBookingsService {
 
   /**
    * Who gets the GST/allowance breakdown: the customer and admin do; a caller who
-   * is ONLY the assigned driver gets the simpler invoice. (Call after access check.)
+   * is ONLY the (assigned) driver gets the simpler invoice. (Call after access check.)
    */
-  private invoiceShowsBreakdown(booking: any, userId: string, roles: string[]): boolean {
+  private async invoiceShowsBreakdown(booking: any, userId: string, roles: string[]): Promise<boolean> {
     const isAdmin = (roles || []).some((r) => r === UserRole.ADMIN || r === UserRole.SUPER_ADMIN);
     const isCustomer = booking.customerId?.toString() === userId;
-    const isDriver = booking.selectedDriverId?.toString() === userId;
+    const isDriver = await this.canOperateBooking(booking, userId);
     return !(isDriver && !isCustomer && !isAdmin);
   }
 
@@ -540,8 +540,8 @@ export class CustomerBookingsService {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
     const booking: any = await this.bookingModel.findById(id).lean();
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertInvoiceAccess(booking, userId, roles);
-    return { token: this.makeInvoiceToken(id, this.invoiceShowsBreakdown(booking, userId, roles)) };
+    await this.assertInvoiceAccess(booking, userId, roles);
+    return { token: this.makeInvoiceToken(id, await this.invoiceShowsBreakdown(booking, userId, roles)) };
   }
 
   /** Public: serve the PDF for a valid signed token (no login header needed). */
@@ -1180,6 +1180,7 @@ export class CustomerBookingsService {
             confirmedAt: new Date(),
             finalFare: fare,
             driverSnapshot: snapshot,
+            assignedDriverPhone: this.phoneLast10(snapshot.phone),
           },
           $push: { offers: { ...offer, status: 'selected' } as any },
         },
@@ -1334,6 +1335,7 @@ export class CustomerBookingsService {
       vehicleNumber: chosen.vehicleNumber || rc.number || rc.documentNumber || '',
       rating: driver?.rating || 0,
     };
+    booking.assignedDriverPhone = this.phoneLast10(booking.driverSnapshot.phone);
     await booking.save();
 
     this.notifications.notifyUser(chosen.driverId, '🎉 You got the booking!',
@@ -1347,8 +1349,17 @@ export class CustomerBookingsService {
   }
 
   async getMyApplications(driverId: string) {
+    // Two ways a booking belongs to "my bookings":
+    //  1. I accepted it (my offer is on it) — the owner/vendor account.
+    //  2. I'm the driver the owner assigned, matched by my phone number — even if
+    //     I only just installed the app and signed up with that number.
+    const me: any = await this.userModel.findById(driverId).select('mobile').lean();
+    const myPhone = this.phoneLast10(me?.mobile);
+    const or: any[] = [{ 'offers.driverId': new Types.ObjectId(driverId) }];
+    if (myPhone) or.push({ assignedDriverPhone: myPhone });
+
     const data = await this.bookingModel
-      .find({ 'offers.driverId': new Types.ObjectId(driverId) })
+      .find({ $or: or })
       .sort({ createdAt: -1 })
       .populate('customerId', 'fullName mobile')
       .lean();
@@ -1357,12 +1368,16 @@ export class CustomerBookingsService {
     const revealHours = await this.getContactRevealHours();
     const mapped = data.map((b: any) => {
       const mine = (b.offers ?? []).find((o: any) => o.driverId.toString() === driverId);
-      const isSelected = b.selectedDriverId && b.selectedDriverId.toString() === driverId;
+      const assignedByPhone = !!myPhone && this.phoneLast10(b.assignedDriverPhone) === myPhone;
+      const isSelected = (b.selectedDriverId && b.selectedDriverId.toString() === driverId) || assignedByPhone;
       const revealed = isSelected && this.contactRevealed(b, revealHours);
       const c: any = b.customerId;
       const customer = revealed && c && typeof c === 'object'
         ? { name: c.fullName || 'Customer', mobile: c.mobile || '' }
         : null;
+      // A driver assigned only by phone has no offer of their own — synthesize a
+      // "selected" marker so the app lists the trip under their won bookings.
+      const myOffer = mine || (assignedByPhone ? { status: 'selected' } : null);
       return {
         ...b,
         customerId: c && typeof c === 'object' ? c._id : c,
@@ -1370,16 +1385,36 @@ export class CustomerBookingsService {
         // Selected driver, but the number isn't shown yet → let the app explain why.
         contactLocked: isSelected && !revealed,
         contactRevealHours: revealHours,
-        myOffer: mine || null,
+        myOffer,
         offers: undefined,
       };
     });
     return { message: 'My applications', data: mapped };
   }
 
-  private assertSelectedDriver(booking: any, driverId: string) {
-    if (!booking.selectedDriverId || booking.selectedDriverId.toString() !== driverId) {
-      throw new ForbiddenException('You are not the selected driver for this booking');
+  /** Last-10 digits of a phone (strips +91 / spaces), or '' if not 10 digits. */
+  private phoneLast10(phone?: string): string {
+    const d = (phone || '').replace(/\D/g, '').slice(-10);
+    return d.length === 10 ? d : '';
+  }
+
+  /**
+   * Can this user operate (start/track/complete/invoice) the booking? True for the
+   * account that was selected (the owner who accepted) AND for the actual driver
+   * the owner assigned — matched by phone, so a driver added by number can run the
+   * trip from their own login even if they registered only after being assigned.
+   */
+  private async canOperateBooking(booking: any, userId: string): Promise<boolean> {
+    if (booking.selectedDriverId && booking.selectedDriverId.toString() === userId) return true;
+    const assigned = this.phoneLast10(booking.assignedDriverPhone || booking.driverSnapshot?.phone);
+    if (!assigned) return false;
+    const u: any = await this.userModel.findById(userId).select('mobile').lean();
+    return this.phoneLast10(u?.mobile) === assigned;
+  }
+
+  private async assertSelectedDriver(booking: any, driverId: string) {
+    if (!(await this.canOperateBooking(booking, driverId))) {
+      throw new ForbiddenException('You are not the assigned driver for this booking');
     }
   }
 
@@ -1387,7 +1422,7 @@ export class CustomerBookingsService {
   async driverArrived(driverId: string, id: string) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertSelectedDriver(booking, driverId);
+    await this.assertSelectedDriver(booking, driverId);
     if (booking.status !== CustomerBookingStatus.CONFIRMED) {
       throw new BadRequestException('You can only mark arriving on a confirmed booking');
     }
@@ -1410,7 +1445,7 @@ export class CustomerBookingsService {
     if (action !== 'start' && action !== 'end') throw new BadRequestException('Invalid action');
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertSelectedDriver(booking, driverId);
+    await this.assertSelectedDriver(booking, driverId);
     if (action === 'start' && booking.status !== CustomerBookingStatus.CONFIRMED) {
       throw new BadRequestException(
         booking.status === CustomerBookingStatus.ONGOING ? 'Trip already started' : 'Trip can start only after confirmation',
@@ -1448,7 +1483,7 @@ export class CustomerBookingsService {
       .findById(id)
       .select('+tripOtp +tripOtpAction +tripOtpExpiresAt');
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertSelectedDriver(booking, driverId);
+    await this.assertSelectedDriver(booking, driverId);
     // Status precondition — a cancelled/expired/completed booking can never be
     // revived by an old OTP.
     const required = action === 'start' ? CustomerBookingStatus.CONFIRMED : CustomerBookingStatus.ONGOING;
@@ -1540,9 +1575,11 @@ export class CustomerBookingsService {
     const value = Number(km);
     if (!isFinite(value) || value < 0) throw new BadRequestException('Invalid distance');
     const booking = await this.bookingModel
-      .findOne({ _id: id, selectedDriverId: new Types.ObjectId(driverId), status: CustomerBookingStatus.ONGOING })
-      .select('trackedKm includedKm');
-    if (!booking) throw new BadRequestException('Trip is not active');
+      .findOne({ _id: id, status: CustomerBookingStatus.ONGOING })
+      .select('trackedKm includedKm selectedDriverId assignedDriverPhone driverSnapshot');
+    if (!booking || !(await this.canOperateBooking(booking, driverId))) {
+      throw new BadRequestException('Trip is not active');
+    }
     if (value > (booking.trackedKm || 0)) {
       booking.trackedKm = Math.round(value * 10) / 10;
       await booking.save();
@@ -1564,7 +1601,7 @@ export class CustomerBookingsService {
   ) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertSelectedDriver(booking, driverId);
+    await this.assertSelectedDriver(booking, driverId);
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('Add charges after the trip is completed');
     }
@@ -1595,7 +1632,7 @@ export class CustomerBookingsService {
   async cancelByDriver(driverId: string, id: string, reason?: string) {
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
-    this.assertSelectedDriver(booking, driverId);
+    await this.assertSelectedDriver(booking, driverId);
     if ([CustomerBookingStatus.COMPLETED, CustomerBookingStatus.CANCELLED].includes(booking.status)) {
       throw new BadRequestException('Booking already closed');
     }

@@ -380,6 +380,8 @@ class MyOfferCard extends StatelessWidget {
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final retM = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
     final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
+    // Hire a Driver: the customer's car gearbox (Manual / Automatic), from notes.
+    final transmission = RegExp(r'Transmission:\s*(Automatic|Manual)', caseSensitive: false).firstMatch((b['notes'] ?? '').toString())?.group(1);
     // Round trip: inclusive day count (travel day → return day), shown under the tag.
     int? roundDays;
     if (isRound && retM != null) {
@@ -492,6 +494,14 @@ class MyOfferCard extends StatelessWidget {
           SizedBox(height: 4.h),
           const Divider(height: 1, color: Colors.black26),
           SizedBox(height: 10.h),
+          if (transmission != null) ...[
+            Row(children: [
+              Icon(Icons.settings_rounded, size: 14.sp, color: AppColors.textSecondary),
+              SizedBox(width: 5.w),
+              Text('$transmission car', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            ]),
+            SizedBox(height: 8.h),
+          ],
           Row(children: [
             Text('Your quote: ₹$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const Spacer(),

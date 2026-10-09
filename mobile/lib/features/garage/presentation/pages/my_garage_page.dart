@@ -1004,13 +1004,18 @@ class _DriverFormState extends State<_DriverForm> {
                 },
                 validator: (v) {
                   final t = (v ?? '').trim();
-                  // Required: the number must belong to a registered driver/vendor.
+                  // Any valid 10-digit number works — the driver need not have an
+                  // account yet. They'll see assigned trips after signing in with it.
                   if (t.isEmpty) return 'Mobile number is required';
                   if (!RegExp(r'^[6-9]\d{9}$').hasMatch(t)) return 'Enter a valid 10-digit mobile';
-                  // Backend rejection (e.g. number not registered) shown right here.
                   if (_phoneServerError != null) return _phoneServerError;
                   return null;
                 },
+              ),
+              SizedBox(height: 6.h),
+              Text(
+                'The driver doesn\'t need an account yet. After you assign them a trip, they\'ll see it in their own app once they sign in with this number.',
+                style: TextStyle(fontSize: 11.sp, color: AppColors.textSecondary, height: 1.3, fontFamily: 'Poppins'),
               ),
               SizedBox(height: 14.h),
 

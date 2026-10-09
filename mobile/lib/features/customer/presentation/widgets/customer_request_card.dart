@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -62,6 +63,9 @@ class CustomerRequestCard extends StatelessWidget {
     final isLocal = subType == 'Local';
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final extraHourPrice = (b['extraHourPrice'] as num?)?.toInt() ?? 0;
+    // Hire a Driver: the customer picks the gearbox of THEIR car — show it so the
+    // driver knows whether they must drive a manual or an automatic.
+    final transmission = RegExp(r'Transmission:\s*(Automatic|Manual)', caseSensitive: false).firstMatch(notes)?.group(1);
 
     return brandCard(
       stamp: stamp?.$1,
@@ -139,9 +143,25 @@ class CustomerRequestCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (transmission != null) ...[
+              SizedBox(width: 10.w),
+              Icon(Icons.settings_rounded, size: 14.sp, color: AppColors.textSecondary),
+              SizedBox(width: 4.w),
+              Text(transmission, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            ],
             const Spacer(),
             if (fare != 0) Text('Budget: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
+          // Round-trip return date (so the driver knows when to bring the car back).
+          if (returnDate != null) ...[
+            SizedBox(height: 8.h),
+            Row(children: [
+              Icon(Icons.event_repeat_rounded, size: 14.sp, color: AppColors.primary),
+              SizedBox(width: 5.w),
+              Text('Return: ${DateFormat('dd MMM yyyy').format(returnDate)}',
+                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+            ]),
+          ],
           // Fare inclusions/exclusions (one clean line, no boxed background).
           SizedBox(height: 10.h),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

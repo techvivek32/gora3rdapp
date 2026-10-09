@@ -128,6 +128,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     if (r['fare'] != null) _customFareCtrl.text = '${(r['fare'] as num).round()}';
     _secureBooking = r['secureBooking'] == true;
     _hideProfile = r['hideProfile'] == true;
+    // Secure bookings always use a custom fare (App Suggested is locked off).
+    if (r['isAppSuggested'] == false || _secureBooking) _useCustomFare = true;
     if (r['estimatedDistance'] != null) _computedDistance = (r['estimatedDistance'] as num).toDouble();
     if (r['travelDate'] != null) {
       try {
@@ -369,6 +371,9 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
             onChanged: (v) => setState(() {
               _secureBooking = v;
               if (!v) _hideProfile = false; // hide-profile needs secure ON
+              // Secure bookings must set their own fare — force "Enter Your Own"
+              // (App Suggested is disabled below while secure is on).
+              if (v) _useCustomFare = true;
             }),
             title: Text('Secure this booking',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp, color: AppColors.textPrimary)),
@@ -716,29 +721,47 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _useCustomFare = false;
-                              });
-                            },
-                            child: Container(
-                              padding: EdgeInsets.symmetric(vertical: 12.h),
-                              decoration: BoxDecoration(
-                                color: _useCustomFare ? Colors.grey[100] : AppColors.primary,
-                                borderRadius: BorderRadius.circular(12.r),
-                                border: Border.all(
-                                  color: _useCustomFare ? AppColors.border : AppColors.primary,
-                                  width: 2,
+                            // Secure bookings must use a custom fare, so "App Suggested"
+                            // is locked off and a tap explains why.
+                            onTap: _secureBooking
+                                ? () => ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Secure bookings need your own fare — "App Suggested" is not available.')),
+                                    )
+                                : () {
+                                    setState(() {
+                                      _useCustomFare = false;
+                                    });
+                                  },
+                            child: Opacity(
+                              opacity: _secureBooking ? 0.5 : 1,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 12.h),
+                                decoration: BoxDecoration(
+                                  color: _useCustomFare ? Colors.grey[100] : AppColors.primary,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  border: Border.all(
+                                    color: _useCustomFare ? AppColors.border : AppColors.primary,
+                                    width: 2,
+                                  ),
                                 ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  'App Suggested'.tr,
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontWeight: FontWeight.w600,
-                                    color: _useCustomFare ? AppColors.textHint : Colors.white,
-                                    fontSize: 14.sp,
+                                child: Center(
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      if (_secureBooking) ...[
+                                        Icon(Icons.lock_rounded, size: 13.sp, color: AppColors.textHint),
+                                        SizedBox(width: 4.w),
+                                      ],
+                                      Text(
+                                        'App Suggested'.tr,
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontWeight: FontWeight.w600,
+                                          color: _useCustomFare ? AppColors.textHint : Colors.white,
+                                          fontSize: 14.sp,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
