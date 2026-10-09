@@ -73,38 +73,52 @@ class _RoleSelectPageState extends State<RoleSelectPage> {
 
   @override
   Widget build(BuildContext context) {
+    const blue = Color(0xFF1E5BC6);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Colors.white,
       appBar: _loggedIn ? AppBar(title: const Text('Change Role'), backgroundColor: AppColors.primary, foregroundColor: Colors.white) : null,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 24),
+              // Brand logo — only on the first-open screen (the Change-Role AppBar
+              // already names the app when logged in).
+              if (!_loggedIn) ...[
+                const SizedBox(height: 10),
+                // Brand logo on a transparent background (navy wordmark, no tagline)
+                // so it sits cleanly on the white page.
+                Center(child: Image.asset('assets/images/gora_logo_white.png', height: 112, fit: BoxFit.contain)),
+                const SizedBox(height: 16),
+              ] else
+                const SizedBox(height: 20),
               const Text('How do you want to use\nGora Taxi Partner?',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+                  style: TextStyle(fontSize: 22, height: 1.25, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               const SizedBox(height: 8),
-              const Text('You can switch anytime from Profile → Change Role.',
+              const Text('You can switch anytime from Profile – Change Role.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(height: 32),
+              const SizedBox(height: 26),
               _RoleCard(
-                icon: Icons.person_pin_circle_rounded,
-                title: '👤 Customer',
-                subtitle: 'Book a cab, hire a driver, luxury or car pool',
+                image: 'assets/images/role_customer.png',
+                title: 'Customer',
+                subtitle: 'Book a cab, hire a driver\nor car pool',
+                accent: blue,
                 onTap: _busy ? null : () => _pick('customer'),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               _RoleCard(
-                icon: Icons.local_taxi_rounded,
-                title: '🚕 Driver / Vendor',
-                subtitle: 'Post duties, get customer bookings & leads',
+                image: 'assets/images/role_driver.png',
+                title: 'Driver / Vendor',
+                subtitle: 'Post duties, get customer\nbookings & leads',
+                accent: AppColors.primary,
                 onTap: _busy ? null : () => _pick('driver'),
               ),
-              const Spacer(),
-              if (_busy) const Center(child: CircularProgressIndicator()),
+              if (_busy) ...[
+                const SizedBox(height: 24),
+                const Center(child: CircularProgressIndicator()),
+              ],
             ],
           ),
         ),
@@ -114,40 +128,60 @@ class _RoleSelectPageState extends State<RoleSelectPage> {
 }
 
 class _RoleCard extends StatelessWidget {
-  final IconData icon;
+  final String image;
   final String title;
   final String subtitle;
+  final Color accent;
   final VoidCallback? onTap;
-  const _RoleCard({required this.icon, required this.title, required this.subtitle, this.onTap});
+  const _RoleCard({required this.image, required this.title, required this.subtitle, required this.accent, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+          color: accent.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: 0.18)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 14, offset: const Offset(0, 6))],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CircleAvatar(radius: 26, backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                child: Icon(icon, color: AppColors.primary, size: 28)),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Illustration banner — rounded to match the card's top corners.
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              child: AspectRatio(
+                aspectRatio: 412 / 180,
+                child: Image.asset(image, fit: BoxFit.cover),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 14, 16),
+              child: Row(
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
-                  const SizedBox(height: 4),
-                  Text(subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: accent)),
+                        const SizedBox(height: 4),
+                        Text(subtitle, style: const TextStyle(fontSize: 13, height: 1.3, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                    child: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 22),
+                  ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.textHint),
           ],
         ),
       ),

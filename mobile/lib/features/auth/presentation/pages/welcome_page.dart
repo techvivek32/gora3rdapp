@@ -67,7 +67,7 @@ class WelcomePage extends StatelessWidget {
                     ),
                     SizedBox(height: 6.h),
                     Text(
-                      'Choose how you’d like to continue',
+                      'Book rides or grow your taxi business',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontSize: 11.5.sp,
@@ -75,25 +75,33 @@ class WelcomePage extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.7),
                       ),
                     ),
-                    SizedBox(height: 20.h),
+                    SizedBox(height: 22.h),
 
-                    // Direct role selection — pick Customer or Driver/Vendor here.
-                    _roleButton(
-                      context,
-                      icon: Icons.person_pin_circle_rounded,
-                      title: 'Customer',
-                      subtitle: 'Book a cab, hire a driver or car pool',
-                      filled: true,
-                      onTap: () => context.go('/customer/login'),
-                    ),
-                    SizedBox(height: 12.h),
-                    _roleButton(
-                      context,
-                      icon: Icons.local_taxi_rounded,
-                      title: 'Driver / Vendor',
-                      subtitle: 'Post duties, get bookings & leads',
-                      filled: false,
-                      onTap: () => context.go('/auth/login'),
+                    // Single "Get Started" CTA → the role-selection screen, where
+                    // the user picks Customer or Driver / Vendor.
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => context.go('/role-select'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange.shade700,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(vertical: 15.h),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Get Started',
+                              style: TextStyle(fontFamily: 'Poppins', fontSize: 15.sp, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(width: 8.w),
+                            Icon(Icons.arrow_forward_rounded, size: 19.sp),
+                          ],
+                        ),
+                      ),
                     ),
                     SizedBox(height: 16.h),
 
@@ -134,78 +142,5 @@ class WelcomePage extends StatelessWidget {
   /// Plain decorative line.
   Widget _rule({required double width, required Color color}) {
     return Container(width: width, height: 1.5.h, color: color);
-  }
-
-  /// Role selection button. `filled` → solid orange (primary / Customer);
-  /// otherwise a frosted translucent card with an orange icon badge (Driver).
-  Widget _roleButton(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool filled,
-    required VoidCallback onTap,
-  }) {
-    final orange = Colors.orange.shade700;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16.r),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 13.h),
-          decoration: BoxDecoration(
-            color: filled ? orange : Colors.white.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(16.r),
-            border: filled ? null : Border.all(color: Colors.white.withValues(alpha: 0.35)),
-            boxShadow: filled
-                ? [BoxShadow(color: orange.withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 8))]
-                : null,
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: EdgeInsets.all(9.r),
-                decoration: BoxDecoration(
-                  color: filled ? Colors.white.withValues(alpha: 0.22) : orange,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: Colors.white, size: 22.sp),
-              ),
-              SizedBox(width: 14.w),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    SizedBox(height: 2.h),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 10.sp,
-                        color: Colors.white.withValues(alpha: 0.85),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_rounded, color: Colors.white.withValues(alpha: 0.9), size: 18.sp),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
