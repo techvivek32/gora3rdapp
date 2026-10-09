@@ -91,22 +91,25 @@ class CustomerRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (subType.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  paymentBadge(b),
+                  if (subType.isNotEmpty) ...[
+                    SizedBox(height: 6.h),
                     filledChip(subType.toUpperCase(), AppColors.primary),
-                    if (days != null) ...[
-                      SizedBox(height: 4.h),
-                      Text('$days day${days == 1 ? '' : 's'}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                    ],
-                    // Local: show the package hours under the LOCAL tag.
-                    if (isLocal && packageHours > 0) ...[
-                      SizedBox(height: 4.h),
-                      Text('$packageHours hours', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
-                    ],
                   ],
-                ),
+                  if (days != null) ...[
+                    SizedBox(height: 4.h),
+                    Text('$days day${days == 1 ? '' : 's'}', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                  ],
+                  // Local: show the package hours under the LOCAL tag.
+                  if (isLocal && packageHours > 0) ...[
+                    SizedBox(height: 4.h),
+                    Text('$packageHours hours', style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                  ],
+                ],
+              ),
             ],
           ),
           SizedBox(height: 10.h),
@@ -222,6 +225,45 @@ Widget _kmInfo(IconData icon, String label) {
     SizedBox(width: 5.w),
     Text(label, style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
   ]);
+}
+
+/// Payment badge for a customer-ride card. Tells the driver how the customer is
+/// paying so they know what to collect:
+///   • fully prepaid online → "Paid Online" (collect nothing)
+///   • partial advance paid  → "Advance Paid" (collect the balance in cash)
+///   • nothing paid          → "Paid by Cash" (collect the full fare in cash)
+Widget paymentBadge(Map<String, dynamic> b) {
+  final fare = (b['finalFare'] as num?)?.toInt() ?? (b['estimatedFare'] as num?)?.toInt() ?? 0;
+  final paid = (b['advanceStatus']?.toString() == 'paid') ? ((b['advanceAmount'] as num?)?.toInt() ?? 0) : 0;
+  final percent = (b['advancePercent'] as num?)?.toInt() ?? 0;
+  final fullyPaid = percent >= 100 || (fare > 0 && paid >= fare);
+  final partPaid = !fullyPaid && paid > 0;
+
+  late final String label;
+  late final Color bg;
+  late final IconData icon;
+  if (fullyPaid) {
+    label = 'Paid Online';
+    bg = AppColors.success;
+    icon = Icons.verified_rounded;
+  } else if (partPaid) {
+    label = 'Advance Paid';
+    bg = AppColors.info;
+    icon = Icons.account_balance_wallet_rounded;
+  } else {
+    label = 'Paid by Cash';
+    bg = const Color(0xFF1A1A1A);
+    icon = Icons.payments_rounded;
+  }
+  return Container(
+    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20.r)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 11.sp, color: Colors.white),
+      SizedBox(width: 4.w),
+      Text(label, style: TextStyle(fontSize: 9.5.sp, fontWeight: FontWeight.w700, color: Colors.white)),
+    ]),
+  );
 }
 
 /// Content for the "Accept this booking?" dialog. Accepting only registers your

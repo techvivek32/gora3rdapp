@@ -445,8 +445,11 @@ class MyOfferCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (subType.isNotEmpty)
+                  paymentBadge(b),
+                  if (subType.isNotEmpty) ...[
+                    SizedBox(height: 6.h),
                     filledChip(tripTag, AppColors.primary),
+                  ],
                   if (isRound && roundDays != null) ...[
                     SizedBox(height: 4.h),
                     Text('$roundDays day${roundDays == 1 ? '' : 's'}',

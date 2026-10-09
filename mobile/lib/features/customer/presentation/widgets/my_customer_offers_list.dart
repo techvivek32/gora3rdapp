@@ -10,14 +10,27 @@ import '../pages/driver_trip_page.dart';
 import '../pages/driver_trip_summary_page.dart';
 import '../utils/invoice_actions.dart';
 
-/// The driver/vendor's WON customer trips (their accepted offers), rendered as a
-/// plain column so it can be embedded inside the "Assigned" tab of My Bookings.
-/// Self-fetching and self-refreshing; shows nothing when there are none.
+/// The driver/vendor's Assigned list: their won customer-app trips MERGED with
+/// the requirement bookings assigned to them — ONE combined list (no separate
+/// "Customer Trips" section), with completed bookings pushed to the bottom.
+/// Self-fetches the customer trips; the requirements are passed in with a builder.
 class MyCustomerOffersList extends StatefulWidget {
-  /// Shown when the driver has no won customer trips (e.g. the Assigned tab's
-  /// empty state when there are also no assigned requirements).
+  /// Shown when there are no assigned requirements AND no won customer trips.
   final Widget? emptyPlaceholder;
-  const MyCustomerOffersList({super.key, this.emptyPlaceholder});
+
+  /// Requirement bookings assigned to the driver, merged into the same list.
+  final List<Map<String, dynamic>> requirements;
+
+  /// Builds the card for one requirement (owned by the page, which has the
+  /// trip-button + menu logic).
+  final Widget Function(Map<String, dynamic> req)? requirementBuilder;
+
+  const MyCustomerOffersList({
+    super.key,
+    this.emptyPlaceholder,
+    this.requirements = const [],
+    this.requirementBuilder,
+  });
 
   @override
   State<MyCustomerOffersList> createState() => _MyCustomerOffersListState();
@@ -199,32 +212,53 @@ class _MyCustomerOffersListState extends State<MyCustomerOffersList> {
     );
   }
 
+  /// A booking is "finished" (→ sinks to the bottom of the list) once it's
+  /// completed, cancelled or expired; everything else is still active.
+  static const _finishedStatuses = {'completed', 'cancelled', 'expired'};
+  bool _reqDone(Map<String, dynamic> r) =>
+      r['tripStatus']?.toString() == 'completed' || _finishedStatuses.contains(r['status']?.toString());
+  bool _custDone(Map<String, dynamic> b) => _finishedStatuses.contains(b['status']?.toString());
+
+  Widget _custCard(Map<String, dynamic> b) => Padding(
+        padding: EdgeInsets.only(bottom: 12.h),
+        child: MyOfferCard(
+          b,
+          onStart: (id) => _tripOtpFlow(id, 'start'),
+          onComplete: (id) => _tripOtpFlow(id, 'end'),
+          onArrived: _arrived,
+          onCancel: _driverCancel,
+          onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
+          onOpenTrip: _openTrip,
+          onBill: _openSummary,
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const SizedBox.shrink();
-    if (_mine.isEmpty) return widget.emptyPlaceholder ?? const SizedBox.shrink();
+    final reqs = widget.requirements;
+    final custs = _loading ? const <Map<String, dynamic>>[] : _mine;
+
+    // Merge requirements + customer trips into ONE list (no divider). Active
+    // bookings stay on top in their original order; completed ones drop to the
+    // bottom. Partitioning (not sort()) keeps the order stable within each group.
+    final active = <Widget>[];
+    final done = <Widget>[];
+    for (final r in reqs) {
+      (widget.requirementBuilder != null)
+          ? (_reqDone(r) ? done : active).add(widget.requirementBuilder!(r))
+          : null;
+    }
+    for (final b in custs) {
+      (_custDone(b) ? done : active).add(_custCard(b));
+    }
+
+    if (active.isEmpty && done.isEmpty) {
+      // Still loading customer trips → wait silently; otherwise show empty state.
+      return _loading ? const SizedBox.shrink() : (widget.emptyPlaceholder ?? const SizedBox.shrink());
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.only(bottom: 8.h, top: 4.h),
-          child: Text('Customer Trips'.toUpperCase(),
-              style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w800, color: AppColors.textSecondary, letterSpacing: 0.5)),
-        ),
-        ..._mine.map((b) => Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: MyOfferCard(
-                b,
-                onStart: (id) => _tripOtpFlow(id, 'start'),
-                onComplete: (id) => _tripOtpFlow(id, 'end'),
-                onArrived: _arrived,
-                onCancel: _driverCancel,
-                onInvoice: (id) => downloadAndOpenInvoice(context, _repo, id),
-                onOpenTrip: _openTrip,
-                onBill: _openSummary,
-              ),
-            )),
-      ],
+      children: [...active, ...done],
     );
   }
 }

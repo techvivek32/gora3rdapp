@@ -224,26 +224,27 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
         children: [
-          ...assigned.map((req) {
-            final trip = (req['tripStatus'] ?? 'pending').toString();
-            final showStamp = trip == 'completed';
-            return Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: Column(
-                children: [
-                  RequirementCardWidget(requirement: req, showStamp: showStamp),
-                  if (trip != 'completed') ...[
-                    SizedBox(height: 8.h),
-                    _tripButton(context, req, trip),
-                  ],
-                ],
-              ),
-            );
-          }),
-          // Won customer-app trips — hidden when none; shows the empty state only
-          // when there are also no assigned requirements.
+          // Assigned requirements + won customer-app trips in ONE merged list
+          // (no "Customer Trips" divider); completed bookings drop to the bottom.
           MyCustomerOffersList(
-            emptyPlaceholder: assigned.isEmpty ? _emptyState('No bookings assigned to you'.tr) : null,
+            requirements: assigned,
+            requirementBuilder: (req) {
+              final trip = (req['tripStatus'] ?? 'pending').toString();
+              final showStamp = trip == 'completed';
+              return Padding(
+                padding: EdgeInsets.only(bottom: 12.h),
+                child: Column(
+                  children: [
+                    RequirementCardWidget(requirement: req, showStamp: showStamp),
+                    if (trip != 'completed') ...[
+                      SizedBox(height: 8.h),
+                      _tripButton(context, req, trip),
+                    ],
+                  ],
+                ),
+              );
+            },
+            emptyPlaceholder: _emptyState('No bookings assigned to you'.tr),
           ),
         ],
       ),
