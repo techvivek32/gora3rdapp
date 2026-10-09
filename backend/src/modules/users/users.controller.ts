@@ -81,8 +81,8 @@ export class UsersController {
 
   @Get('lookup')
   @ApiOperation({ summary: 'Find a user by mobile number' })
-  lookupByMobile(@Query('mobile') mobile: string) {
-    return this.usersService.lookupByMobile(mobile);
+  lookupByMobile(@Query('mobile') mobile: string, @CurrentUser('sub') userId: string) {
+    return this.usersService.lookupByMobile(mobile, userId);
   }
 
   @Patch('me/location')

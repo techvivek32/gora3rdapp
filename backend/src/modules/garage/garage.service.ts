@@ -31,6 +31,20 @@ export class GarageService {
   }
 
   /**
+   * You can't add your OWN number as a driver — it's the same account whether
+   * you're in customer or driver mode, and you can't assign a trip to yourself.
+   */
+  private async assertNotOwnNumber(userId: string, phone?: string): Promise<void> {
+    const last10 = (phone || '').replace(/\D/g, '').slice(-10);
+    if (last10.length !== 10) return;
+    const me: any = await this.userModel.findById(userId).select('mobile').lean();
+    const myLast10 = (me?.mobile || '').replace(/\D/g, '').slice(-10);
+    if (myLast10 && myLast10 === last10) {
+      throw new BadRequestException("You can't add your own number as a driver.");
+    }
+  }
+
+  /**
    * Prevent the same phone number being saved twice in one account's driver list.
    * Compares on the last 10 digits; `exceptId` skips the driver being edited.
    */
@@ -106,9 +120,9 @@ export class GarageService {
   }
 
   async createDriver(userId: string, dto: CreateGarageDriverDto) {
-    // Only allow saving a driver whose number is a registered driver/vendor.
     this.assertValidPhone(dto.phone);
-    // ...and not one this account already saved.
+    // ...not your own number, and not one this account already saved.
+    await this.assertNotOwnNumber(userId, dto.phone);
     await this.assertPhoneNotDuplicate(userId, dto.phone);
     const driver = await this.driverModel.create({
       ...dto,
@@ -122,6 +136,7 @@ export class GarageService {
     // Re-validate whenever the phone is being set/changed.
     if (dto.phone !== undefined && dto.phone !== driver.phone) {
       this.assertValidPhone(dto.phone);
+      await this.assertNotOwnNumber(userId, dto.phone);
       await this.assertPhoneNotDuplicate(userId, dto.phone, id);
     }
     Object.assign(driver, dto);

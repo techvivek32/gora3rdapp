@@ -11,6 +11,7 @@ import { UpdateRequirementDto } from './dto/update-requirement.dto';
 import { FilterRequirementsDto } from './dto/filter-requirements.dto';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
+import { ChatService } from '../chat/chat.service';
 import {
   generateBookingId,
   generateRequirementId,
@@ -29,6 +30,7 @@ export class RequirementsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private notificationsService: NotificationsService,
     private settingsService: SettingsService,
+    private chatService: ChatService,
   ) {}
 
   /**
@@ -495,9 +497,9 @@ export class RequirementsService {
       throw new BadRequestException('You cannot assign a booking to yourself');
     }
 
-    const driver = await this.userModel
+    const driver: any = await this.userModel
       .findOne({ _id: new Types.ObjectId(driverId), isActive: true, isBlocked: { $ne: true } })
-      .select('_id fcmTokens')
+      .select('_id fcmTokens fullName agencyName mobile documents')
       .lean();
     if (!driver) throw new NotFoundException('Driver not found');
 
@@ -517,7 +519,45 @@ export class RequirementsService {
 
     this.notificationsService.notifyRequirementAssigned(updated).catch(() => {});
 
+    // Auto-post the driver + vehicle details into the owner↔driver chat.
+    const rc: any = driver.documents?.vehicleRc || {};
+    const detailLines = [
+      `Driver Name: ${driver.agencyName || driver.fullName || 'Driver'}`,
+      `Contact Number: ${driver.mobile || '-'}`,
+      `Vehicle Registration: ${rc.number || rc.documentNumber || '-'}`,
+      `Vehicle Type: ${requirement.vehicleType || '-'}`,
+    ];
+    this.chatService
+      .postDriverDetails(ownerId, driverId, id, detailLines.join('\n'))
+      .catch((e) => this.logger.warn(`postDriverDetails failed: ${e?.message}`));
+
     return { message: 'Driver assigned', data: updated };
+  }
+
+  /**
+   * Owner edits the commission amount — allowed only while the booking is still
+   * open (ACTIVE / ON_HOLD, i.e. no driver assigned yet). Once a driver is
+   * assigned/booked, the agreed commission is locked.
+   */
+  async updateCommission(id: string, ownerId: string, commission: number) {
+    const value = Math.max(0, Math.round(Number(commission)));
+    if (!isFinite(value)) throw new BadRequestException('Invalid commission amount');
+
+    const requirement = await this.requirementModel.findById(id);
+    if (!requirement) throw new NotFoundException('Requirement not found');
+    if (requirement.postedBy.toString() !== ownerId) {
+      throw new ForbiddenException('Only the booking owner can edit the commission');
+    }
+    if (requirement.status !== BookingStatus.ACTIVE && requirement.status !== BookingStatus.ON_HOLD) {
+      throw new BadRequestException('Commission can be changed only while the booking is open (before a driver is assigned).');
+    }
+
+    const updated = await this.requirementModel
+      .findByIdAndUpdate(id, { commission: value }, { new: true })
+      .populate('postedBy', RequirementsService.PARTY_SELECT)
+      .populate('assignedDriver', RequirementsService.PARTY_SELECT)
+      .lean();
+    return { message: 'Commission updated', data: updated };
   }
 
   /** Remove the assigned driver and put the requirement back in Running. */

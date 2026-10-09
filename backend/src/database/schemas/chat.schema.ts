@@ -46,6 +46,8 @@ export enum MessageType {
   IMAGE = 'image',
   AUDIO = 'audio',
   SYSTEM = 'system',
+  // Driver + vehicle details auto-posted into the chat when a driver is assigned.
+  DRIVER_DETAILS = 'driver_details',
 }
 
 @Schema({ timestamps: true, collection: 'messages' })

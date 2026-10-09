@@ -90,7 +90,7 @@ export class ChatService {
     if (!Types.ObjectId.isValid(chatId)) throw new NotFoundException('Chat not found');
     const chat: any = await this.chatModel
       .findById(chatId)
-      .populate('relatedRequirement', 'bookingId pickupCity dropCity pickup drop travelDate travelTime tripType vehicleType')
+      .populate('relatedRequirement', 'bookingId pickupCity dropCity pickup drop travelDate travelTime tripType vehicleType fare commission status postedBy assignedDriver secureBooking')
       .lean();
     if (!chat) throw new NotFoundException('Chat not found');
     const isParticipant = (chat.participants as any[]).some((p) => (p?._id?.toString?.() ?? p?.toString?.()) === userId);
@@ -163,6 +163,34 @@ export class ChatService {
     });
 
     return await this.messageModel.findById(message._id).populate('senderId', 'fullName profileImage').lean();
+  }
+
+  /**
+   * Auto-post the assigned driver's details into the owner↔driver chat (creating
+   * the chat if needed). Sent as the driver so it reads as "the driver's details"
+   * to the owner. Used by the requirements module when a driver is assigned.
+   */
+  async postDriverDetails(ownerId: string, driverId: string, requirementId: string, content: string) {
+    const chat = await this.getOrCreateChat(ownerId, driverId, requirementId);
+    const message = await this.messageModel.create({
+      chatId: chat._id,
+      senderId: new Types.ObjectId(driverId),
+      content,
+      type: MessageType.DRIVER_DETAILS,
+    });
+    const unreadUpdate: any = {};
+    (chat.participants as any[]).forEach((pid) => {
+      if (pid.toString() !== driverId) {
+        unreadUpdate[`unreadCount.${pid}`] = (chat.unreadCount?.[pid.toString()] || 0) + 1;
+      }
+    });
+    await this.chatModel.findByIdAndUpdate(chat._id, {
+      lastMessage: message._id,
+      lastMessageText: 'Driver & vehicle details',
+      lastMessageAt: new Date(),
+      ...unreadUpdate,
+    });
+    return message;
   }
 
   async markMessagesRead(chatId: string, userId: string) {

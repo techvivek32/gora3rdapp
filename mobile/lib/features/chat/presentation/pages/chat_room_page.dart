@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/chat_bloc.dart';
 
 class ChatRoomPage extends StatefulWidget {
@@ -122,6 +124,145 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     return out;
   }
 
+  /// Current signed-in user id (to tell if I'm the booking owner).
+  String? get _myId {
+    final s = context.read<AuthBloc>().state;
+    if (s is AuthAuthenticated) return (s.user['_id'] as String?) ?? (s.user['id'] as String?);
+    return null;
+  }
+
+  /// A compact booking summary card shown under the app bar: route, trip type,
+  /// total fare, vehicle & commission — with an "Edit Commission Amount" button
+  /// for the owner while the booking is still open (no driver assigned yet).
+  Widget? _bookingCard() {
+    final req = _header?['relatedRequirement'] is Map ? Map<String, dynamic>.from(_header!['relatedRequirement'] as Map) : null;
+    if (req == null) return null;
+
+    final from = (req['pickupCity']?.toString().trim().isNotEmpty ?? false)
+        ? req['pickupCity'].toString()
+        : ((req['pickup'] as Map?)?['address']?.toString() ?? '');
+    final to = (req['dropCity']?.toString().trim().isNotEmpty ?? false)
+        ? req['dropCity'].toString()
+        : ((req['drop'] as Map?)?['address']?.toString() ?? '');
+    final tripType = (req['tripType'] ?? '').toString();
+    final vehicle = (req['vehicleType'] ?? '').toString();
+    final fare = (req['fare'] as num?)?.round() ?? 0;
+    final commission = (req['commission'] as num?)?.round() ?? 0;
+    final status = (req['status'] ?? '').toString();
+    final postedBy = req['postedBy']?.toString();
+    final hasDriver = (req['assignedDriver'] != null) && req['assignedDriver'].toString().isNotEmpty;
+
+    final isOwner = postedBy != null && _myId != null && postedBy == _myId;
+    final isOpen = (status == 'active' || status == 'on_hold') && !hasDriver;
+    final canEditCommission = isOwner && isOpen;
+
+    Widget pill(String label, String value, Color color) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('₹$value', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+            Text(label, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
+          ],
+        );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Expanded(
+              child: Row(children: [
+                Flexible(child: Text(from, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.primary)),
+                Flexible(child: Text(to, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary))),
+              ]),
+            ),
+            if (tripType.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                child: Text(tripType.toUpperCase(), style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+              ),
+          ]),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (fare > 0) pill('Total Amount', '$fare', AppColors.textPrimary),
+              if (vehicle.isNotEmpty)
+                Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.local_taxi_rounded, size: 18, color: AppColors.primary),
+                  Text(vehicle, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
+                ]),
+              pill('Commission', '$commission', AppColors.primary),
+            ],
+          ),
+          if (canEditCommission) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _editCommission(commission),
+                icon: const Icon(Icons.edit_rounded, size: 16),
+                label: const Text('Edit Commission Amount'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF5A623),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editCommission(int current) async {
+    final req = _header?['relatedRequirement'] is Map ? _header!['relatedRequirement'] as Map : null;
+    final reqId = req?['_id']?.toString();
+    if (reqId == null) return;
+    final ctrl = TextEditingController(text: current > 0 ? '$current' : '');
+    final value = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Commission Amount'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: const InputDecoration(prefixText: '₹ ', hintText: 'Commission amount'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text.trim())),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (value == null) return;
+    try {
+      await getIt<ApiClient>().post('/requirements/$reqId/commission', data: {'commission': value});
+      if (!mounted) return;
+      await _loadHeader();
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Commission updated'), backgroundColor: AppColors.success));
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().contains('open') ? 'Commission can only be changed before a driver is assigned.' : 'Could not update commission';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.error));
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollCtrl.hasClients) _scrollCtrl.animateTo(_scrollCtrl.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
@@ -147,6 +288,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bookingCard = _bookingCard();
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
@@ -163,6 +305,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
       ),
       body: Column(
         children: [
+          if (bookingCard != null) bookingCard,
           Expanded(
             child: BlocBuilder<ChatBloc, ChatState>(
               builder: (context, state) {
@@ -228,6 +371,53 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMe = message['isMe'] as bool? ?? false;
+    final content = message['content'] as String? ?? '';
+
+    // Driver + vehicle details auto-posted on assignment — a highlighted card
+    // with a Share button, regardless of who it reads as being from.
+    if ((message['type'] ?? '').toString() == 'driver_details') {
+      return Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(14),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5A623).withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFF5A623).withValues(alpha: 0.5)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.badge_rounded, size: 16, color: Color(0xFFD48806)),
+                const SizedBox(width: 6),
+                const Text('Driver & Vehicle Details', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFFD48806))),
+              ]),
+              const SizedBox(height: 8),
+              Text(content, style: const TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textPrimary)),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => Share.share(content),
+                  icon: const Icon(Icons.share_rounded, size: 15),
+                  label: const Text('Share'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFD48806),
+                    side: const BorderSide(color: Color(0xFFF5A623)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -242,10 +432,10 @@ class _MessageBubble extends StatelessWidget {
             bottomLeft: Radius.circular(isMe ? 16 : 4),
             bottomRight: Radius.circular(isMe ? 4 : 16),
           ),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 1))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
         ),
         child: Text(
-          message['content'] as String? ?? '',
+          content,
           style: TextStyle(color: isMe ? Colors.white : null, fontSize: 15),
         ),
       ),

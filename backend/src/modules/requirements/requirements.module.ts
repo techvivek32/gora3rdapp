@@ -7,6 +7,7 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
+import { ChatModule } from '../chat/chat.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { SettingsModule } from '../settings/settings.module';
     ]),
     NotificationsModule,
     SettingsModule,
+    ChatModule,
   ],
   controllers: [RequirementsController],
   providers: [RequirementsService],

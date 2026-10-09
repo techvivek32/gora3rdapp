@@ -112,6 +112,16 @@ export class RequirementsController {
     return this.requirementsService.unassignDriver(id, userId);
   }
 
+  @Post(':id/commission')
+  @ApiOperation({ summary: 'Edit the commission amount (owner only, while the booking is still open)' })
+  updateCommission(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: string,
+    @Body('commission') commission: number,
+  ) {
+    return this.requirementsService.updateCommission(id, userId, commission);
+  }
+
   @Post(':id/trip/request-otp')
   @ApiOperation({ summary: 'Driver: request the start/end OTP (delivered to the owner)' })
   requestTripOtp(

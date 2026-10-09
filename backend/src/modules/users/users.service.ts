@@ -100,7 +100,7 @@ export class UsersService {
     return { ...user, vehicles };
   }
 
-  async lookupByMobile(mobile: string) {
+  async lookupByMobile(mobile: string, currentUserId?: string) {
     const digits = (mobile || '').replace(/\D/g, '');
     if (digits.length < 10) {
       throw new BadRequestException('Enter a valid mobile number');
@@ -114,6 +114,12 @@ export class UsersService {
       .select(PUBLIC_PROFILE_SELECT)
       .lean();
     if (!user) throw new NotFoundException('No user found with this number');
+    // Never return the caller's own account — you can't assign yourself as a
+    // driver, send money to yourself, etc. (this is the same account showing in
+    // both customer and driver mode of a dual-role user).
+    if (currentUserId && (user as any)._id?.toString() === currentUserId) {
+      throw new BadRequestException('This is your own number.');
+    }
 
     return { message: 'User found', data: await this.withVehicles(user) };
   }
