@@ -117,7 +117,10 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
     final trackedKm = _num(_b['trackedKm']);
     final extraKm = _num(_b['extraKm']);
     final extraCharge = _num(_b['extraCharge']);
-    final total = _num(_b['finalFare'] ?? _b['fare'] ?? _b['estimatedFare'] ?? _b['totalFare']);
+    // Driver collects the GST-free amount — GST is the platform's, not the driver's.
+    final gstAmount = _num(_b['gstAmount']);
+    final rawTotal = _num(_b['finalFare'] ?? _b['fare'] ?? _b['estimatedFare'] ?? _b['totalFare']);
+    final total = (rawTotal - gstAmount).clamp(0, double.infinity).toDouble();
     final advance = (_b['advanceStatus']?.toString() == 'paid') ? _num(_b['advanceAmount']) : 0.0;
     final collected = (total - advance).clamp(0, double.infinity).toDouble();
     final isRound = (_b['subType'] ?? '').toString() == 'Round Trip';

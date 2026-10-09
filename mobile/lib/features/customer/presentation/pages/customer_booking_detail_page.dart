@@ -538,8 +538,6 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     final fare = (b['finalFare'] as num?)?.toInt() ?? (b['estimatedFare'] as num?)?.toInt() ?? 0;
     final paid = (b['advanceAmount'] as num?)?.toInt() ?? 0;
     final percent = (b['advancePercent'] as num?)?.toInt() ?? 0;
-    final remaining = (fare - paid) < 0 ? 0 : (fare - paid);
-    final fullyPaid = remaining == 0 || percent >= 100;
     Widget row(IconData icon, Color color, String label, String amount, {bool strong = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(children: [
@@ -547,6 +545,26 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
             const SizedBox(width: 8),
             Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: strong ? FontWeight.w700 : FontWeight.w500, color: AppColors.textPrimary))),
             Text(amount, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: color)),
+          ]),
+        );
+    // Itemised fare breakdown (customer view): Base fare / Driver allowance /
+    // extras / GST — mirrors the customer invoice. Driver screens never show this.
+    int n(String k) => (b[k] as num?)?.round() ?? 0;
+    final toll = n('tollCharge'), parking = n('parkingCharge'), other = n('otherCharge');
+    final extraKmCharge = n('extraCharge'), extraHourCharge = n('extraHourCharge');
+    final allowance = n('driverAllowance'), gst = n('gstAmount');
+    final baseFare = (fare - toll - parking - other - extraKmCharge - extraHourCharge - allowance - gst)
+        .clamp(0, fare);
+    final showBreakdown = fare > 0 && (gst > 0 || allowance > 0 || toll > 0 || parking > 0 || other > 0 || extraKmCharge > 0 || extraHourCharge > 0);
+    final gstPct = (baseFare + allowance) > 0 ? ((gst / (baseFare + allowance)) * 100).round() : 0;
+    // The driver collects the GST-free amount in cash; GST goes to Gora separately.
+    final driverCash = (fare - gst - paid) < 0 ? 0 : (fare - gst - paid);
+    final nothingToDriver = driverCash == 0 || percent >= 100;
+    Widget line(String label, String amount, {bool muted = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(children: [
+            Expanded(child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: muted ? AppColors.textSecondary : AppColors.textPrimary))),
+            Text(amount, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: muted ? AppColors.textSecondary : AppColors.textPrimary)),
           ]),
         );
     return Container(
@@ -557,17 +575,30 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
         children: [
           const Text('Payment', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
+          if (showBreakdown) ...[
+            line('Base fare', '₹$baseFare'),
+            if (allowance > 0) line('Driver allowance', '₹$allowance'),
+            if (extraKmCharge > 0) line('Extra ${n('extraKm')} km @ ₹${n('extraKmPrice')}/km', '₹$extraKmCharge'),
+            if (extraHourCharge > 0) line('Extra ${n('extraHours')} hr @ ₹${n('extraHourPrice')}/hr', '₹$extraHourCharge'),
+            if (toll > 0) line('Toll', '₹$toll'),
+            if (parking > 0) line('Parking', '₹$parking'),
+            if (other > 0) line('Other charges', '₹$other'),
+            if (gst > 0) line('GST${gstPct > 0 ? ' ($gstPct%)' : ''}', '₹$gst'),
+            const Divider(height: 14),
+          ],
           if (fare > 0) row(Icons.receipt_long_rounded, AppColors.textSecondary, 'Total Fare', '₹$fare'),
-          row(Icons.check_circle_rounded, AppColors.success, 'Advance paid', '₹$paid'),
-          if (!fullyPaid)
-            row(Icons.account_balance_wallet_rounded, AppColors.warning, 'Remaining Balance', '₹$remaining', strong: true),
+          if (paid > 0) row(Icons.check_circle_rounded, AppColors.success, 'Advance paid', '₹$paid'),
+          if (!nothingToDriver)
+            row(Icons.account_balance_wallet_rounded, AppColors.warning, 'Cash to driver', '₹$driverCash', strong: true),
           const SizedBox(height: 6),
           Text(
-            fullyPaid
-                ? 'Fully paid. Nothing more to pay to the driver.'
-                : (paid > 0
-                    ? 'You paid ₹$paid advance online. Pay the remaining ₹$remaining directly to the driver.'
-                    : 'Pay ₹$remaining directly to the driver.'),
+            nothingToDriver
+                ? (gst > 0
+                    ? 'Fully paid. GST ₹$gst is billed by Gora separately — not paid to the driver.'
+                    : 'Fully paid. Nothing more to pay to the driver.')
+                : (gst > 0
+                    ? 'Pay ₹$driverCash to the driver in cash. GST ₹$gst is billed by Gora separately — not paid to the driver.'
+                    : 'Pay ₹$driverCash directly to the driver.'),
             style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
           ),
         ],

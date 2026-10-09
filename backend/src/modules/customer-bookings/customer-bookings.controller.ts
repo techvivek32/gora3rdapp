@@ -206,8 +206,11 @@ export class CustomerBookingsController {
     @Param('id') id: string,
     @Body('action') action: 'start' | 'end',
     @Body('otp') otp: string,
+    // Start-trip verification photos (car front + driver in car), URLs from /storage/upload.
+    @Body('carPhoto') carPhoto?: string,
+    @Body('driverPhoto') driverPhoto?: string,
   ) {
-    return this.service.verifyTripOtp(userId, id, action, otp);
+    return this.service.verifyTripOtp(userId, id, action, otp, { carPhoto, driverPhoto });
   }
 
   @Post(':id/track')

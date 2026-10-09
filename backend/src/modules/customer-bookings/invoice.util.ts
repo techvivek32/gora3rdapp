@@ -33,6 +33,10 @@ export interface InvoiceData {
   tollAmount?: number;
   parkingCharge?: number;
   otherCharge?: number;
+  // GST split (new bookings): driver allowance and the GST charged on
+  // (base + allowance). Shown as their own lines in the Fare Summary.
+  driverAllowance?: number;
+  gstAmount?: number;
   fareMode?: string;
   paymentMode?: string;
   // Round-trip GPS extra-km billing (optional).
@@ -206,13 +210,27 @@ export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
   const extraHourCharge = data.extraHourCharge && data.extraHourCharge > 0 ? data.extraHourCharge : 0;
   const parkingCharge = data.parkingCharge && data.parkingCharge > 0 ? data.parkingCharge : 0;
   const otherCharge = data.otherCharge && data.otherCharge > 0 ? data.otherCharge : 0;
-  const base = Math.max(0, Math.round((data.fare || 0) - (data.tollAmount || 0) - extraCharge - extraHourCharge - parkingCharge - otherCharge));
-  const items: [string, number][] = [['Ride fare' + (data.fareMode ? ` (${data.fareMode})` : ''), base]];
+  const allowance = data.driverAllowance && data.driverAllowance > 0 ? Math.round(data.driverAllowance) : 0;
+  const gst = data.gstAmount && data.gstAmount > 0 ? Math.round(data.gstAmount) : 0;
+  // "Base fare" is whatever is left after every line we itemise below. GST and
+  // driver allowance are only broken out for new bookings that store them; older
+  // bookings have gst/allowance = 0, so the base stays the full pre-tax ride fare.
+  const base = Math.max(0, Math.round(
+    (data.fare || 0) - (data.tollAmount || 0) - extraCharge - extraHourCharge - parkingCharge - otherCharge - allowance - gst,
+  ));
+  const baseLabel = (gst > 0 || allowance > 0) ? 'Base fare' : 'Ride fare';
+  const items: [string, number][] = [[baseLabel + (data.fareMode ? ` (${data.fareMode})` : ''), base]];
+  if (allowance > 0) items.push(['Driver allowance', allowance]);
   if (extraCharge > 0) items.push([`Extra ${data.extraKm} km @ Rs.${data.extraKmPrice}/km`, extraCharge]);
   if (extraHourCharge > 0) items.push([`Extra ${data.extraHours} hr @ Rs.${data.extraHourPrice}/hr`, extraHourCharge]);
   if (data.tollAmount && data.tollAmount > 0) items.push(['Toll', data.tollAmount]);
   if (parkingCharge > 0) items.push(['Parking', parkingCharge]);
   if (otherCharge > 0) items.push(['Other charges', otherCharge]);
+  if (gst > 0) {
+    // GST is charged on (base + driver allowance); derive the rate for the label.
+    const pct = (base + allowance) > 0 ? Math.round((gst / (base + allowance)) * 100) : 0;
+    items.push([`GST${pct > 0 ? ` (${pct}%)` : ''}`, gst]);
+  }
   const advance = Math.max(0, Math.round(data.advanceAmount || 0));
 
   doc.fillColor(DARK).font('Helvetica-Bold').fontSize(13).text('Fare Summary', M, y);

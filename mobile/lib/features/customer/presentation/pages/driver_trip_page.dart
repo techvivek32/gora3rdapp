@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/scheduler.dart' show Ticker;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:geolocator/geolocator.dart';
@@ -76,6 +78,7 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   double _segDurMs = 1000; // how long to glide across it (= real GPS interval)
   double _lastGpsMs = 0;
   double _lastProgMs = 0; // throttle route-consume/ETA recompute
+  double _lastDrawMs = 0; // throttle marker-rebuild + camera to ~30fps (ANR fix)
   double _targetBearing = 0;
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
@@ -351,12 +354,20 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       _lastProgMs = now;
       _updateProgress(np);
     }
-    _buildMarkers();
-    setState(() {});
-    if (_following && _map != null) {
-      _map!.moveCamera(CameraUpdate.newCameraPosition(
-        CameraPosition(target: np, zoom: 18.4, tilt: 60, bearing: _bearing),
-      ));
+    // Draw at ~30fps, not every frame. The interpolation math above still runs
+    // each tick so motion stays accurate, but rebuilding the GoogleMap widget
+    // (markers + polylines over the platform channel) 60x/sec saturates the main
+    // thread — that's what ANRs on the emulator and janks low-end phones. 30fps
+    // is visually smooth for a nav view and roughly halves the main-thread load.
+    if (now - _lastDrawMs >= 33) {
+      _lastDrawMs = now;
+      _buildMarkers();
+      setState(() {});
+      if (_following && _map != null) {
+        _map!.moveCamera(CameraUpdate.newCameraPosition(
+          CameraPosition(target: np, zoom: 18.4, tilt: 60, bearing: _bearing),
+        ));
+      }
     }
   }
 
@@ -669,13 +680,149 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     }
   }
 
-  Future<Map<String, dynamic>?> _apiVerifyOtp(String action, String otp) async {
+  Future<Map<String, dynamic>?> _apiVerifyOtp(String action, String otp, {String? carPhoto, String? driverPhoto}) async {
     if (_isReq) {
       final res = await _api.post('/requirements/$_id/trip/verify-otp', data: {'action': action, 'otp': otp});
       final d = res.data is Map ? res.data['data'] : null;
       return d is Map ? Map<String, dynamic>.from(d) : null;
     }
-    return _repo.verifyTripOtp(_id, action, otp);
+    return _repo.verifyTripOtp(_id, action, otp, carPhoto: carPhoto, driverPhoto: driverPhoto);
+  }
+
+  /// Upload one captured photo to storage; returns its URL (or null on failure).
+  Future<String?> _uploadPhoto(Uint8List bytes, String tag) async {
+    try {
+      final res = await _api.dio.post(
+        '/storage/upload',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(bytes, filename: 'trip_${tag}_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+          'folder': 'trip-start',
+        }),
+      );
+      // /storage/upload returns the URL as a plain string in `data` (older builds
+      // may wrap it in an object) — handle both.
+      final d = res.data is Map ? res.data['data'] : res.data;
+      final url = (d is Map ? (d['url'] ?? d['Location'] ?? d['path']) : d)?.toString();
+      return (url != null && url.isNotEmpty) ? url : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Start-trip verification: driver captures the car's front and a photo of
+  /// themselves in the car (camera only — no gallery). Returns the two images,
+  /// or null if the driver cancelled. The sheet can't be dismissed by dragging;
+  /// both shots are required before "Start Trip" enables.
+  Future<(Uint8List, Uint8List)?> _captureStartPhotos() async {
+    final picker = ImagePicker();
+    Uint8List? car, driver;
+
+    Future<Uint8List?> shoot() async {
+      final x = await picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        maxWidth: 1280,
+        imageQuality: 70,
+      );
+      return x == null ? null : await x.readAsBytes();
+    }
+
+    return showModalBottomSheet<(Uint8List, Uint8List)?>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Widget slot(String label, String hint, IconData icon, Uint8List? img, VoidCallback onTap) {
+            return GestureDetector(
+              onTap: onTap,
+              child: Container(
+                height: 150.h,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14.r),
+                  border: Border.all(color: img != null ? AppColors.success : AppColors.border, width: img != null ? 1.6 : 1.2),
+                  image: img != null ? DecorationImage(image: MemoryImage(img), fit: BoxFit.cover) : null,
+                ),
+                child: img != null
+                    ? Align(
+                        alignment: Alignment.topRight,
+                        child: Container(
+                          margin: EdgeInsets.all(8.r),
+                          padding: EdgeInsets.all(4.r),
+                          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                          child: Icon(Icons.check, size: 16.sp, color: Colors.white),
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(icon, size: 34.sp, color: AppColors.primary),
+                          SizedBox(height: 8.h),
+                          Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                          SizedBox(height: 2.h),
+                          Text(hint, style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                        ],
+                      ),
+              ),
+            );
+          }
+
+          final ready = car != null && driver != null;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(18.w, 14.h, 18.w, MediaQuery.of(ctx).viewInsets.bottom + 18.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+                SizedBox(height: 14.h),
+                Text('Trip start photos', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                SizedBox(height: 4.h),
+                Text('Take two live photos to start the trip.', style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                SizedBox(height: 16.h),
+                Row(children: [
+                  Expanded(child: slot('Car front', 'Tap to capture', Icons.directions_car_rounded, car, () async {
+                    final b = await shoot();
+                    if (b != null) setSheet(() => car = b);
+                  })),
+                  SizedBox(width: 12.w),
+                  Expanded(child: slot('Driver in car', 'Tap to capture', Icons.person_pin_circle_rounded, driver, () async {
+                    final b = await shoot();
+                    if (b != null) setSheet(() => driver = b);
+                  })),
+                ]),
+                SizedBox(height: 18.h),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: ready ? () => Navigator.of(ctx).pop((car!, driver!)) : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.textHint,
+                      padding: EdgeInsets.symmetric(vertical: 13.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                      elevation: 0,
+                    ),
+                    child: Text(ready ? 'Start Trip' : 'Capture both photos', style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+                  ),
+                ),
+                SizedBox(height: 6.h),
+                Center(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(null),
+                    child: Text('Cancel', style: TextStyle(fontSize: 13.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _otpTransition(String action) async {
@@ -690,8 +837,29 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
         _slideKey.currentState?.reset();
         return;
       }
+      // Start-trip verification: the driver captures (camera only) the car's front
+      // and themselves in the car before the trip begins. Customer bookings only.
+      String? carUrl, driverUrl;
+      if (action == 'start' && !_isReq) {
+        final shots = await _captureStartPhotos();
+        if (shots == null) {
+          // Driver backed out of the photo step → don't start the trip.
+          _slideKey.currentState?.reset();
+          return;
+        }
+        setState(() => _busy = true);
+        carUrl = await _uploadPhoto(shots.$1, 'car');
+        driverUrl = await _uploadPhoto(shots.$2, 'driver');
+        if (!mounted) return;
+        if (carUrl == null || driverUrl == null) {
+          setState(() => _busy = false);
+          _slideKey.currentState?.reset();
+          _snack('Could not upload the photos — please try again.');
+          return;
+        }
+      }
       setState(() => _busy = true);
-      final updated = await _apiVerifyOtp(action, otp);
+      final updated = await _apiVerifyOtp(action, otp, carPhoto: carUrl, driverPhoto: driverUrl);
       if (!mounted) return;
       if (action == 'start') {
         if (!_isReq) TripTracker.instance.start(_id); // no GPS extra-km for requirements
@@ -706,13 +874,18 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
         _snack('Trip started 🚀', ok: true);
       } else {
         if (!_isReq) TripTracker.instance.stop();
+        // NOTE: slide_to_act runs `await reset()` (≈900ms of reverse animations,
+        // with no mounted-check) AFTER onSubmit returns. Navigating here disposes
+        // this page mid-reset, so the package logs a benign (caught, non-fatal)
+        // "AnimationController after dispose". It does not affect the flow; the
+        // only true fixes are an ~1s stall or swapping the slider, both worse.
+        final nav = Navigator.of(context);
+        _snack(_isReq ? 'Trip completed 🎉' : 'Trip completed ✅', ok: true);
+        final b = updated ?? _b;
         if (_isReq) {
-          // Requirements: no fare/extra-km summary — just confirm and return.
-          _snack('Trip completed 🎉', ok: true);
-          Navigator.of(context).pop(true);
+          nav.pop(true);
         } else {
-          final b = updated ?? _b;
-          Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: b)));
+          nav.pushReplacement(MaterialPageRoute(builder: (_) => DriverTripSummaryPage(booking: b)));
         }
       }
     } catch (e) {

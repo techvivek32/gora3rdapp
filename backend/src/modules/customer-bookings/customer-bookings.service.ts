@@ -337,6 +337,10 @@ export class CustomerBookingsService {
       durationHours: dto.durationHours || 0,
       notes: dto.notes || '',
       estimatedFare: dto.estimatedFare || 0,
+      // Fare breakdown snapshot — lets the driver side show a GST-exclusive amount.
+      baseFare: dto.baseFare || 0,
+      driverAllowance: dto.driverAllowance || 0,
+      gstAmount: dto.gstAmount || 0,
       estimatedDistance: dto.estimatedDistance || 0,
       // Round-trip rental snapshot from the chosen cab (0 = no extra-km tracking).
       dailyKmLimit: dto.dailyKmLimit || 0,
@@ -436,7 +440,7 @@ export class CustomerBookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     this.assertInvoiceAccess(booking, userId, roles);
-    return this.buildInvoiceForBooking(booking);
+    return this.buildInvoiceForBooking(booking, this.invoiceShowsBreakdown(booking, userId, roles));
   }
 
   /** Access check shared by the direct download and the tokenized link. */
@@ -450,32 +454,48 @@ export class CustomerBookingsService {
     }
   }
 
+  /**
+   * Who gets the GST/allowance breakdown: the customer and admin do; a caller who
+   * is ONLY the assigned driver gets the simpler invoice. (Call after access check.)
+   */
+  private invoiceShowsBreakdown(booking: any, userId: string, roles: string[]): boolean {
+    const isAdmin = (roles || []).some((r) => r === UserRole.ADMIN || r === UserRole.SUPER_ADMIN);
+    const isCustomer = booking.customerId?.toString() === userId;
+    const isDriver = booking.selectedDriverId?.toString() === userId;
+    return !(isDriver && !isCustomer && !isAdmin);
+  }
+
   // ── Tokenized invoice link (lets the app open the PDF in the browser, so it
   // works without the path_provider/share_plus plugins on the device) ──────────
   private invoiceSecret(): string {
     return process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'gora-invoice';
   }
 
-  private makeInvoiceToken(id: string): string {
+  private makeInvoiceToken(id: string, breakdown = true): string {
     const exp = Date.now() + 15 * 60 * 1000; // valid 15 minutes
-    const payload = `${id}.${exp}`;
+    // `b` = whether the opened PDF shows the GST/allowance breakdown (customer) or
+    // the simple driver view; signed so it can't be flipped to peek at the split.
+    const payload = `${id}.${exp}.${breakdown ? '1' : '0'}`;
     const sig = crypto.createHmac('sha256', this.invoiceSecret()).update(payload).digest('hex');
     return Buffer.from(`${payload}.${sig}`).toString('base64url');
   }
 
-  private verifyInvoiceToken(token: string): string {
+  private verifyInvoiceToken(token: string): { id: string; breakdown: boolean } {
     let decoded = '';
     try {
       decoded = Buffer.from(token, 'base64url').toString('utf8');
     } catch {
       throw new BadRequestException('Invalid invoice link');
     }
-    const [id, expStr, sig] = decoded.split('.');
+    const parts = decoded.split('.');
+    // New tokens: id.exp.b.sig (4 parts). Old tokens: id.exp.sig (3 parts, breakdown defaults on).
+    const sig = parts.pop() as string;
+    const [id, expStr, bStr] = parts;
     if (!id || !expStr || !sig) throw new BadRequestException('Invalid invoice link');
-    const expected = crypto.createHmac('sha256', this.invoiceSecret()).update(`${id}.${expStr}`).digest('hex');
+    const expected = crypto.createHmac('sha256', this.invoiceSecret()).update(parts.join('.')).digest('hex');
     if (expected !== sig) throw new ForbiddenException('Invalid or tampered invoice link');
     if (Date.now() > Number(expStr)) throw new BadRequestException('Invoice link expired — please try again');
-    return id;
+    return { id, breakdown: bStr !== '0' };
   }
 
   /** Access-checked → returns a short-lived token the app opens as a public URL. */
@@ -484,28 +504,41 @@ export class CustomerBookingsService {
     const booking: any = await this.bookingModel.findById(id).lean();
     if (!booking) throw new NotFoundException('Booking not found');
     this.assertInvoiceAccess(booking, userId, roles);
-    return { token: this.makeInvoiceToken(id) };
+    return { token: this.makeInvoiceToken(id, this.invoiceShowsBreakdown(booking, userId, roles)) };
   }
 
   /** Public: serve the PDF for a valid signed token (no login header needed). */
   async getInvoiceByToken(token: string): Promise<{ buffer: Buffer; filename: string }> {
-    const id = this.verifyInvoiceToken(token);
+    const { id, breakdown } = this.verifyInvoiceToken(token);
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
     const booking: any = await this.bookingModel.findById(id).lean();
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status !== CustomerBookingStatus.COMPLETED) {
       throw new BadRequestException('Invoice is available only after the trip is completed');
     }
-    return this.buildInvoiceForBooking(booking);
+    return this.buildInvoiceForBooking(booking, breakdown);
   }
 
-  private async buildInvoiceForBooking(booking: any): Promise<{ buffer: Buffer; filename: string }> {
+  /**
+   * Build the booking's PDF invoice. `showTaxBreakdown` is the CUSTOMER view: the
+   * fare includes GST and the Fare Summary itemises Base fare / Driver allowance /
+   * GST. The DRIVER view (false) excludes GST entirely — GST is the platform's,
+   * not collected by the driver — so the total is the GST-free amount the driver
+   * actually collects in cash, shown as a single "Ride fare" line + extras.
+   */
+  private async buildInvoiceForBooking(
+    booking: any,
+    showTaxBreakdown = true,
+  ): Promise<{ buffer: Buffer; filename: string }> {
     const customer: any = await this.userModel
       .findById(booking.customerId)
       .select('fullName mobile')
       .lean();
 
-    const fare = booking.finalFare || booking.estimatedFare || 0;
+    const gstAmount = Math.max(0, Math.round(booking.gstAmount || 0));
+    const rawFare = booking.finalFare || booking.estimatedFare || 0;
+    // Driver collects the GST-free amount; customer is billed the full total.
+    const fare = showTaxBreakdown ? rawFare : Math.max(0, rawFare - gstAmount);
     // Toll: prefer the structured charge the driver entered on the bill screen;
     // fall back to the legacy value concatenated into `notes` for old bookings.
     let tollAmount = Math.max(0, Math.round(booking.tollCharge || 0));
@@ -578,6 +611,10 @@ export class CustomerBookingsService {
       tollAmount,
       parkingCharge: Math.max(0, Math.round(booking.parkingCharge || 0)),
       otherCharge: Math.max(0, Math.round(booking.otherCharge || 0)),
+      // Driver's copy hides the tax split — pass 0 so the invoice collapses to a
+      // single "Ride fare" line while the TOTAL stays the same.
+      driverAllowance: showTaxBreakdown ? Math.max(0, Math.round(booking.driverAllowance || 0)) : 0,
+      gstAmount: showTaxBreakdown ? Math.max(0, Math.round(booking.gstAmount || 0)) : 0,
       fareMode,
       includedKm: booking.includedKm || 0,
       trackedKm: booking.trackedKm || 0,
@@ -590,7 +627,13 @@ export class CustomerBookingsService {
       extraHours: booking.extraHours || 0,
       extraHourCharge: booking.extraHourCharge || 0,
       advanceAmount: booking.advanceStatus === 'paid' ? (booking.advanceAmount || 0) : 0,
-      paymentMode: 'Cash — paid directly to the driver',
+      // Customer copy: the driver is paid the GST-free cash; GST goes to Gora
+      // separately. Driver copy already has GST stripped from the total, so the
+      // plain cash note is accurate for them.
+      paymentMode:
+        showTaxBreakdown && gstAmount > 0
+          ? `Cash Rs. ${(rawFare - gstAmount).toLocaleString('en-IN')} to the driver — GST Rs. ${gstAmount.toLocaleString('en-IN')} billed separately by Gora`
+          : 'Cash — paid directly to the driver',
     });
 
     return { buffer, filename: `Gora-Invoice-${booking.bookingId}.pdf` };
@@ -1354,7 +1397,13 @@ export class CustomerBookingsService {
   }
 
   /** Driver enters the OTP the customer read out. Starts / completes the trip. */
-  async verifyTripOtp(driverId: string, id: string, action: 'start' | 'end', otp: string) {
+  async verifyTripOtp(
+    driverId: string,
+    id: string,
+    action: 'start' | 'end',
+    otp: string,
+    photos?: { carPhoto?: string; driverPhoto?: string },
+  ) {
     const booking = await this.bookingModel
       .findById(id)
       .select('+tripOtp +tripOtpAction +tripOtpExpiresAt');
@@ -1384,6 +1433,9 @@ export class CustomerBookingsService {
     if (action === 'start') {
       booking.status = CustomerBookingStatus.ONGOING;
       booking.startedAt = new Date();
+      // Save the start-trip verification photos the driver captured.
+      if (photos?.carPhoto) booking.startCarPhoto = photos.carPhoto;
+      if (photos?.driverPhoto) booking.startDriverPhoto = photos.driverPhoto;
     } else {
       booking.status = CustomerBookingStatus.COMPLETED;
       booking.completedAt = new Date();

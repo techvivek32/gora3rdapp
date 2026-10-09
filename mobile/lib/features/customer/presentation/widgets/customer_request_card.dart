@@ -23,7 +23,12 @@ class CustomerRequestCard extends StatelessWidget {
     final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
     final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
     final date = tripDate(b['travelDate']);
-    final fare = b['estimatedFare'] ?? 0;
+    // Driver-facing amount: GST is the platform's tax, not the driver's earning,
+    // so show the fare WITHOUT it. Older bookings have no stored gstAmount —
+    // fall back to the total rather than guessing.
+    final _total = ((b['estimatedFare'] as num?) ?? 0).toInt();
+    final _gst = ((b['gstAmount'] as num?) ?? 0).toInt();
+    final fare = _total - _gst;
     final applied = b['alreadyApplied'] == true;
     final subType = (b['subType'] ?? '').toString();
     final status = (b['status'] ?? 'open').toString();
@@ -335,7 +340,9 @@ class _AcceptDialogState extends State<_AcceptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final fare = widget.booking['estimatedFare'] ?? 0;
+    // Same rule as the feed card — driver sees the amount without GST.
+    final fare = (((widget.booking['estimatedFare'] as num?) ?? 0).toInt())
+        - (((widget.booking['gstAmount'] as num?) ?? 0).toInt());
     final canSubmit = _vehicle != null && _driver != null;
     final emptyGarage = !_loading && _err == null && (_vehicles.isEmpty || _drivers.isEmpty);
 

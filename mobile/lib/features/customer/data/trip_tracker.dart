@@ -31,6 +31,7 @@ class TripTracker {
   String? _bookingId;
   Position? _last;
   double _km = 0;
+  int _consecutiveDrops = 0; // implausible fixes in a row → resync a stale _last
 
   // Persisted-state keys (survive an app kill / phone restart mid-trip).
   static const _kId = 'trip_track_booking_id';
@@ -112,7 +113,22 @@ class TripTracker {
     final dtSec = (p.timestamp.millisecondsSinceEpoch - _last!.timestamp.millisecondsSinceEpoch) / 1000.0;
     final speed = metres / (dtSec > 0 ? dtSec : 1);
     final plausibleGap = metres > 3000 && speed <= _maxSpeedMps;
-    if (!normal && !plausibleGap) return; // implausible teleport → drop it, KEEP last good point
+    if (!normal && !plausibleGap) {
+      // Implausible jump (GPS glitch, or a gap we can't trust). Drop the distance
+      // so a bad fix can't inflate it. A SINGLE outlier is ignored while keeping
+      // the last good point — but if fixes keep failing, _last is stale (e.g. the
+      // driver really moved far during a GPS gap at speed), so resync to the
+      // current fix. Without this the tracker freezes for the rest of the trip:
+      // every later fix is measured from the frozen point and also looks like a
+      // teleport. We lose only the untrusted gap's distance, not all of it.
+      if (++_consecutiveDrops >= 2) {
+        _last = p;
+        _consecutiveDrops = 0;
+        _save();
+      }
+      return;
+    }
+    _consecutiveDrops = 0;
 
     final from = _last!;
     _last = p; // advance immediately so live tracking keeps flowing during the await

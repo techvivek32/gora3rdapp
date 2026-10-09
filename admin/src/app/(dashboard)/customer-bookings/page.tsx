@@ -6,7 +6,7 @@ import { adminApi } from '@/lib/api';
 import { DataTable } from '@/components/ui/DataTable';
 import { Badge } from '@/components/ui/Badge';
 import { FilterBar } from '@/components/ui/FilterBar';
-import { CarTaxiFront, FileText, Loader2, Star, ShieldCheck, Crown, X, UserCheck } from 'lucide-react';
+import { CarTaxiFront, FileText, Loader2, Star, ShieldCheck, Crown, X, UserCheck, Eye } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -133,7 +133,7 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
       >
         <div className="flex items-start justify-between p-5 border-b border-gray-200 dark:border-gray-700">
           <div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">Assign a Driver</h2>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white">{booking.status === 'open' ? 'Assign a Driver' : 'Booking Details'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               #{booking.bookingId} · {SERVICE_LABELS[booking.serviceType] || booking.serviceType} ·{' '}
               {booking.pickup?.address || '—'} → {booking.drop?.address || '—'}
@@ -150,6 +150,31 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
             </div>
           )}
           {error && <p className="mb-3 text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+
+          {/* Trip-start verification photos the driver captured (car front + driver in car). */}
+          {(detail?.startCarPhoto || detail?.startDriverPhoto) && (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Trip start photos</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Car front', url: detail.startCarPhoto },
+                  { label: 'Driver in car', url: detail.startDriverPhoto },
+                ].map((p) => (
+                  <div key={p.label}>
+                    {p.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <a href={p.url} target="_blank" rel="noreferrer" title="Open full size">
+                        <img src={p.url} alt={p.label} className="w-full h-36 object-cover rounded-lg border border-gray-200 dark:border-gray-700 hover:opacity-90 transition" />
+                      </a>
+                    ) : (
+                      <div className="w-full h-36 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 flex items-center justify-center text-xs text-gray-400">Not captured</div>
+                    )}
+                    <p className="text-[11px] text-gray-500 mt-1 text-center">{p.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-8 justify-center">
@@ -309,10 +334,25 @@ export default function CustomerBookingsPage() {
             </button>
           );
         }
+        // Ongoing / completed: let the admin view the ride (incl. trip-start photos).
+        const viewBtn = (
+          <button
+            onClick={() => setAssignFor(row.original)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            View
+          </button>
+        );
         if (row.original.status === 'completed') {
-          return <InvoiceButton id={row.original._id} bookingId={row.original.bookingId} />;
+          return (
+            <div className="flex items-center gap-2 justify-end">
+              {viewBtn}
+              <InvoiceButton id={row.original._id} bookingId={row.original.bookingId} />
+            </div>
+          );
         }
-        return <span className="text-xs text-gray-300 dark:text-gray-600">—</span>;
+        return viewBtn;
       },
     },
   ];

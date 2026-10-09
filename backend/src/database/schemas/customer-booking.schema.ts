@@ -103,7 +103,12 @@ export class CustomerBooking {
   @Prop({ default: 0 }) durationHours: number; // Hire-a-Driver
   @Prop({ default: '' }) notes: string;
 
-  @Prop({ default: 0 }) estimatedFare: number;
+  @Prop({ default: 0 }) estimatedFare: number; // customer-facing total (incl. GST)
+  // Fare breakdown, snapshotted at booking time so the driver side can show a
+  // GST-exclusive amount and later GST-% changes don't rewrite old bookings.
+  @Prop({ default: 0 }) baseFare: number;
+  @Prop({ default: 0 }) driverAllowance: number;
+  @Prop({ default: 0 }) gstAmount: number;
   @Prop({ default: 0 }) estimatedDistance: number;
 
   // ── Round-trip GPS km tracking + extra-km billing ──────────────────────────
@@ -118,6 +123,11 @@ export class CustomerBooking {
   // Finalised at trip completion.
   @Prop({ default: 0 }) extraKm: number;
   @Prop({ default: 0 }) extraCharge: number;
+
+  // Trip-start verification photos the driver captures (camera only) right after
+  // the start OTP: the car's front and the driver seated inside with the rider.
+  @Prop({ default: '' }) startCarPhoto: string;
+  @Prop({ default: '' }) startDriverPhoto: string;
 
   // ── Local (in-city hourly package) billing ─────────────────────────────────
   // Booked package length in hours (6/8/10/12). 0 = not a Local package booking.

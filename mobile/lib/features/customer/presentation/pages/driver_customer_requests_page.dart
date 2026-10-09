@@ -396,7 +396,12 @@ class MyOfferCard extends StatelessWidget {
         : subType.toUpperCase();
     // myOffer is injected by backend for the driver's own offer on this booking.
     final myOffer = b['myOffer'] as Map? ?? {};
-    final quoted = myOffer['quotedFare'] ?? b['finalFare'] ?? 0;
+    // Driver-facing amount excludes GST (platform tax, not the driver's earning),
+    // matching the booking feed card. Customer bookings have no driver-entered
+    // quote (the accept dialog only picks vehicle+driver — quotedFare is just a
+    // copy of the full fare), so always show fare minus GST here.
+    final quoted = (((b['estimatedFare'] as num?) ?? (b['finalFare'] as num?) ?? 0)
+        - ((b['gstAmount'] as num?) ?? 0));
     final hold = myOffer['holdAmount'] ?? 0;
     final offerStatus = (myOffer['status'] ?? '').toString();
     // Won ONLY if THIS driver's offer was the selected one — not merely because

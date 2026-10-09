@@ -236,6 +236,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (t['tripEndTime'] != null) 'tripEndTime': t['tripEndTime'],
       'passengers': t['passengers'] ?? 1,
       if (_fare > 0) 'estimatedFare': _fare,
+      // Snapshot the breakdown so the driver side can show the fare without GST.
+      if (_baseFarePart > 0) 'baseFare': _baseFarePart,
+      if (_driverAllowance > 0) 'driverAllowance': _driverAllowance,
+      if (_gstAmount > 0) 'gstAmount': _gstAmount,
       // For Local, estimatedDistance holds the package's included km (billedKm).
       if (_distanceKm > 0) 'estimatedDistance': _distanceKm.round()
       else if (_isLocal && _billedKm > 0) 'estimatedDistance': _billedKm.round(),

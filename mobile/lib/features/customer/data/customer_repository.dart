@@ -113,8 +113,14 @@ class CustomerRepository {
 
   /// Driver submits the OTP the customer gave them → starts/completes the trip.
   /// Returns the updated booking (with final trackedKm / extraKm / finalFare).
-  Future<Map<String, dynamic>?> verifyTripOtp(String id, String action, String otp) async {
-    final res = await _api.post('/customer-bookings/$id/trip/verify-otp', data: {'action': action, 'otp': otp});
+  Future<Map<String, dynamic>?> verifyTripOtp(String id, String action, String otp,
+      {String? carPhoto, String? driverPhoto}) async {
+    final res = await _api.post('/customer-bookings/$id/trip/verify-otp', data: {
+      'action': action,
+      'otp': otp,
+      if (carPhoto != null && carPhoto.isNotEmpty) 'carPhoto': carPhoto,
+      if (driverPhoto != null && driverPhoto.isNotEmpty) 'driverPhoto': driverPhoto,
+    });
     final data = res.data is Map ? res.data['data'] : null;
     return data is Map ? Map<String, dynamic>.from(data) : null;
   }

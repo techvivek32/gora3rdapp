@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Trip-start verification photos (driver captures car front + driver in car). -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <!-- Location — required so Android shows the runtime permission dialog and the
          app can capture the user's last GPS location ("Last Login: … <address>"). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
