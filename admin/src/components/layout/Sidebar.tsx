@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, Bell, CreditCard,
   BarChart3, Flag, Image, Settings, LogOut, PlayCircle, Building2,
-  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle, Music, Megaphone, MessageSquareWarning, CarTaxiFront, LayoutGrid, CarFront
+  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle, Music, Megaphone, MessageSquareWarning, CarTaxiFront, LayoutGrid, CarFront, ClipboardList
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 
@@ -32,6 +32,7 @@ const navigation = [
       { href: '/support-chats', label: 'Support Chats', icon: MessageSquare },
       { href: '/referrals', label: 'Invite Leaderboard', icon: Trophy },
       { href: '/verification-requests', label: 'Verification Requests', icon: BadgeCheck },
+      { href: '/vehicle-driver-requests', label: 'Vehicle / Driver Requests', icon: ClipboardList },
       { href: '/deletion-requests', label: 'Deletion Requests', icon: UserX },
       { href: '/requirements', label: 'Requirements', icon: FileText },
       { href: '/vehicles', label: 'Available Vehicles', icon: Car },
@@ -91,6 +92,7 @@ const franchiseNavigation = [
       { href: '/support-chats', label: 'Support Chat', icon: MessageSquare },
       { href: '/referrals', label: 'Invite Leaderboard', icon: Trophy },
       { href: '/verification-requests', label: 'Verification Requests', icon: BadgeCheck },
+      { href: '/vehicle-driver-requests', label: 'Vehicle / Driver Requests', icon: ClipboardList },
       { href: '/deletion-requests', label: 'Delete Requests', icon: UserX },
       { href: '/requirements', label: 'Requirements', icon: FileText },
       { href: '/vehicles', label: 'Available', icon: Car },

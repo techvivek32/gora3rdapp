@@ -50,6 +50,23 @@ export class GarageDriver {
 
   @Prop({ trim: true })
   notes: string;
+
+  /**
+   * Admin approval state. A newly added/edited driver is `pending` and cannot be
+   * used to accept bookings until an admin `approved`s it. `rejected` carries a
+   * reason the owner can read and fix.
+   */
+  @Prop({ type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true })
+  approvalStatus: string;
+
+  @Prop({ trim: true, default: '' })
+  rejectionReason: string;
+
+  @Prop({ type: Date })
+  reviewedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  reviewedBy?: Types.ObjectId;
 }
 
 export const GarageDriverSchema = SchemaFactory.createForClass(GarageDriver);

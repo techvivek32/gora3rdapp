@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { GarageService } from './garage.service';
 import { CreateGarageVehicleDto, UpdateGarageVehicleDto } from './dto/garage-vehicle.dto';
@@ -17,8 +17,8 @@ export class GarageController {
 
   @Get('drivers')
   @ApiOperation({ summary: "List the user's saved drivers" })
-  listDrivers(@CurrentUser('sub') userId: string) {
-    return this.service.listDrivers(userId);
+  listDrivers(@CurrentUser('sub') userId: string, @Query('approvedOnly') approvedOnly?: string) {
+    return this.service.listDrivers(userId, approvedOnly === 'true');
   }
 
   @Post('drivers')
@@ -43,8 +43,8 @@ export class GarageController {
 
   @Get()
   @ApiOperation({ summary: "List the user's saved vehicles" })
-  list(@CurrentUser('sub') userId: string) {
-    return this.service.list(userId);
+  list(@CurrentUser('sub') userId: string, @Query('approvedOnly') approvedOnly?: string) {
+    return this.service.list(userId, approvedOnly === 'true');
   }
 
   @Post()

@@ -19,6 +19,8 @@ import { Notification, NotificationSchema } from '../../database/schemas/notific
 import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
 import { Franchise, FranchiseSchema } from '../../database/schemas/franchise.schema';
 import { FranchiseSettlement, FranchiseSettlementSchema } from '../../database/schemas/franchise-settlement.schema';
+import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garage-vehicle.schema';
+import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RequirementsModule } from '../requirements/requirements.module';
 import { AvailableVehiclesModule } from '../available-vehicles/available-vehicles.module';
@@ -43,6 +45,8 @@ import { AvailableVehiclesModule } from '../available-vehicles/available-vehicle
       { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
       { name: Franchise.name, schema: FranchiseSchema },
       { name: FranchiseSettlement.name, schema: FranchiseSettlementSchema },
+      { name: GarageVehicle.name, schema: GarageVehicleSchema },
+      { name: GarageDriver.name, schema: GarageDriverSchema },
     ]),
     NotificationsModule,
     // Admin "post on behalf of a user" reuses these services, so booking ids,

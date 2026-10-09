@@ -12,6 +12,8 @@ import { User, UserDocument } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { CabCategory, CabCategoryDocument } from '../../database/schemas/home-content.schema';
 import { Payment, PaymentDocument, PaymentStatus } from '../../database/schemas/payment.schema';
+import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
+import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garage-driver.schema';
 import { generatePaymentOrderId } from '../../common/utils/booking-id.util';
 import Razorpay from 'razorpay';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -35,9 +37,44 @@ export class CustomerBookingsService {
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     @InjectModel(CabCategory.name) private cabCategoryModel: Model<CabCategoryDocument>,
     @InjectModel(Payment.name) private paymentModel: Model<PaymentDocument>,
+    @InjectModel(GarageVehicle.name) private garageVehicleModel: Model<GarageVehicleDocument>,
+    @InjectModel(GarageDriver.name) private garageDriverModel: Model<GarageDriverDocument>,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * A driver can only accept a booking with a vehicle & driver that admin has
+   * APPROVED in their garage. The mobile sheet already lists approved-only, but we
+   * re-check server-side (by reg number / phone) so the API can't be bypassed.
+   */
+  private async assertApprovedSelection(
+    driverId: string,
+    selection?: { vehicleNumber?: string; driverPhone?: string },
+  ): Promise<void> {
+    if (!selection) return;
+    const userId = new Types.ObjectId(driverId);
+    const reg = (selection.vehicleNumber || '').trim().toUpperCase();
+    if (reg) {
+      const v = await this.garageVehicleModel
+        .findOne({ userId, registrationNumber: reg })
+        .select('approvalStatus')
+        .lean();
+      if (v && v.approvalStatus !== 'approved') {
+        throw new BadRequestException('This vehicle is awaiting admin approval. Please pick an approved vehicle.');
+      }
+    }
+    const last10 = (selection.driverPhone || '').replace(/\D/g, '').slice(-10);
+    if (last10.length === 10) {
+      const d = await this.garageDriverModel
+        .findOne({ userId, phone: last10 })
+        .select('approvalStatus')
+        .lean();
+      if (d && d.approvalStatus !== 'approved') {
+        throw new BadRequestException('This driver is awaiting admin approval. Please pick an approved driver.');
+      }
+    }
+  }
 
   // ─── Advance payment (customer pays 10% / 100% to the platform) ─────────────
 
@@ -1098,6 +1135,9 @@ export class CustomerBookingsService {
     if (!booking) throw new NotFoundException('Booking not found');
     if (booking.status !== CustomerBookingStatus.OPEN) throw new BadRequestException('This booking is no longer open');
     if (booking.customerId.toString() === driverId) throw new BadRequestException('You cannot accept your own booking');
+
+    // The chosen vehicle & driver must be admin-approved in this driver's garage.
+    await this.assertApprovedSelection(driverId, selection);
 
     const dId = new Types.ObjectId(driverId);
     const fare = booking.estimatedFare || 0;

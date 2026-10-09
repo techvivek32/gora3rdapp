@@ -20,6 +20,8 @@ import {
 } from '../../database/schemas/account-deletion-request.schema';
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
 import { FranchiseSettlement, FranchiseSettlementDocument } from '../../database/schemas/franchise-settlement.schema';
+import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
+import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garage-driver.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { AvailableVehiclesService } from '../available-vehicles/available-vehicles.service';
@@ -48,6 +50,8 @@ export class AdminService {
     private deletionRequestModel: Model<AccountDeletionRequestDocument>,
     @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
     @InjectModel(FranchiseSettlement.name) private franchiseSettlementModel: Model<FranchiseSettlementDocument>,
+    @InjectModel(GarageVehicle.name) private garageVehicleModel: Model<GarageVehicleDocument>,
+    @InjectModel(GarageDriver.name) private garageDriverModel: Model<GarageDriverDocument>,
     private notificationsService: NotificationsService,
     private requirementsService: RequirementsService,
     private availableVehiclesService: AvailableVehiclesService,
@@ -964,6 +968,151 @@ export class AdminService {
       { new: true },
     ).select('-password -refreshToken -fcmTokens');
     return { message: 'Verification rejected', data: user };
+  }
+
+  // ─── Garage approvals (My Vehicles / My Drivers) ────────────────────────────
+  // Drivers add vehicles & drivers to their garage; each one is PENDING until an
+  // admin approves it, and only approved entries can be used to accept bookings.
+
+  /** List garage vehicles for review, newest first, joined with the owner. */
+  async getGarageVehicles(query: any, franchiseCity?: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = {};
+    // Default to pending; ?status=approved|rejected|all narrows/widens it.
+    if (!query.status || query.status === 'pending') filter.approvalStatus = 'pending';
+    else if (query.status !== 'all') filter.approvalStatus = query.status;
+    if (franchiseCity) filter.userId = { $in: await this.cityUserIds(franchiseCity) };
+
+    const [rows, total] = await Promise.all([
+      this.garageVehicleModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.garageVehicleModel.countDocuments(filter),
+    ]);
+    const data = await this.attachGarageOwners(rows);
+    return { message: 'Garage vehicles retrieved', data: buildPaginatedResult(data, total, page, limit) };
+  }
+
+  /** List garage drivers for review, newest first, joined with the owner. */
+  async getGarageDrivers(query: any, franchiseCity?: any) {
+    const { page, limit, skip } = getPaginationParams(query);
+    const filter: any = {};
+    if (!query.status || query.status === 'pending') filter.approvalStatus = 'pending';
+    else if (query.status !== 'all') filter.approvalStatus = query.status;
+    if (franchiseCity) filter.userId = { $in: await this.cityUserIds(franchiseCity) };
+
+    const [rows, total] = await Promise.all([
+      this.garageDriverModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.garageDriverModel.countDocuments(filter),
+    ]);
+    const data = await this.attachGarageOwners(rows);
+    return { message: 'Garage drivers retrieved', data: buildPaginatedResult(data, total, page, limit) };
+  }
+
+  /** Attach a compact `owner` {name, mobile, city} to each garage row. */
+  private async attachGarageOwners(rows: any[]) {
+    const ids = [...new Set(rows.map((r) => r.userId?.toString()).filter(Boolean))];
+    const users = await this.userModel
+      .find({ _id: { $in: ids } })
+      .select('fullName agencyName mobile city state')
+      .lean();
+    const byId = new Map(users.map((u: any) => [u._id.toString(), u]));
+    return rows.map((r) => {
+      const u: any = byId.get(r.userId?.toString()) || {};
+      return {
+        ...r,
+        owner: {
+          _id: r.userId,
+          name: u.agencyName || u.fullName || 'User',
+          mobile: u.mobile || '',
+          city: u.city || '',
+          state: u.state || '',
+        },
+      };
+    });
+  }
+
+  async approveGarageVehicle(id: string, adminId: string, franchiseCity?: any) {
+    const v = await this.loadGarageVehicleInScope(id, franchiseCity);
+    v.approvalStatus = 'approved';
+    v.rejectionReason = '';
+    v.reviewedAt = new Date();
+    v.reviewedBy = new Types.ObjectId(adminId);
+    await v.save();
+    await this.notifyGarageOwner(v.userId, 'vehicle', 'approved', this.vehicleLabel(v));
+    return { message: 'Vehicle approved', data: v };
+  }
+
+  async rejectGarageVehicle(id: string, reason: string, adminId: string, franchiseCity?: any) {
+    const v = await this.loadGarageVehicleInScope(id, franchiseCity);
+    v.approvalStatus = 'rejected';
+    v.rejectionReason = reason || 'Vehicle details could not be verified';
+    v.reviewedAt = new Date();
+    v.reviewedBy = new Types.ObjectId(adminId);
+    await v.save();
+    await this.notifyGarageOwner(v.userId, 'vehicle', 'rejected', this.vehicleLabel(v), v.rejectionReason);
+    return { message: 'Vehicle rejected', data: v };
+  }
+
+  async approveGarageDriver(id: string, adminId: string, franchiseCity?: any) {
+    const d = await this.loadGarageDriverInScope(id, franchiseCity);
+    d.approvalStatus = 'approved';
+    d.rejectionReason = '';
+    d.reviewedAt = new Date();
+    d.reviewedBy = new Types.ObjectId(adminId);
+    await d.save();
+    await this.notifyGarageOwner(d.userId, 'driver', 'approved', d.fullName);
+    return { message: 'Driver approved', data: d };
+  }
+
+  async rejectGarageDriver(id: string, reason: string, adminId: string, franchiseCity?: any) {
+    const d = await this.loadGarageDriverInScope(id, franchiseCity);
+    d.approvalStatus = 'rejected';
+    d.rejectionReason = reason || 'Driver details could not be verified';
+    d.reviewedAt = new Date();
+    d.reviewedBy = new Types.ObjectId(adminId);
+    await d.save();
+    await this.notifyGarageOwner(d.userId, 'driver', 'rejected', d.fullName, d.rejectionReason);
+    return { message: 'Driver rejected', data: d };
+  }
+
+  private async loadGarageVehicleInScope(id: string, franchiseCity?: any): Promise<GarageVehicleDocument> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Vehicle not found');
+    const v = await this.garageVehicleModel.findById(id);
+    if (!v) throw new NotFoundException('Vehicle not found');
+    await this.assertUserInCity(v.userId.toString(), franchiseCity);
+    return v;
+  }
+
+  private async loadGarageDriverInScope(id: string, franchiseCity?: any): Promise<GarageDriverDocument> {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Driver not found');
+    const d = await this.garageDriverModel.findById(id);
+    if (!d) throw new NotFoundException('Driver not found');
+    await this.assertUserInCity(d.userId.toString(), franchiseCity);
+    return d;
+  }
+
+  private vehicleLabel(v: any): string {
+    const base = (v.modelName || v.vehicleType || 'Vehicle').toString().trim();
+    const reg = (v.registrationNumber || '').toString().trim();
+    return reg ? `${base} (${reg})` : base;
+  }
+
+  private async notifyGarageOwner(
+    userId: Types.ObjectId,
+    kind: 'vehicle' | 'driver',
+    outcome: 'approved' | 'rejected',
+    label: string,
+    reason?: string,
+  ): Promise<void> {
+    try {
+      const noun = kind === 'vehicle' ? 'Vehicle' : 'Driver';
+      const title = outcome === 'approved' ? `${noun} approved` : `${noun} needs changes`;
+      const body = outcome === 'approved'
+        ? `Your ${kind} "${label}" is approved. You can now use it to accept bookings.`
+        : `Your ${kind} "${label}" was not approved${reason ? `: ${reason}` : '.'} Please update it and resubmit.`;
+      await this.notificationsService.notifyUser(userId, title, body, { type: 'garage_review', kind, outcome });
+    } catch {
+      /* best-effort — the status badge in the app is the source of truth */
+    }
   }
 
   private readonly TIER_RANK: Record<string, number> = {

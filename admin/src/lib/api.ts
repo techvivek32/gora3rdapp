@@ -76,6 +76,16 @@ export const adminApi = {
   reviewDocument: (id: string, doc: string, status: 'approved' | 'rejected', reason?: string) =>
     apiClient.post(`/admin/verification-requests/${id}/documents/${doc}`, { status, reason }),
 
+  // ─── Vehicle / Driver Requests (partners' My Vehicles & Drivers) ──────────
+  getGarageVehicles: (params: any) => apiClient.get('/admin/garage/vehicles', { params }),
+  getGarageDrivers: (params: any) => apiClient.get('/admin/garage/drivers', { params }),
+  approveGarageVehicle: (id: string) => apiClient.post(`/admin/garage/vehicles/${id}/approve`),
+  rejectGarageVehicle: (id: string, reason: string) =>
+    apiClient.post(`/admin/garage/vehicles/${id}/reject`, { reason }),
+  approveGarageDriver: (id: string) => apiClient.post(`/admin/garage/drivers/${id}/approve`),
+  rejectGarageDriver: (id: string, reason: string) =>
+    apiClient.post(`/admin/garage/drivers/${id}/reject`, { reason }),
+
   // ─── Requirements ──────────────────────────────────────────────────────────
   getRequirements: (params: any) => apiClient.get('/admin/requirements', { params }),
   updateRequirement: (id: string, data: any) => apiClient.put(`/admin/requirements/${id}`, data),

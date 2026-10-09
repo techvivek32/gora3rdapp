@@ -59,9 +59,11 @@ export class GarageService {
     }
   }
 
-  async list(userId: string) {
+  async list(userId: string, approvedOnly = false) {
+    const filter: any = { userId: new Types.ObjectId(userId) };
+    if (approvedOnly) filter.approvalStatus = 'approved';
     const vehicles = await this.garageModel
-      .find({ userId: new Types.ObjectId(userId) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .lean();
     return { message: 'My vehicles', data: vehicles };
@@ -78,8 +80,14 @@ export class GarageService {
   async update(userId: string, id: string, dto: UpdateGarageVehicleDto) {
     const vehicle = await this.owned(userId, id);
     Object.assign(vehicle, dto);
+    // Any edit sends the vehicle back for admin review — details changed, so the
+    // previous approval no longer applies.
+    vehicle.approvalStatus = 'pending';
+    vehicle.rejectionReason = '';
+    vehicle.reviewedAt = undefined;
+    vehicle.reviewedBy = undefined;
     await vehicle.save();
-    return { message: 'Vehicle updated', data: vehicle };
+    return { message: 'Vehicle updated — sent for admin approval', data: vehicle };
   }
 
   async remove(userId: string, id: string) {
@@ -101,9 +109,11 @@ export class GarageService {
 
   // ─── Drivers (My Drivers) ──────────────────────────────────────────────────
 
-  async listDrivers(userId: string) {
+  async listDrivers(userId: string, approvedOnly = false) {
+    const filter: any = { userId: new Types.ObjectId(userId) };
+    if (approvedOnly) filter.approvalStatus = 'approved';
     const drivers = await this.driverModel
-      .find({ userId: new Types.ObjectId(userId) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .lean();
     return { message: 'My drivers', data: drivers };
@@ -129,8 +139,13 @@ export class GarageService {
       await this.assertPhoneNotDuplicate(userId, dto.phone, id);
     }
     Object.assign(driver, dto);
+    // Any edit sends the driver back for admin review.
+    driver.approvalStatus = 'pending';
+    driver.rejectionReason = '';
+    driver.reviewedAt = undefined;
+    driver.reviewedBy = undefined;
     await driver.save();
-    return { message: 'Driver updated', data: driver };
+    return { message: 'Driver updated — sent for admin approval', data: driver };
   }
 
   async removeDriver(userId: string, id: string) {

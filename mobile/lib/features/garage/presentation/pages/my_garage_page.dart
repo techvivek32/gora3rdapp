@@ -272,6 +272,8 @@ class _VehiclesTabState extends State<_VehiclesTab> with AutomaticKeepAliveClien
                     )).toList(),
                   ),
                 ],
+                SizedBox(height: 8.h),
+                _approvalBadge(v),
               ],
             ),
           ),
@@ -473,6 +475,8 @@ class _DriversTabState extends State<_DriversTab> with AutomaticKeepAliveClientM
                     )).toList(),
                   ),
                 ],
+                SizedBox(height: 8.h),
+                _approvalBadge(d),
               ],
             ),
           ),
@@ -1108,6 +1112,53 @@ Widget _fieldLabel(String t) => Padding(
       padding: EdgeInsets.only(bottom: 6.h),
       child: Text(t, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
     );
+
+/// Admin-approval status chip shown on a garage vehicle/driver card. Pending &
+/// rejected items can't be used to accept bookings until an admin approves them.
+Widget _approvalBadge(Map<String, dynamic> item) {
+  final status = (item['approvalStatus'] ?? 'pending').toString();
+  final reason = (item['rejectionReason'] ?? '').toString().trim();
+  late final Color color;
+  late final IconData icon;
+  late final String label;
+  switch (status) {
+    case 'approved':
+      color = AppColors.success;
+      icon = Icons.verified_rounded;
+      label = 'Approved';
+      break;
+    case 'rejected':
+      color = AppColors.error;
+      icon = Icons.cancel_rounded;
+      label = 'Rejected';
+      break;
+    default:
+      color = AppColors.warning;
+      icon = Icons.hourglass_top_rounded;
+      label = 'Pending admin approval';
+  }
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6.r),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 13.sp, color: color),
+          SizedBox(width: 4.w),
+          Text(label, style: TextStyle(fontSize: 10.5.sp, fontWeight: FontWeight.w700, color: color, fontFamily: 'Poppins')),
+        ]),
+      ),
+      if (status == 'rejected' && reason.isNotEmpty) ...[
+        SizedBox(height: 4.h),
+        Text(reason, style: TextStyle(fontSize: 10.5.sp, color: AppColors.error, fontFamily: 'Poppins')),
+      ],
+    ],
+  );
+}
 
 InputDecoration _fieldDec(IconData icon, {String? hint}) => InputDecoration(
       prefixIcon: Icon(icon, size: 20.sp),

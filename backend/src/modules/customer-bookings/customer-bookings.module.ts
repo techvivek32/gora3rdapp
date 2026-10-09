@@ -7,6 +7,8 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
 import { WalletTransaction, WalletTransactionSchema } from '../../database/schemas/wallet-transaction.schema';
 import { CabCategory, CabCategorySchema } from '../../database/schemas/home-content.schema';
 import { Payment, PaymentSchema } from '../../database/schemas/payment.schema';
+import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garage-vehicle.schema';
+import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 
@@ -18,6 +20,8 @@ import { SettingsModule } from '../settings/settings.module';
       { name: WalletTransaction.name, schema: WalletTransactionSchema },
       { name: CabCategory.name, schema: CabCategorySchema },
       { name: Payment.name, schema: PaymentSchema },
+      { name: GarageVehicle.name, schema: GarageVehicleSchema },
+      { name: GarageDriver.name, schema: GarageDriverSchema },
     ]),
     NotificationsModule,
     SettingsModule,

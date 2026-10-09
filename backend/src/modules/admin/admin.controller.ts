@@ -203,6 +203,49 @@ export class AdminController {
     return this.adminService.rejectVerification(id, reason, city);
   }
 
+  // ─── Garage approvals (drivers' My Vehicles / My Drivers) ──────────────────
+  @Get('garage/vehicles')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'List garage vehicles awaiting approval (?status=pending|approved|rejected|all)' })
+  getGarageVehicles(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getGarageVehicles(query, city);
+  }
+
+  @Get('garage/drivers')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'List garage drivers awaiting approval (?status=pending|approved|rejected|all)' })
+  getGarageDrivers(@Query() query: any, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getGarageDrivers(query, city);
+  }
+
+  @Post('garage/vehicles/:id/approve')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'Approve a garage vehicle' })
+  approveGarageVehicle(@Param('id') id: string, @CurrentUser('sub') adminId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.approveGarageVehicle(id, adminId, city);
+  }
+
+  @Post('garage/vehicles/:id/reject')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'Reject a garage vehicle' })
+  rejectGarageVehicle(@Param('id') id: string, @Body('reason') reason: string, @CurrentUser('sub') adminId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.rejectGarageVehicle(id, reason, adminId, city);
+  }
+
+  @Post('garage/drivers/:id/approve')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'Approve a garage driver' })
+  approveGarageDriver(@Param('id') id: string, @CurrentUser('sub') adminId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.approveGarageDriver(id, adminId, city);
+  }
+
+  @Post('garage/drivers/:id/reject')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'Reject a garage driver' })
+  rejectGarageDriver(@Param('id') id: string, @Body('reason') reason: string, @CurrentUser('sub') adminId: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.rejectGarageDriver(id, reason, adminId, city);
+  }
+
   @Post('users/:id/documents')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: "Upload KYC documents on a user's behalf and send for verification" })

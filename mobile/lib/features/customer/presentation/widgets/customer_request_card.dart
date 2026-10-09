@@ -308,8 +308,9 @@ class _AcceptDialogState extends State<_AcceptDialog> {
 
   Future<void> _load() async {
     try {
-      final v = await _api.get('/garage');
-      final d = await _api.get('/garage/drivers');
+      // Only admin-APPROVED vehicles & drivers can be used to accept a booking.
+      final v = await _api.get('/garage', params: {'approvedOnly': 'true'});
+      final d = await _api.get('/garage/drivers', params: {'approvedOnly': 'true'});
       List<Map<String, dynamic>> parse(dynamic raw) =>
           (raw as List? ?? []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
       if (!mounted) return;
@@ -362,7 +363,7 @@ class _AcceptDialogState extends State<_AcceptDialog> {
           if (_loading)
             const Padding(padding: EdgeInsets.symmetric(vertical: 28), child: Center(child: CircularProgressIndicator()))
           else if (_err != null)
-            Text('Could not load your garage: $_err', style: TextStyle(fontSize: 12.5.sp, color: AppColors.error))
+            Text('Could not load your vehicles & drivers: $_err', style: TextStyle(fontSize: 12.5.sp, color: AppColors.error))
           else if (emptyGarage) ...[
             Container(
               padding: EdgeInsets.all(12.w),
@@ -372,8 +373,10 @@ class _AcceptDialogState extends State<_AcceptDialog> {
                 SizedBox(width: 10.w),
                 Expanded(child: Text(
                   _vehicles.isEmpty && _drivers.isEmpty
-                      ? 'Add at least one vehicle and one driver in My Garage first.'
-                      : _vehicles.isEmpty ? 'Add at least one vehicle in My Garage first.' : 'Add at least one driver in My Garage first.',
+                      ? 'To accept a booking you need at least one approved vehicle and one approved driver. Add them in Settings → My Vehicles & Drivers. An admin reviews each one before you can use it.'
+                      : _vehicles.isEmpty
+                          ? 'You have no approved vehicle yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.'
+                          : 'You have no approved driver yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.',
                   style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.warning),
                 )),
               ]),
@@ -383,8 +386,8 @@ class _AcceptDialogState extends State<_AcceptDialog> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () { Navigator.pop(context); context.push('/my-vehicles-garage'); },
-                icon: Icon(Icons.garage_rounded, size: 18.sp),
-                label: const Text('Open My Garage'),
+                icon: Icon(Icons.directions_car_filled_rounded, size: 18.sp),
+                label: const Text('Add Vehicle / Driver'),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
               ),
             ),

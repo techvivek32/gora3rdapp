@@ -47,6 +47,23 @@ export class GarageVehicle {
 
   @Prop({ trim: true })
   rcBackImage: string;
+
+  /**
+   * Admin approval state. A newly added/edited vehicle is `pending` and cannot be
+   * used to accept bookings until an admin `approved`s it. `rejected` carries a
+   * reason the owner can read and fix.
+   */
+  @Prop({ type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true })
+  approvalStatus: string;
+
+  @Prop({ trim: true, default: '' })
+  rejectionReason: string;
+
+  @Prop({ type: Date })
+  reviewedAt?: Date;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  reviewedBy?: Types.ObjectId;
 }
 
 export const GarageVehicleSchema = SchemaFactory.createForClass(GarageVehicle);
