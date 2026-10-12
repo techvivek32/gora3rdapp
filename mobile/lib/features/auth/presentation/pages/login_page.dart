@@ -8,6 +8,8 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
+import '../../../customer/data/customer_repository.dart';
+import '../../../customer/presentation/role_switch.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
 
@@ -75,17 +77,49 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return false;
     setState(() => _loading = false);
 
-    return result.fold(
-      (failure) {
-        _snack(failure.message); // wrong/expired OTP
-        return false;
-      },
-      (_) {
+    final failure = result.fold((f) => f, (_) => null);
+    if (failure != null) {
+      _snack(failure.message); // wrong/expired OTP
+      return false;
+    }
+
+    // This is the DRIVER / VENDOR login. One account can hold both sides, so a
+    // number last used in Customer mode still belongs here — switch it back to
+    // driver instead of letting the router drop them on the customer home,
+    // which would make picking "Driver / Vendor" look like a failed login.
+    final data = result.fold((_) => <String, dynamic>{}, (d) => d);
+    final role = ((data['user'] as Map?)?['role'] ?? '').toString();
+    if (role == 'customer') {
+      try {
+        await getIt<CustomerRepository>().changeRole('driver');
+        if (!mounted) return true;
+        // Bring the bloc up from the freshly stored tokens FIRST: until it is
+        // authenticated, AuthReloadProfileEvent is a no-op, so applyRoleAndWait
+        // would wait out its timeout and we'd navigate while still logged out —
+        // which the router answers by bouncing us back to /role-select.
         context.read<AuthBloc>().add(AuthCheckStatusEvent());
+        // Then let the new role reach the router before navigating, else its
+        // redirect still sees 'customer'.
+        await applyRoleAndWait(context.read<AuthBloc>(), 'driver');
+        if (!mounted) return true;
         context.go('/');
-        return true;
-      },
-    );
+      } catch (e) {
+        if (!mounted) return true;
+        setState(() => _loading = false);
+        final msg = e.toString();
+        // Never been onboarded as a driver → run the quick driver setup first.
+        if (msg.contains('DRIVER_ONBOARDING_REQUIRED')) {
+          context.push('/driver/onboarding');
+        } else {
+          _snack('Could not switch to Driver: ${msg.replaceFirst('Exception: ', '')}');
+        }
+      }
+      return true;
+    }
+
+    context.read<AuthBloc>().add(AuthCheckStatusEvent());
+    context.go('/');
+    return true;
   }
 
   Future<String?> _showOtpDialog(String mobile) {

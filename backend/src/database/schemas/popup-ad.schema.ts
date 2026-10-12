@@ -13,7 +13,16 @@ export class PopupAd {
   @Prop({ default: '' })
   linkUrl: string;
 
-  /** Only the active ad is shown in the app (one active at a time). */
+  /**
+   * Who sees this ad. Driver/vendor mode and Customer mode each get their own
+   * active ad, so the two sides can run different campaigns at the same time.
+   * Existing rows have no value — they default to 'driver', which is where the
+   * popup already appeared before this split.
+   */
+  @Prop({ default: 'driver', enum: ['driver', 'customer'], index: true })
+  audience: string;
+
+  /** Only the active ad is shown in the app (one active per audience). */
   @Prop({ default: false, index: true })
   isActive: boolean;
 
@@ -22,3 +31,6 @@ export class PopupAd {
 }
 
 export const PopupAdSchema = SchemaFactory.createForClass(PopupAd);
+
+// The app's only read: the one active ad for the caller's side.
+PopupAdSchema.index({ audience: 1, isActive: 1 });

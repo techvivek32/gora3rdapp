@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PopupAdsService } from './popup-ads.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -17,19 +17,22 @@ export class PopupAdsController {
 
   @Post()
   @ApiOperation({ summary: 'Add a popup ad (image + optional link)' })
-  create(@Body() data: { imageUrl?: string; linkUrl?: string }) {
+  create(@Body() data: { imageUrl?: string; linkUrl?: string; audience?: string }) {
     return this.service.create(data);
   }
 
   @Get()
-  @ApiOperation({ summary: 'List all popup ads' })
-  findAll() {
-    return this.service.findAll();
+  @ApiOperation({ summary: 'List popup ads (?audience=driver|customer)' })
+  findAll(@Query('audience') audience?: string) {
+    return this.service.findAll(audience);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Update / set-active a popup ad' })
-  update(@Param('id') id: string, @Body() data: { linkUrl?: string; isActive?: boolean }) {
+  update(
+    @Param('id') id: string,
+    @Body() data: { linkUrl?: string; isActive?: boolean; audience?: string },
+  ) {
     return this.service.update(id, data);
   }
 

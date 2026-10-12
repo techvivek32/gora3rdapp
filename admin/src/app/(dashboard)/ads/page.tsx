@@ -6,12 +6,21 @@ import { adminApi } from '@/lib/api';
 import { Megaphone, Upload, Trash2, CheckCircle2, Circle, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+type Audience = 'driver' | 'customer';
+
 interface PopupAd {
   _id: string;
   imageUrl: string;
   linkUrl?: string;
   isActive: boolean;
+  // Rows created before the driver/customer split have no value — treat as driver.
+  audience?: Audience;
 }
+
+const AUDIENCES: { key: Audience; label: string; hint: string }[] = [
+  { key: 'driver', label: 'Driver / Vendor', hint: 'Shown in driver & vendor mode' },
+  { key: 'customer', label: 'Customer', hint: 'Shown in customer mode' },
+];
 
 export default function AdsPage() {
   const qc = useQueryClient();
@@ -19,19 +28,26 @@ export default function AdsPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  // Which side the new ad is for, and which side the list is showing.
+  const [audience, setAudience] = useState<Audience>('driver');
+  const [tab, setTab] = useState<Audience>('driver');
 
   const { data: raw, isLoading } = useQuery({
     queryKey: ['popup-ads'],
     queryFn: () => adminApi.getPopupAds(),
   });
-  const ads: PopupAd[] = ((raw as any)?.data ?? []) as PopupAd[];
+  const allAds: PopupAd[] = ((raw as any)?.data ?? []) as PopupAd[];
+  // Only the side currently selected, so the two campaigns never get confused.
+  const ads = allAds.filter((a) => (a.audience ?? 'driver') === tab);
+  const countFor = (k: Audience) => allAds.filter((a) => (a.audience ?? 'driver') === k).length;
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['popup-ads'] });
 
   const create = useMutation({
-    mutationFn: () => adminApi.createPopupAd({ imageUrl, linkUrl: linkUrl.trim() }),
+    mutationFn: () => adminApi.createPopupAd({ imageUrl, linkUrl: linkUrl.trim(), audience }),
     onSuccess: () => {
-      toast.success('Ad added — it is now live in the app');
+      toast.success(`Ad added — now live for ${audience === 'customer' ? 'customers' : 'drivers'}`);
+      setTab(audience);
       setImageUrl('');
       setLinkUrl('');
       if (fileRef.current) fileRef.current.value = '';
@@ -75,13 +91,36 @@ export default function AdsPage() {
         <Megaphone className="w-6 h-6 text-orange-500" />
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ads</h1>
-          <p className="text-sm text-gray-500">A popup ad shown to users each time they open the app.</p>
+          <p className="text-sm text-gray-500">A popup ad shown on app open. Driver and Customer mode each run their own ad.</p>
         </div>
       </div>
 
       {/* Add form */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
         <h2 className="font-semibold text-gray-900 dark:text-white">Add Ad</h2>
+
+        {/* Who this ad is for — each side has its own active ad. */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Show this ad to</label>
+          <div className="flex flex-wrap gap-2">
+            {AUDIENCES.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setAudience(a.key)}
+                className={`px-3 py-2 rounded-lg border text-sm font-medium transition ${
+                  audience === a.key
+                    ? 'border-orange-500 bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                }`}
+              >
+                {a.label}
+                <span className="block text-[11px] font-normal opacity-70">{a.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="flex items-center justify-between gap-2 mb-1">
@@ -129,11 +168,28 @@ export default function AdsPage() {
 
       {/* List */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="font-semibold text-gray-900 dark:text-white mb-4">All Ads</h2>
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {AUDIENCES.map((a) => (
+            <button
+              key={a.key}
+              type="button"
+              onClick={() => setTab(a.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition ${
+                tab === a.key
+                  ? 'bg-orange-500 text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {a.label} ({countFor(a.key)})
+            </button>
+          ))}
+        </div>
         {isLoading ? (
           <p className="text-sm text-gray-500 py-4">Loading…</p>
         ) : ads.length === 0 ? (
-          <p className="text-sm text-gray-500 py-4">No ads yet. Add one above.</p>
+          <p className="text-sm text-gray-500 py-4">
+            No {tab === 'customer' ? 'customer' : 'driver'} ads yet. Add one above.
+          </p>
         ) : (
           <div className="space-y-3">
             {ads.map((a) => (

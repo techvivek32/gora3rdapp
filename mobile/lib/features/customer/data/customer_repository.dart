@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -211,6 +212,27 @@ class CustomerRepository {
     final refresh = (d['refreshToken'] ?? '').toString();
     if (access.isNotEmpty) await _storage.write(key: 'access_token', value: access);
     if (refresh.isNotEmpty) await _storage.write(key: 'refresh_token', value: refresh);
+    // A role switch returns the new role alongside the tokens. The AuthBloc
+    // rebuilds itself from the CACHED `user_data`, not from the network, so if
+    // we leave the old role cached the router keeps sending the user to the
+    // previous side's home even though the switch succeeded.
+    final role = (d['role'] ?? '').toString();
+    if (role.isNotEmpty) await _patchCachedUserRole(role);
+  }
+
+  /// Keep the cached user profile's role in step with a role switch.
+  Future<void> _patchCachedUserRole(String role) async {
+    try {
+      final raw = await _storage.read(key: 'user_data');
+      if (raw == null || raw.isEmpty) return;
+      final user = jsonDecode(raw);
+      if (user is! Map) return;
+      final updated = Map<String, dynamic>.from(user)..['role'] = role;
+      await _storage.write(key: 'user_data', value: jsonEncode(updated));
+    } catch (_) {
+      // Cache is best-effort — a failure here just means the next profile
+      // fetch will correct it.
+    }
   }
 
   List<Map<String, dynamic>> _list(dynamic v) =>

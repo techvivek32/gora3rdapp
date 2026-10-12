@@ -200,10 +200,12 @@ export const adminApi = {
 
   // ─── Popup Ads (admin only) ─────────────────────────────────────────────────
   getPopupAds: () => apiClient.get('/admin/popup-ads'),
-  createPopupAd: (data: { imageUrl: string; linkUrl?: string }) =>
+  createPopupAd: (data: { imageUrl: string; linkUrl?: string; audience?: 'driver' | 'customer' }) =>
     apiClient.post('/admin/popup-ads', data),
-  updatePopupAd: (id: string, data: { linkUrl?: string; isActive?: boolean }) =>
-    apiClient.put(`/admin/popup-ads/${id}`, data),
+  updatePopupAd: (
+    id: string,
+    data: { linkUrl?: string; isActive?: boolean; audience?: 'driver' | 'customer' },
+  ) => apiClient.put(`/admin/popup-ads/${id}`, data),
   deletePopupAd: (id: string) => apiClient.delete(`/admin/popup-ads/${id}`),
   uploadAdImage: (file: File) => {
     const fd = new FormData();

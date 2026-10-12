@@ -10,6 +10,8 @@ import '../../../../core/widgets/app_logo.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../data/customer_repository.dart';
+import '../role_switch.dart';
 
 /// Dedicated Customer login — mobile + OTP only. An unregistered number is sent
 /// to the customer sign-up (never the driver form).
@@ -79,16 +81,35 @@ class _CustomerLoginPageState extends State<CustomerLoginPage> {
       return false;
     }
 
-    // This is the CUSTOMER login — only customer accounts may enter here. A
-    // driver/vendor number must use the Driver login, so we sign back out and
-    // tell them, instead of dropping them into vendor mode.
+    // This is the CUSTOMER login. One account can hold both sides, so a number
+    // sitting in Driver mode that has already been onboarded as a customer just
+    // gets switched over. Only a number that has never been a customer is sent
+    // to onboarding / back to the Driver login.
     final data = result.fold((_) => <String, dynamic>{}, (d) => d);
     final role = ((data['user'] as Map?)?['role'] ?? '').toString();
     if (role.isNotEmpty && role != 'customer') {
-      await _authRepo.logout();
-      if (!mounted) return true;
-      _snack('This number is registered as a Driver / Vendor. Please use the Driver login.');
-      return true; // handled — stop the OTP loop, stay on customer login
+      try {
+        await getIt<CustomerRepository>().changeRole('customer');
+        if (!mounted) return true;
+        // Authenticate the bloc from the freshly stored tokens first — otherwise
+        // AuthReloadProfileEvent is a no-op and applyRoleAndWait just times out.
+        context.read<AuthBloc>().add(AuthCheckStatusEvent());
+        // Then let the new role reach the router before navigating.
+        await applyRoleAndWait(context.read<AuthBloc>(), 'customer');
+        if (!mounted) return true;
+        context.go('/customer');
+      } catch (e) {
+        if (!mounted) return true;
+        // Never been a customer → run the quick customer setup first.
+        if (e.toString().contains('CUSTOMER_ONBOARDING_REQUIRED')) {
+          context.push('/customer/onboarding');
+          return true;
+        }
+        await _authRepo.logout();
+        if (!mounted) return true;
+        _snack('This number is registered as a Driver / Vendor. Please use the Driver login.');
+      }
+      return true; // handled — stop the OTP loop
     }
 
     // Router redirect sends the user to the home that matches their role.

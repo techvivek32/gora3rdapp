@@ -429,6 +429,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     final decoration = BoxDecoration(
       color: bg,
       borderRadius: BorderRadius.circular(20.r),
+      // Outline in a darker shade of the tile's own tint, so each card reads as
+      // a distinct block against the white page instead of a floating wash.
+      border: Border.all(color: Color.alphaBlend(Colors.black.withValues(alpha: 0.14), bg), width: 1.2),
       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 6))],
     );
 
