@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_bloc.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/auth/presentation/pages/onboarding_page.dart';
-import '../../features/auth/presentation/pages/welcome_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/otp_page.dart';
@@ -97,13 +96,13 @@ class AppRouter {
       final isCustomerAuth = loc == '/customer/login' || loc == '/customer/register';
       final isAuthRoute = loc.startsWith('/auth') || isCustomerAuth;
       final isSplash = loc == '/splash';
-      final isWelcome = loc == '/welcome';
+      final isRoleSelect = loc == '/role-select';
 
       if (isSplash) return null;
       if (authState is AuthAuthenticated) {
         final isCustomer = _roleOf(authState) == 'customer';
-        // Coming from auth/welcome → land on the role's home.
-        if (isAuthRoute || isWelcome) return isCustomer ? '/customer' : '/';
+        // Coming from auth/role-select → land on the role's home.
+        if (isAuthRoute || isRoleSelect) return isCustomer ? '/customer' : '/';
         // Keep each role on its own home root; shared detail routes are untouched.
         if (isCustomer && loc == '/') return '/customer';
         if (!isCustomer && loc == '/customer') return '/';
@@ -111,14 +110,13 @@ class AppRouter {
       }
       if (authState is AuthUnauthenticated) {
         // Role selection + the auth screens are reachable while logged out.
-        if (!isAuthRoute && !isWelcome && loc != '/role-select') return '/welcome';
+        if (!isAuthRoute && !isRoleSelect) return '/role-select';
         return null;
       }
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashPage()),
-      GoRoute(path: '/welcome', builder: (_, __) => const WelcomePage()),
       GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingPage()),
 
       // Auth Routes

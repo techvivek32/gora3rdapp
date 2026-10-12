@@ -7,7 +7,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
 import '../role_switch.dart';
 
-/// "How do you want to use Gora Taxi Partner?" — shown on first open (from
+/// "How do you want to use Gora Taxi?" — shown on first open (from
 /// welcome) and reachable from Profile → Change Role. If the user is already
 /// logged in, picking a role switches it in place; otherwise it routes to the
 /// right sign-up/login flow.
@@ -93,7 +93,7 @@ class _RoleSelectPageState extends State<RoleSelectPage> {
                 const SizedBox(height: 16),
               ] else
                 const SizedBox(height: 20),
-              const Text('How do you want to use\nGora Taxi Partner?',
+              const Text('How do you want to use\nGora Taxi?',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 22, height: 1.25, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
               const SizedBox(height: 8),

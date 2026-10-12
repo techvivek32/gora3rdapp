@@ -15,7 +15,7 @@ class SplashPage extends StatelessWidget {
           final isCustomer = u is Map && u['role']?.toString() == 'customer';
           context.go(isCustomer ? '/customer' : '/');
         } else if (state is AuthUnauthenticated) {
-          context.go('/welcome');
+          context.go('/role-select');
         }
       },
       child: const Scaffold(
