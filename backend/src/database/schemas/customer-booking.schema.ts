@@ -86,7 +86,7 @@ export class CustomerBooking {
   @Prop({ type: Object }) pickup: { address?: string; lat?: number; lng?: number };
   @Prop({ type: Object }) drop: { address?: string; lat?: number; lng?: number };
   @Prop({ type: [{ type: Object }], default: [] })
-  stops: { address?: string; lat?: number; lng?: number }[];
+  stops: { address?: string; lat?: number; lng?: number; city?: string }[];
 
   @Prop() pickupCity: string;
   @Prop() dropCity: string;

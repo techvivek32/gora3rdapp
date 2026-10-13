@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/trip_stops.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -44,6 +45,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     final a = ((_trip['pickup'] as Map?)?['address'] ?? '').toString().trim();
     return a.isNotEmpty ? a : (_trip['pickupCity'] ?? '—').toString();
   }
+
+  /// Intermediate stops, in order, as the customer entered them.
+  List<String> get _stopAddrs => stopLabels(_trip['stops'], short: false);
 
   String get _dropAddr {
     final a = ((_trip['drop'] as Map?)?['address'] ?? '').toString().trim();
@@ -281,6 +285,8 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       'humanId': _pendingHumanId,
       'bookingObjId': id,
       'pickupCity': _cityOf('pickupCity', 'pickup'),
+      // Short labels for any added stops, so the thank-you screen can list them.
+      'stops': stopLabels(t['stops']),
       'totalFare': _fare,
       'tripType': (t['subType'] ?? 'One Way').toString(),
       'dateTime': [if (date.isNotEmpty) _prettyDate(date), if (time.isNotEmpty) time].join(' | '),
@@ -478,7 +484,12 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
                   text: TextSpan(
                     style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'),
                     children: [
-                      TextSpan(text: _isLocal ? from : (_isRound ? '$from → $to → $from' : '$from → $to')),
+                      TextSpan(
+                          text: _isLocal
+                              ? from
+                              : (_isRound
+                                  ? '${itineraryLine(from, _trip['stops'], to, sep: ' → ')} → $from'
+                                  : itineraryLine(from, _trip['stops'], to, sep: ' → '))),
                       TextSpan(text: '  (${_titleCase(sub)})', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
                     ],
                   ),
@@ -549,8 +560,19 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
             _field(_emailCtrl, 'Email ID (optional)', Icons.email_rounded, keyboard: TextInputType.emailAddress),
             SizedBox(height: 14.h),
             _readonlyLoc('Pickup Location', Icons.my_location_rounded, AppColors.success, _pickupAddr),
-            // Local (in-city hourly) has no fixed drop.
+            // Local (in-city hourly) has no fixed drop — and no stops either.
             if (!_isLocal) ...[
+              // Show every added stop between pickup and drop, so the customer
+              // can confirm the route they actually built on the form.
+              for (int i = 0; i < _stopAddrs.length; i++) ...[
+                SizedBox(height: 10.h),
+                _readonlyLoc(
+                  _stopAddrs.length == 1 ? 'Stop' : 'Stop ${i + 1}',
+                  Icons.trip_origin_rounded,
+                  AppColors.warning,
+                  _stopAddrs[i],
+                ),
+              ],
               SizedBox(height: 10.h),
               _readonlyLoc('Drop Location', Icons.location_on_rounded, AppColors.error, _dropAddr),
             ],

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -81,6 +82,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   // Cab page extras: admin-managed promo banners + the support number to call.
   String _supportPhone = '';
   List<Map<String, dynamic>> _offers = [];
+  // Promo strip auto-advances so later banners actually get seen.
+  final _offersCtrl = ScrollController();
+  Timer? _offersTimer;
   // Representative Local package km-per-hour (for the "X km included" chip hint).
   double _localKmPerHour = 0;
   // Hire a Driver: transmission + admin-set per-day rate (total = rate × days).
@@ -236,6 +240,8 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
 
   @override
   void dispose() {
+    _offersTimer?.cancel();
+    _offersCtrl.dispose();
     _pickupCtrl.dispose();
     _dropCtrl.dispose();
     _notesCtrl.dispose();
@@ -258,7 +264,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     try {
       final d = await getIt<CustomerRepository>().homeContent(null);
       final list = (d['offers'] as List?)?.map((e) => Map<String, dynamic>.from(e as Map)).toList() ?? <Map<String, dynamic>>[];
-      if (mounted) setState(() => _offers = list);
+      if (mounted) {
+        setState(() => _offers = list);
+        _startOffersAuto();
+      }
     } catch (_) {}
     // Representative Local package km/hour — the most common value among the
     // active cabs that offer a Local package, used to show "X km included".
@@ -1207,6 +1216,22 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     );
   }
 
+  /// Scroll the promo strip forward one card every few seconds, looping back to
+  /// the start at the end. Same behaviour as the carousels on the customer home.
+  void _startOffersAuto() {
+    _offersTimer?.cancel();
+    if (_offers.length <= 1) return;
+    _offersTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_offersCtrl.hasClients) return;
+      final max = _offersCtrl.position.maxScrollExtent;
+      if (max <= 0) return; // all cards already fit — nothing to scroll
+      final step = (240 + 10).w; // card width + separator
+      final atEnd = _offersCtrl.offset >= max - 2;
+      final next = atEnd ? 0.0 : (_offersCtrl.offset + step).clamp(0.0, max).toDouble();
+      _offersCtrl.animateTo(next, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
+    });
+  }
+
   // Admin-managed promotional banners (reuses home "offers") shown below the card.
   Widget _offersBanner() {
     if (_offers.isEmpty) return const SizedBox.shrink();
@@ -1215,6 +1240,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       child: SizedBox(
         height: 120.h,
         child: ListView.separated(
+          controller: _offersCtrl,
           scrollDirection: Axis.horizontal,
           itemCount: _offers.length,
           separatorBuilder: (_, __) => SizedBox(width: 10.w),

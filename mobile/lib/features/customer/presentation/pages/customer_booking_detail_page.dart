@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/trip_stops.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -287,7 +288,8 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
     if (_mainTab == 0) {
       content = Column(children: [
         kv('Trip Type', tripType),
-        kv('Itinerary', [from, to].where((s) => s.isNotEmpty).join('  →  ')),
+        // Includes any stops the customer added, in order.
+        kv('Itinerary', itineraryLine(from, b['stops'], to)),
         kv('Date', [dateStr, time].where((s) => s.isNotEmpty).join(' | ')),
         kv('Car Type', (b['vehicleType'] ?? '—').toString()),
         kv('Total Fare', '₹ $fare'),

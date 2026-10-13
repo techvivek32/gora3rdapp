@@ -96,8 +96,11 @@ class _CabBookingConfirmedPageState extends State<CabBookingConfirmedPage> {
 
   // ── Your Booking Details ────────────────────────────────────────────────────
   Widget _bookingDetailsCard() {
+    final stops = _list('stops');
     final rows = <(String, String, bool)>[
       ('Pickup city', (d['pickupCity'] ?? '—').toString(), false),
+      // Only shown when the customer actually added stops on the booking form.
+      if (stops.isNotEmpty) (stops.length == 1 ? 'Stop' : 'Stops', stops.join('  →  '), false),
       ('Total Fare', '₹ ${d['totalFare'] ?? 0}', true),
       ('Trip Type', (d['tripType'] ?? '—').toString(), false),
       ('Pick Up Date & Time', (d['dateTime'] ?? '—').toString(), false),

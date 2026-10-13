@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/trip_stops.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
@@ -192,7 +193,9 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
     final sub = (_trip['subType'] ?? 'One Way').toString();
     final date = (_trip['travelDate'] ?? '').toString();
     final time = (_trip['travelTime'] ?? '').toString();
-    final route = _isLocal ? '$from · Local' : (_isRound ? '$from → $to → $from' : '$from → $to');
+    // Include any stops so the route matches what the customer built.
+    final leg = itineraryLine(from, _trip['stops'], to, sep: ' → ');
+    final route = _isLocal ? '$from · Local' : (_isRound ? '$leg → $from' : leg);
     return Container(
       padding: EdgeInsets.all(14.w),
       decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14.r), border: Border.all(color: AppColors.primary.withValues(alpha: 0.2))),

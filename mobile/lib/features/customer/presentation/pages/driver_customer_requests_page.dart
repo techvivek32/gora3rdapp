@@ -486,7 +486,7 @@ class MyOfferCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: routeTimeline(pickup, drop)),
+              Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
               SizedBox(width: 10.w),
               dateTimeBox(tripDate(b['travelDate']), (b['travelTime'] ?? '').toString(), barColor),
             ],

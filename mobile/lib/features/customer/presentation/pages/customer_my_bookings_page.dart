@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/utils/trip_stops.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/customer_repository.dart';
@@ -224,7 +225,9 @@ class _BookingCard extends StatelessWidget {
     final (barColor, statusLabel) = bookingStatusInfo(status);
     final stamp = bookingStamp(status);
 
-    final route = isLocal ? '$fromCity · Local' : (isRound ? '$fromCity → $toCity → $fromCity' : '$fromCity → $toCity');
+    // Stops sit between pickup and drop so the card shows the real route.
+    final leg = itineraryLine(fromCity, b['stops'], toCity, sep: ' → ');
+    final route = isLocal ? '$fromCity · Local' : (isRound ? '$leg → $fromCity' : leg);
 
     final canCancel = status == 'open' || status == 'confirmed';
     final canEdit = status == 'open';

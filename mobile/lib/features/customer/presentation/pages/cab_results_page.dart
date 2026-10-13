@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/indian_states.dart';
+import '../../../../core/utils/trip_stops.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -414,7 +415,17 @@ class _CabResultsPageState extends State<CabResultsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_isLocal ? '$from · Local' : (_isRound ? '$from → $to → $from' : '$from → $to'), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+            // Intermediate stops sit between pickup and drop, so the title shows
+            // the real chain the car will drive (and the return leg for a round trip).
+            Text(
+                _isLocal
+                    ? '$from · Local'
+                    : (_isRound
+                        ? '${itineraryLine(from, t['stops'], to, sep: ' → ')} → $from'
+                        : itineraryLine(from, t['stops'], to, sep: ' → ')),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
             Text(
                 _isLocal
                     ? '$_localHours-hour package  •  $date${time.isNotEmpty ? ', $time' : ''}'

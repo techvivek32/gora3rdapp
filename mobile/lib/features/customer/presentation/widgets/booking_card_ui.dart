@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/trip_stops.dart';
 
 /// Shared card chrome for Customer Mode, matching the Requirement / Available-Car
 /// cards: colored top bar, tinted body, FROM→TO route, and a colored date box.
@@ -135,7 +136,10 @@ Widget filledChip(String text, Color color) => Container(
     );
 
 /// Vertical FROM → TO route with the connecting line.
-Widget routeTimeline(String from, String to) {
+/// FROM → (VIA …) → TO. `stops` is the booking's raw `stops` list; any
+/// intermediate stops the customer added are drawn between the two ends so the
+/// driver sees the route they actually have to take.
+Widget routeTimeline(String from, String to, {dynamic stops}) {
   Widget point(IconData icon, Color color, String label, String text, {required bool showLine}) => IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,11 +165,15 @@ Widget routeTimeline(String from, String to) {
           ],
         ),
       );
+  final via = stopLabels(stops, short: false);
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
     children: [
-      point(Icons.trip_origin, Colors.green, 'FROM', from, showLine: to.isNotEmpty),
+      point(Icons.trip_origin, Colors.green, 'FROM', from, showLine: to.isNotEmpty || via.isNotEmpty),
+      for (int i = 0; i < via.length; i++)
+        point(Icons.adjust, Colors.orange, via.length == 1 ? 'STOP' : 'STOP ${i + 1}', via[i],
+            showLine: to.isNotEmpty || i < via.length - 1),
       if (to.isNotEmpty) point(Icons.location_on, Colors.red, 'TO', to, showLine: false),
     ],
   );
