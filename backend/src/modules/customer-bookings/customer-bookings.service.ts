@@ -1191,6 +1191,10 @@ export class CustomerBookingsService {
       this.notifications.notifyUser(dId, '🎉 You got the booking!',
         `Local booking ${booking.bookingId} is assigned to you. Contact the customer and start the trip.`,
         { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
+      this.notifyAssignedDriverByPhone(
+        { bookingId: booking.bookingId, assignedDriverPhone: snapshot.phone },
+        dId?.toString(),
+      ).catch(() => {});
       this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
         `Your local booking ${booking.bookingId} is confirmed with ${snapshot.name}.`,
         { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
@@ -1341,11 +1345,44 @@ export class CustomerBookingsService {
     this.notifications.notifyUser(chosen.driverId, '🎉 You got the booking!',
       `Our team assigned booking ${booking.bookingId} to you. Contact the customer and start the trip.`,
       { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
+    // The garage driver actually driving this trip (if their number has an account).
+    this.notifyAssignedDriverByPhone(booking, chosen.driverId?.toString()).catch(() => {});
     this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
       `Your ${booking.serviceType} booking is confirmed with ${booking.driverSnapshot.name}.`,
       { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
 
     return { message: 'Driver assigned — booking confirmed', data: booking };
+  }
+
+  /**
+   * Tell the driver who will actually DRIVE the trip that it's been assigned.
+   *
+   * When a vendor assigns someone from their garage, the booking's offer belongs
+   * to the VENDOR, so the "You got the booking!" push goes to the vendor's
+   * account. The garage driver — the person who has to show up — got nothing and
+   * had to notice the trip by opening My Bookings. If that number has an account,
+   * notify it too. `excludeUserId` skips the case where the vendor assigned
+   * themselves (they already got the vendor notification).
+   */
+  private async notifyAssignedDriverByPhone(booking: any, excludeUserId?: string) {
+    try {
+      const phone = this.phoneLast10(booking.assignedDriverPhone);
+      if (!phone) return;
+      const driver: any = await this.userModel
+        .findOne({ mobile: new RegExp(`${phone}$`) })
+        .select('_id')
+        .lean();
+      if (!driver) return; // not registered yet — they'll see it when they sign up
+      if (excludeUserId && driver._id.toString() === excludeUserId.toString()) return;
+      await this.notifications.notifyUser(
+        driver._id,
+        'New trip assigned to you',
+        `Booking ${booking.bookingId} has been assigned to you. Open My Bookings to start the trip.`,
+        { type: 'customer_booking_selected', bookingId: booking.bookingId },
+      );
+    } catch {
+      // Best effort — never block an assignment because a push failed.
+    }
   }
 
   async getMyApplications(driverId: string) {

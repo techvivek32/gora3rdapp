@@ -368,8 +368,16 @@ class MyOfferCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final id = (b['_id'] ?? b['id'] ?? '').toString();
     final service = kServiceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
-    final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
-    final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
+    // Fall back to the city when a booking has no full address object — bookings
+    // created from the admin panel / WhatsApp carry only pickupCity & dropCity,
+    // and without this the driver's card showed an empty route.
+    String loc(String objKey, String cityKey) {
+      final a = ((b[objKey] as Map?)?['address'] ?? '').toString().trim();
+      if (a.isNotEmpty) return a;
+      return (b[cityKey] ?? '').toString().trim();
+    }
+    final pickup = loc('pickup', 'pickupCity');
+    final drop = loc('drop', 'dropCity');
     final status = (b['status'] ?? '').toString();
     // Round-trip context — carried on the booking (subType) + return date in notes.
     // Must stay visible AFTER a driver is selected (the win card is what they work

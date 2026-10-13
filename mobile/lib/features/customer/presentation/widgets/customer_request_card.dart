@@ -21,8 +21,16 @@ class CustomerRequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final b = booking;
     final service = kServiceNames[(b['serviceType'] ?? '').toString()] ?? 'Booking';
-    final pickup = ((b['pickup'] as Map?)?['address'] ?? '').toString();
-    final drop = ((b['drop'] as Map?)?['address'] ?? '').toString();
+    // Fall back to the city when a booking has no full address object — bookings
+    // created from the admin panel / WhatsApp carry only pickupCity & dropCity,
+    // and without this the driver's card showed an empty route.
+    String loc(String objKey, String cityKey) {
+      final a = ((b[objKey] as Map?)?['address'] ?? '').toString().trim();
+      if (a.isNotEmpty) return a;
+      return (b[cityKey] ?? '').toString().trim();
+    }
+    final pickup = loc('pickup', 'pickupCity');
+    final drop = loc('drop', 'dropCity');
     final date = tripDate(b['travelDate']);
     // Driver-facing amount: GST is the platform's tax, not the driver's earning,
     // so show the fare WITHOUT it. Older bookings have no stored gstAmount —
