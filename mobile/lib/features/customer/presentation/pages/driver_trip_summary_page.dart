@@ -117,10 +117,14 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
     final trackedKm = _num(_b['trackedKm']);
     final extraKm = _num(_b['extraKm']);
     final extraCharge = _num(_b['extraCharge']);
-    // Driver collects the GST-free amount — GST is the platform's, not the driver's.
-    final gstAmount = _num(_b['gstAmount']);
-    final rawTotal = _num(_b['finalFare'] ?? _b['fare'] ?? _b['estimatedFare'] ?? _b['totalFare']);
-    final total = (rawTotal - gstAmount).clamp(0, double.infinity).toDouble();
+    // The driver collects the WHOLE fare in cash, GST included — Gora's share was
+    // already taken from their wallet when the booking was assigned, so there is
+    // nothing to hand over afterwards.
+    final total = _num(_b['finalFare'] ?? _b['fare'] ?? _b['estimatedFare'] ?? _b['totalFare']);
+    // What we already took up front: our commission + the GST. Shown so the bill
+    // reconciles with the "You earn" figure on their booking card.
+    final platformDue = _num(_b['platformDue']);
+    final netEarning = (total - platformDue).clamp(0, double.infinity).toDouble();
     final advance = (_b['advanceStatus']?.toString() == 'paid') ? _num(_b['advanceAmount']) : 0.0;
     final collected = (total - advance).clamp(0, double.infinity).toDouble();
     final isRound = (_b['subType'] ?? '').toString() == 'Round Trip';
@@ -226,6 +230,11 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
             const Divider(height: 20),
             _row('Total fare', '₹${total.toStringAsFixed(0)}', bold: true),
             if (advance > 0) _row('Advance paid (to platform)', '- ₹${advance.toStringAsFixed(0)}'),
+            if (platformDue > 0) ...[
+              _row('Already paid to Gora (from wallet)', '- ₹${platformDue.toStringAsFixed(0)}'),
+              const Divider(height: 20),
+              _row('Your earning', '₹${netEarning.toStringAsFixed(0)}', bold: true),
+            ],
           ]),
           SizedBox(height: 12.h),
 

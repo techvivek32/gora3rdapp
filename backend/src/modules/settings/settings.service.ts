@@ -129,6 +129,7 @@ export class SettingsService {
     minBillKm?: number;
     tollTaxPerKm?: number;
     gstPercent?: number;
+    platformCommissionPercent?: number;
     driverHirePerDay?: number;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;

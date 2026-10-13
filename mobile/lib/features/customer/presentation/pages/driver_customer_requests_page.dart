@@ -406,12 +406,13 @@ class MyOfferCard extends StatelessWidget {
         : subType.toUpperCase();
     // myOffer is injected by backend for the driver's own offer on this booking.
     final myOffer = b['myOffer'] as Map? ?? {};
-    // Driver-facing amount excludes GST (platform tax, not the driver's earning),
-    // matching the booking feed card. Customer bookings have no driver-entered
-    // quote (the accept dialog only picks vehicle+driver — quotedFare is just a
-    // copy of the full fare), so always show fare minus GST here.
-    final quoted = (((b['estimatedFare'] as num?) ?? (b['finalFare'] as num?) ?? 0)
-        - ((b['gstAmount'] as num?) ?? 0));
+    // What the driver actually takes home. The backend works this out as
+    // (what the customer pays) - (our commission + GST), so the card never shows
+    // money that isn't theirs. Older backends don't send it, so fall back to
+    // fare minus GST, which is what this card used to show.
+    final quoted = (b['driverEarning'] as num?) ??
+        (((b['estimatedFare'] as num?) ?? (b['finalFare'] as num?) ?? 0)
+            - ((b['gstAmount'] as num?) ?? 0));
     final hold = myOffer['holdAmount'] ?? 0;
     final offerStatus = (myOffer['status'] ?? '').toString();
     // Won ONLY if THIS driver's offer was the selected one — not merely because
@@ -511,7 +512,7 @@ class MyOfferCard extends StatelessWidget {
             SizedBox(height: 8.h),
           ],
           Row(children: [
-            Text('Your quote: ₹$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            Text('You earn: ₹$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const Spacer(),
             if (hold != 0) Text('Hold: ₹$hold', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ]),

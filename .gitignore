@@ -62,3 +62,6 @@ flow_screenshots/
 
 # Local test screenshots (not committed)
 test_screenshots/
+
+# Emulator test screenshots (local only)
+ss/

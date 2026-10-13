@@ -32,12 +32,12 @@ class CustomerRequestCard extends StatelessWidget {
     final pickup = loc('pickup', 'pickupCity');
     final drop = loc('drop', 'dropCity');
     final date = tripDate(b['travelDate']);
-    // Driver-facing amount: GST is the platform's tax, not the driver's earning,
-    // so show the fare WITHOUT it. Older bookings have no stored gstAmount —
-    // fall back to the total rather than guessing.
+    // Driver-facing amount: what they'd actually take home, i.e. the customer's
+    // fare less the platform's cut (our commission + GST). The backend sends this
+    // as driverEarning; older backends don't, so fall back to fare minus GST.
     final _total = ((b['estimatedFare'] as num?) ?? 0).toInt();
     final _gst = ((b['gstAmount'] as num?) ?? 0).toInt();
-    final fare = _total - _gst;
+    final fare = ((b['driverEarning'] as num?) ?? (_total - _gst)).toInt();
     final applied = b['alreadyApplied'] == true;
     final subType = (b['subType'] ?? '').toString();
     final status = (b['status'] ?? 'open').toString();
@@ -158,7 +158,7 @@ class CustomerRequestCard extends StatelessWidget {
               Text(transmission, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
             ],
             const Spacer(),
-            if (fare != 0) Text('Budget: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            if (fare != 0) Text('You earn: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
           ]),
           // Round-trip return date (so the driver knows when to bring the car back).
           if (returnDate != null) ...[
@@ -411,9 +411,13 @@ class _AcceptDialogState extends State<_AcceptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    // Same rule as the feed card — driver sees the amount without GST.
-    final fare = (((widget.booking['estimatedFare'] as num?) ?? 0).toInt())
-        - (((widget.booking['gstAmount'] as num?) ?? 0).toInt());
+    // Same rule as the feed card — the driver sees their own payout.
+    final fare = ((widget.booking['driverEarning'] as num?) ??
+            (((widget.booking['estimatedFare'] as num?) ?? 0) -
+                ((widget.booking['gstAmount'] as num?) ?? 0)))
+        .toInt();
+    // What accepting will hold from their wallet (our commission + GST).
+    final hold = ((widget.booking['platformDue'] as num?) ?? 0).toInt();
     final canSubmit = _vehicle != null && _driver != null;
     final emptyGarage = !_loading && _err == null && (_vehicles.isEmpty || _drivers.isEmpty);
 
@@ -426,7 +430,10 @@ class _AcceptDialogState extends State<_AcceptDialog> {
           Text('Accept this booking', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
           SizedBox(height: 4.h),
           Text(
-            fare != 0 ? "Choose the vehicle & driver for this trip (budget ₹$fare)." : 'Choose the vehicle & driver for this trip.',
+            fare != 0
+                ? "Choose the vehicle & driver for this trip. You earn ₹$fare"
+                    "${hold > 0 ? ' — ₹$hold (commission + GST) is held from your wallet' : ''}."
+                : 'Choose the vehicle & driver for this trip.',
             style: TextStyle(fontSize: 12.5.sp, color: AppColors.textSecondary),
           ),
           SizedBox(height: 18.h),

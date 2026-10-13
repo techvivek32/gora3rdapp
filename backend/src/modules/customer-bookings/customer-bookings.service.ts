@@ -213,6 +213,47 @@ export class CustomerBookingsService {
     return `CB${Date.now().toString().slice(-7)}${Math.floor(100 + Math.random() * 900)}`;
   }
 
+  // ─── Platform due (commission + GST) ───────────────────────────────────────
+
+  /**
+   * The slice of a booking that belongs to the platform, not the driver:
+   *
+   *   commission = platformCommissionPercent % of (base fare + driver allowance)
+   *   due        = commission + the booking's GST
+   *
+   * GST is included because it is the platform's to remit — the driver collects
+   * the full amount from the customer but never keeps the tax. Commission is
+   * charged on the ride only, never on GST (no tax-on-tax) and never on the toll
+   * / parking the driver pays out of pocket.
+   *
+   * Worked example — base 10000, allowance 300, GST 560, commission 10%:
+   *   commission = 10% of 10300        = 1030
+   *   due        = 1030 + 560          = 1590
+   *   customer pays                      10860
+   *   driver keeps 10860 - 1590        = 9270
+   */
+  async platformDueFor(booking: any, fareOverride?: number): Promise<{ commission: number; gst: number; due: number }> {
+    const settings: any = await this.settings.getSettings();
+    const percent = Math.max(0, Math.min(100, Number(settings?.platformCommissionPercent) || 0));
+    const gst = Math.max(0, Math.round(Number(booking?.gstAmount) || 0));
+
+    // The ride portion the commission applies to. Prefer the stored split; for a
+    // booking saved before that existed (or a driver-quoted fare), fall back to
+    // the fare minus GST so we never charge commission on the tax.
+    const total = Number(fareOverride ?? booking?.finalFare ?? booking?.estimatedFare) || 0;
+    const stored = (Number(booking?.baseFare) || 0) + (Number(booking?.driverAllowance) || 0);
+    const ride = stored > 0 ? stored : Math.max(0, total - gst);
+
+    const commission = Math.round((ride * percent) / 100);
+    return { commission, gst, due: commission + gst };
+  }
+
+  /** What the driver actually takes home: everything the customer pays, less the
+   * platform's cut. `due` is the amount frozen on the offer when they accepted. */
+  private driverEarningFor(total: number, due: number): number {
+    return Math.max(0, Math.round((Number(total) || 0) - (Number(due) || 0)));
+  }
+
   // ─── Wallet ledger (atomic available ↔ held ↔ settled) ─────────────────────
 
   /** Move `amount` from a driver's AVAILABLE to HELD. Returns false if short. */
@@ -557,7 +598,16 @@ export class CustomerBookingsService {
   }
 
   /**
-   * Build the booking's PDF invoice. `showTaxBreakdown` is the CUSTOMER view: the
+   * Build the booking's PDF invoice.
+   *
+   * NOTE: the invoice is now IDENTICAL for the customer and the driver. The
+   * driver collects the full fare (GST included) in cash, and Gora's share was
+   * already taken from their wallet when the booking was assigned — so there is
+   * no second, GST-free version of the bill any more. `showTaxBreakdown` is kept
+   * only because the tokenized invoice link still signs it; it no longer changes
+   * what the PDF contains.
+   *
+   * (historical) `showTaxBreakdown` was the CUSTOMER view: the
    * fare includes GST and the Fare Summary itemises Base fare / Driver allowance /
    * GST. The DRIVER view (false) excludes GST entirely — GST is the platform's,
    * not collected by the driver — so the total is the GST-free amount the driver
@@ -574,8 +624,11 @@ export class CustomerBookingsService {
 
     const gstAmount = Math.max(0, Math.round(booking.gstAmount || 0));
     const rawFare = booking.finalFare || booking.estimatedFare || 0;
-    // Driver collects the GST-free amount; customer is billed the full total.
-    const fare = showTaxBreakdown ? rawFare : Math.max(0, rawFare - gstAmount);
+    // The driver collects the FULL amount in cash — GST included. We are already
+    // paid: our commission + GST came out of their wallet when the booking was
+    // assigned, so there is nothing for them to settle with us afterwards.
+    // Both copies of the invoice therefore show the same total.
+    const fare = rawFare;
     // Toll: prefer the structured charge the driver entered on the bill screen;
     // fall back to the legacy value concatenated into `notes` for old bookings.
     let tollAmount = Math.max(0, Math.round(booking.tollCharge || 0));
@@ -650,8 +703,11 @@ export class CustomerBookingsService {
       otherCharge: Math.max(0, Math.round(booking.otherCharge || 0)),
       // Driver's copy hides the tax split — pass 0 so the invoice collapses to a
       // single "Ride fare" line while the TOTAL stays the same.
-      driverAllowance: showTaxBreakdown ? Math.max(0, Math.round(booking.driverAllowance || 0)) : 0,
-      gstAmount: showTaxBreakdown ? Math.max(0, Math.round(booking.gstAmount || 0)) : 0,
+      // Both copies show the real split now. The driver collects the whole amount
+      // including GST, so hiding the GST line from them would leave the invoice
+      // lines not adding up to the total they're handed.
+      driverAllowance: Math.max(0, Math.round(booking.driverAllowance || 0)),
+      gstAmount: Math.max(0, Math.round(booking.gstAmount || 0)),
       fareMode,
       includedKm: booking.includedKm || 0,
       trackedKm: booking.trackedKm || 0,
@@ -664,13 +720,10 @@ export class CustomerBookingsService {
       extraHours: booking.extraHours || 0,
       extraHourCharge: booking.extraHourCharge || 0,
       advanceAmount: booking.advanceStatus === 'paid' ? (booking.advanceAmount || 0) : 0,
-      // Customer copy: the driver is paid the GST-free cash; GST goes to Gora
-      // separately. Driver copy already has GST stripped from the total, so the
-      // plain cash note is accurate for them.
-      paymentMode:
-        showTaxBreakdown && gstAmount > 0
-          ? `Cash Rs. ${(rawFare - gstAmount).toLocaleString('en-IN')} to the driver — GST Rs. ${gstAmount.toLocaleString('en-IN')} billed separately by Gora`
-          : 'Cash — paid directly to the driver',
+      // The customer hands the driver the whole amount, GST included. Gora's
+      // share was already collected from the driver's wallet up front, so the
+      // note is the same on both copies.
+      paymentMode: `Cash Rs. ${rawFare.toLocaleString('en-IN')} — paid directly to the driver`,
     });
 
     return { buffer, filename: `Gora-Invoice-${booking.bookingId}.pdf` };
@@ -1013,14 +1066,25 @@ export class CustomerBookingsService {
     const bookings = await this.bookingModel.find(filter).sort({ createdAt: -1 }).limit(100).lean();
     const uid = driverId;
     // Hide other drivers' quotes; only flag whether THIS driver already applied.
-    const data = bookings.map((b: any) => ({
-      ...b,
-      offerCount: (b.offers ?? []).filter((o: any) => o.status !== 'released').length,
-      alreadyApplied: (b.offers ?? []).some((o: any) => o.driverId.toString() === uid && o.status !== 'released'),
-      // Per-item so it survives the response interceptor (which keeps only `data`).
-      canAccept,
-      offers: undefined,
-    }));
+    const data = await Promise.all(
+      bookings.map(async (b: any) => {
+        // Show what the driver would actually take home if they accept, not the
+        // customer's bill — otherwise the feed advertises a number they never get.
+        // Nothing is held yet, so this is quoted at today's commission rate; the
+        // real figure is frozen onto their offer the moment they accept.
+        const { due } = await this.platformDueFor(b);
+        return {
+          ...b,
+          offerCount: (b.offers ?? []).filter((o: any) => o.status !== 'released').length,
+          alreadyApplied: (b.offers ?? []).some((o: any) => o.driverId.toString() === uid && o.status !== 'released'),
+          platformDue: due,
+          driverEarning: this.driverEarningFor(b.finalFare || b.estimatedFare || 0, due),
+          // Per-item so it survives the response interceptor (which keeps only `data`).
+          canAccept,
+          offers: undefined,
+        };
+      }),
+    );
     return { message: 'Available bookings', data, canAccept, goldenRequired: !canAccept };
   }
 
@@ -1045,7 +1109,10 @@ export class CustomerBookingsService {
     if (booking.serviceType === 'car_pool' && dto.farePerSeat && dto.farePerSeat > 0) {
       fare = Math.round(dto.farePerSeat * seats);
     }
-    const holdAmount = Math.round((fare * (booking.commitmentPercent || 0)) / 100);
+    // What this driver owes the platform if they win: commission + GST. It is
+    // held now and only actually taken when an admin assigns the booking.
+    const { commission, gst, due } = await this.platformDueFor(booking, fare);
+    const holdAmount = due;
 
     // Hold first (atomic on the wallet), then attempt an ATOMIC conditional push:
     // the offer is only added if the booking is still OPEN and this driver has no
@@ -1054,7 +1121,8 @@ export class CustomerBookingsService {
     const held = await this.holdFunds(dId, holdAmount, booking._id);
     if (!held) {
       throw new BadRequestException(
-        `Insufficient wallet balance. You need ₹${holdAmount} available to apply for this booking.`,
+        `You need ₹${holdAmount} in your wallet to accept this booking ` +
+          `(₹${commission} commission + ₹${gst} GST). Please recharge and try again.`,
       );
     }
 
@@ -1142,13 +1210,26 @@ export class CustomerBookingsService {
     const dId = new Types.ObjectId(driverId);
     const fare = booking.estimatedFare || 0;
 
+    // The platform's cut if this driver wins: commission + GST. It is HELD now
+    // (so they can't accept more work than their wallet covers) and only actually
+    // taken when an admin assigns the booking to them.
+    const { commission, gst, due } = await this.platformDueFor(booking, fare);
+    if (due > 0) {
+      const held = await this.holdFunds(dId, due, booking._id);
+      if (!held) {
+        throw new BadRequestException(
+          `You need ₹${due} in your wallet to accept this booking ` +
+            `(₹${commission} commission + ₹${gst} GST). Please recharge and try again.`,
+        );
+      }
+    }
+
     // Register interest with an ATOMIC conditional push: the offer is added only
     // if the booking is still OPEN and this driver has no active offer already.
-    // This closes the concurrent double-accept race without any wallet hold.
     const offer = {
       driverId: dId,
       quotedFare: fare,
-      holdAmount: 0,
+      holdAmount: due,
       vehicle: selection?.vehicle || '',
       vehicleNumber: selection?.vehicleNumber || '',
       vehicleImage: selection?.vehicleImage || '',
@@ -1321,6 +1402,16 @@ export class CustomerBookingsService {
       .lean();
     const rc: any = driver?.documents?.vehicleRc || {};
 
+    // Take the winner's commitment (commission + GST) out of their wallet for
+    // real, and hand every other applicant their hold back. Without this an
+    // admin-assigned booking left the money stuck in `heldBalance` forever.
+    await this.settleHold(chosen.driverId, chosen.holdAmount, booking._id);
+    for (const o of booking.offers as any[]) {
+      if (o.driverId.toString() !== chosen.driverId.toString() && o.status === 'applied') {
+        await this.releaseHold(o.driverId, o.holdAmount, booking._id);
+      }
+    }
+
     // Mark the chosen offer selected, the rest released.
     for (const o of booking.offers as any[]) {
       o.status = o.driverId.toString() === driverId ? 'selected' : 'released';
@@ -1415,6 +1506,14 @@ export class CustomerBookingsService {
       // A driver assigned only by phone has no offer of their own — synthesize a
       // "selected" marker so the app lists the trip under their won bookings.
       const myOffer = mine || (assignedByPhone ? { status: 'selected' } : null);
+
+      // What this driver takes home. `holdAmount` is the platform's cut
+      // (commission + GST) frozen when they accepted, so a later change to the
+      // commission % never rewrites what an existing booking pays out. A driver
+      // assigned by phone has no offer, so fall back to the selected offer's cut.
+      const selectedOffer = (b.offers ?? []).find((o: any) => o.status === 'selected');
+      const platformDue = Math.max(0, Math.round(mine?.holdAmount ?? selectedOffer?.holdAmount ?? 0));
+      const total = Math.round(b.finalFare || b.estimatedFare || 0);
       return {
         ...b,
         customerId: c && typeof c === 'object' ? c._id : c,
@@ -1423,6 +1522,9 @@ export class CustomerBookingsService {
         contactLocked: isSelected && !revealed,
         contactRevealHours: revealHours,
         myOffer,
+        // The driver-facing number: their payout, not the customer's bill.
+        driverEarning: this.driverEarningFor(total, platformDue),
+        platformDue,
         offers: undefined,
       };
     });

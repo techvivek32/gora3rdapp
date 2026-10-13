@@ -110,6 +110,18 @@ export class PlatformSettings {
   @Prop({ default: 0, min: 0, max: 100 })
   gstPercent: number;
 
+  /**
+   * Platform commission percent, charged on the ride itself (base fare + driver
+   * allowance) — NOT on GST or the road charges the driver collects in cash.
+   *
+   * What the driver owes the platform on a booking is this commission PLUS the
+   * booking's GST (GST is the platform's to remit, the driver never keeps it).
+   * That combined amount must be in their wallet to accept the booking, and is
+   * deducted once an admin assigns it to them. 0 = commission disabled.
+   */
+  @Prop({ default: 0, min: 0, max: 100 })
+  platformCommissionPercent: number;
+
   /** Hire-a-Driver per-day rate (₹). Total = this × number of days. 0 = not set. */
   @Prop({ default: 0, min: 0 })
   driverHirePerDay: number;

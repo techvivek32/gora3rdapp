@@ -25,6 +25,7 @@ export default function CabCategoriesPage() {
   const [tollTaxPerKm, setTollTaxPerKm] = useState<number>(0);
   const [gstPercent, setGstPercent] = useState<number>(0);
   const [driverHirePerDay, setDriverHirePerDay] = useState<number>(0);
+  const [platformCommissionPercent, setPlatformCommissionPercent] = useState<number>(0);
   const { data: settingsData } = useQuery({
     queryKey: ['admin-settings-cab'],
     queryFn: () => adminApi.getAdminSettings(),
@@ -35,9 +36,10 @@ export default function CabCategoriesPage() {
     if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
     if (typeof s?.gstPercent === 'number') setGstPercent(s.gstPercent);
     if (typeof s?.driverHirePerDay === 'number') setDriverHirePerDay(s.driverHirePerDay);
+    if (typeof s?.platformCommissionPercent === 'number') setPlatformCommissionPercent(s.platformCommissionPercent);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0 }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0, platformCommissionPercent: Number(platformCommissionPercent) || 0 }),
     onSuccess: () => {
       toast.success('Cab settings saved');
       queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
@@ -121,6 +123,25 @@ export default function CabCategoriesPage() {
             />
             <p className="text-xs text-gray-500 mt-1">
               Added to the “All Inclusive” fare for all cabs. e.g. 5% on a ₹1,000 fare → +₹50.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Platform Commission (%)</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step="0.5"
+              placeholder="e.g. 10 (0 = no commission)"
+              value={platformCommissionPercent}
+              onChange={(e) => setPlatformCommissionPercent(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Our cut, charged on base fare + driver allowance (never on GST). The driver must hold
+              this <strong>plus the booking&apos;s GST</strong> in their wallet to accept a booking, and it is
+              deducted when you assign them. e.g. 10% on ₹10,300 ride + ₹560 GST → ₹1,590 taken,
+              driver keeps ₹9,270 of a ₹10,860 fare.
             </p>
           </div>
           <div>
