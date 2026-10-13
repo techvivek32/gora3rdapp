@@ -235,7 +235,7 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  Flexible(child: Text('${_cat['name'] ?? 'Cab'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+                  Flexible(child: Text('${_cat['name'] ?? 'Cab'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
                   if (_isLowest) ...[
                     SizedBox(width: 8.w),
                     Container(

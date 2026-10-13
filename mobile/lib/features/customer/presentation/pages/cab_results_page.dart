@@ -644,7 +644,8 @@ class _CabResultsPageState extends State<CabResultsPage> {
                         Expanded(
                           child: Text('${cat['name'] ?? 'Cab'}  or similar',
                               maxLines: 2, overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 14.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                              // Same size as the "N seater … AC Cab" line below it.
+                              style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                         ),
                         if (isLowest)
                           Container(
@@ -661,7 +662,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
                         if (disc > 0) ...[
                           Row(children: [
                             Flexible(
-                              child: Text(loRaw == hiRaw ? '₹$loRaw' : '₹$loRaw – ₹$hiRaw',
+                              // Only the lowest (cheapest fuel) price — a range
+                              // made the card read as if the fare were uncertain.
+                              child: Text('₹$loRaw',
                                   maxLines: 1, overflow: TextOverflow.ellipsis,
                                   style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, decoration: TextDecoration.lineThrough, fontFamily: 'Poppins')),
                             ),
@@ -674,7 +677,7 @@ class _CabResultsPageState extends State<CabResultsPage> {
                           ]),
                           SizedBox(height: 2.h),
                         ],
-                        Text(loFare == hiFare ? '₹$loFare' : '₹$loFare – ₹$hiFare',
+                        Text('₹$loFare',
                             style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w900, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                       ] else
                         Text('On request', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.textSecondary, fontFamily: 'Poppins')),
@@ -759,7 +762,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
     final base = _netBaseForFuel(cat, fuel);
     final gst = _gstForFuel(cat, fuel);
     final allowance = _allowanceFor(cat);
-    final totalLabel = loFare == hiFare ? '₹$loFare' : '₹$loFare – ₹$hiFare';
+    // Matches the headline: the lowest price, not a range.
+    final totalLabel = '₹$loFare';
+    // Best Price quotes the ride only — the road charges are settled with the
+    // driver. All Inclusive rolls them into the fare. Either way the lines are
+    // listed, so the customer can see what they are and aren't paying for here.
+    final roadChargesIncluded = !_isBestPrice;
     return Container(
       margin: EdgeInsets.only(top: 6.h),
       padding: EdgeInsets.fromLTRB(12.w, 10.h, 12.w, 12.h),
@@ -768,8 +776,13 @@ class _CabResultsPageState extends State<CabResultsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _bkRow('Base fare', '₹$base'),
-          if (allowance > 0) _bkRow('Driver allowance', '₹$allowance'),
-          if (!_isBestPrice && _toll > 0) _bkRow('Toll & state tax', 'Included', valueColor: AppColors.success),
+          if (allowance > 0)
+            _bkRow('Driver allowance', '₹$allowance')
+          else
+            _bkIncExc('Driver allowance', true),
+          _bkIncExc('Toll tax', roadChargesIncluded),
+          _bkIncExc('State tax', roadChargesIncluded),
+          _bkIncExc('Car parking', roadChargesIncluded),
           if (gst > 0) _bkRow('GST (${_gstPercent.round()}%)', '₹$gst'),
           Padding(padding: EdgeInsets.symmetric(vertical: 8.h), child: Divider(height: 1, color: AppColors.border)),
           Row(children: [
@@ -783,6 +796,15 @@ class _CabResultsPageState extends State<CabResultsPage> {
       ),
     );
   }
+
+  /// A breakup line that carries no rupee amount — it just says whether that
+  /// charge is covered by the quoted fare. Green "Included" vs amber "Excluded"
+  /// so the customer can tell at a glance what they'll still pay the driver.
+  Widget _bkIncExc(String label, bool included) => _bkRow(
+        label,
+        included ? 'Included' : 'Excluded',
+        valueColor: included ? AppColors.success : AppColors.warning,
+      );
 
   // One line of the inline fare breakup (label + optional ₹/km subtitle, value).
   Widget _bkRow(String label, String value, {String? subtitle, Color? valueColor}) => Padding(
