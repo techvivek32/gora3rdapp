@@ -27,6 +27,17 @@ import {
   RateBookingDto,
 } from './dto/customer-booking.dto';
 
+/** What the admin may send when assigning a booking. */
+export interface AdminAssignInput {
+  /** One of the drivers who accepted (settles their wallet hold). */
+  driverId?: string;
+  /** Any phone number — used when nobody accepted, or to override who drives. */
+  driverPhone?: string;
+  driverName?: string;
+  vehicle?: string;
+  vehicleNumber?: string;
+}
+
 @Injectable()
 export class CustomerBookingsService {
   private readonly logger = new Logger(CustomerBookingsService.name);
@@ -1385,75 +1396,132 @@ export class CustomerBookingsService {
    * The chosen driver's offer becomes 'selected', the rest 'released'. No wallet
    * holds are involved. Both the driver and the customer are notified.
    */
-  async adminAssign(id: string, driverId: string) {
+  /**
+   * Admin assigns (or RE-assigns) a booking.
+   *
+   * Three ways in:
+   *  1. `driverId` — one of the drivers who accepted. Their frozen commitment
+   *     (commission + GST) is settled out of their wallet, as before.
+   *  2. `driverPhone` — any number at all, even one nobody has registered with.
+   *     Nothing accepted, so nothing is held or settled; the booking is simply
+   *     stamped with that number and the driver sees it the moment they log in
+   *     with it (matched by `assignedDriverPhone` in getMyApplications).
+   *  3. Re-assign — the booking already has a driver. The previous one is
+   *     refunded in full (they are being replaced, not cancelling on us) and
+   *     the new assignment proceeds as 1 or 2.
+   */
+  async adminAssign(id: string, input: AdminAssignInput) {
     if (!Types.ObjectId.isValid(id)) throw new NotFoundException('Booking not found');
-    if (!driverId || !Types.ObjectId.isValid(driverId)) throw new BadRequestException('Invalid driver');
+
+    const driverId = (input?.driverId || '').trim();
+    const driverPhone = this.phoneLast10(input?.driverPhone || '');
+    if (!driverId && !driverPhone) {
+      throw new BadRequestException('Pick a driver who accepted, or enter a phone number');
+    }
+    if (driverId && !Types.ObjectId.isValid(driverId)) throw new BadRequestException('Invalid driver');
 
     const booking = await this.bookingModel.findById(id);
     if (!booking) throw new NotFoundException('Booking not found');
-    if (booking.status !== CustomerBookingStatus.OPEN) {
-      throw new BadRequestException('Only an open booking can be assigned');
-    }
-    const chosen: any = (booking.offers as any[]).find(
-      (o) => o.driverId.toString() === driverId && o.status !== 'released',
-    );
-    if (!chosen) throw new BadRequestException('That driver has not accepted this booking');
 
-    // Atomically claim OPEN → CONFIRMED so a concurrent assign/cancel/expiry can't
-    // also run against the same booking.
+    // Assign is only meaningful before the trip runs. Once it is ongoing or
+    // finished, swapping the driver would rewrite history.
+    const assignable = [CustomerBookingStatus.OPEN, CustomerBookingStatus.CONFIRMED];
+    if (!assignable.includes(booking.status)) {
+      throw new BadRequestException(`A ${booking.status} booking cannot be assigned`);
+    }
+
+    const chosen: any = driverId
+      ? (booking.offers as any[]).find((o) => o.driverId.toString() === driverId && o.status !== 'released')
+      : null;
+    if (driverId && !chosen) throw new BadRequestException('That driver has not accepted this booking');
+
+    // Claim the booking so a concurrent assign/cancel/expiry can't race us.
     const claimed = await this.bookingModel.findOneAndUpdate(
-      { _id: booking._id, status: CustomerBookingStatus.OPEN },
+      { _id: booking._id, status: { $in: assignable } },
       { $set: { status: CustomerBookingStatus.CONFIRMED } },
     );
-    if (!claimed) throw new BadRequestException('This booking is no longer open');
+    if (!claimed) throw new BadRequestException('This booking is no longer assignable');
 
-    const driver: any = await this.userModel
-      .findById(chosen.driverId)
-      .select('fullName agencyName mobile rating documents')
-      .lean();
-    const rc: any = driver?.documents?.vehicleRc || {};
+    // ── Re-assign: give the outgoing driver their money back ──────────────────
+    const previous: any = (booking.offers as any[]).find((o) => o.status === 'selected');
+    const replacingPrevious = previous && previous.driverId?.toString() !== driverId;
+    if (replacingPrevious && previous.holdAmount > 0) {
+      await this.refundToWallet(previous.driverId, previous.holdAmount, booking._id,
+        `Commitment refunded — booking ${booking.bookingId} reassigned`);
+      this.notifications.notifyUser(previous.driverId, 'Booking Reassigned',
+        `Booking ${booking.bookingId} was reassigned by our team. Your commitment has been refunded.`,
+        { type: 'customer_booking_reassigned', bookingId: booking.bookingId }).catch(() => {});
+    }
 
-    // Take the winner's commitment (commission + GST) out of their wallet for
-    // real, and hand every other applicant their hold back. Without this an
-    // admin-assigned booking left the money stuck in `heldBalance` forever.
-    await this.settleHold(chosen.driverId, chosen.holdAmount, booking._id);
+    // ── Money for the incoming driver ────────────────────────────────────────
+    if (chosen) {
+      await this.settleHold(chosen.driverId, chosen.holdAmount, booking._id);
+    }
+    // Everyone still holding who is NOT the winner gets their hold back.
     for (const o of booking.offers as any[]) {
-      if (o.driverId.toString() !== chosen.driverId.toString() && o.status === 'applied') {
+      const isWinner = chosen && o.driverId.toString() === chosen.driverId.toString();
+      if (!isWinner && o.status === 'applied') {
         await this.releaseHold(o.driverId, o.holdAmount, booking._id);
       }
     }
-
-    // Mark the chosen offer selected, the rest released.
     for (const o of booking.offers as any[]) {
-      o.status = o.driverId.toString() === driverId ? 'selected' : 'released';
+      o.status = chosen && o.driverId.toString() === chosen.driverId.toString() ? 'selected' : 'released';
     }
 
-    booking.selectedDriverId = chosen.driverId;
-    booking.finalFare = chosen.quotedFare || booking.estimatedFare;
+    // ── Snapshot of who is actually driving ──────────────────────────────────
+    if (chosen) {
+      const driver: any = await this.userModel
+        .findById(chosen.driverId)
+        .select('fullName agencyName mobile rating documents')
+        .lean();
+      const rc: any = driver?.documents?.vehicleRc || {};
+      booking.selectedDriverId = chosen.driverId;
+      booking.finalFare = chosen.quotedFare || booking.estimatedFare;
+      booking.driverSnapshot = {
+        name: chosen.assignedDriverName || driver?.agencyName || driver?.fullName || 'Driver',
+        phone: chosen.assignedDriverPhone || driver?.mobile || '',
+        vehicle: chosen.vehicle || booking.vehicleType || '',
+        vehicleNumber: chosen.vehicleNumber || rc.number || rc.documentNumber || '',
+        rating: driver?.rating || 0,
+      };
+    } else {
+      // Phone-only assignment. If that number already has an account, link it so
+      // the trip shows under their login immediately; if not, the match happens
+      // by phone the moment they register.
+      const existing: any = await this.userModel
+        .findOne({ mobile: new RegExp(`${driverPhone}$`) })
+        .select('_id fullName agencyName rating documents')
+        .lean();
+      const rc: any = existing?.documents?.vehicleRc || {};
+      booking.selectedDriverId = existing?._id ?? undefined;
+      booking.finalFare = booking.finalFare || booking.estimatedFare;
+      booking.driverSnapshot = {
+        name: (input.driverName || '').trim() || existing?.agencyName || existing?.fullName || 'Driver',
+        phone: driverPhone,
+        vehicle: (input.vehicle || '').trim() || booking.vehicleType || '',
+        vehicleNumber: (input.vehicleNumber || '').trim() || rc.number || rc.documentNumber || '',
+        rating: existing?.rating || 0,
+      };
+    }
+
     booking.status = CustomerBookingStatus.CONFIRMED;
-    booking.confirmedAt = new Date();
-    // Prefer the actual driver + vehicle the owner chose from their garage; fall
-    // back to the account holder's own name / KYC vehicle.
-    booking.driverSnapshot = {
-      name: chosen.assignedDriverName || driver?.agencyName || driver?.fullName || 'Driver',
-      phone: chosen.assignedDriverPhone || driver?.mobile || '',
-      vehicle: chosen.vehicle || booking.vehicleType || '',
-      vehicleNumber: chosen.vehicleNumber || rc.number || rc.documentNumber || '',
-      rating: driver?.rating || 0,
-    };
+    booking.confirmedAt = booking.confirmedAt || new Date();
     booking.assignedDriverPhone = this.phoneLast10(booking.driverSnapshot.phone);
     await booking.save();
 
-    this.notifications.notifyUser(chosen.driverId, '🎉 You got the booking!',
-      `Our team assigned booking ${booking.bookingId} to you. Contact the customer and start the trip.`,
-      { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
-    // The garage driver actually driving this trip (if their number has an account).
-    this.notifyAssignedDriverByPhone(booking, chosen.driverId?.toString()).catch(() => {});
+    if (chosen) {
+      this.notifications.notifyUser(chosen.driverId, '🎉 You got the booking!',
+        `Our team assigned booking ${booking.bookingId} to you. Contact the customer and start the trip.`,
+        { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
+    }
+    // The person who will actually drive (garage driver, or a phone-only assignee).
+    this.notifyAssignedDriverByPhone(booking, chosen?.driverId?.toString()).catch(() => {});
     this.notifications.notifyUser(booking.customerId, '✅ Booking Confirmed',
       `Your ${booking.serviceType} booking is confirmed with ${booking.driverSnapshot.name}.`,
       { type: 'customer_booking_confirmed', bookingId: booking.bookingId }).catch(() => {});
 
-    return { message: 'Driver assigned — booking confirmed', data: booking };
+    const verb = replacingPrevious ? 'reassigned' : 'assigned';
+    return { message: `Driver ${verb} — booking confirmed`, data: booking };
   }
 
   /**

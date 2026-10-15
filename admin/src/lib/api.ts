@@ -260,8 +260,10 @@ export const adminApi = {
   // One booking with the full review of every driver who accepted (for assign).
   getCustomerBookingDetail: (id: string) => apiClient.get(`/customer-bookings/admin/${id}`),
   // Assign one accepted driver to the booking.
-  assignCustomerBookingDriver: (id: string, driverId: string) =>
-    apiClient.post(`/customer-bookings/admin/${id}/assign`, { driverId }),
+  assignCustomerBookingDriver: (
+    id: string,
+    payload: { driverId?: string; driverPhone?: string; driverName?: string; vehicle?: string; vehicleNumber?: string },
+  ) => apiClient.post(`/customer-bookings/admin/${id}/assign`, payload),
   // Returns the invoice PDF as a Blob (response interceptor passes res.data through).
   downloadCustomerBookingInvoice: (id: string) =>
     apiClient.get(`/customer-bookings/${id}/invoice`, { responseType: 'blob' }) as unknown as Promise<Blob>,

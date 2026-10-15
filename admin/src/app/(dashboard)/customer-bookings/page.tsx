@@ -115,9 +115,20 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
   });
   const detail = (data as any)?.data;
   const drivers: AcceptedDriver[] = detail?.acceptedDrivers || [];
+  // Assignable while open, RE-assignable once confirmed - never after the trip starts.
+  const canAssign = booking.status === 'open' || booking.status === 'confirmed';
+  const isReassign = booking.status === 'confirmed' && !!booking.selectedDriverId;
+
+  // Assigning by phone works even when nobody accepted, and can override an
+  // existing assignment - the backend refunds the previous driver.
+  const [phone, setPhone] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [vehicle, setVehicle] = useState('');
+  const [vehicleNumber, setVehicleNumber] = useState('');
 
   const assign = useMutation({
-    mutationFn: (driverId: string) => adminApi.assignCustomerBookingDriver(booking._id, driverId),
+    mutationFn: (payload: { driverId?: string; driverPhone?: string; driverName?: string; vehicle?: string; vehicleNumber?: string }) =>
+      adminApi.assignCustomerBookingDriver(booking._id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer-bookings'] });
       onClose();
@@ -144,9 +155,12 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
 
         <div className="p-5 overflow-y-auto">
           {booking.status !== 'open' && (
-            <div className="mb-4 text-sm text-gray-500 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+            <div className={`mb-4 text-sm rounded-lg px-3 py-2 ${canAssign ? 'text-amber-700 bg-amber-50 dark:bg-amber-900/20' : 'text-gray-500 bg-gray-50 dark:bg-gray-800'}`}>
               This booking is <b>{booking.status}</b>
-              {booking.selectedDriverId ? ` — assigned to ${booking.selectedDriverId.fullName}.` : '.'} Assignment is only possible while it is open.
+              {booking.selectedDriverId ? ` \u2014 currently with ${booking.selectedDriverId.fullName}.` : '.'}{' '}
+              {canAssign
+                ? 'You can still reassign it \u2014 the current driver is refunded automatically.'
+                : 'The trip has started, so the driver can no longer be changed.'}
             </div>
           )}
           {error && <p className="mb-3 text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
@@ -180,8 +194,65 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
             <div className="flex items-center gap-2 text-gray-400 text-sm py-8 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading accepted drivers…
             </div>
-          ) : drivers.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-10">No driver has accepted this booking yet.</div>
+          ) : null}
+
+          {/* Assign by phone - works whether or not anyone accepted, and overrides
+              an existing assignment. The driver sees the trip the moment they log
+              in with this number, even if they have never used the app before. */}
+          {canAssign && (
+            <div className="mb-5 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-4">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                {isReassign ? 'Reassign by phone number' : 'Assign by phone number'}
+              </p>
+              <p className="text-xs text-gray-500 mb-3">
+                Use this when nobody has accepted, or to hand the trip to someone else. The number does
+                not need an account &mdash; the trip appears for them as soon as they sign in with it.
+                No wallet commission is taken for a phone assignment.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Driver phone number *"
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <input
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  placeholder="Driver name"
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <input
+                  value={vehicle}
+                  onChange={(e) => setVehicle(e.target.value)}
+                  placeholder="Vehicle (e.g. Swift Dzire)"
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <input
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value)}
+                  placeholder="Vehicle number (e.g. GJ03AB1234)"
+                  className="px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setError('');
+                  const p = phone.replace(/\\D/g, '');
+                  if (p.length < 10) { setError('Enter a valid 10-digit phone number'); return; }
+                  assign.mutate({ driverPhone: phone, driverName, vehicle, vehicleNumber });
+                }}
+                disabled={assign.isPending}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-60"
+              >
+                {assign.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                {isReassign ? 'Reassign to this number' : 'Assign to this number'}
+              </button>
+            </div>
+          )}
+
+          {isLoading ? null : drivers.length === 0 ? (
+            <div className="text-center text-gray-400 text-sm py-6">No driver has accepted this booking yet.</div>
           ) : (
             <div className="space-y-3">
               {drivers.map((d) => (
@@ -221,8 +292,8 @@ function AssignModal({ booking, onClose }: { booking: CustomerBooking; onClose: 
                     )}
                   </div>
                   <button
-                    onClick={() => { setError(''); assign.mutate(d.driverId); }}
-                    disabled={assign.isPending || booking.status !== 'open'}
+                    onClick={() => { setError(''); assign.mutate({ driverId: d.driverId }); }}
+                    disabled={assign.isPending || !canAssign}
                     className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 shrink-0"
                   >
                     {assign.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}

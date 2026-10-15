@@ -77,9 +77,12 @@ export class CustomerBookingsController {
   @Post('admin/:id/assign')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Admin: assign one of the accepted drivers to the booking' })
-  adminAssign(@Param('id') id: string, @Body('driverId') driverId: string) {
-    return this.service.adminAssign(id, driverId);
+  @ApiOperation({ summary: 'Admin: assign / reassign a driver (by offer or by phone number)' })
+  adminAssign(
+    @Param('id') id: string,
+    @Body() body: { driverId?: string; driverPhone?: string; driverName?: string; vehicle?: string; vehicleNumber?: string },
+  ) {
+    return this.service.adminAssign(id, body);
   }
 
   // ── Customer actions ──
