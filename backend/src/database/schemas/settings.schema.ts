@@ -127,6 +127,30 @@ export class PlatformSettings {
   driverHirePerDay: number;
 
   /**
+   * Hire-a-Driver allowances, all admin-managed. They drive both the quoted fare
+   * and the terms shown to the customer on the booking page, so the customer
+   * knows up front what is included and what they pay on top.
+   */
+  /** Km the driver covers per day before extra-km billing starts. 0 = unlimited. */
+  @Prop({ default: 0, min: 0 })
+  driverHireKmPerDay: number;
+
+  /** ₹ per km beyond `driverHireKmPerDay`. 0 = no extra-km charge. */
+  @Prop({ default: 0, min: 0 })
+  driverHireExtraKmPrice: number;
+
+  /** Driver's food allowance per day (₹), paid by the customer. 0 = not charged. */
+  @Prop({ default: 0, min: 0 })
+  driverHireFoodPerDay: number;
+
+  /**
+   * One Way only: the customer bears the driver's return travel (train/bus fare).
+   * Shown as a term; the actual amount is settled with the driver.
+   */
+  @Prop({ default: true })
+  driverHireReturnByCustomer: boolean;
+
+  /**
    * Minimum wallet balance (₹) a Golden driver/vendor must have to ACCEPT a
    * customer booking. Nothing is deducted — it's only an eligibility check.
    * 0 = no minimum (anyone Golden can accept).

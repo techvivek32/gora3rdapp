@@ -90,6 +90,11 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   // Hire a Driver: transmission + admin-set per-day rate (total = rate × days).
   String _transmission = 'Automatic';
   double _hirePerDay = 0;
+  // Admin-managed Hire-a-Driver allowances (what's included vs charged extra).
+  double _hireKmPerDay = 0;          // km/day included, 0 = unlimited
+  double _hireExtraKmPrice = 0;      // Rs per km beyond the allowance
+  double _hireFoodPerDay = 0;        // driver's food per day, paid by the customer
+  bool _hireReturnByCustomer = true; // One Way: customer bears the driver's return travel
 
   // Accent colour for the cab layout (orange to match the app brand).
   static const _teal = AppColors.primary;
@@ -190,6 +195,41 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                     )
                   : Text('Daily rate not set — the driver will quote on accept.', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
             ),
+
+              // What's included vs what's extra - every value here is admin-managed,
+              // so the customer agrees to exactly what the admin configured.
+              _card(
+                'Included & Extra',
+                Icons.fact_check_rounded,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ..._hireInclusions.map((t) => Padding(
+                          padding: EdgeInsets.only(bottom: 6.h),
+                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Icon(Icons.check_circle_rounded, size: 15.sp, color: AppColors.success),
+                            SizedBox(width: 7.w),
+                            Expanded(child: Text(t, style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+                          ]),
+                        )),
+                    if (_hireExclusions.isNotEmpty) ...[
+                      SizedBox(height: 4.h),
+                      Divider(height: 12.h, color: AppColors.border),
+                      Text('Paid by you, directly to the driver',
+                          style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                      SizedBox(height: 6.h),
+                      ..._hireExclusions.map((t) => Padding(
+                            padding: EdgeInsets.only(bottom: 6.h),
+                            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Icon(Icons.add_circle_outline_rounded, size: 15.sp, color: AppColors.warning),
+                              SizedBox(width: 7.w),
+                              Expanded(child: Text(t, style: TextStyle(fontSize: 12.sp, color: AppColors.textPrimary, fontFamily: 'Poppins'))),
+                            ]),
+                          )),
+                    ],
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -295,8 +335,14 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     try {
       final res = await getIt<ApiClient>().get('/settings');
       final d = (res.data['data'] as Map?) ?? const {};
-      final r = (d['driverHirePerDay'] as num?)?.toDouble() ?? 0;
-      if (mounted) setState(() => _hirePerDay = r);
+      if (!mounted) return;
+      setState(() {
+        _hirePerDay = (d['driverHirePerDay'] as num?)?.toDouble() ?? 0;
+        _hireKmPerDay = (d['driverHireKmPerDay'] as num?)?.toDouble() ?? 0;
+        _hireExtraKmPrice = (d['driverHireExtraKmPrice'] as num?)?.toDouble() ?? 0;
+        _hireFoodPerDay = (d['driverHireFoodPerDay'] as num?)?.toDouble() ?? 0;
+        _hireReturnByCustomer = (d['driverHireReturnByCustomer'] as bool?) ?? true;
+      });
     } catch (_) {}
   }
 
@@ -309,6 +355,31 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   }
 
   int get _hireTotal => (_hirePerDay * _hireDays).round();
+
+  /// Total km the hire includes across the booked days (0 = unlimited).
+  int get _hireIncludedKm => (_hireKmPerDay * _hireDays).round();
+
+  /// What the fare covers - shown BEFORE booking so there is no surprise later.
+  List<String> get _hireInclusions => <String>[
+        'Driver for $_hireDays day${_hireDays > 1 ? "s" : ""}',
+        if (_hireKmPerDay > 0)
+          '${_hireKmPerDay.round()} km per day included (total $_hireIncludedKm km)'
+        else
+          'No km limit',
+        'Driver drives your own car',
+      ];
+
+  /// What the customer pays on top, settled directly with the driver.
+  List<String> get _hireExclusions => <String>[
+        if (_hireKmPerDay > 0 && _hireExtraKmPrice > 0)
+          'Beyond $_hireIncludedKm km: Rs.${_hireExtraKmPrice.round()}/km extra',
+        if (_hireFoodPerDay > 0)
+          'Driver food: Rs.${_hireFoodPerDay.round()}/day (Rs.${(_hireFoodPerDay * _hireDays).round()} total)',
+        if (_subType == 'One Way' && _hireReturnByCustomer)
+          "Driver's return travel (train/bus fare) is paid by you",
+        'Toll, state tax & parking',
+        'Fuel / CNG for your car',
+      ];
 
   void _addStop() {
     if (_stops.length >= 3) {
@@ -538,6 +609,10 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       notes.add('Transmission: $_transmission');
       if (_endDate != null) notes.add('$_hireDays day${_hireDays > 1 ? 's' : ''} (to ${DateFormat('dd-MM-yyyy').format(_endDate!)})');
       if (_hirePerDay > 0) notes.add('Rate: ₹${_hirePerDay.round()}/day → ₹$_hireTotal');
+      // Freeze the agreed terms onto the booking so a later settings change
+      // cannot alter what this customer signed up to.
+      notes.add('Included: ${_hireInclusions.join(", ")}');
+      if (_hireExclusions.isNotEmpty) notes.add('Extra: ${_hireExclusions.join(", ")}');
     }
     final body = <String, dynamic>{
       // serviceType is fixed on edit (backend rejects it in the update DTO).

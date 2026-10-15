@@ -294,6 +294,10 @@ export const adminApi = {
     gstPercent?: number;
     platformCommissionPercent?: number;
     driverHirePerDay?: number;
+    driverHireKmPerDay?: number;
+    driverHireExtraKmPrice?: number;
+    driverHireFoodPerDay?: number;
+    driverHireReturnByCustomer?: boolean;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;
   }) => apiClient.put('/settings', data),

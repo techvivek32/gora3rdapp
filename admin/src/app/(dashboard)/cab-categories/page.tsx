@@ -25,6 +25,10 @@ export default function CabCategoriesPage() {
   const [tollTaxPerKm, setTollTaxPerKm] = useState<number>(0);
   const [gstPercent, setGstPercent] = useState<number>(0);
   const [driverHirePerDay, setDriverHirePerDay] = useState<number>(0);
+  const [driverHireKmPerDay, setDriverHireKmPerDay] = useState<number>(0);
+  const [driverHireExtraKmPrice, setDriverHireExtraKmPrice] = useState<number>(0);
+  const [driverHireFoodPerDay, setDriverHireFoodPerDay] = useState<number>(0);
+  const [driverHireReturnByCustomer, setDriverHireReturnByCustomer] = useState<boolean>(true);
   const [platformCommissionPercent, setPlatformCommissionPercent] = useState<number>(0);
   const { data: settingsData } = useQuery({
     queryKey: ['admin-settings-cab'],
@@ -36,10 +40,14 @@ export default function CabCategoriesPage() {
     if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
     if (typeof s?.gstPercent === 'number') setGstPercent(s.gstPercent);
     if (typeof s?.driverHirePerDay === 'number') setDriverHirePerDay(s.driverHirePerDay);
+    if (typeof s?.driverHireKmPerDay === 'number') setDriverHireKmPerDay(s.driverHireKmPerDay);
+    if (typeof s?.driverHireExtraKmPrice === 'number') setDriverHireExtraKmPrice(s.driverHireExtraKmPrice);
+    if (typeof s?.driverHireFoodPerDay === 'number') setDriverHireFoodPerDay(s.driverHireFoodPerDay);
+    if (typeof s?.driverHireReturnByCustomer === 'boolean') setDriverHireReturnByCustomer(s.driverHireReturnByCustomer);
     if (typeof s?.platformCommissionPercent === 'number') setPlatformCommissionPercent(s.platformCommissionPercent);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0, platformCommissionPercent: Number(platformCommissionPercent) || 0 }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0, platformCommissionPercent: Number(platformCommissionPercent) || 0, driverHireKmPerDay: Number(driverHireKmPerDay) || 0, driverHireExtraKmPrice: Number(driverHireExtraKmPrice) || 0, driverHireFoodPerDay: Number(driverHireFoodPerDay) || 0, driverHireReturnByCustomer: !!driverHireReturnByCustomer }),
     onSuccess: () => {
       toast.success('Cab settings saved');
       queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
@@ -158,6 +166,68 @@ export default function CabCategoriesPage() {
               Daily rate for “Hire a Driver”. Total = this × number of days selected. e.g. ₹1200 × 3 days = ₹3600.
             </p>
           </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hire a Driver &mdash; Km Included Per Day</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 250 (0 = unlimited)"
+                value={driverHireKmPerDay}
+                onChange={(e) => setDriverHireKmPerDay(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Km the driver covers per day before extra-km billing starts. Shown to the customer on
+                the booking page. 0 = unlimited (no km cap).
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hire a Driver &mdash; Extra Km Rate (&#8377;/km)</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 12 (0 = no extra charge)"
+                value={driverHireExtraKmPrice}
+                onChange={(e) => setDriverHireExtraKmPrice(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Charged for every km beyond the daily allowance. e.g. 250 km included, drove 300 km
+                &rarr; 50 &times; &#8377;12 = &#8377;600 extra.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Hire a Driver &mdash; Food Allowance Per Day (&#8377;)</label>
+              <input
+                type="number"
+                min={0}
+                placeholder="e.g. 300 (0 = not charged)"
+                value={driverHireFoodPerDay}
+                onChange={(e) => setDriverHireFoodPerDay(Number(e.target.value))}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                The driver&apos;s food cost per day, paid by the customer. Listed as an extra on the
+                booking page so there is no dispute later.
+              </p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">One Way &mdash; Driver&apos;s Return Ticket</label>
+              <label className="flex items-center gap-2 mt-2">
+                <input
+                  type="checkbox"
+                  checked={driverHireReturnByCustomer}
+                  onChange={(e) => setDriverHireReturnByCustomer(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Customer pays the driver&apos;s return travel</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                On a <strong>One Way</strong> hire the driver still has to get back. When ticked, the
+                booking page tells the customer the return train/bus fare is on them, settled directly
+                with the driver.
+              </p>
+            </div>
         </div>
         <button
           onClick={() => saveMinKmMutation.mutate()}
