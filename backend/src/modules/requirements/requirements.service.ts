@@ -438,9 +438,12 @@ export class RequirementsService {
       status: BookingStatus.ACCEPTED,
     });
 
-    // Notify the poster
+    // Notify the poster — best effort. The accept is already committed above, so
+    // a push failure (e.g. Firebase not configured) must not turn a successful
+    // accept into a 500 for the driver. Every other notify here is guarded the
+    // same way.
     const user = await this.userModel.findById(userId);
-    await this.notificationsService.notifyRequirementAccepted(requirement, user);
+    this.notificationsService.notifyRequirementAccepted(requirement, user).catch(() => {});
 
     return { message: 'Booking accepted successfully' };
   }

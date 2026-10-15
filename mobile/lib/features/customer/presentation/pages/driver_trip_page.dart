@@ -129,6 +129,23 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   Map? get _dropMap => (_isReq ? _b['dropCoordinates'] : _b['drop']) as Map?;
   LatLng? get _pickup => _ll(_pickupMap);
   LatLng? get _drop => _ll(_dropMap);
+
+  /// Intermediate stops the customer added, in visit order.
+  List<LatLng> get _stopPoints {
+    final raw = _b['stops'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map(_ll)
+        .whereType<LatLng>()
+        .toList();
+  }
+
+  /// Stops that still lie ahead on the CURRENT leg. They sit between pickup and
+  /// drop, so they only apply while driving to the drop — not on the way to the
+  /// pickup, and not on a round trip's return leg (those are already behind us).
+  List<LatLng> get _legStops =>
+      (_status == 'ongoing' && !_isLocal && !_returning) ? _stopPoints : const [];
   // On the round-trip return leg the destination flips back to the pickup.
   // Local has no destination once ongoing (hourly, driver stays with the rider).
   LatLng? get _dest => _status == 'ongoing'
@@ -519,8 +536,12 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     final dest = _dest;
     if (origin == null || dest == null) return;
     try {
+      // Route THROUGH the stops, not straight to the drop — otherwise the line,
+      // the turn-by-turn steps and the distance all describe a trip the driver
+      // isn't actually making. The endpoint takes ordered "lat,lng;lat,lng;…".
+      final legs = <LatLng>[origin, ..._legStops, dest];
       final res = await _api.get('/places/route', params: {
-        'points': '${origin.latitude},${origin.longitude};${dest.latitude},${dest.longitude}',
+        'points': legs.map((p) => '${p.latitude},${p.longitude}').join(';'),
       });
       final data = res.data['data'] ?? {};
       final pts = (data['points'] as List?) ?? [];
@@ -605,14 +626,27 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   Future<void> _navigate() async {
     final dest = _dest;
     if (dest == null) return;
+    final stops = _legStops;
+
+    // The google.navigation: intent cannot carry waypoints, so a trip WITH stops
+    // has to open the maps/dir URL instead — otherwise Google would route the
+    // driver straight to the drop and skip every stop.
+    final dirUrl = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1'
+      '&destination=${dest.latitude},${dest.longitude}'
+      '${stops.isEmpty ? '' : '&waypoints=${stops.map((p) => '${p.latitude},${p.longitude}').join('|')}'}'
+      '&travelmode=driving',
+    );
+    if (stops.isNotEmpty) {
+      await launchUrl(dirUrl, mode: LaunchMode.externalApplication);
+      return;
+    }
+
     final nav = Uri.parse('google.navigation:q=${dest.latitude},${dest.longitude}&mode=d');
     try {
       await launchUrl(nav, mode: LaunchMode.externalApplication);
     } catch (_) {
-      await launchUrl(
-        Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${dest.latitude},${dest.longitude}&travelmode=driving'),
-        mode: LaunchMode.externalApplication,
-      );
+      await launchUrl(dirUrl, mode: LaunchMode.externalApplication);
     }
   }
 

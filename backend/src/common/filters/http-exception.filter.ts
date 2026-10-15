@@ -12,6 +12,11 @@ import { Request, Response } from 'express';
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
 
+  /** Mongoose throws this when a path like `_id` gets a value it can't cast. */
+  private isCastError(exception: unknown): boolean {
+    return exception instanceof Error && exception.name === 'CastError';
+  }
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -31,8 +36,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = exceptionResponse.message || exceptionResponse.error || message;
         errors = exceptionResponse.errors || null;
       }
+    } else if (this.isCastError(exception)) {
+      // A malformed :id (not a valid ObjectId) is a bad URL, not a server fault.
+      status = HttpStatus.NOT_FOUND;
+      message = 'Not found';
     } else if (exception instanceof Error) {
-      message = exception.message;
+      // Never surface the raw error text — it leaks model/schema internals. The
+      // full message and stack still go to the server log below.
       this.logger.error(`Unhandled exception: ${exception.message}`, exception.stack);
     }
 

@@ -21,6 +21,12 @@ export class ChatController {
     return this.chatService.getUserChats(userId);
   }
 
+  @Get('grouped')
+  @ApiOperation({ summary: 'Chats grouped by the booking they belong to' })
+  getUserChatsGrouped(@CurrentUser('sub') userId: string): Promise<any> {
+    return this.chatService.getUserChatsGrouped(userId);
+  }
+
   @Post('with/:userId')
   @ApiOperation({ summary: 'Get or create chat with a user (optionally linked to a booking)' })
   getOrCreateChat(

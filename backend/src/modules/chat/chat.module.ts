@@ -7,6 +7,7 @@ import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { Chat, ChatSchema, Message, MessageSchema } from '../../database/schemas/chat.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
+import { Requirement, RequirementSchema } from '../../database/schemas/requirement.schema';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
       { name: Chat.name, schema: ChatSchema },
       { name: Message.name, schema: MessageSchema },
       { name: User.name, schema: UserSchema },
+      { name: Requirement.name, schema: RequirementSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

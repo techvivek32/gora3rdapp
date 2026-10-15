@@ -1267,8 +1267,16 @@ export class CustomerBookingsService {
         },
       );
       if (!claimed) {
+        // We took the commitment before claiming; another driver won the race,
+        // so give it straight back rather than leaving it stuck in `held`.
+        await this.releaseHold(dId, due, booking._id);
         throw new BadRequestException('This booking is no longer open, or you have already accepted it.');
       }
+
+      // Local accept IS the assignment — there's no admin step afterwards, so the
+      // commitment is taken for real now instead of sitting held forever.
+      await this.settleHold(dId, due, booking._id);
+
       this.notifications.notifyUser(dId, '🎉 You got the booking!',
         `Local booking ${booking.bookingId} is assigned to you. Contact the customer and start the trip.`,
         { type: 'customer_booking_selected', bookingId: booking.bookingId }).catch(() => {});
@@ -1291,6 +1299,9 @@ export class CustomerBookingsService {
       { $push: { offers: offer as any } },
     );
     if (!pushed) {
+      // Same as above: the hold was taken before the conditional push, so it has
+      // to come back when the push is rejected.
+      await this.releaseHold(dId, due, booking._id);
       throw new BadRequestException('This booking is no longer open, or you have already accepted it.');
     }
 

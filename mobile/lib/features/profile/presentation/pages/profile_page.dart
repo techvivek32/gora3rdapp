@@ -36,6 +36,9 @@ class ProfilePage extends StatelessWidget {
         final planLabel = config['label'] as String;
 
         return Scaffold(
+          // Same as the customer side: switching modes isn't a settings row, so it
+          // stays pinned above the bottom nav rather than scrolling off the end.
+          bottomNavigationBar: _switchModeBar(context),
           backgroundColor: AppColors.background,
           body: CustomScrollView(
             slivers: [
@@ -140,14 +143,6 @@ class ProfilePage extends StatelessWidget {
                       _ProfileAction(icon: Icons.info_outline, label: 'About Us'.tr, onTap: () => context.push('/policy/about')),
                       SizedBox(height: 12.h),
 
-                      // You're in Driver mode here, so the only other side to go
-                      // to is Customer — switch straight there, no chooser screen.
-                      _ProfileAction(
-                        icon: Icons.swap_horiz_rounded,
-                        label: 'Switch to Customer'.tr,
-                        onTap: () => switchRole(context, 'customer'),
-                      ),
-                      SizedBox(height: 12.h),
                       _ProfileAction(
                         icon: Icons.logout,
                         label: 'Sign Out'.tr,
@@ -191,6 +186,45 @@ class ProfilePage extends StatelessWidget {
 
   /// Asks for a reason, then submits a deletion *request* for an admin to review.
   /// The account stays usable until an admin approves it.
+  /// Pinned bar holding the mode-switch card: a hairline rule, then the card,
+  /// padded clear of the system gesture bar underneath. Mirrors the customer
+  /// Settings page so both sides behave the same.
+  Widget _switchModeBar(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: SafeArea(top: false, child: _switchModeCard(context)),
+      );
+
+  /// "Go to the other side of the app" — tinted and outlined in the brand colour
+  /// so it reads as a mode change, not another settings row.
+  Widget _switchModeCard(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.primary.withValues(alpha: 0.45), width: 1.4),
+        ),
+        child: ListTile(
+          onTap: () => switchRole(context, 'customer'),
+          dense: true,
+          visualDensity: VisualDensity.compact,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          minLeadingWidth: 0,
+          horizontalTitleGap: 10,
+          leading: Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 17),
+          ),
+          title: Text('Switch to Customer'.tr,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
+          trailing: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 16),
+        ),
+      );
+
   Future<void> _confirmDeleteAccount(BuildContext context) async {
     // The dialog owns its own controller (see _DeleteAccountDialog) — disposing it
     // here would tear it down while the closing dialog's TextFormField is still
