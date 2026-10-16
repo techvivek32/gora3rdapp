@@ -1,4 +1,5 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -30,17 +31,31 @@ export class VerificationController {
     return { message: data.message, data };
   }
 
-  @Post('digilocker/start')
-  @ApiOperation({ summary: 'Begin DigiLocker verification (Aadhaar OTP + DL)' })
-  async start(@CurrentUser('sub') userId: string, @Body('redirectUrl') redirectUrl?: string) {
-    const data = await this.service.startDigilocker(userId, redirectUrl);
+  /**
+   * Driving licence lookup. Unlike the RC there is no owner-name gate here: the
+   * driver is a different person from the account holder by design, so the name
+   * is something we fill in, not something we check against.
+   */
+  /**
+   * Read an uploaded ID photo. The name it is checked against is the one already
+   * on the form (from the licence), never a name sent up with the request.
+   */
+  @Post('ocr')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: 'Read name/number/address off an uploaded ID photo' })
+  async ocr(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('documentType') documentType: string,
+    @Body('compareName') compareName?: string,
+  ) {
+    const data = await this.service.ocrDocument(file, documentType, compareName);
     return { message: data.message, data };
   }
 
-  @Post('digilocker/fetch')
-  @ApiOperation({ summary: 'Read back a completed DigiLocker verification' })
-  async fetch(@Body('requestId') requestId: string) {
-    const data = await this.service.fetchDigilocker(requestId);
+  @Post('dl')
+  @ApiOperation({ summary: 'Fetch licence details from the DL number and date of birth' })
+  async dl(@Body('dlNumber') dlNumber: string, @Body('dob') dob: string) {
+    const data = await this.service.lookupDl(dlNumber, dob);
     return { message: data.message, data };
   }
 }

@@ -5,6 +5,10 @@ and until then everything falls back to manual entry — no screen breaks.
 
 ## What the user sees
 
+Both forms open as a **centred dialog**, sized to their content and scrolling
+inside the box when they outgrow the screen. They do not close on a stray tap
+outside — a half-filled form is easy to lose that way — so each has an X.
+
 **Add Vehicle** — the registration number is the only field on the form:
 
 ```
@@ -25,23 +29,39 @@ Type, model, fuel, seats and colour are not inputs — they are read back from t
 RC. If the owner name is not the account holder's, the banner turns red and
 **Add Vehicle is refused**, in the app and again on the server.
 
-**Add Driver** — the identity card is the form:
+**Add Driver** — the licence number, and nothing else:
 
 ```
-🛡  Verify identity (DL + Aadhaar)
-    The driver verifies with the OTP sent to their Aadhaar-linked mobile.
-    [ Open DigiLocker ]   [ I have verified ]
+🪪  Verify driving licence
+    Driving Licence (DL) Number *  [ GJ0120110012345 ]
+    [ Fetch ]
     Skip and enter details manually
 
-  Name     RAJPUT MANOJBHAI KANTIBHAI
-  DL       GJ0120110012345
-  Aadhaar  XXXX XXXX 1012
-  Address  12 Green Park Society, Rajkot
+  Name        RAJPUT MANOJBHAI KANTIBHAI
+  Valid till  2031-04-21
+  Can drive   LMV, MCWG, TRANS
+  RTO         RAJKOT RTO (GJ-03)
+  Address     12 Green Park Society, Rajkot, Gujarat 360005
 ```
 
-Name, DL, Aadhaar and address come from the record; only the last 4 of the
-Aadhaar is ever stored. The phone stays an input — DigiLocker does not carry
-one, and it is what matches a driver to the trips assigned to them.
+Name, address, validity, licence classes and RTO come from the RTO record. An
+expired licence turns the card red and says so plainly — it is a warning, not a
+block, since admin approval still stands between the driver and a trip.
+
+**About the date of birth.** The RTO lookup keys on licence number *and* date of
+birth together — no provider in the market verifies on the number alone, and
+that pairing is exactly what stops anyone pulling a stranger's record from a
+licence number they happened to see. So it is not a second field on the form:
+tapping Fetch opens the date picker once, and from then on the card shows
+`Date of birth: 1991-04-22 · Change` as a one-line note.
+
+The phone stays an input: a licence record does not carry one, and it is what
+matches a driver to the trips assigned to them.
+
+**Why not DigiLocker.** It needed the driver to have a DigiLocker account, hold
+the phone, open a hosted page and clear an OTP. Most drivers do not have one, so
+it stalled before it started. The licence lookup asks nothing of the driver — the
+vendor types the number and date of birth, the same as the RC.
 
 ### When the lookup cannot serve
 
@@ -57,20 +77,20 @@ disabled, so a vehicle can never be saved as nothing but a number.
 
 ## Vendor: Cashfree Secure ID (Verification Suite)
 
-One account covers all three — Vehicle RC, Driving Licence and DigiLocker — which
-is why it was chosen over stitching two vendors together.
+One account covers all three — Vehicle RC, Driving Licence and Smart OCR — which
+is why it was chosen over stitching vendors together.
 
 Pricing is **not published**. Cashfree sells it prepaid (buy credits up front) or
 postpaid (billed on usage), and points to sales for rates. Ask them for the
-per-call rate on *Vehicle RC* and *DigiLocker* specifically; those are the only
-two the app calls.
+per-call rate on *Vehicle RC*, *Driving Licence* and *Smart OCR* specifically;
+those are the only three the app calls.
 
 ### Sign-up
 
 1. https://www.cashfree.com/kyc-verification/ → sign up / use the existing
    Cashfree merchant account.
-2. Enable **Secure ID**, and within it the **Vehicle RC** and **DigiLocker**
-   products.
+2. Enable **Secure ID**, and within it the **Vehicle RC**, **Driving Licence**
+   and **Smart OCR** products.
 3. Dashboard → Developers → API Keys. Copy the **Client ID** and **Client Secret**.
    Sandbox keys are separate from live keys.
 
@@ -85,23 +105,74 @@ Admin → **Settings** → *Vehicle & Driver Verification*:
 | Sandbox mode | leave **on** for test keys, turn **off** for live keys |
 | Block name mismatch | leave **off** until tested on real RCs, then turn on |
 
-### Aadhaar — why DigiLocker and not OTP
+### Aadhaar — read off the photo, by OCR
 
-Direct Aadhaar OTP eKYC is no longer open to private companies, so there is no
-way to send an OTP to an Aadhaar number from our own server. DigiLocker is the
-supported route: the OTP happens on DigiLocker's own page, and we read the
-verified result back. That also keeps us clear of holding Aadhaar numbers under
-the DPDP Act — the app stores only the last 4 digits.
+The form already asked for an Aadhaar photo, so that photo is now read
+automatically the moment it is uploaded. Nothing extra is asked of the driver:
 
-There is also **no way to OTP the phone number linked to a DL**. The RTO does not
-expose it. The DL is proven through DigiLocker instead, which is stronger: it
-proves the licence *and* that the person holds the Aadhaar-linked phone.
+```
+  Aadhaar Front  [photo]      Aadhaar Back  [ + ]
+  ✓ Aadhaar read - name matches the licence
+```
+
+What it does:
+
+- fills the Aadhaar number as `XXXX XXXX 1012` — **only the last 4 are ever
+  stored**, the full number is dropped on the server and never reaches the app;
+- compares the name on the Aadhaar against the name from the **licence** and
+  says so plainly if they are different people;
+- flags a photo of a screen, a digitally edited image, blur and glare. That
+  fraud check is the real value here — it catches the forged card that a human
+  reviewer would wave through.
+
+Both are warnings rather than hard blocks: a bad OCR read on a creased card
+should not stop a legitimate driver, and admin approval still stands between
+them and a trip.
+
+**Why not eKYC.** There is no low-friction, legal route to *authenticated*
+Aadhaar verification for an app like this. **OTP eKYC** needs an AUA/KUA licence,
+and since the Supreme Court struck down Section 57 a private company needs a
+statutory basis (such as PMLA) to use it at all — a taxi platform does not have
+one. **Offline XML / QR** is open to anyone with consent, but the driver has to
+download a file from the myAadhaar portal and share a passphrase: the same
+friction that sank DigiLocker, for the same reason. OCR asks nothing of the
+driver, is legal with consent, and keeps no Aadhaar number on file.
+
+The DL remains the document that is actually verified against a government
+database; the Aadhaar OCR is the cross-check on top of it.
+
+There is also **no way to OTP the phone number linked to a DL** — the RTO does
+not expose it. The licence is proven by matching the number against the date of
+birth instead, which is what stops anyone pulling a stranger's record from a
+licence number alone.
 
 ## Pointing it somewhere else
 
 `VERIFY_BASE_URL` in the backend environment overrides the vendor host for both
 sandbox and live. It is the hook for a staging vendor, for a mock during testing,
 and the single place to change if the vendor is ever swapped. Unset in normal use.
+
+## What actually gets billed
+
+Every vendor call costs money, so the same answer is never bought twice. Lookups
+are cached for 15 minutes by what identifies them — the registration number, or
+the licence number plus date of birth — so:
+
+| The user does | Vendor calls |
+|---|---|
+| Taps Fetch five times on one registration number | **1** |
+| Adds a vehicle with name-match enforcement on | **1** (the server's own check reuses the app's lookup) |
+| Taps Fetch repeatedly on one licence | **1** |
+| Changes the date of birth and fetches again | 1 more — a different date is a different lookup |
+| Uploads an Aadhaar photo | 1 OCR call, each upload (a new image has nothing to reuse) |
+
+So in normal use: **one vehicle = 1 call**, **one driver = 1 DL call + 1 OCR
+call** if an Aadhaar photo is attached. These fire when a vehicle or driver is
+*added*, not per booking or per trip, so the volume tracks new sign-ups and not
+ride traffic.
+
+Before the cache, adding one vehicle cost two RC calls — the app's Fetch and
+then the server's owner check on the same number seconds later.
 
 ## Name matching
 
@@ -133,8 +204,10 @@ it), end to end through the app on an emulator:
 | Gate branches (enforce on/off x match/mismatch/no-keys/no-record/vendor-down) | 6/6 |
 | RC lookup: own vehicle, someone else's, unknown number | all correct |
 | Messy input `gj 01 ab 1234` | normalised, matched |
-| DigiLocker: start, read-too-early, read-after-completion | all correct |
-| Aadhaar stored | last 4 only (`XXXX XXXX 1012`) |
+| DL lookup: valid, expired, wrong date of birth, missing date of birth | all correct |
+| Licence classes as objects or strings | both flattened correctly |
+| Aadhaar OCR: clean read, someone else's card, edited image, photo of a screen, unreadable, no file | all correct |
+| Aadhaar number kept | last 4 only — full number never leaves the server |
 | Server refuses a mismatched vehicle (enforce on) | HTTP 400 |
 | Server allows when vendor is down / no record | HTTP 201 |
 | Admin page: loads keys, secret never sent to browser, blank keeps stored, wrong secret rejected | all correct |
@@ -159,12 +232,14 @@ Three defects were found this way and fixed:
 | `backend/src/common/utils/name-match.util.ts` | fuzzy name comparison |
 | `backend/src/modules/garage/garage.service.ts` | `assertRcOwnedByUser` server-side gate |
 | `backend/src/database/schemas/settings.schema.ts` | `verifyClientId` / `verifyClientSecret` / `verifySandbox` / `verifyEnforceNameMatch` |
-| `mobile/.../my_garage_page.dart` | RC Fetch + banner, DigiLocker card |
+| `mobile/.../my_garage_page.dart` | RC Fetch + banner, licence lookup card |
 | `admin/.../settings/page.tsx` | credentials card |
 
-Endpoints: `POST /verification/rc`, `/verification/digilocker/start`,
-`/verification/digilocker/fetch`. The name compared against is always taken from
-the caller's own account, never from the request body.
+Endpoints: `POST /verification/rc`, `POST /verification/dl` and
+`POST /verification/ocr` (multipart). For the RC, the
+name compared against is always taken from the caller's own account, never from
+the request body. The DL has no name gate — the driver is a different person from
+the account holder by design.
 
 Switching vendor means editing `verification.service.ts` only — every outbound
 call goes through one `post()` helper.

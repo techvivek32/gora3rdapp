@@ -37,34 +37,80 @@ export interface RcLookupResult {
   message: string;
 }
 
-export interface DigilockerStartResult {
+export interface DlLookupResult {
   configured: boolean;
-  /** Hosted URL the app opens; the user does the Aadhaar OTP there. */
-  url?: string;
-  requestId?: string;
-  message: string;
-}
-
-export interface DigilockerResult {
-  configured: boolean;
-  verified: boolean;
-  person?: {
-    fullName: string;
+  found: boolean;
+  /** Normalised licence fields, ready to drop into the driver form. */
+  licence?: {
+    dlNumber: string;
+    holderName: string;
     dob?: string;
     gender?: string;
     address?: string;
-    /** Last 4 only — we never store a full Aadhaar number. */
-    aadhaarLast4?: string;
-    dlNumber?: string;
-    dlValidUpto?: string;
-    photo?: string;
+    issuedOn?: string;
+    validUpto?: string;
+    /** "LMV", "MCWG", "TRANS" - what they are allowed to drive. */
+    vehicleClasses?: string[];
+    rto?: string;
+    /** True when the licence has expired as of today. */
+    expired?: boolean;
   };
+  message: string;
+}
+
+export interface OcrResult {
+  configured: boolean;
+  found: boolean;
+  document?: {
+    type: string;
+    name?: string;
+    dob?: string;
+    gender?: string;
+    address?: string;
+    /** Last 4 only - a full Aadhaar number is not ours to keep. */
+    aadhaarLast4?: string;
+    idNumber?: string;
+  };
+  /** Vendor's read on whether the image can be trusted at all. */
+  quality?: {
+    blurred?: boolean;
+    glare?: boolean;
+    /** A photo of a screen, or a digitally altered image. */
+    screenshot?: boolean;
+    tampered?: boolean;
+  };
+  /** Present when we had a name to compare the document against. */
+  nameMatch?: NameMatchResult;
   message: string;
 }
 
 @Injectable()
 export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
+
+  /** Answers already paid for, by lookup key. */
+  private readonly _cache = new Map<string, { at: number; value: any }>();
+  /** Long enough to cover a form being filled in, short enough to stay current. */
+  private static readonly CACHE_MS = 15 * 60 * 1000;
+
+  private cached<T>(key: string): T | null {
+    const hit = this._cache.get(key);
+    if (!hit) return null;
+    if (Date.now() - hit.at > VerificationService.CACHE_MS) {
+      this._cache.delete(key);
+      return null;
+    }
+    return hit.value as T;
+  }
+
+  private remember(key: string, value: any): void {
+    // Keep it bounded - this is a cost saver, not a datastore.
+    if (this._cache.size > 500) {
+      const oldest = [...this._cache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+      if (oldest) this._cache.delete(oldest[0]);
+    }
+    this._cache.set(key, { at: Date.now(), value });
+  }
 
   constructor(private readonly settings: SettingsService) {}
 
@@ -117,6 +163,42 @@ export class VerificationService {
     return json;
   }
 
+  /** The OCR endpoint wants the file itself, not JSON. */
+  private async postFile(path: string, file: { buffer: Buffer; mimetype?: string; originalname?: string }, fields: Record<string, string>): Promise<any> {
+    const c = await this.creds();
+    if (!c) return null;
+
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'image/jpeg' }),
+      file.originalname || 'document.jpg',
+    );
+    for (const [k, v] of Object.entries(fields)) form.append(k, v);
+
+    let res: Response;
+    try {
+      res = await fetch(`${c.baseUrl}${path}`, {
+        method: 'POST',
+        // No Content-Type here on purpose - fetch sets the multipart boundary.
+        headers: { 'x-client-id': c.clientId, 'x-client-secret': c.clientSecret },
+        body: form,
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (e: any) {
+      this.logger.warn(`verification ${path} unreachable: ${e?.message || e}`);
+      throw new ServiceUnavailableException(
+        'Verification service is unreachable right now - enter the details manually.',
+      );
+    }
+    const json: any = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      this.logger.warn(`verification ${path} -> ${res.status} ${JSON.stringify(json).slice(0, 200)}`);
+      throw new BadRequestException(json?.message || 'Verification service refused the request');
+    }
+    return json;
+  }
+
   /** Registration numbers come in with spaces/dashes/lowercase; the API wants none. */
   private normaliseRc(raw: string): string {
     return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -139,8 +221,14 @@ export class VerificationService {
       };
     }
 
-    const json = await this.post('/vehicle-rc', { vehicle_number: rc });
-    const d = json?.data ?? json ?? {};
+    // The name check is applied below, so the cache holds the raw record only.
+    const key = `rc:${rc}`;
+    let d = this.cached<any>(key);
+    if (!d) {
+      const json = await this.post('/vehicle-rc', { vehicle_number: rc });
+      d = json?.data ?? json ?? {};
+      this.remember(key, d);
+    }
     const ownerName = (d.owner_name || d.ownerName || '').trim();
     if (!ownerName && !d.maker_model && !d.makerModel) {
       return { configured: true, found: false, message: 'No record found for this registration number' };
@@ -175,62 +263,164 @@ export class VerificationService {
     return result;
   }
 
+  /** Licence numbers are written with spaces, dashes and lowercase; strip them. */
+  private normaliseDl(raw: string): string {
+    return (raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  }
+
   /**
-   * Start a DigiLocker session. The user completes Aadhaar OTP on the hosted page,
-   * which is what proves the DL and Aadhaar belong to the person holding the phone.
-   * (UIDAI no longer lets third parties run Aadhaar OTP directly — DigiLocker is
-   * the supported route.)
+   * Driving licence lookup against the RTO record.
+   *
+   * Date of birth is not optional padding - the government lookup keys on
+   * licence number AND date of birth together, which is also what stops anyone
+   * pulling a stranger's details from a licence number alone.
    */
-  async startDigilocker(userId: string, redirectUrl?: string): Promise<DigilockerStartResult> {
+  async lookupDl(dlNumber: string, dob: string): Promise<DlLookupResult> {
+    const dl = this.normaliseDl(dlNumber);
+    if (dl.length < 8) throw new BadRequestException('Enter a valid driving licence number');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dob || '')) {
+      throw new BadRequestException("Enter the driver's date of birth");
+    }
+
     const c = await this.creds();
     if (!c) {
       return {
         configured: false,
-        message: 'DigiLocker verification is not set up yet — enter the details manually.',
+        found: false,
+        message: 'Automatic licence lookup is not set up yet - enter the details manually.',
       };
     }
-    const json = await this.post('/digilocker', {
-      verification_id: `gora_${userId}_${Date.now()}`,
-      document_requested: ['AADHAAR', 'DRIVING_LICENSE'],
-      redirect_url: redirectUrl || 'https://backend.goracabs.com/digilocker/done',
-    });
-    const d = json?.data ?? json ?? {};
+
+    const key = `dl:${dl}:${dob}`;
+    let d = this.cached<any>(key);
+    if (!d) {
+      const json = await this.post('/driving-license', { dl_number: dl, dob });
+      d = json?.data ?? json ?? {};
+      this.remember(key, d);
+    }
+    const holderName = (d.name || d.holder_name || d.holderName || '').trim();
+    if (!holderName) {
+      return { configured: true, found: false, message: 'No record found for this licence number and date of birth' };
+    }
+
+    // The vendor returns the classes either as strings or as objects carrying a
+    // code - flatten both to the codes we show.
+    const rawClasses = d.vehicle_classes ?? d.cov_details ?? d.vehicleClasses ?? [];
+    const vehicleClasses: string[] = Array.isArray(rawClasses)
+      ? rawClasses
+          .map((v: any) => (typeof v === 'string' ? v : v?.cov || v?.class || v?.category || ''))
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+      : [];
+
+    const validUpto = d.doe || d.valid_upto || d.validUpto || d.dl_validity;
+    const expiry = validUpto ? new Date(validUpto) : null;
+    const expired = expiry && !Number.isNaN(expiry.getTime()) ? expiry < new Date() : undefined;
+
     return {
       configured: true,
-      url: d.url || d.consent_url,
-      requestId: d.verification_id || d.ref_id,
-      message: 'Open the link and verify with the OTP sent to your Aadhaar-linked mobile',
+      found: true,
+      licence: {
+        dlNumber: dl,
+        holderName,
+        dob: d.dob || d.date_of_birth || dob,
+        gender: d.gender,
+        address: (d.address || d.permanent_address || '').toString().trim() || undefined,
+        issuedOn: d.doi || d.issue_date || d.issuedOn,
+        validUpto,
+        vehicleClasses,
+        rto: (d.rto_name || d.rto || '').trim() || undefined,
+        expired,
+      },
+      message: expired
+        ? 'Licence found - but it has EXPIRED'
+        : 'Licence verified',
     };
   }
 
-  /** Read back a completed DigiLocker session. */
-  async fetchDigilocker(requestId: string): Promise<DigilockerResult> {
+  /**
+   * Read an uploaded ID photo.
+   *
+   * `claimedName` is the name we already hold for this person (from the
+   * licence), so a mismatch between the licence and the Aadhaar surfaces here
+   * rather than after the driver is on a trip.
+   */
+  async ocrDocument(
+    file: { buffer: Buffer; mimetype?: string; originalname?: string; size?: number } | undefined,
+    documentType: string,
+    claimedName?: string,
+  ): Promise<OcrResult> {
+    if (!file?.buffer?.length) throw new BadRequestException('Attach the document photo');
+    // The vendor caps uploads at 5 MB; fail here rather than burning a call.
+    if (file.buffer.length > 5 * 1024 * 1024) {
+      throw new BadRequestException('Photo is too large - keep it under 5 MB');
+    }
+    const type = (documentType || 'aadhaar').toLowerCase();
+
     const c = await this.creds();
     if (!c) {
-      return { configured: false, verified: false, message: 'DigiLocker verification is not set up yet' };
+      return {
+        configured: false,
+        found: false,
+        message: 'Automatic document reading is not set up yet - enter the details manually.',
+      };
     }
-    const json = await this.post('/digilocker/document', { verification_id: requestId });
+
+    const json = await this.postFile('/smart-ocr', file, { document_type: type });
     const d = json?.data ?? json ?? {};
-    const status = (d.status || '').toString().toUpperCase();
-    if (status && !['SUCCESS', 'VALID', 'COMPLETED'].includes(status)) {
-      return { configured: true, verified: false, message: 'Verification not completed yet' };
+    const name = (d.name || d.full_name || '').trim();
+    const uid = (d.uid || d.aadhaar_number || d.id_number || '').toString().replace(/\s/g, '');
+
+    if (!name && !uid) {
+      return {
+        configured: true,
+        found: false,
+        message: 'Could not read this photo - try a clearer picture in good light',
+      };
     }
-    const aadhaar = (d.aadhaar_number || d.aadhaarNumber || '').toString();
-    return {
+
+    // Vendors spell these a few ways; treat any of them as the flag being set.
+    const q = d.quality ?? d.image_quality ?? d;
+    const quality = {
+      blurred: Boolean(q.blur || q.is_blur || q.blurred),
+      glare: Boolean(q.glare || q.is_glare),
+      screenshot: Boolean(q.screenshot || q.is_screenshot || q.screen_capture),
+      tampered: Boolean(q.tampered || q.is_tampered || q.tamper_detected),
+    };
+
+    const result: OcrResult = {
       configured: true,
-      verified: true,
-      person: {
-        fullName: (d.name || d.full_name || '').trim(),
+      found: true,
+      document: {
+        type,
+        name: name || undefined,
         dob: d.dob || d.date_of_birth,
         gender: d.gender,
-        address: (d.address || '').toString().trim(),
-        // Store only the last 4 — a full Aadhaar number is not ours to keep.
-        aadhaarLast4: aadhaar ? aadhaar.slice(-4) : undefined,
-        dlNumber: (d.dl_number || d.driving_license_number || '').trim() || undefined,
-        dlValidUpto: d.dl_validity || d.doe,
-        photo: d.photo || d.profile_image,
+        address: (d.address || '').toString().trim() || undefined,
+        // Aadhaar: keep the last 4 and nothing else. Other IDs are fine in full.
+        aadhaarLast4: type === 'aadhaar' && uid ? uid.slice(-4) : undefined,
+        idNumber: type === 'aadhaar' ? undefined : uid || undefined,
       },
-      message: 'Identity verified via DigiLocker',
+      quality,
+      message: 'Document read',
     };
+
+    // A forged or screen-captured image is worth more than a name mismatch.
+    if (quality.tampered || quality.screenshot) {
+      result.message = 'This looks like a photo of a screen or an edited image - upload the original document';
+    } else if (quality.blurred || quality.glare) {
+      result.message = 'Read, but the photo is blurred or has glare - a clearer one is safer';
+    }
+
+    if (claimedName && name) {
+      result.nameMatch = matchNames(name, claimedName);
+      if (!result.nameMatch.matched) {
+        result.message = 'The name on this document does not match the licence';
+      } else if (!quality.tampered && !quality.screenshot && !quality.blurred && !quality.glare) {
+        // Say what was actually confirmed, not just that a read happened.
+        result.message = 'Aadhaar read - name matches the licence';
+      }
+    }
+    return result;
   }
 }

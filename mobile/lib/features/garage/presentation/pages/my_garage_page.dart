@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
@@ -133,11 +132,10 @@ class _VehiclesTabState extends State<_VehiclesTab> with AutomaticKeepAliveClien
   }
 
   Future<void> _openForm({Map<String, dynamic>? vehicle}) async {
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
+      // The form is long; tapping outside by accident would lose it.
+      barrierDismissible: false,
       builder: (_) => _VehicleForm(vehicle: vehicle),
     );
     if (saved == true) _load();
@@ -334,11 +332,10 @@ class _DriversTabState extends State<_DriversTab> with AutomaticKeepAliveClientM
   }
 
   Future<void> _openForm({Map<String, dynamic>? driver}) async {
-    final saved = await showModalBottomSheet<bool>(
+    final saved = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
+      // The form is long; tapping outside by accident would lose it.
+      barrierDismissible: false,
       builder: (_) => _DriverForm(driver: driver),
     );
     if (saved == true) _load();
@@ -897,29 +894,36 @@ class _VehicleFormState extends State<_VehicleForm> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, controller) => Form(
+    final size = MediaQuery.of(context).size;
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 28.h),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+      child: ConstrainedBox(
+        // Grows with the content but never past the screen, so a short form is
+        // a small box and a long one scrolls inside the dialog.
+        constraints: BoxConstraints(maxHeight: size.height * 0.85, maxWidth: 520.w),
+        child: Form(
           key: _formKey,
           child: ListView(
-            controller: controller,
+            shrinkWrap: true,
             padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
             children: [
-              Center(
-                child: Container(
-                  width: 40.w, height: 4.h,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2.r)),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(_isEdit ? 'Edit Vehicle'.tr : 'Add Vehicle'.tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
+                  ),
+                  IconButton(
+                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    icon: Icon(Icons.close, size: 22.sp, color: AppColors.textSecondary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
-              SizedBox(height: 16.h),
-              Text(_isEdit ? 'Edit Vehicle'.tr : 'Add Vehicle'.tr,
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
               SizedBox(height: 16.h),
 
               _label('Registration Number *'),
@@ -1129,15 +1133,26 @@ class _DriverFormState extends State<_DriverForm> {
   final _dlCtrl = TextEditingController();
   final _aadharCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+  final _dobCtrl = TextEditingController();
 
-  // DigiLocker verification. UIDAI no longer lets us run Aadhaar OTP ourselves,
-  // so the OTP happens on DigiLocker's hosted page and we only read the result.
+  // Licence verification against the RTO record. Nothing is asked of the driver
+  // - no app, no OTP - so it works for every driver, not only the ones who
+  // happen to have a DigiLocker account.
   bool _dlBusy = false;
-  String? _dlRequestId;
   bool _dlVerified = false;
   String? _dlMessage;
-  bool? _dlNameMatched;
-  /// DigiLocker can't serve this driver, or the user chose to type it in.
+  /// What the RTO record said about the licence itself.
+  String _dlValidUpto = '';
+  List<String> _dlClasses = const [];
+  String _dlRto = '';
+  bool _dlExpired = false;
+
+  /// What the Aadhaar photo turned out to say. Null until one is uploaded.
+  bool _ocrBusy = false;
+  String? _ocrMessage;
+  bool? _ocrNameMatched;
+  bool _ocrSuspect = false;
+  /// The lookup can't serve this driver, or the user chose to type it in.
   bool _dlManual = false;
 
   /// Editing a saved driver always shows the fields.
@@ -1182,6 +1197,7 @@ class _DriverFormState extends State<_DriverForm> {
     _dlCtrl.dispose();
     _aadharCtrl.dispose();
     _addressCtrl.dispose();
+    _dobCtrl.dispose();
     super.dispose();
   }
 
@@ -1198,6 +1214,9 @@ class _DriverFormState extends State<_DriverForm> {
       final url = res.data['data'] as String?;
       if (!mounted) return;
       setState(() => _setSlot(slot, url));
+      // The Aadhaar photo is the only one worth reading - the rest are just
+      // documents for the admin to eyeball.
+      if (slot == 'aadharFront') await _ocrAadhaar(bytes);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1206,6 +1225,50 @@ class _DriverFormState extends State<_DriverForm> {
       }
     } finally {
       if (mounted) setState(() => _uploadingSlot = null);
+    }
+  }
+
+  /// Read the uploaded Aadhaar and check it against the name on the licence.
+  ///
+  /// This is the only Aadhaar route open to an app like this - no eKYC licence,
+  /// no portal visit, no OTP. We are reading a document the user handed over,
+  /// and we keep only the last 4 digits of the number.
+  Future<void> _ocrAadhaar(Uint8List bytes) async {
+    setState(() {
+      _ocrBusy = true;
+      _ocrMessage = null;
+      _ocrNameMatched = null;
+      _ocrSuspect = false;
+    });
+    try {
+      final res = await _api.dio.post('/verification/ocr', data: FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: 'aadhaar.jpg'),
+        'documentType': 'aadhaar',
+        // Compare against the licence holder's name, which is already on screen.
+        'compareName': _nameCtrl.text.trim(),
+      }));
+      final d = Map<String, dynamic>.from(res.data['data'] as Map);
+      if (!mounted) return;
+
+      if (d['configured'] == false || d['found'] != true) {
+        setState(() => _ocrMessage = (d['message'] ?? '').toString());
+        return;
+      }
+
+      final doc = Map<String, dynamic>.from((d['document'] ?? {}) as Map);
+      final q = Map<String, dynamic>.from((d['quality'] ?? {}) as Map);
+      final nm = d['nameMatch'] is Map ? Map<String, dynamic>.from(d['nameMatch'] as Map) : null;
+      setState(() {
+        final last4 = (doc['aadhaarLast4'] ?? '').toString();
+        if (last4.isNotEmpty) _aadharCtrl.text = 'XXXX XXXX $last4';
+        _ocrNameMatched = nm?['matched'] as bool?;
+        _ocrSuspect = q['tampered'] == true || q['screenshot'] == true;
+        _ocrMessage = (d['message'] ?? '').toString();
+      });
+    } catch (e) {
+      if (mounted) setState(() => _ocrMessage = serverMessage(e, fallback: 'Could not read the Aadhaar photo'));
+    } finally {
+      if (mounted) setState(() => _ocrBusy = false);
     }
   }
 
@@ -1224,87 +1287,64 @@ class _DriverFormState extends State<_DriverForm> {
     }
   }
 
-  /// Open DigiLocker. The driver finishes with the OTP sent to their
-  /// Aadhaar-linked mobile, which is what ties the DL to the real person.
-  Future<void> _startDigilocker() async {
+  /// Pull the licence straight from the RTO record.
+  ///
+  /// Date of birth is required by the lookup itself - licence number alone would
+  /// let anyone pull a stranger's details, so the government keys on both.
+  Future<void> _fetchDl() async {
+    final dl = _dlCtrl.text.trim();
+    final dob = _dobCtrl.text.trim();
+    if (dl.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length < 8) {
+      _driverToast('Enter a valid driving licence number');
+      return;
+    }
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(dob)) {
+      // Ask once, inline, instead of putting a second field on the form.
+      await _pickDob();
+      final picked = _dobCtrl.text.trim();
+      if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(picked)) return;
+      return _fetchDl();
+    }
     setState(() {
       _dlBusy = true;
       _dlMessage = null;
+      _dlExpired = false;
     });
     try {
-      final res = await _api.post('/verification/digilocker/start', data: const {});
+      final res = await _api.post('/verification/dl', data: {'dlNumber': dl, 'dob': dob});
       final d = Map<String, dynamic>.from(res.data['data'] as Map);
       if (!mounted) return;
-      if (d['configured'] == false) {
-        setState(() {
-          _dlManual = true;
-          _dlMessage = (d['message'] ?? '').toString();
-        });
-        return;
-      }
-      final url = (d['url'] ?? '').toString();
-      if (url.isEmpty) {
-        setState(() {
-          _dlManual = true;
-          _dlMessage = 'DigiLocker did not return a link - enter the details below';
-        });
-        return;
-      }
-      setState(() {
-        _dlRequestId = (d['requestId'] ?? '').toString();
-        _dlMessage = 'Finish on the DigiLocker page, then tap "I have verified".';
-      });
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _dlManual = true;
-          _dlMessage = serverMessage(e, fallback: 'Could not start DigiLocker');
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _dlBusy = false);
-    }
-  }
 
-  /// Read the finished session back and fill the form from the record.
-  Future<void> _fetchDigilocker() async {
-    final id = _dlRequestId;
-    if (id == null || id.isEmpty) return;
-    setState(() => _dlBusy = true);
-    try {
-      final res = await _api.post('/verification/digilocker/fetch', data: {'requestId': id});
-      final d = Map<String, dynamic>.from(res.data['data'] as Map);
-      if (!mounted) return;
-      if (d['verified'] != true) {
-        setState(() => _dlMessage = (d['message'] ?? 'Not verified yet').toString());
+      if (d['configured'] == false || d['found'] != true) {
+        setState(() {
+          _dlManual = true;
+          _dlMessage = (d['message'] ?? 'No record found').toString();
+        });
         return;
       }
-      final p = Map<String, dynamic>.from((d['person'] ?? {}) as Map);
-      final official = (p['fullName'] ?? '').toString().trim();
-      final typed = _nameCtrl.text.trim();
+
+      final l = Map<String, dynamic>.from(d['licence'] as Map);
       setState(() {
         _dlVerified = true;
-        if (official.isNotEmpty) _nameCtrl.text = official;
-        final dl = (p['dlNumber'] ?? '').toString();
-        if (dl.isNotEmpty) _dlCtrl.text = dl;
-        final addr = (p['address'] ?? '').toString();
+        _dlManual = false;
+        _nameCtrl.text = (l['holderName'] ?? '').toString();
+        final addr = (l['address'] ?? '').toString();
         if (addr.isNotEmpty) _addressCtrl.text = addr;
-        final last4 = (p['aadhaarLast4'] ?? '').toString();
-        // We only ever hold the last 4, so the field shows them masked.
-        if (last4.isNotEmpty) _aadharCtrl.text = 'XXXX XXXX $last4';
-        // The name typed before verifying is worth flagging - it usually means
-        // the wrong person's DigiLocker was used.
-        _dlNameMatched = (typed.isEmpty || official.isEmpty) ? null : _looseSame(typed, official);
-        _dlMessage = _dlNameMatched == false
-            ? 'Verified as "$official" - that is not the name you entered'
-            : 'Identity verified via DigiLocker';
+        _dlValidUpto = (l['validUpto'] ?? '').toString();
+        _dlClasses = ((l['vehicleClasses'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        _dlRto = (l['rto'] ?? '').toString();
+        _dlExpired = l['expired'] == true;
+        _dlMessage = (d['message'] ?? '').toString();
       });
     } catch (e) {
+      // Vendor down or refused - let them type it in rather than strand them.
       if (mounted) {
         setState(() {
           _dlManual = true;
-          _dlMessage = serverMessage(e, fallback: 'Could not read the verification');
+          _dlMessage = serverMessage(e, fallback: 'Could not fetch licence details');
         });
       }
     } finally {
@@ -1312,12 +1352,60 @@ class _DriverFormState extends State<_DriverForm> {
     }
   }
 
-  /// What DigiLocker returned. Facts from the record, so nothing to edit.
+  void _driverToast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  /// What the uploaded Aadhaar turned out to be. A forged or screen-captured
+  /// image is the loudest thing here - a name mismatch is next.
+  Widget? get _ocrBanner {
+    if ((_ocrMessage ?? '').isEmpty) return null;
+    final bad = _ocrSuspect || _ocrNameMatched == false;
+    final tone = bad
+        ? AppColors.error
+        : _ocrNameMatched == true
+            ? AppColors.success
+            : AppColors.textSecondary;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.08),
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _ocrSuspect
+                ? Icons.report_gmailerrorred
+                : bad
+                    ? Icons.cancel_outlined
+                    : _ocrNameMatched == true
+                        ? Icons.verified_outlined
+                        : Icons.info_outline,
+            size: 18.sp,
+            color: tone,
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(_ocrMessage!,
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: tone, height: 1.35)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// What the RTO record returned. Facts, so nothing here is editable.
   Widget _verifiedSummary() {
     final rows = <List<String>>[
       ['Name', _nameCtrl.text],
-      ['DL', _dlCtrl.text],
-      ['Aadhaar', _aadharCtrl.text],
+      ['Valid till', _dlValidUpto],
+      ['Can drive', _dlClasses.join(', ')],
+      ['RTO', _dlRto],
       ['Address', _addressCtrl.text],
     ].where((r) => r[1].trim().isNotEmpty).toList();
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -1362,11 +1450,10 @@ class _DriverFormState extends State<_DriverForm> {
     );
   }
 
-  /// One card doing the whole identity step: start DigiLocker, come back, read
-  /// it. Everything below it fills itself once this is green.
-  Widget _digilockerCard() {
-    final bad = _dlNameMatched == false;
-    final tone = bad
+  /// The licence lookup, which is now the whole identity step: a number, a date
+  /// of birth, and the RTO record fills in the rest.
+  Widget _licenceCard() {
+    final tone = _dlExpired
         ? AppColors.error
         : _dlVerified
             ? AppColors.success
@@ -1383,85 +1470,99 @@ class _DriverFormState extends State<_DriverForm> {
         children: [
           Row(
             children: [
-              Icon(_dlVerified && !bad ? Icons.verified_user : Icons.shield_outlined, size: 20.sp, color: tone),
+              Icon(_dlVerified && !_dlExpired ? Icons.verified_user : Icons.badge_outlined, size: 20.sp, color: tone),
               SizedBox(width: 8.w),
               Expanded(
                 child: Text(
-                  _dlVerified && !bad ? 'Identity verified'.tr : 'Verify identity (DL + Aadhaar)'.tr,
+                  _dlVerified && !_dlExpired ? 'Licence verified'.tr : 'Verify driving licence'.tr,
                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 14.sp, color: AppColors.textPrimary),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6.h),
+          SizedBox(height: 4.h),
           Text(
             _dlMessage ??
-                'The driver verifies with the OTP sent to their Aadhaar-linked mobile. Their name, DL and address then fill in automatically.',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp, color: bad ? tone : AppColors.textSecondary, height: 1.35),
+                "Enter the licence number. Their name, address and licence validity come from the RTO record.",
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp, color: _dlExpired ? tone : AppColors.textSecondary, height: 1.35),
           ),
-          if (!_dlVerified) ...[
-            SizedBox(height: 10.h),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _dlBusy ? null : _startDigilocker,
-                    icon: Icon(Icons.open_in_new, size: 16.sp),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: tone,
-                      side: BorderSide(color: tone.withValues(alpha: 0.5)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    ),
-                    label: Text(_dlRequestId == null ? 'Open DigiLocker'.tr : 'Open again'.tr,
-                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12.5.sp)),
-                  ),
-                ),
-                if (_dlRequestId != null) ...[
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _dlBusy ? null : _fetchDigilocker,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: tone,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                      ),
-                      child: _dlBusy
-                          ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : Text('I have verified'.tr,
-                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12.5.sp)),
-                    ),
-                  ),
+          SizedBox(height: 12.h),
+
+          _fieldLabel('Driving Licence (DL) Number *'),
+          TextFormField(
+            controller: _dlCtrl,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _fieldDec(Icons.badge_outlined, hint: 'e.g. GJ0120210001234'),
+          ),
+          // The date of birth is collected by the picker on Fetch, not as a
+          // second field - but once we have it, show what is being used.
+          if (_dobCtrl.text.isNotEmpty) ...[
+            SizedBox(height: 8.h),
+            GestureDetector(
+              onTap: _pickDob,
+              child: Row(
+                children: [
+                  Icon(Icons.cake_outlined, size: 14.sp, color: AppColors.textSecondary),
+                  SizedBox(width: 6.w),
+                  Text('Date of birth: ${_dobCtrl.text}',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp, color: AppColors.textSecondary)),
+                  SizedBox(width: 6.w),
+                  Text('Change'.tr,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ],
-              ],
-            ),
-            // Nobody gets stuck on a form they cannot finish.
-            if (!_showDriverFields) ...[
-              SizedBox(height: 8.h),
-              GestureDetector(
-                onTap: () => setState(() => _dlManual = true),
-                child: Text('Skip and enter details manually'.tr,
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
               ),
-            ],
+            ),
+          ],
+          SizedBox(height: 12.h),
+
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _dlBusy ? null : _fetchDl,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: tone,
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+              ),
+              child: _dlBusy
+                  ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : Text(_dlVerified ? 'Fetch again'.tr : 'Fetch'.tr,
+                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 13.sp)),
+            ),
+          ),
+
+          // Nobody gets stuck on a form they cannot finish.
+          if (!_showDriverFields && !_dlVerified) ...[
+            SizedBox(height: 8.h),
+            GestureDetector(
+              onTap: () => setState(() => _dlManual = true),
+              child: Text('Skip and enter details manually'.tr,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+            ),
           ],
         ],
       ),
     );
   }
 
-  /// Rough check only, to warn on an obviously different person; the
-  /// authoritative comparison lives on the server.
-  bool _looseSame(String a, String b) {
-    List<String> w(String x) => x
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z\s]'), ' ')
-        .split(RegExp(r'\s+'))
-        .where((t) => t.length > 1)
-        .toList();
-    final wa = w(a), wb = w(b);
-    if (wa.isEmpty || wb.isEmpty) return true;
-    return wa.any((t) => wb.any((u) => u.startsWith(t) || t.startsWith(u)));
+  /// A licence holder is an adult with a licence, so the picker opens on a
+  /// plausible year rather than today.
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final current = DateTime.tryParse(_dobCtrl.text.trim());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime(now.year - 30),
+      firstDate: DateTime(now.year - 80),
+      lastDate: DateTime(now.year - 18),
+      helpText: "Driver's date of birth",
+      // The RTO looks up the licence by number AND date of birth together.
+      fieldHintText: 'YYYY-MM-DD',
+    );
+    if (picked == null) return;
+    String two(int n) => n.toString().padLeft(2, '0');
+    setState(() => _dobCtrl.text = '${picked.year}-${two(picked.month)}-${two(picked.day)}');
   }
 
   Future<void> _save() async {
@@ -1511,29 +1612,36 @@ class _DriverFormState extends State<_DriverForm> {
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.85,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, controller) => Form(
+    final size = MediaQuery.of(context).size;
+    return Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 28.h),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
+      child: ConstrainedBox(
+        // Grows with the content but never past the screen, so a short form is
+        // a small box and a long one scrolls inside the dialog.
+        constraints: BoxConstraints(maxHeight: size.height * 0.85, maxWidth: 520.w),
+        child: Form(
           key: _formKey,
           child: ListView(
-            controller: controller,
+            shrinkWrap: true,
             padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
             children: [
-              Center(
-                child: Container(
-                  width: 40.w, height: 4.h,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2.r)),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(_isEdit ? 'Edit Driver'.tr : 'Add Driver'.tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
+                  ),
+                  IconButton(
+                    onPressed: _saving ? null : () => Navigator.pop(context),
+                    icon: Icon(Icons.close, size: 22.sp, color: AppColors.textSecondary),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    tooltip: 'Close',
+                  ),
+                ],
               ),
-              SizedBox(height: 16.h),
-              Text(_isEdit ? 'Edit Driver'.tr : 'Add Driver'.tr,
-                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
               SizedBox(height: 16.h),
 
               // Driver photo (centered avatar picker)
@@ -1561,10 +1669,10 @@ class _DriverFormState extends State<_DriverForm> {
               Center(child: Text('Driver Photo', style: TextStyle(fontSize: 11.sp, color: AppColors.textHint, fontFamily: 'Poppins'))),
               SizedBox(height: 16.h),
 
-              _digilockerCard(),
+              _licenceCard(),
               SizedBox(height: 14.h),
 
-              // Everything DigiLocker returned - shown, not typed.
+              // Everything the RTO record returned - shown, not typed.
               if (_dlVerified && !_showDriverFields) ...[
                 _verifiedSummary(),
                 SizedBox(height: 14.h),
@@ -1581,8 +1689,8 @@ class _DriverFormState extends State<_DriverForm> {
                 SizedBox(height: 14.h),
               ],
 
-              // The phone always stays: DigiLocker does not carry one, and this
-              // is what matches the driver to the trips assigned to them.
+              // The phone always stays: a licence record does not carry one, and
+              // this is what matches the driver to the trips assigned to them.
               _fieldLabel('Phone *'),
               TextFormField(
                 controller: _phoneCtrl,
@@ -1611,14 +1719,6 @@ class _DriverFormState extends State<_DriverForm> {
               SizedBox(height: 14.h),
 
               if (_showDriverFields) ...[
-              _fieldLabel('Driving Licence (DL) Number'),
-              TextFormField(
-                controller: _dlCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: _fieldDec(Icons.badge_outlined, hint: 'e.g. GJ0120210001234'),
-              ),
-              SizedBox(height: 14.h),
-
               _fieldLabel('Aadhaar Number'),
               TextFormField(
                 controller: _aadharCtrl,
@@ -1661,12 +1761,26 @@ class _DriverFormState extends State<_DriverForm> {
                   _imageSlot(busy: _uploadingSlot == 'aadharBack', onPick: () => _pick('aadharBack'), onClear: () => _clearSlot('aadharBack'), caption: 'Aadhaar Back', url: _aadharBack),
                 ],
               ),
+              if (_ocrBusy || _ocrBanner != null) ...[
+                SizedBox(height: 10.h),
+                if (_ocrBusy)
+                  Row(
+                    children: [
+                      SizedBox(width: 14.w, height: 14.w, child: const CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8.w),
+                      Text('Reading the Aadhaar photo...'.tr,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
+                    ],
+                  )
+                else
+                  _ocrBanner!,
+              ],
               SizedBox(height: 22.h),
 
               if (_needsVerify)
                 Padding(
                   padding: EdgeInsets.only(bottom: 10.h),
-                  child: Text('Verify the driver with DigiLocker first, or enter the details manually.'.tr,
+                  child: Text('Fetch the licence details first, or enter them manually.'.tr,
                       style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
                 ),
               SizedBox(
