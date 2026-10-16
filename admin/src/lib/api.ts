@@ -302,6 +302,10 @@ export const adminApi = {
     driverHireReturnByCustomer?: boolean;
     minWalletToAccept?: number;
     contactRevealHoursBeforePickup?: number;
+    verifyClientId?: string;
+    verifyClientSecret?: string;
+    verifySandbox?: boolean;
+    verifyEnforceNameMatch?: boolean;
   }) => apiClient.put('/settings', data),
 
   // ─── Notifications ─────────────────────────────────────────────────────────

@@ -770,37 +770,75 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.r))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) {
-          Widget slot(String label, String hint, IconData icon, Uint8List? img, VoidCallback onTap) {
+          /// One capture tile. While empty it shows a faded example photo plus
+          /// viewfinder brackets, so the driver can see what the shot should look
+          /// like rather than guessing from an icon. Once taken, the real photo
+          /// fills the tile with a green tick.
+          Widget slot(String label, String hint, IconData icon, String guideAsset,
+              Uint8List? img, VoidCallback onTap) {
             return GestureDetector(
               onTap: onTap,
               child: Container(
                 height: 150.h,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(14.r),
-                  border: Border.all(color: img != null ? AppColors.success : AppColors.border, width: img != null ? 1.6 : 1.2),
-                  image: img != null ? DecorationImage(image: MemoryImage(img), fit: BoxFit.cover) : null,
+                  border: Border.all(
+                    color: img != null ? AppColors.success : AppColors.border,
+                    width: img != null ? 1.6 : 1,
+                  ),
                 ),
                 child: img != null
-                    ? Align(
-                        alignment: Alignment.topRight,
-                        child: Container(
-                          margin: EdgeInsets.all(8.r),
-                          padding: EdgeInsets.all(4.r),
-                          decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
-                          child: Icon(Icons.check, size: 16.sp, color: Colors.white),
+                    ? Stack(fit: StackFit.expand, children: [
+                        Image.memory(img, fit: BoxFit.cover),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Container(
+                            margin: EdgeInsets.all(8.r),
+                            padding: EdgeInsets.all(4.r),
+                            decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                            child: Icon(Icons.check, size: 16.sp, color: Colors.white),
+                          ),
                         ),
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(icon, size: 34.sp, color: AppColors.primary),
-                          SizedBox(height: 8.h),
-                          Text(label, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
-                          SizedBox(height: 2.h),
-                          Text(hint, style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
-                        ],
-                      ),
+                      ])
+                    : Stack(fit: StackFit.expand, children: [
+                        // The example shot, faded right back so it reads as a guide
+                        // and never gets mistaken for an already-captured photo.
+                        Opacity(
+                          opacity: 0.22,
+                          child: Image.asset(guideAsset, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink()),
+                        ),
+                        // Corner brackets = "frame it like this".
+                        CustomPaint(painter: _ViewfinderPainter(AppColors.primary.withValues(alpha: 0.55))),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(9.r),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.88),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(icon, size: 24.sp, color: AppColors.primary),
+                            ),
+                            SizedBox(height: 8.h),
+                            Text(label,
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                            SizedBox(height: 2.h),
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Text(hint,
+                                  style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary, fontFamily: 'Poppins')),
+                            ),
+                          ],
+                        ),
+                      ]),
               ),
             );
           }
@@ -819,12 +857,12 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
                 Text('Take two live photos to start the trip.', style: TextStyle(fontSize: 11.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
                 SizedBox(height: 16.h),
                 Row(children: [
-                  Expanded(child: slot('Car front', 'Tap to capture', Icons.directions_car_rounded, car, () async {
+                  Expanded(child: slot('Car front', 'Whole car in frame', Icons.directions_car_rounded, 'assets/images/sedan-r.png', car, () async {
                     final b = await shoot();
                     if (b != null) setSheet(() => car = b);
                   })),
                   SizedBox(width: 12.w),
-                  Expanded(child: slot('Driver in car', 'Tap to capture', Icons.person_pin_circle_rounded, driver, () async {
+                  Expanded(child: slot('Driver in car', 'Face clearly visible', Icons.person_pin_circle_rounded, 'assets/images/role_driver.png', driver, () async {
                     final b = await shoot();
                     if (b != null) setSheet(() => driver = b);
                   })),
@@ -1306,4 +1344,39 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       },
     );
   }
+}
+
+/// Four corner brackets drawn inside a capture tile - the usual "line it up here"
+/// cue people already know from camera and KYC screens.
+class _ViewfinderPainter extends CustomPainter {
+  const _ViewfinderPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    const inset = 12.0;
+    final arm = size.shortestSide * 0.16;
+    final l = inset, t = inset, r = size.width - inset, b = size.height - inset;
+
+    // top-left
+    canvas.drawLine(Offset(l, t + arm), Offset(l, t), p);
+    canvas.drawLine(Offset(l, t), Offset(l + arm, t), p);
+    // top-right
+    canvas.drawLine(Offset(r - arm, t), Offset(r, t), p);
+    canvas.drawLine(Offset(r, t), Offset(r, t + arm), p);
+    // bottom-left
+    canvas.drawLine(Offset(l, b - arm), Offset(l, b), p);
+    canvas.drawLine(Offset(l, b), Offset(l + arm, b), p);
+    // bottom-right
+    canvas.drawLine(Offset(r - arm, b), Offset(r, b), p);
+    canvas.drawLine(Offset(r, b), Offset(r, b - arm), p);
+  }
+
+  @override
+  bool shouldRepaint(_ViewfinderPainter old) => old.color != color;
 }

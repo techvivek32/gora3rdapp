@@ -122,6 +122,17 @@ export class PlatformSettings {
   @Prop({ default: 0, min: 0, max: 100 })
   platformCommissionPercent: number;
 
+  /**
+   * Government-verification provider credentials (vehicle RC + DigiLocker).
+   * Blank = the feature degrades to manual entry rather than failing.
+   */
+  @Prop({ default: '' }) verifyClientId: string;
+  @Prop({ default: '' }) verifyClientSecret: string;
+  /** Sandbox until the client finishes the provider's business KYC. */
+  @Prop({ default: true }) verifySandbox: boolean;
+  /** Block saving a vehicle whose RC owner name doesn't match the account. */
+  @Prop({ default: false }) verifyEnforceNameMatch: boolean;
+
   /** Hire-a-Driver per-day rate (₹). Total = this × number of days. 0 = not set. */
   @Prop({ default: 0, min: 0 })
   driverHirePerDay: number;

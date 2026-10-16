@@ -31,6 +31,7 @@ import { WalletModule } from './modules/wallet/wallet.module';
 import { PlacesModule } from './modules/places/places.module';
 import { SupportModule } from './modules/support/support.module';
 import { GarageModule } from './modules/garage/garage.module';
+import { VerificationModule } from './modules/verification/verification.module';
 import { TrainingModule } from './modules/training/training.module';
 import { RingtonesModule } from './modules/ringtones/ringtones.module';
 import { CustomerBookingsModule } from './modules/customer-bookings/customer-bookings.module';
@@ -106,6 +107,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
     PlacesModule,
     SupportModule,
     GarageModule,
+    VerificationModule,
     TrainingModule,
     RingtonesModule,
     CustomerBookingsModule,

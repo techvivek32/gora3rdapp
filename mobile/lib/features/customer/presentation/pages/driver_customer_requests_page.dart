@@ -343,6 +343,11 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
 }
 
 
+/// True while the trip is still too far away to start. The backend enforces the
+/// same rule (`assertTripWindowOpen`), so offering the button early would only
+/// produce an error - better not to offer it at all.
+bool _tripLocked(Map<String, dynamic> b) => b['contactLocked'] == true;
+
 /// "1 hour" / "N hours" before pickup, from the booking's contactRevealHours.
 String _revealHoursText(Map b) {
   final h = (b['contactRevealHours'] as num?)?.toInt() ?? 1;
@@ -557,7 +562,7 @@ class MyOfferCard extends StatelessWidget {
                 SizedBox(width: 8.w),
                 Expanded(
                   child: Text(
-                    'Customer number shows ${_revealHoursText(b)} before pickup',
+                    'Customer number & trip start unlock ${_revealHoursText(b)} before pickup',
                     style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                   ),
                 ),
@@ -567,7 +572,9 @@ class MyOfferCard extends StatelessWidget {
           // Full-screen map navigation flow (arrive → start → complete via swipe + OTP).
           // Local is an in-city hourly package — no route/direction — so it uses the
           // simple inline OTP buttons below instead of the map navigation.
-          if (onOpenTrip != null && !isLocal && won && (status == 'confirmed' || status == 'ongoing')) ...[
+          // Trip may only be opened/started inside the reveal window. An ongoing
+          // trip is always resumable - it is already running.
+          if (onOpenTrip != null && !isLocal && won && (status == 'ongoing' || (status == 'confirmed' && !_tripLocked(b)))) ...[
             SizedBox(height: 12.h),
             SizedBox(width: double.infinity, child: ElevatedButton.icon(
               onPressed: () => onOpenTrip!(b),
@@ -576,7 +583,7 @@ class MyOfferCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
             )),
           ],
-          if ((onOpenTrip == null || isLocal) && won && status == 'confirmed') ...[
+          if ((onOpenTrip == null || isLocal) && won && status == 'confirmed' && !_tripLocked(b)) ...[
             SizedBox(height: 12.h),
             Row(children: [
               Expanded(child: OutlinedButton.icon(

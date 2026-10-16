@@ -42,6 +42,17 @@ export default function SettingsPage() {
   const [cbSaved, setCbSaved] = useState(false);
   const [cbError, setCbError] = useState('');
 
+  // RC / DigiLocker verification vendor
+  const [vClientId, setVClientId] = useState('');
+  const [vClientSecret, setVClientSecret] = useState('');
+  const [vSecretSet, setVSecretSet] = useState(false);
+  const [showVSecret, setShowVSecret] = useState(false);
+  const [vSandbox, setVSandbox] = useState(true);
+  const [vEnforce, setVEnforce] = useState(false);
+  const [vSaving, setVSaving] = useState(false);
+  const [vSaved, setVSaved] = useState(false);
+  const [vError, setVError] = useState('');
+
   const [loading, setLoading] = useState(true);
 
   // Wait for the session before fetching. SessionSync feeds the access token to
@@ -70,6 +81,11 @@ export default function SettingsPage() {
         setAutoBookMins(String(s.whatsappAutoBookMinutes ?? 0));
         setMinWalletToAccept(String(s.minWalletToAccept ?? 0));
         setContactRevealHours(String(s.contactRevealHoursBeforePickup ?? 1));
+        setVClientId(s.verifyClientId ?? '');
+        setVClientSecret('');
+        setVSecretSet(!!s.verifyClientSecretSet);
+        setVSandbox(s.verifySandbox !== false);
+        setVEnforce(!!s.verifyEnforceNameMatch);
       })
       .catch(() => setError('Failed to load settings'))
       .finally(() => setLoading(false));
@@ -148,6 +164,28 @@ export default function SettingsPage() {
       setCbError(e.message || 'Failed to save');
     } finally {
       setCbSaving(false);
+    }
+  };
+
+  const handleSaveVerification = async () => {
+    setVError('');
+    setVSaving(true);
+    try {
+      await adminApi.updateSettings({
+        verifyClientId: vClientId.trim(),
+        // Blank means "keep what is stored" — the server drops an empty secret.
+        ...(vClientSecret.trim() ? { verifyClientSecret: vClientSecret.trim() } : {}),
+        verifySandbox: vSandbox,
+        verifyEnforceNameMatch: vEnforce,
+      });
+      if (vClientSecret.trim()) setVSecretSet(true);
+      setVClientSecret('');
+      setVSaved(true);
+      setTimeout(() => setVSaved(false), 3000);
+    } catch (e: any) {
+      setVError(e.message || 'Failed to save');
+    } finally {
+      setVSaving(false);
     }
   };
 
@@ -354,6 +392,83 @@ export default function SettingsPage() {
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
                 {saving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : saved ? '✓ Saved!' : 'Save Razorpay Keys'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* RC / DigiLocker verification */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Vehicle &amp; Driver Verification</h2>
+          <p className="text-gray-500 text-sm mb-5">
+            Credentials for RC lookup and DigiLocker. With these set, adding a vehicle needs only the
+            registration number — model, fuel, seats, colour and owner name come from the RC record.
+            Leave blank to keep manual entry.
+          </p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Client ID</label>
+                <input
+                  type="text"
+                  value={vClientId}
+                  onChange={(e) => { setVClientId(e.target.value); setVSaved(false); }}
+                  placeholder="CF1234567ABCDEFGH"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Client Secret</label>
+                <div className="relative">
+                  <input
+                    type={showVSecret ? 'text' : 'password'}
+                    value={vClientSecret}
+                    onChange={(e) => { setVClientSecret(e.target.value); setVSaved(false); }}
+                    placeholder={vSecretSet ? '•••••••• configured — leave blank to keep' : 'Enter secret'}
+                    className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 pr-16 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                  />
+                  <button type="button" onClick={() => setShowVSecret((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600">
+                    {showVSecret ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={vSandbox}
+                  onChange={(e) => { setVSandbox(e.target.checked); setVSaved(false); }}
+                  className="mt-0.5 accent-orange-500"
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  <span className="font-medium text-gray-900 dark:text-white">Sandbox mode</span> — test keys, test data.
+                  Turn this off once live keys are in.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={vEnforce}
+                  onChange={(e) => { setVEnforce(e.target.checked); setVSaved(false); }}
+                  className="mt-0.5 accent-orange-500"
+                />
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  <span className="font-medium text-gray-900 dark:text-white">Block name mismatch</span> — refuse a vehicle
+                  whose RC owner name does not match the account. A lookup that cannot run is never
+                  treated as a mismatch.
+                </span>
+              </label>
+              {vError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{vError}</p>}
+              <button
+                onClick={handleSaveVerification}
+                disabled={vSaving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {vSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : vSaved ? '✓ Saved!' : 'Save Verification Keys'}
               </button>
             </div>
           )}
