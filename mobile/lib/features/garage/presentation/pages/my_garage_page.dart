@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
@@ -520,6 +521,27 @@ class _VehicleFormState extends State<_VehicleForm> {
   late String _fuelType;
   bool _saving = false;
 
+  // RC lookup state. `_rcOwner`/`_rcNameMatched` stay null until a lookup runs,
+  // so a manually-entered vehicle is never shown a match verdict it never got.
+  bool _rcFetching = false;
+  String? _rcOwner;
+  bool? _rcNameMatched;
+  String? _rcMessage;
+  bool _rcConfigured = true;
+  /// Set when the form's details came from a lookup rather than the keyboard.
+  bool _rcFilled = false;
+  /// The lookup could not serve this vehicle (no keys, no record, vendor down),
+  /// so the detail fields are shown and the user fills them in by hand.
+  bool _manualMode = false;
+
+  /// Editing an already-saved vehicle always shows the fields - we are not
+  /// going to make someone re-fetch to change a colour.
+  bool get _showVehicleFields => _isEdit || _manualMode;
+
+  /// Nothing has been fetched and nothing can be typed, so there is no vehicle
+  /// here yet - only a registration number.
+  bool get _needsFetch => !_rcFilled && !_showVehicleFields;
+
   // Uploaded image URLs. Two car photos + RC front/back.
   final List<String?> _carPhotos = [null, null];
   String? _rcFront;
@@ -608,8 +630,242 @@ class _VehicleFormState extends State<_VehicleForm> {
     super.dispose();
   }
 
+  /// Pull the vehicle straight from the RC record and fill the form with it.
+  /// Nothing here is typed by the user beyond the registration number.
+  Future<void> _fetchRc() async {
+    final rc = _regCtrl.text.trim();
+    if (rc.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').length < 6) {
+      _toast('Enter a valid registration number');
+      return;
+    }
+    setState(() {
+      _rcFetching = true;
+      _rcOwner = null;
+      _rcNameMatched = null;
+      _rcMessage = null;
+      // Whatever is in the form came from the previous registration number.
+      // Leaving it there after a failed lookup shows one car's details under
+      // another car's number.
+      if (_rcFilled) {
+        _modelCtrl.clear();
+        _seatsCtrl.clear();
+        _colorCtrl.clear();
+        _rcFilled = false;
+      }
+    });
+    try {
+      final res = await _api.post('/verification/rc', data: {'registrationNumber': rc});
+      final d = Map<String, dynamic>.from(res.data['data'] as Map);
+      if (!mounted) return;
+
+      if (d['configured'] == false) {
+        setState(() {
+          _rcConfigured = false;
+          _manualMode = true;
+          _rcMessage = (d['message'] ?? '').toString();
+        });
+        return;
+      }
+      if (d['found'] != true) {
+        setState(() {
+          _manualMode = true;
+          _rcMessage = (d['message'] ?? 'No record found').toString();
+        });
+        return;
+      }
+
+      final v = Map<String, dynamic>.from(d['vehicle'] as Map);
+      final nm = d['nameMatch'] is Map ? Map<String, dynamic>.from(d['nameMatch'] as Map) : null;
+      setState(() {
+        _modelCtrl.text = (v['modelName'] ?? '').toString();
+        final seats = (v['seatingCapacity'] as num?)?.toInt() ?? 0;
+        if (seats > 0) _seatsCtrl.text = '$seats';
+        final color = (v['color'] ?? '').toString();
+        if (color.isNotEmpty) _colorCtrl.text = color;
+        final fuel = _closestOption((v['fuelType'] ?? '').toString(), _fuelTypes);
+        if (fuel != null) _fuelType = fuel;
+        final type = _closestOption((v['vehicleType'] ?? '').toString(), kVehicleTypes);
+        if (type != null) _vehicleType = type;
+        _rcFilled = true;
+        _manualMode = false;
+        _rcOwner = (v['ownerName'] ?? '').toString();
+        _rcNameMatched = nm?['matched'] as bool?;
+        _rcMessage = (d['message'] ?? '').toString();
+      });
+    } catch (e) {
+      // The vendor is down or refused. Don't strand them on a form with one
+      // field and no way forward - let them type it in.
+      if (mounted) {
+        setState(() {
+          _manualMode = true;
+          _rcMessage = _clean(e);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _rcFetching = false);
+    }
+  }
+
+  /// The RC's wording rarely matches our dropdown exactly ("PETROL/CNG",
+  /// "LMV-CAR"), so pick the option whose label or value appears in it rather
+  /// than dropping the value entirely.
+  String? _closestOption(String raw, List<Map<String, String>> options) {
+    final v = raw.toLowerCase();
+    if (v.isEmpty) return null;
+    for (final o in options) {
+      final val = (o['value'] ?? '').toLowerCase();
+      final lab = (o['label'] ?? '').toLowerCase();
+      if (val.isNotEmpty && val != 'any' && v.contains(val)) return o['value'];
+      if (lab.isNotEmpty && lab != 'any fuel' && v.contains(lab)) return o['value'];
+    }
+    return null;
+  }
+
+  String _clean(Object e) {
+    final m = e.toString();
+    final i = m.indexOf('message: ');
+    return i >= 0 ? m.substring(i + 9).replaceAll(RegExp(r'[}\]]+$'), '') : 'Could not fetch RC details';
+  }
+
+  /// What came back from the RC, shown as plain text. These are facts from the
+  /// government record, so there is nothing here to edit.
+  Widget _fetchedSummary() {
+    final rows = <List<String>>[
+      ['Type', _labelFor(kVehicleTypes, _vehicleType)],
+      ['Model', _modelCtrl.text],
+      ['Fuel', _labelFor(_fuelTypes, _fuelType)],
+      ['Seats', _seatsCtrl.text],
+      ['Colour', _colorCtrl.text],
+    ].where((r) => r[1].trim().isNotEmpty).toList();
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final r in rows)
+            Padding(
+              padding: EdgeInsets.only(bottom: r == rows.last ? 0 : 8.h),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 64.w,
+                    child: Text(r[0].tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
+                  ),
+                  Expanded(
+                    child: Text(r[1],
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  ),
+                ],
+              ),
+            ),
+          SizedBox(height: 10.h),
+          GestureDetector(
+            onTap: () => setState(() => _manualMode = true),
+            child: Text('Something wrong? Edit manually'.tr,
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Turn a stored dropdown value back into the label people read.
+  String _labelFor(List<Map<String, String>> options, String value) {
+    for (final o in options) {
+      if (o['value'] == value) return o['label'] ?? value;
+    }
+    return value;
+  }
+
+  /// True once a lookup has told us the vehicle belongs to somebody else.
+  bool get _rcBlocked => _rcNameMatched == false;
+
+  /// What the RC lookup came back with. Null until a lookup runs, so a vehicle
+  /// typed in by hand never shows a verdict it was never given.
+  Widget? get _rcBanner {
+    if (_rcMessage == null && _rcOwner == null) return null;
+
+    // No vendor keys yet: say so plainly and let them fill the form by hand.
+    final bool ok = _rcNameMatched == true;
+    final bool bad = _rcNameMatched == false;
+    final Color tone = !_rcConfigured
+        ? AppColors.textSecondary
+        : bad
+            ? AppColors.error
+            : ok
+                ? AppColors.success
+                : AppColors.textSecondary;
+    final IconData icon = !_rcConfigured
+        ? Icons.info_outline
+        : bad
+            ? Icons.cancel_outlined
+            : ok
+                ? Icons.verified_outlined
+                : Icons.info_outline;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.08),
+        border: Border.all(color: tone.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18.sp, color: tone),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if ((_rcOwner ?? '').isNotEmpty)
+                  Text('RC owner: ${_rcOwner!}',
+                      style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 13.sp, color: AppColors.textPrimary)),
+                if ((_rcMessage ?? '').isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.only(top: (_rcOwner ?? '').isNotEmpty ? 2.h : 0),
+                    child: Text(_rcMessage!,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: tone)),
+                  ),
+                if (bad)
+                  Padding(
+                    padding: EdgeInsets.only(top: 4.h),
+                    child: Text('You can only add a vehicle registered in your own name.'.tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp, color: AppColors.textSecondary)),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toast(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    // A lookup that came back with someone else's name is a hard stop - the
+    // vehicle has to be registered to the person adding it.
+    if (_rcNameMatched == false) {
+      _toast('RC owner name does not match your account - cannot add this vehicle');
+      return;
+    }
     setState(() => _saving = true);
     final body = {
       'vehicleType': _vehicleType,
@@ -666,6 +922,52 @@ class _VehicleFormState extends State<_VehicleForm> {
                   style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold, fontSize: 18.sp, color: AppColors.textPrimary)),
               SizedBox(height: 16.h),
 
+              _label('Registration Number *'),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _regCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: _dec(Icons.confirmation_number_outlined, hint: 'e.g. GJ01AB1234'),
+                    ),
+                  ),
+                  SizedBox(width: 10.w),
+                  SizedBox(
+                    height: 48.h,
+                    child: ElevatedButton(
+                      onPressed: _rcFetching ? null : _fetchRc,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(horizontal: 18.w),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                      ),
+                      child: _rcFetching
+                          ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text('Fetch'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 14.sp)),
+                    ),
+                  ),
+                ],
+              ),
+              if (_rcBanner != null) ...[SizedBox(height: 10.h), _rcBanner!],
+              if (_needsFetch) ...[
+                SizedBox(height: 8.h),
+                GestureDetector(
+                  onTap: () => setState(() => _manualMode = true),
+                  child: Text('Skip and enter details manually'.tr,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                ),
+              ],
+              SizedBox(height: 14.h),
+
+              // Everything below came back from the RC - shown, not typed.
+              if (_rcFilled && !_showVehicleFields) ...[
+                _fetchedSummary(),
+                SizedBox(height: 14.h),
+              ],
+
+              if (_showVehicleFields) ...[
               _label('Vehicle Type *'),
               DropdownButtonFormField<String>(
                 initialValue: _vehicleType,
@@ -677,14 +979,6 @@ class _VehicleFormState extends State<_VehicleForm> {
 
               _label('Model Name'),
               TextFormField(controller: _modelCtrl, decoration: _dec(Icons.badge_outlined, hint: 'e.g. Toyota Innova Crysta 2022')),
-              SizedBox(height: 14.h),
-
-              _label('Registration Number'),
-              TextFormField(
-                controller: _regCtrl,
-                textCapitalization: TextCapitalization.characters,
-                decoration: _dec(Icons.confirmation_number_outlined, hint: 'e.g. GJ01AB1234'),
-              ),
               SizedBox(height: 14.h),
 
               Row(
@@ -731,6 +1025,7 @@ class _VehicleFormState extends State<_VehicleForm> {
               _label('Colour'),
               TextFormField(controller: _colorCtrl, decoration: _dec(Icons.palette_outlined, hint: 'e.g. White')),
               SizedBox(height: 14.h),
+              ],
 
               _label('Notes'),
               TextFormField(
@@ -760,13 +1055,40 @@ class _VehicleFormState extends State<_VehicleForm> {
               ),
               SizedBox(height: 22.h),
 
+              // The mismatch banner is far up the form; by the time they reach
+              // the button it is off screen, so say it again right here.
+              if (_rcBlocked)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 10.h),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.block, size: 16.sp, color: AppColors.error),
+                      SizedBox(width: 6.w),
+                      Expanded(
+                        child: Text(
+                          'This vehicle is registered to ${_rcOwner ?? "someone else"} - you can only add a vehicle registered in your own name.'.tr,
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.error, height: 1.35),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_needsFetch)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 10.h),
+                  child: Text('Enter the registration number and tap Fetch.'.tr,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
+                ),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
+                  onPressed: (_saving || _rcBlocked || _needsFetch) ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.border,
+                    disabledForegroundColor: AppColors.textSecondary,
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                   ),
@@ -807,6 +1129,22 @@ class _DriverFormState extends State<_DriverForm> {
   final _dlCtrl = TextEditingController();
   final _aadharCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
+
+  // DigiLocker verification. UIDAI no longer lets us run Aadhaar OTP ourselves,
+  // so the OTP happens on DigiLocker's hosted page and we only read the result.
+  bool _dlBusy = false;
+  String? _dlRequestId;
+  bool _dlVerified = false;
+  String? _dlMessage;
+  bool? _dlNameMatched;
+  /// DigiLocker can't serve this driver, or the user chose to type it in.
+  bool _dlManual = false;
+
+  /// Editing a saved driver always shows the fields.
+  bool get _showDriverFields => _isEdit || _dlManual;
+
+  /// Nothing verified and nothing typed - there is no driver here yet.
+  bool get _needsVerify => !_dlVerified && !_showDriverFields;
 
   bool _saving = false;
   // Server-side error for the phone field (e.g. "not registered as driver/vendor"),
@@ -884,6 +1222,246 @@ class _DriverFormState extends State<_DriverForm> {
       case 'aadharBack':
         _aadharBack = url;
     }
+  }
+
+  /// Open DigiLocker. The driver finishes with the OTP sent to their
+  /// Aadhaar-linked mobile, which is what ties the DL to the real person.
+  Future<void> _startDigilocker() async {
+    setState(() {
+      _dlBusy = true;
+      _dlMessage = null;
+    });
+    try {
+      final res = await _api.post('/verification/digilocker/start', data: const {});
+      final d = Map<String, dynamic>.from(res.data['data'] as Map);
+      if (!mounted) return;
+      if (d['configured'] == false) {
+        setState(() {
+          _dlManual = true;
+          _dlMessage = (d['message'] ?? '').toString();
+        });
+        return;
+      }
+      final url = (d['url'] ?? '').toString();
+      if (url.isEmpty) {
+        setState(() {
+          _dlManual = true;
+          _dlMessage = 'DigiLocker did not return a link - enter the details below';
+        });
+        return;
+      }
+      setState(() {
+        _dlRequestId = (d['requestId'] ?? '').toString();
+        _dlMessage = 'Finish on the DigiLocker page, then tap "I have verified".';
+      });
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _dlManual = true;
+          _dlMessage = serverMessage(e, fallback: 'Could not start DigiLocker');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _dlBusy = false);
+    }
+  }
+
+  /// Read the finished session back and fill the form from the record.
+  Future<void> _fetchDigilocker() async {
+    final id = _dlRequestId;
+    if (id == null || id.isEmpty) return;
+    setState(() => _dlBusy = true);
+    try {
+      final res = await _api.post('/verification/digilocker/fetch', data: {'requestId': id});
+      final d = Map<String, dynamic>.from(res.data['data'] as Map);
+      if (!mounted) return;
+      if (d['verified'] != true) {
+        setState(() => _dlMessage = (d['message'] ?? 'Not verified yet').toString());
+        return;
+      }
+      final p = Map<String, dynamic>.from((d['person'] ?? {}) as Map);
+      final official = (p['fullName'] ?? '').toString().trim();
+      final typed = _nameCtrl.text.trim();
+      setState(() {
+        _dlVerified = true;
+        if (official.isNotEmpty) _nameCtrl.text = official;
+        final dl = (p['dlNumber'] ?? '').toString();
+        if (dl.isNotEmpty) _dlCtrl.text = dl;
+        final addr = (p['address'] ?? '').toString();
+        if (addr.isNotEmpty) _addressCtrl.text = addr;
+        final last4 = (p['aadhaarLast4'] ?? '').toString();
+        // We only ever hold the last 4, so the field shows them masked.
+        if (last4.isNotEmpty) _aadharCtrl.text = 'XXXX XXXX $last4';
+        // The name typed before verifying is worth flagging - it usually means
+        // the wrong person's DigiLocker was used.
+        _dlNameMatched = (typed.isEmpty || official.isEmpty) ? null : _looseSame(typed, official);
+        _dlMessage = _dlNameMatched == false
+            ? 'Verified as "$official" - that is not the name you entered'
+            : 'Identity verified via DigiLocker';
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _dlManual = true;
+          _dlMessage = serverMessage(e, fallback: 'Could not read the verification');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _dlBusy = false);
+    }
+  }
+
+  /// What DigiLocker returned. Facts from the record, so nothing to edit.
+  Widget _verifiedSummary() {
+    final rows = <List<String>>[
+      ['Name', _nameCtrl.text],
+      ['DL', _dlCtrl.text],
+      ['Aadhaar', _aadharCtrl.text],
+      ['Address', _addressCtrl.text],
+    ].where((r) => r[1].trim().isNotEmpty).toList();
+    if (rows.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final r in rows)
+            Padding(
+              padding: EdgeInsets.only(bottom: r == rows.last ? 0 : 8.h),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 68.w,
+                    child: Text(r[0].tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
+                  ),
+                  Expanded(
+                    child: Text(r[1],
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  ),
+                ],
+              ),
+            ),
+          SizedBox(height: 10.h),
+          GestureDetector(
+            onTap: () => setState(() => _dlManual = true),
+            child: Text('Something wrong? Edit manually'.tr,
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One card doing the whole identity step: start DigiLocker, come back, read
+  /// it. Everything below it fills itself once this is green.
+  Widget _digilockerCard() {
+    final bad = _dlNameMatched == false;
+    final tone = bad
+        ? AppColors.error
+        : _dlVerified
+            ? AppColors.success
+            : AppColors.primary;
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: tone.withValues(alpha: 0.06),
+        border: Border.all(color: tone.withValues(alpha: 0.30)),
+        borderRadius: BorderRadius.circular(14.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(_dlVerified && !bad ? Icons.verified_user : Icons.shield_outlined, size: 20.sp, color: tone),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  _dlVerified && !bad ? 'Identity verified'.tr : 'Verify identity (DL + Aadhaar)'.tr,
+                  style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 14.sp, color: AppColors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            _dlMessage ??
+                'The driver verifies with the OTP sent to their Aadhaar-linked mobile. Their name, DL and address then fill in automatically.',
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp, color: bad ? tone : AppColors.textSecondary, height: 1.35),
+          ),
+          if (!_dlVerified) ...[
+            SizedBox(height: 10.h),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _dlBusy ? null : _startDigilocker,
+                    icon: Icon(Icons.open_in_new, size: 16.sp),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: tone,
+                      side: BorderSide(color: tone.withValues(alpha: 0.5)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    ),
+                    label: Text(_dlRequestId == null ? 'Open DigiLocker'.tr : 'Open again'.tr,
+                        style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12.5.sp)),
+                  ),
+                ),
+                if (_dlRequestId != null) ...[
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _dlBusy ? null : _fetchDigilocker,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: tone,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                      ),
+                      child: _dlBusy
+                          ? SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : Text('I have verified'.tr,
+                              style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 12.5.sp)),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            // Nobody gets stuck on a form they cannot finish.
+            if (!_showDriverFields) ...[
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: () => setState(() => _dlManual = true),
+                child: Text('Skip and enter details manually'.tr,
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Rough check only, to warn on an obviously different person; the
+  /// authoritative comparison lives on the server.
+  bool _looseSame(String a, String b) {
+    List<String> w(String x) => x
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length > 1)
+        .toList();
+    final wa = w(a), wb = w(b);
+    if (wa.isEmpty || wb.isEmpty) return true;
+    return wa.any((t) => wb.any((u) => u.startsWith(t) || t.startsWith(u)));
   }
 
   Future<void> _save() async {
@@ -983,15 +1561,28 @@ class _DriverFormState extends State<_DriverForm> {
               Center(child: Text('Driver Photo', style: TextStyle(fontSize: 11.sp, color: AppColors.textHint, fontFamily: 'Poppins'))),
               SizedBox(height: 16.h),
 
-              _fieldLabel('Full Name *'),
-              TextFormField(
-                controller: _nameCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: _fieldDec(Icons.person_outline, hint: 'e.g. Suresh Kumar'),
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-              ),
+              _digilockerCard(),
               SizedBox(height: 14.h),
 
+              // Everything DigiLocker returned - shown, not typed.
+              if (_dlVerified && !_showDriverFields) ...[
+                _verifiedSummary(),
+                SizedBox(height: 14.h),
+              ],
+
+              if (_showDriverFields) ...[
+                _fieldLabel('Full Name *'),
+                TextFormField(
+                  controller: _nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: _fieldDec(Icons.person_outline, hint: 'e.g. Suresh Kumar'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+                SizedBox(height: 14.h),
+              ],
+
+              // The phone always stays: DigiLocker does not carry one, and this
+              // is what matches the driver to the trips assigned to them.
               _fieldLabel('Phone *'),
               TextFormField(
                 controller: _phoneCtrl,
@@ -1019,6 +1610,7 @@ class _DriverFormState extends State<_DriverForm> {
               ),
               SizedBox(height: 14.h),
 
+              if (_showDriverFields) ...[
               _fieldLabel('Driving Licence (DL) Number'),
               TextFormField(
                 controller: _dlCtrl,
@@ -1049,6 +1641,7 @@ class _DriverFormState extends State<_DriverForm> {
                 decoration: _fieldDec(Icons.location_on_outlined, hint: 'e.g. 12 Green Park, Rajkot'),
               ),
               SizedBox(height: 16.h),
+              ],
 
               _fieldLabel('Driving Licence (front & back)'),
               Row(
@@ -1070,13 +1663,21 @@ class _DriverFormState extends State<_DriverForm> {
               ),
               SizedBox(height: 22.h),
 
+              if (_needsVerify)
+                Padding(
+                  padding: EdgeInsets.only(bottom: 10.h),
+                  child: Text('Verify the driver with DigiLocker first, or enter the details manually.'.tr,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp, color: AppColors.textSecondary)),
+                ),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
+                  onPressed: (_saving || _needsVerify) ? null : _save,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.border,
+                    disabledForegroundColor: AppColors.textSecondary,
                     padding: EdgeInsets.symmetric(vertical: 14.h),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                   ),

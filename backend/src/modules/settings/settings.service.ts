@@ -87,15 +87,24 @@ export class SettingsService {
   // secrets to the browser — a stolen admin session / XSS / browser extension
   // would otherwise leak the payment-gateway secret. We expose only whether each
   // secret is configured; writes still accept new values via PUT /settings.
-  async getAdminSettings(): Promise<Partial<PlatformSettings> & { razorpayKeySecretSet: boolean; razorpayWebhookSecretSet: boolean }> {
+  async getAdminSettings(): Promise<
+    Partial<PlatformSettings> & {
+      razorpayKeySecretSet: boolean;
+      razorpayWebhookSecretSet: boolean;
+      verifyClientSecretSet: boolean;
+    }
+  > {
     const s = await this.getSettings();
-    const { razorpayKeySecret, razorpayWebhookSecret, ...safe } = s as any;
+    const { razorpayKeySecret, razorpayWebhookSecret, verifyClientSecret, ...safe } = s as any;
     return {
       ...safe,
       razorpayKeySecret: '',
       razorpayWebhookSecret: '',
+      // Never send a provider secret back to a browser - only whether it is set.
+      verifyClientSecret: '',
       razorpayKeySecretSet: !!(razorpayKeySecret || process.env.RAZORPAY_KEY_SECRET),
       razorpayWebhookSecretSet: !!(razorpayWebhookSecret || process.env.RAZORPAY_WEBHOOK_SECRET),
+      verifyClientSecretSet: !!verifyClientSecret,
     };
   }
 
@@ -131,6 +140,10 @@ export class SettingsService {
     gstPercent?: number;
     platformCommissionPercent?: number;
     driverHirePerDay?: number;
+    verifyClientId?: string;
+    verifyClientSecret?: string;
+    verifySandbox?: boolean;
+    verifyEnforceNameMatch?: boolean;
     driverHireKmPerDay?: number;
     driverHireExtraKmPrice?: number;
     driverHireFoodPerDay?: number;
@@ -143,6 +156,7 @@ export class SettingsService {
     const clean: any = { ...data };
     if (!clean.razorpayKeySecret) delete clean.razorpayKeySecret;
     if (!clean.razorpayWebhookSecret) delete clean.razorpayWebhookSecret;
+    if (!clean.verifyClientSecret) delete clean.verifyClientSecret;
     const settings = await this.settingsModel.findOneAndUpdate(
       { key: 'global' },
       { $set: clean },

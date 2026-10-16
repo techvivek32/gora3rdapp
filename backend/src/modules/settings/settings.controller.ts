@@ -62,6 +62,10 @@ export class SettingsController {
     gstPercent?: number;
     platformCommissionPercent?: number;
     driverHirePerDay?: number;
+    verifyClientId?: string;
+    verifyClientSecret?: string;
+    verifySandbox?: boolean;
+    verifyEnforceNameMatch?: boolean;
     driverHireKmPerDay?: number;
     driverHireExtraKmPrice?: number;
     driverHireFoodPerDay?: number;

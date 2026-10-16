@@ -5,6 +5,8 @@ import { GarageService } from './garage.service';
 import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garage-vehicle.schema';
 import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
+import { VerificationModule } from '../verification/verification.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { User, UserSchema } from '../../database/schemas/user.schema';
       { name: GarageDriver.name, schema: GarageDriverSchema },
       { name: User.name, schema: UserSchema },
     ]),
+    VerificationModule,
+    SettingsModule,
   ],
   controllers: [GarageController],
   providers: [GarageService],

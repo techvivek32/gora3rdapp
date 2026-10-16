@@ -780,6 +780,25 @@ export class CustomerBookingsService {
     return Date.now() >= pickup.getTime() - revealHours * 3600000;
   }
 
+  /**
+   * Throw unless the trip is close enough to start. Same window as the contact
+   * reveal (`contactRevealHoursBeforePickup`), so "you can see the number" and
+   * "you can start the trip" happen together instead of the driver being able to
+   * kick off a trip days ahead of the booking.
+   *
+   * Fails OPEN when the pickup time can't be read or the setting is 0 - never
+   * block a legitimate trip because of an unparseable date.
+   */
+  private async assertTripWindowOpen(booking: any): Promise<void> {
+    const revealHours = await this.getContactRevealHours();
+    if (this.contactRevealed(booking, revealHours)) return;
+    const pickup = this.pickupInstant(booking);
+    const when = pickup
+      ? ` It opens ${revealHours} hour${revealHours === 1 ? '' : 's'} before pickup.`
+      : '';
+    throw new BadRequestException(`This trip can't be started yet.${when}`);
+  }
+
   private async getContactRevealHours(): Promise<number> {
     const s: any = await this.settings.getSettings();
     return s?.contactRevealHoursBeforePickup ?? 1;
@@ -1644,6 +1663,7 @@ export class CustomerBookingsService {
     if (booking.status !== CustomerBookingStatus.CONFIRMED) {
       throw new BadRequestException('You can only mark arriving on a confirmed booking');
     }
+    await this.assertTripWindowOpen(booking);
     booking.driverArrivedAt = new Date();
     await booking.save();
     this.notifications.notifyUser(booking.customerId, '🚗 Your Driver is Arriving',
@@ -1669,6 +1689,8 @@ export class CustomerBookingsService {
         booking.status === CustomerBookingStatus.ONGOING ? 'Trip already started' : 'Trip can start only after confirmation',
       );
     }
+    // Only the START is time-gated; a running trip must always be completable.
+    if (action === 'start') await this.assertTripWindowOpen(booking);
     if (action === 'end' && booking.status !== CustomerBookingStatus.ONGOING) {
       throw new BadRequestException('Start the trip first');
     }

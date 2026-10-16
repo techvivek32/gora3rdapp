@@ -6,6 +6,8 @@ import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garag
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { CreateGarageVehicleDto, UpdateGarageVehicleDto } from './dto/garage-vehicle.dto';
 import { CreateGarageDriverDto, UpdateGarageDriverDto } from './dto/garage-driver.dto';
+import { VerificationService } from '../verification/verification.service';
+import { SettingsService } from '../settings/settings.service';
 
 // A saved driver's number must belong to a real driver/vendor account in the app.
 
@@ -15,6 +17,8 @@ export class GarageService {
     @InjectModel(GarageVehicle.name) private garageModel: Model<GarageVehicleDocument>,
     @InjectModel(GarageDriver.name) private driverModel: Model<GarageDriverDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private readonly verification: VerificationService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -69,7 +73,35 @@ export class GarageService {
     return { message: 'My vehicles', data: vehicles };
   }
 
+  /**
+   * When the admin has turned enforcement on, a vehicle may only be added by the
+   * person it is registered to. Checked here and not just in the app, because the
+   * app is the one part of this an attacker controls.
+   *
+   * A lookup that cannot run (no vendor keys, vendor down, no record) is NOT
+   * treated as a mismatch - that would lock every user out of their own garage
+   * the moment the vendor has a bad day.
+   */
+  private async assertRcOwnedByUser(userId: string, registrationNumber?: string): Promise<void> {
+    const s: any = await this.settings.getSettings().catch(() => null);
+    if (s?.verifyEnforceNameMatch !== true) return;
+    if (!registrationNumber) return;
+
+    const me: any = await this.userModel.findById(userId).select('fullName agencyName').lean();
+    const claimed = (me?.fullName || me?.agencyName || '').trim();
+    if (!claimed) return;
+
+    const rc = await this.verification.lookupRc(registrationNumber, claimed).catch(() => null);
+    if (!rc?.configured || !rc.found || !rc.nameMatch) return;
+    if (!rc.nameMatch.matched) {
+      throw new BadRequestException(
+        'This vehicle is registered to a different name. You can only add a vehicle registered in your own name.',
+      );
+    }
+  }
+
   async create(userId: string, dto: CreateGarageVehicleDto) {
+    await this.assertRcOwnedByUser(userId, dto.registrationNumber);
     const vehicle = await this.garageModel.create({
       ...dto,
       userId: new Types.ObjectId(userId),
