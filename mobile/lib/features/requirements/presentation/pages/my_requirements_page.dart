@@ -7,6 +7,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
@@ -355,20 +356,25 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
     if (mounted) bloc.add(const LoadMyRequirementsEvent());
   }
 
-  void _openAssignSheet(BuildContext context, Map<String, dynamic> req) {
+  Future<void> _openAssignSheet(BuildContext context, Map<String, dynamic> req) async {
     final bloc = context.read<RequirementsBloc>();
-    showModalBottomSheet(
+    final messenger = ScaffoldMessenger.of(context);
+    // The sheet closes with `true` only once the assign actually succeeded; a
+    // refusal keeps it open so the owner keeps the number they looked up.
+    final assigned = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _AssignDriverSheet(
-        requirement: req,
-        onConfirm: (driverId) => bloc.add(AssignDriverEvent(id: req['_id'] as String, driverId: driverId)),
-      ),
+      builder: (_) => _AssignDriverSheet(requirement: req),
     );
+    if (assigned != true || !mounted) return;
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Driver assigned & booking confirmed'), backgroundColor: AppColors.success),
+    );
+    bloc.add(const LoadMyRequirementsEvent());
   }
 }
 
@@ -377,9 +383,8 @@ class _MyRequirementsPageState extends State<MyRequirementsPage> {
 /// disposed with — the sheet's own element.
 class _AssignDriverSheet extends StatefulWidget {
   final Map<String, dynamic> requirement;
-  final void Function(String driverId) onConfirm;
 
-  const _AssignDriverSheet({required this.requirement, required this.onConfirm});
+  const _AssignDriverSheet({required this.requirement});
 
   @override
   State<_AssignDriverSheet> createState() => _AssignDriverSheetState();
@@ -392,6 +397,10 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
   Map<String, dynamic>? _driver;
   bool _searching = false;
   String? _error;
+  bool _assigning = false;
+  /// Why the server refused this assignment - shown in the sheet, not as a
+  /// page-level error, because the booking list is perfectly fine.
+  String? _assignError;
 
   @override
   void dispose() {
@@ -423,11 +432,26 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
     }
   }
 
-  void _confirm() {
+  Future<void> _confirm() async {
     final id = _driver?['_id']?.toString();
     if (id == null) return;
-    widget.onConfirm(id);
-    Navigator.of(context).pop();
+    setState(() {
+      _assigning = true;
+      _assignError = null;
+    });
+    try {
+      await _api.post('/requirements/${widget.requirement['_id']}/assign', data: {'driverId': id});
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      // Stay open. The number and the driver stay on screen so the owner can
+      // ask them to recharge and try again without typing it in afresh.
+      if (!mounted) return;
+      setState(() {
+        _assignError = serverMessage(e, fallback: 'Could not assign this driver');
+        _assigning = false;
+      });
+    }
   }
 
   @override
@@ -529,21 +553,53 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
             ),
           ],
 
+          if (_assignError != null) ...[
+            SizedBox(height: 14.h),
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.08),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.35)),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline, size: 18.sp, color: AppColors.error),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      _assignError!,
+                      style: TextStyle(fontSize: 12.sp, color: AppColors.error, height: 1.35, fontFamily: 'Poppins'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           SizedBox(height: 20.h),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: d == null ? null : _confirm,
+              onPressed: (d == null || _assigning) ? null : _confirm,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 disabledBackgroundColor: AppColors.border,
                 padding: EdgeInsets.symmetric(vertical: 14.h),
               ),
-              child: Text(
-                'Confirm & Book',
-                style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
-              ),
+              child: _assigning
+                  ? SizedBox(
+                      width: 20.w,
+                      height: 20.w,
+                      child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(
+                      'Confirm & Book',
+                      style: TextStyle(fontSize: 15.sp, fontFamily: 'Poppins', fontWeight: FontWeight.w600),
+                    ),
             ),
           ),
           SizedBox(height: 8.h),

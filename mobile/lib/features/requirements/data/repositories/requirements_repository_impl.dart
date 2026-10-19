@@ -1,5 +1,6 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/error/failures.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../domain/repositories/requirements_repository.dart';
 import '../datasources/requirements_remote_datasource.dart';
 
@@ -124,7 +125,10 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.assignDriver(id, driverId);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      // The server explains WHY an assign was refused (e.g. the driver's wallet
+      // is below the minimum). e.toString() would bury that in a DioException
+      // dump, so the owner would see nothing useful.
+      return Left(ServerFailure(message: serverMessage(e, fallback: 'Could not assign this driver')));
     }
   }
 

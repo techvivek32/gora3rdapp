@@ -70,22 +70,52 @@ export default function CabCategoriesPage() {
     onError: () => toast.error('Failed to delete category'),
   });
 
+  /** The page does two separate jobs; show one at a time. */
+  const [tab, setTab] = useState<'pricing' | 'cabs'>('pricing');
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cab Categories</h1>
-          <p className="text-gray-500 mt-1">Manage the vehicle classes shown on the customer app&apos;s Explore Cabs results</p>
+          <p className="text-gray-500 mt-1">
+            {tab === 'pricing'
+              ? 'Rates and allowances that apply to every cab'
+              : 'The vehicle classes shown on the customer app’s Explore Cabs results'}
+          </p>
         </div>
-        <button
-          onClick={() => router.push('/cab-categories/new')}
-          className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors"
-        >
-          + Add Category
-        </button>
+        {tab === 'cabs' && (
+          <button
+            onClick={() => router.push('/cab-categories/new')}
+            className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors"
+          >
+            + Add Category
+          </button>
+        )}
       </div>
 
-      {/* Global cab settings — apply to every cab */}
+      {/* Two modules: the rates, and the cabs themselves. */}
+      <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700">
+        {([
+          { key: 'pricing', label: 'Pricing' },
+          { key: 'cabs', label: `Cabs${items.length ? ` (${items.length})` : ''}` },
+        ] as const).map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2.5 text-sm font-semibold -mb-px border-b-2 transition-colors ${
+              tab === t.key
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Module 1 — rates that apply to every cab */}
+      {tab === 'pricing' && (
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -237,9 +267,10 @@ export default function CabCategoriesPage() {
           {saveMinKmMutation.isPending ? 'Saving…' : 'Save'}
         </button>
       </div>
+      )}
 
-      {/* Categories table */}
-      {isLoading ? (
+      {/* Module 2 — the cabs themselves */}
+      {tab === 'cabs' && (isLoading ? (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse" />
@@ -323,7 +354,7 @@ export default function CabCategoriesPage() {
             </table>
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

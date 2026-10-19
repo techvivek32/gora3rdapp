@@ -502,9 +502,23 @@ export class RequirementsService {
 
     const driver: any = await this.userModel
       .findOne({ _id: new Types.ObjectId(driverId), isActive: true, isBlocked: { $ne: true } })
-      .select('_id fcmTokens fullName agencyName mobile documents')
+      .select('_id fcmTokens fullName agencyName mobile documents walletBalance')
       .lean();
     if (!driver) throw new NotFoundException('Driver not found');
+
+    // The driver must be able to cover the platform's cut before they are given
+    // the trip. Admin sets the floor; 0 turns the rule off. Nothing is deducted.
+    const settings: any = await this.settingsService.getSettings();
+    const minWallet = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
+    if (minWallet > 0) {
+      const balance = Math.round(driver.walletBalance || 0);
+      if (balance < minWallet) {
+        const name = driver.agencyName || driver.fullName || 'This driver';
+        throw new BadRequestException(
+          `${name} has ₹${balance} in their wallet. A minimum of ₹${minWallet} is required before a booking can be assigned - ask them to recharge.`,
+        );
+      }
+    }
 
     const updated = await this.requirementModel
       .findByIdAndUpdate(
