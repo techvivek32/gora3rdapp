@@ -105,6 +105,12 @@ export class Requirement {
   @Prop({ type: Boolean, default: false })
   hideProfile: boolean;
 
+  // Set the moment the commission is moved from the driver's wallet to the
+  // poster's, when the trip is completed. Doubles as the idempotency guard -
+  // a second "trip end" must never charge the driver twice.
+  @Prop({ type: Date })
+  commissionSettledAt: Date;
+
   @Prop({ trim: true })
   notes: string;
 

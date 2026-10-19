@@ -4,6 +4,7 @@ import { Cron } from '@nestjs/schedule';
 import { Model, Types } from 'mongoose';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { WalletTransaction, WalletTransactionDocument } from '../../database/schemas/wallet-transaction.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { CreateRequirementDto } from './dto/create-requirement.dto';
@@ -28,6 +29,7 @@ export class RequirementsService {
   constructor(
     @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     private notificationsService: NotificationsService,
     private settingsService: SettingsService,
     private chatService: ChatService,
@@ -518,8 +520,14 @@ export class RequirementsService {
       const balance = Math.round(driver.walletBalance || 0);
       if (balance < required) {
         const name = driver.agencyName || driver.fullName || 'This driver';
+        // Say which rule is actually binding, otherwise "commission is 300, so
+        // 500 is required" reads like a mistake.
+        const why =
+          commission >= floor
+            ? `This booking's commission is ₹${commission}, so ₹${required} must be in the driver's wallet.`
+            : `A minimum wallet balance of ₹${floor} is required (this booking's commission is ₹${commission}).`;
         throw new BadRequestException(
-          `This booking's commission is ₹${commission}, so ₹${required} must be in the driver's wallet. ${name} has ₹${balance} - ask them to recharge ₹${required - balance} more.`,
+          `${why} ${name} has ₹${balance} - ask them to recharge ₹${required - balance} more.`,
         );
       }
     }
@@ -646,6 +654,93 @@ export class RequirementsService {
   }
 
   /** Driver enters the OTP the owner gave them. */
+  /**
+   * Move this booking's commission from the driver to the poster.
+   *
+   * Returns a note when it could not be done, so the caller can tell the driver
+   * rather than silently swallowing it. Never throws - a finished trip must be
+   * recorded as finished either way.
+   */
+  private async settleCommission(requirementId: string | Types.ObjectId): Promise<string | null> {
+    // Claim it: only the first caller gets the document back, so a repeated
+    // "trip end" cannot charge twice.
+    const claimed = await this.requirementModel.findOneAndUpdate(
+      { _id: requirementId, commissionSettledAt: { $in: [null, undefined] } },
+      { $set: { commissionSettledAt: new Date() } },
+      { new: false },
+    );
+    if (!claimed) return null; // already settled, or no such booking
+
+    const amount = Math.max(0, Math.round(claimed.commission || 0));
+    const driverId = claimed.assignedDriver;
+    const ownerId = claimed.postedBy;
+    if (amount <= 0 || !driverId || !ownerId) {
+      return null; // nothing to move
+    }
+
+    // Debit conditionally so two settlements can never overdraw the wallet.
+    const debited = await this.userModel
+      .findOneAndUpdate(
+        { _id: driverId, walletBalance: { $gte: amount } },
+        { $inc: { walletBalance: -amount } },
+        { new: true },
+      )
+      .select('walletBalance fullName agencyName');
+
+    if (!debited) {
+      // Not enough left. Release the claim so it can be settled later.
+      await this.requirementModel.findByIdAndUpdate(requirementId, { $unset: { commissionSettledAt: '' } });
+      const driver: any = await this.userModel.findById(driverId).select('walletBalance').lean();
+      const have = Math.round(driver?.walletBalance || 0);
+      this.logger.warn(`Commission ₹${amount} not settled on ${claimed.bookingId || requirementId}: driver has ₹${have}`);
+      return `Trip completed, but the ₹${amount} commission could not be taken - the driver's wallet has ₹${have}.`;
+    }
+
+    try {
+      await this.userModel.findByIdAndUpdate(ownerId, { $inc: { walletBalance: amount } });
+    } catch (e: any) {
+      // Put it back. Money is never taken without a matching credit.
+      await this.userModel.findByIdAndUpdate(driverId, { $inc: { walletBalance: amount } });
+      await this.requirementModel.findByIdAndUpdate(requirementId, { $unset: { commissionSettledAt: '' } });
+      this.logger.error(`Commission credit failed, debit rolled back: ${e?.message ?? e}`);
+      return 'Trip completed, but the commission transfer failed and was reversed.';
+    }
+
+    const ref = claimed.bookingId || claimed.requirementId || '';
+    await this.txModel.create([
+      {
+        userId: driverId,
+        counterpartyId: ownerId,
+        amount,
+        type: 'debit',
+        status: 'success',
+        source: 'settle',
+        note: `Commission for booking ${ref}`.trim(),
+      },
+      {
+        userId: ownerId,
+        counterpartyId: driverId,
+        amount,
+        type: 'credit',
+        status: 'success',
+        source: 'settle',
+        note: `Commission from booking ${ref}`.trim(),
+      },
+    ]);
+
+    const driverName = (debited as any)?.agencyName || (debited as any)?.fullName || 'the driver';
+    this.notificationsService
+      .notifyUser(ownerId.toString(), 'Commission received',
+        `₹${amount} commission for booking ${ref} has been credited to your wallet.`)
+      .catch(() => {});
+    this.notificationsService
+      .notifyUser(driverId.toString(), 'Commission paid',
+        `₹${amount} commission for booking ${ref} was deducted from your wallet.`)
+      .catch(() => {});
+    this.logger.log(`Commission ₹${amount} settled on ${ref}: ${driverName} -> owner`);
+    return null;
+  }
+
   async verifyTripOtp(id: string, driverId: string, action: 'start' | 'end', otp: string) {
     // tripOtp* are select:false on the schema — opt in for the comparison.
     const requirement = await this.requirementModel
@@ -686,7 +781,14 @@ export class RequirementsService {
 
     this.notificationsService.notifyTripStatus(updated, action).catch(() => {});
 
-    return { message: action === 'start' ? 'Trip started' : 'Trip completed', data: updated };
+    // The trip is recorded first, then the money moves - so a settlement problem
+    // can never cost the driver a completed trip.
+    const warning = action === 'end' ? await this.settleCommission(id) : null;
+
+    return {
+      message: warning ?? (action === 'start' ? 'Trip started' : 'Trip completed'),
+      data: updated,
+    };
   }
 
   /** Requirements other users have assigned to me. */

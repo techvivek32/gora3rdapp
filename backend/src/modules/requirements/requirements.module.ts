@@ -5,6 +5,7 @@ import { RequirementsService } from './requirements.service';
 import { Requirement, RequirementSchema } from '../../database/schemas/requirement.schema';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { Notification, NotificationSchema } from '../../database/schemas/notification.schema';
+import { WalletTransaction, WalletTransactionSchema } from '../../database/schemas/wallet-transaction.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
 import { ChatModule } from '../chat/chat.module';
@@ -15,6 +16,7 @@ import { ChatModule } from '../chat/chat.module';
       { name: Requirement.name, schema: RequirementSchema },
       { name: User.name, schema: UserSchema },
       { name: Notification.name, schema: NotificationSchema },
+      { name: WalletTransaction.name, schema: WalletTransactionSchema },
     ]),
     NotificationsModule,
     SettingsModule,
