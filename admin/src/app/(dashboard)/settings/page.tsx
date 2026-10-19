@@ -42,6 +42,11 @@ export default function SettingsPage() {
   const [cbSaved, setCbSaved] = useState(false);
   const [cbError, setCbError] = useState('');
 
+  // Contact reveal saves on its own now, so it needs its own flags.
+  const [crSaving, setCrSaving] = useState(false);
+  const [crSaved, setCrSaved] = useState(false);
+  const [crError, setCrError] = useState('');
+
   // RC / DigiLocker verification vendor
   const [vClientId, setVClientId] = useState('');
   const [vClientSecret, setVClientSecret] = useState('');
@@ -152,18 +157,32 @@ export default function SettingsPage() {
   const handleSaveMinWallet = async () => {
     const minW = Math.round(Number(minWalletToAccept));
     if (!Number.isFinite(minW) || minW < 0) return setCbError('Enter a valid amount (0 = no minimum)');
-    const revealH = Math.round(Number(contactRevealHours));
-    if (!Number.isFinite(revealH) || revealH < 0) return setCbError('Enter valid contact-reveal hours (0 = show immediately)');
     setCbError('');
     setCbSaving(true);
     try {
-      await adminApi.updateSettings({ minWalletToAccept: minW, contactRevealHoursBeforePickup: revealH });
+      await adminApi.updateSettings({ minWalletToAccept: minW });
       setCbSaved(true);
       setTimeout(() => setCbSaved(false), 3000);
     } catch (e: any) {
       setCbError(e.message || 'Failed to save');
     } finally {
       setCbSaving(false);
+    }
+  };
+
+  const handleSaveContactReveal = async () => {
+    const revealH = Math.round(Number(contactRevealHours));
+    if (!Number.isFinite(revealH) || revealH < 0) return setCrError('Enter valid hours (0 = show immediately)');
+    setCrError('');
+    setCrSaving(true);
+    try {
+      await adminApi.updateSettings({ contactRevealHoursBeforePickup: revealH });
+      setCrSaved(true);
+      setTimeout(() => setCrSaved(false), 3000);
+    } catch (e: any) {
+      setCrError(e.message || 'Failed to save');
+    } finally {
+      setCrSaving(false);
     }
   };
 
@@ -509,10 +528,13 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Customer Booking Acceptance */}
+        {/* Driver wallet requirement */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Customer Booking Acceptance</h2>
-          <p className="text-gray-500 text-sm mb-5">Eligibility for accepting Customer Mode bookings. Drivers who accept only register interest — an admin assigns the driver from the Customer Bookings page.</p>
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Driver — Minimum Wallet Balance</h2>
+          <p className="text-gray-500 text-sm mb-5">
+            How much a <strong>driver</strong> must hold in their wallet before a booking can reach them —
+            whether they accept it themselves, or an admin or owner assigns it to them.
+          </p>
           {loading ? (
             <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
               <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
@@ -521,7 +543,7 @@ export default function SettingsPage() {
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Minimum Wallet to Accept Booking (₹)</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Minimum wallet balance (₹)</label>
                 <input
                   type="number" min={0}
                   value={minWalletToAccept}
@@ -529,18 +551,14 @@ export default function SettingsPage() {
                   placeholder="e.g. 500 (0 = no minimum)"
                   className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
                 />
-                <p className="text-xs text-gray-400 mt-1">A Golden driver must have at least this much in their wallet to accept a customer booking. Nothing is deducted — it is only an eligibility check. 0 = no minimum.</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Show contact numbers (hours before pickup)</label>
-                <input
-                  type="number" min={0}
-                  value={contactRevealHours}
-                  onChange={(e) => { setContactRevealHours(e.target.value); setCbSaved(false); }}
-                  placeholder="e.g. 1 (0 = show immediately)"
-                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
-                />
-                <p className="text-xs text-gray-400 mt-1">For one-way, round-trip & local bookings, the driver and customer only see each other&apos;s phone number this many hours before the pickup time. 0 = show as soon as the booking is confirmed.</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Nothing is deducted — it is only an eligibility check. <strong>0 = no minimum.</strong>
+                </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  This acts as a <strong>floor</strong>. A partner booking already needs its own commission in the
+                  driver&apos;s wallet, so the driver must have whichever is larger. e.g. commission ₹600 → ₹600 needed;
+                  commission ₹300 with this set to ₹500 → ₹500 needed.
+                </p>
               </div>
               {cbError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{cbError}</p>}
               <button
@@ -548,7 +566,46 @@ export default function SettingsPage() {
                 disabled={cbSaving}
                 className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
               >
-                {cbSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : cbSaved ? '✓ Saved!' : 'Save Acceptance Settings'}
+                {cbSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : cbSaved ? '✓ Saved!' : 'Save Minimum Wallet'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Contact number reveal */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <h2 className="font-semibold text-gray-900 dark:text-white mb-1">Contact Numbers — When to Reveal</h2>
+          <p className="text-gray-500 text-sm mb-5">
+            When the driver and the customer get to see each other&apos;s phone number on a confirmed booking.
+          </p>
+          {loading ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-4">
+              <div className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+              Loading...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Hours before pickup</label>
+                <input
+                  type="number" min={0}
+                  value={contactRevealHours}
+                  onChange={(e) => { setContactRevealHours(e.target.value); setCrSaved(false); }}
+                  placeholder="e.g. 1 (0 = show immediately)"
+                  className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Applies to one-way, round-trip &amp; local bookings. The same window also gates
+                  &ldquo;Open Trip &amp; Navigate&rdquo;. <strong>0 = show as soon as the booking is confirmed.</strong>
+                </p>
+              </div>
+              {crError && <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{crError}</p>}
+              <button
+                onClick={handleSaveContactReveal}
+                disabled={crSaving}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+              >
+                {crSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Saving...</> : crSaved ? '✓ Saved!' : 'Save Contact Reveal'}
               </button>
             </div>
           )}

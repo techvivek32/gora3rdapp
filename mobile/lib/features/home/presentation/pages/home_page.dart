@@ -35,6 +35,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _supportWhatsapp = '+919587090620';
 
   bool _alertsOn = false;
+  /// Online = available for work. Offline silences the booking popup and ring
+  /// without touching what the user has chosen to be alerted about.
+  bool _online = true;
   bool _awaitingOverlayGrant = false;
   List<String> _alertVehicles = [];
   List<String> _alertTrips = [];
@@ -59,6 +62,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
     _alertsOn = user?['notificationsEnabled'] == true;
+    isOnline().then((v) {
+      if (mounted) setState(() => _online = v);
+    });
     // Mirror the server value into the local flag every isolate reads, so the
     // FCM background handler / overlay ring respect it too.
     setAlertsEnabled(_alertsOn);
@@ -110,6 +116,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         );
       });
     }
+  }
+
+  Future<void> _toggleOnline(bool value) async {
+    setState(() => _online = value);
+    await setOnline(value); // every isolate reads this, so it takes effect at once
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(value
+            ? "You're Online — booking alerts will pop up.".tr
+            : "You're Offline — no booking pop-ups until you go back online.".tr),
+        backgroundColor: value ? AppColors.success : AppColors.textSecondary,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _toggleAlerts(bool value) async {
@@ -235,6 +256,30 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             titleSpacing: 12,
             actions: [
+              Text(
+                (_online ? 'Online' : 'Offline').tr,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                  color: _online ? AppColors.success : AppColors.textSecondary,
+                ),
+              ),
+              SizedBox(width: 2.w),
+              SizedBox(
+                width: 38.w,
+                height: 26.h,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Switch(
+                    value: _online,
+                    activeColor: Colors.white,
+                    activeTrackColor: AppColors.success,
+                    onChanged: _toggleOnline,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8.w),
               Text('Alerts'.tr, style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
               SizedBox(width: 2.w),
               SizedBox(

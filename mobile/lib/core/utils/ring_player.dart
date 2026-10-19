@@ -48,6 +48,31 @@ Future<void> setAlertsEnabled(bool on) async {
   } catch (_) {}
 }
 
+/// Whether the partner is Online. Offline means no booking popup and no ring,
+/// whatever the alert settings say - it is the "I am not working right now"
+/// switch, separate from "what am I interested in".
+///
+/// Defaults to ONLINE: an existing user who never touches it keeps behaving
+/// exactly as before.
+const _kOnlineKey = 'gora_online';
+
+Future<bool> isOnline() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // pick up a toggle made in the UI isolate
+    return prefs.getBool(_kOnlineKey) ?? true;
+  } catch (_) {
+    return true; // fail open - a storage hiccup must not silently stop work
+  }
+}
+
+Future<void> setOnline(bool on) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kOnlineKey, on);
+  } catch (_) {}
+}
+
 // ─── User-chosen ringtones (popup vs notification, stored per kind) ───────────
 // Each kind stores the chosen ringtone's URL + title. Empty URL = use the bundled
 // default. Stored in SharedPreferences so every isolate (UI, FCM background,

@@ -45,6 +45,9 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // Respect the user's alert toggle even from the background/terminated
       // isolate — no overlay, no ring when alerts are off.
       if (!await alertsEnabled()) return;
+      // Same gate in the background isolate - going offline has to hold even
+      // when the app is not running.
+      if (!await isOnline()) return;
       // Overlay first so it appears immediately, then hold this isolate open for
       // the ring — it is killed as soon as this handler returns. Uses the user's
       // chosen NOTIFICATION tone (the tray channel is silent, app plays the sound).

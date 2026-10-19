@@ -109,7 +109,10 @@ class PushNotificationService {
     final isNewRequirement = (data['type'] ?? '').toString() == 'new_requirement';
     // Booking alerts are opt-in: if the user hasn't turned them on, no ring and
     // no pop-up — not even the loud notification below.
+    // Offline means not working: no popup, no ring, not even the loud
+    // notification - regardless of the alert settings.
     if (isNewRequirement && !(await alertsEnabled())) return;
+    if (isNewRequirement && !(await isOnline())) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isNewRequirement) {
       playRequirementRing(kind: RingKind.popup);
