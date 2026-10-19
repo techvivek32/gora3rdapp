@@ -644,8 +644,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
                         Expanded(
                           child: Text('${cat['name'] ?? 'Cab'}  or similar',
                               maxLines: 2, overflow: TextOverflow.ellipsis,
-                              // Same size as the "N seater … AC Cab" line below it.
-                              style: TextStyle(fontSize: 11.5.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
+                              // The car name is what people scan the list by, so it
+                              // sits a step above the spec line beneath it.
+                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Poppins')),
                         ),
                         if (isLowest)
                           Container(

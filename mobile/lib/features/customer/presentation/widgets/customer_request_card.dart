@@ -74,6 +74,12 @@ class CustomerRequestCard extends StatelessWidget {
     // Hire a Driver: the customer picks the gearbox of THEIR car — show it so the
     // driver knows whether they must drive a manual or an automatic.
     final transmission = RegExp(r'Transmission:\s*(Automatic|Manual)', caseSensitive: false).firstMatch(notes)?.group(1);
+    // The customer picks a fuel on the Cab Details page and it rides along in the
+    // notes as "Fuel: Petrol". The driver needs it - a CNG car is a different job.
+    final fuelType = RegExp(r'Fuel:\s*([A-Za-z/ ]+)', caseSensitive: false)
+        .firstMatch(notes)
+        ?.group(1)
+        ?.trim();
 
     return brandCard(
       // Customer-app bookings read as violet, so they are distinct from the
@@ -154,14 +160,24 @@ class CustomerRequestCard extends StatelessWidget {
                 ),
               ),
             ],
+            if (fuelType != null && fuelType.isNotEmpty) ...[
+              SizedBox(width: 8.w),
+              Icon(Icons.local_gas_station_rounded, size: 14.sp, color: AppColors.textSecondary),
+              SizedBox(width: 3.w),
+              Text(fuelType, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+            ],
             if (transmission != null) ...[
-              SizedBox(width: 10.w),
+              SizedBox(width: 8.w),
               Icon(Icons.settings_rounded, size: 14.sp, color: AppColors.textSecondary),
-              SizedBox(width: 4.w),
+              SizedBox(width: 3.w),
               Text(transmission, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
             ],
             const Spacer(),
-            if (fare != 0) Text('You earn: ₹$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            // The rupee sign carries the meaning; the words were only noise.
+            if (fare != 0) ...[
+              Icon(Icons.currency_rupee_rounded, size: 14.sp, color: AppColors.textPrimary),
+              Text('$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+            ],
           ]),
           // Round-trip return date (so the driver knows when to bring the car back).
           if (returnDate != null) ...[

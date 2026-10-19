@@ -35,7 +35,7 @@ class CustomerNavPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _NavItem(icon: Icons.home_rounded, label: 'Home', index: 0, selectedIndex: selected, onTap: () => context.go('/customer')),
-                _NavItem(icon: Icons.receipt_long_rounded, label: 'Bookings', index: 1, selectedIndex: selected, onTap: () => context.go('/customer/bookings')),
+                _NavItem(icon: Icons.receipt_long_rounded, label: 'My Bookings', index: 1, selectedIndex: selected, onTap: () => context.go('/customer/bookings')),
                 _NavItem(icon: Icons.settings_rounded, label: 'Settings', index: 2, selectedIndex: selected, onTap: () => context.go('/customer/profile')),
               ],
             ),

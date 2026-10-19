@@ -395,6 +395,12 @@ class MyOfferCard extends StatelessWidget {
     final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
     // Hire a Driver: the customer's car gearbox (Manual / Automatic), from notes.
     final transmission = RegExp(r'Transmission:\s*(Automatic|Manual)', caseSensitive: false).firstMatch((b['notes'] ?? '').toString())?.group(1);
+    // The customer chose a fuel on the Cab Details page; it travels in the notes
+    // as "Fuel: Petrol". Driving a CNG car is a different job, so show it.
+    final fuelType = RegExp(r'Fuel:\s*([A-Za-z/ ]+)', caseSensitive: false)
+        .firstMatch((b['notes'] ?? '').toString())
+        ?.group(1)
+        ?.trim();
     // Round trip: inclusive day count (travel day → return day), shown under the tag.
     int? roundDays;
     if (isRound && retM != null) {
@@ -512,16 +518,41 @@ class MyOfferCard extends StatelessWidget {
           SizedBox(height: 4.h),
           const Divider(height: 1, color: Colors.black26),
           SizedBox(height: 10.h),
-          if (transmission != null) ...[
+          // What car, and on what fuel - the two things that decide whether a
+          // driver can actually take this trip.
+          if ((b['vehicleType'] ?? '').toString().isNotEmpty || fuelType != null || transmission != null) ...[
             Row(children: [
-              Icon(Icons.settings_rounded, size: 14.sp, color: AppColors.textSecondary),
-              SizedBox(width: 5.w),
-              Text('$transmission car', style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              if ((b['vehicleType'] ?? '').toString().isNotEmpty) ...[
+                Icon(Icons.local_taxi_rounded, size: 15.sp, color: barColor),
+                SizedBox(width: 5.w),
+                Flexible(
+                  child: Text(
+                    b['vehicleType'].toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                  ),
+                ),
+              ],
+              if (fuelType != null && fuelType.isNotEmpty) ...[
+                SizedBox(width: 8.w),
+                Icon(Icons.local_gas_station_rounded, size: 14.sp, color: AppColors.textSecondary),
+                SizedBox(width: 3.w),
+                Text(fuelType, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              ],
+              if (transmission != null) ...[
+                SizedBox(width: 8.w),
+                Icon(Icons.settings_rounded, size: 14.sp, color: AppColors.textSecondary),
+                SizedBox(width: 3.w),
+                Text(transmission, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+              ],
             ]),
             SizedBox(height: 8.h),
           ],
           Row(children: [
-            Text('You earn: ₹$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            // The rupee sign says it; the words in front were only noise.
+            Icon(Icons.currency_rupee_rounded, size: 15.sp, color: AppColors.primary),
+            Text('$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
             const Spacer(),
             if (hold != 0) Text('Hold: ₹$hold', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ]),
