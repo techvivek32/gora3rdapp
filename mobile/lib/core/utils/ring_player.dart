@@ -52,17 +52,17 @@ Future<void> setAlertsEnabled(bool on) async {
 /// whatever the alert settings say - it is the "I am not working right now"
 /// switch, separate from "what am I interested in".
 ///
-/// Defaults to ONLINE: an existing user who never touches it keeps behaving
-/// exactly as before.
+/// Defaults to OFFLINE, like the alerts flag: nothing pops up or rings until
+/// the user says they are working.
 const _kOnlineKey = 'gora_online';
 
 Future<bool> isOnline() async {
   try {
     final prefs = await SharedPreferences.getInstance();
     await prefs.reload(); // pick up a toggle made in the UI isolate
-    return prefs.getBool(_kOnlineKey) ?? true;
+    return prefs.getBool(_kOnlineKey) ?? false;
   } catch (_) {
-    return true; // fail open - a storage hiccup must not silently stop work
+    return false; // fail closed - silence beats an unwanted ring
   }
 }
 

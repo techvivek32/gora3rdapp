@@ -65,3 +65,9 @@ test_screenshots/
 
 # Emulator test screenshots (local only)
 ss/
+
+# Firebase service-account keys. These carry a live private key that can send a
+# push to every user, so they are kept on the server's .env and never committed.
+*firebase-adminsdk*.json
+backend/*firebase-adminsdk*.json
+serviceAccountKey.json

@@ -424,7 +424,11 @@ class MyOfferCard extends StatelessWidget {
     // some driver was selected (that would light up losing drivers' cards too).
     final won = offerStatus == 'selected';
     final (chipColor, chipLabel) = _statusInfo(status, offerStatus);
-    final barColor = won ? AppColors.primary : (status == 'completed' ? AppColors.success : AppColors.info);
+    // Every card on this page is a customer booking, so the card wears the
+    // customer-booking colour. Won / lost / completed is already carried by the
+    // status chip and the stamp across the card, which is where it belongs -
+    // the card colour says WHAT this is, not how it went.
+    const barColor = AppColors.memberPremium; // violet
     // Stamp overlay from the driver's own perspective.
     final lost = !won && status != 'open';
     final (String, Color)? stamp = lost

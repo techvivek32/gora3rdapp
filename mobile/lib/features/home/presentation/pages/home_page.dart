@@ -37,7 +37,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   bool _alertsOn = false;
   /// Online = available for work. Offline silences the booking popup and ring
   /// without touching what the user has chosen to be alerted about.
-  bool _online = true;
+  /// Starts OFF and is replaced by the stored value once it is read.
+  bool _online = false;
   bool _awaitingOverlayGrant = false;
   List<String> _alertVehicles = [];
   List<String> _alertTrips = [];
@@ -61,13 +62,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     final auth = context.read<AuthBloc>().state;
     final user = auth is AuthAuthenticated ? auth.user as Map<String, dynamic>? : null;
-    _alertsOn = user?['notificationsEnabled'] == true;
+    // Both switches read from the LOCAL flags - the same ones the FCM background
+    // handler and the overlay isolate read. Seeding Alerts from the cached login
+    // payload and mirroring it back used to overwrite the user's "off" on every
+    // launch, because turning it off never updated that cached copy.
+    alertsEnabled().then((v) {
+      if (mounted) setState(() => _alertsOn = v);
+    });
     isOnline().then((v) {
       if (mounted) setState(() => _online = v);
     });
-    // Mirror the server value into the local flag every isolate reads, so the
-    // FCM background handler / overlay ring respect it too.
-    setAlertsEnabled(_alertsOn);
     // Show the admin popup ad once per app launch, after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) maybeShowAdPopup(context, getIt<ApiClient>());
@@ -137,6 +141,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (!value) {
       setState(() => _alertsOn = false);
       await setAlertsEnabled(false); // silence rings immediately (all isolates)
+      // Keep the cached login payload in step - a stale 'true' in there is what
+      // used to turn alerts back on by itself.
+      final auth = context.read<AuthBloc>().state;
+      if (auth is AuthAuthenticated && auth.user is Map) {
+        (auth.user as Map<String, dynamic>)['notificationsEnabled'] = false;
+      }
       try {
         await getIt<ApiClient>().put('/users/notifications', data: {'enabled': false});
       } catch (_) {
