@@ -76,6 +76,9 @@ class CustomerRequestCard extends StatelessWidget {
     final transmission = RegExp(r'Transmission:\s*(Automatic|Manual)', caseSensitive: false).firstMatch(notes)?.group(1);
 
     return brandCard(
+      // Customer-app bookings read as violet, so they are distinct from the
+      // partner-posted cards in the same feed.
+      color: AppColors.memberPremium,
       stamp: stamp?.$1,
       stampColor: stamp?.$2,
       child: Column(

@@ -137,6 +137,10 @@ class RequirementCardWidget extends StatelessWidget {
         final bool locked =
             showStamp && (isCancelled || isBooked || isOnHold || isCompleted) && !isCurrentUserOwner;
 
+        // WhatsApp-imported bookings have no real member profile (the customer
+        // isn't a Gora user), so we hide the poster profile on those cards.
+        final isWhatsapp = requirement['source'] == 'whatsapp';
+
         final memberType = (mine ? currentMembership : (postedBy?['membershipType'] as String?)) ?? 'new';
         Color topBarColor;
         String? badgeText;
@@ -156,6 +160,10 @@ class RequirementCardWidget extends StatelessWidget {
           topBarColor = AppColors.memberVerified;
           badgeText = 'NEW USER';
         }
+        // A duty card is green because it is a duty card - not because of whoever
+        // happens to be on the other end of the WhatsApp import. Set before the
+        // tint and badge colours are derived, so the whole card follows.
+        if (isWhatsapp) topBarColor = AppColors.memberVerified;
         final Color cardBg = topBarColor.withOpacity(0.07);
         final Color badgeColor = topBarColor;
         final Color badgeBg = topBarColor.withOpacity(0.12);
@@ -178,9 +186,6 @@ class RequirementCardWidget extends StatelessWidget {
         final mobile = (contactMobile != null && contactMobile.isNotEmpty)
             ? contactMobile
             : postedBy?['mobile'] as String?;
-        // WhatsApp-imported bookings have no real member profile (the customer
-        // isn't a Gora user), so we hide the poster profile on those cards.
-        final isWhatsapp = requirement['source'] == 'whatsapp';
         void openSheet() {
           if (postedBy != null) showUserCardSheet(context, Map<String, dynamic>.from(postedBy));
         }
