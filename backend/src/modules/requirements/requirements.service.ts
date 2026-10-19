@@ -506,16 +506,20 @@ export class RequirementsService {
       .lean();
     if (!driver) throw new NotFoundException('Driver not found');
 
-    // The driver must be able to cover the platform's cut before they are given
-    // the trip. Admin sets the floor; 0 turns the rule off. Nothing is deducted.
+    // The driver has to be able to cover this booking's commission before they
+    // are given it - that is the amount they will owe the owner for the job, so
+    // it moves with the booking rather than being a flat figure. The admin's
+    // global minimum sits underneath as a floor (0 = no floor).
     const settings: any = await this.settingsService.getSettings();
-    const minWallet = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
-    if (minWallet > 0) {
+    const floor = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
+    const commission = Math.max(0, Math.round(requirement.commission || 0));
+    const required = Math.max(floor, commission);
+    if (required > 0) {
       const balance = Math.round(driver.walletBalance || 0);
-      if (balance < minWallet) {
+      if (balance < required) {
         const name = driver.agencyName || driver.fullName || 'This driver';
         throw new BadRequestException(
-          `${name} has ₹${balance} in their wallet. A minimum of ₹${minWallet} is required before a booking can be assigned - ask them to recharge.`,
+          `This booking's commission is ₹${commission}, so ₹${required} must be in the driver's wallet. ${name} has ₹${balance} - ask them to recharge ₹${required - balance} more.`,
         );
       }
     }
