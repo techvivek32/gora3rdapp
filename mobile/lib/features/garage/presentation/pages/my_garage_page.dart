@@ -10,6 +10,12 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 
+/// Set to true once an RC / DL verification vendor is configured in the admin
+/// panel. While false the garage forms are plain manual entry: the Fetch
+/// buttons are hidden, because without API keys they can only report that the
+/// lookup is not set up. Nothing else about the fetch flow is removed.
+const bool kVerificationEnabled = false;
+
 /// The user's garage: two tabs — saved Vehicles and saved Drivers, each reusable
 /// when posting/assigning so details don't have to be retyped.
 class MyGaragePage extends StatefulWidget {
@@ -527,9 +533,13 @@ class _VehicleFormState extends State<_VehicleForm> {
   bool _rcConfigured = true;
   /// Set when the form's details came from a lookup rather than the keyboard.
   bool _rcFilled = false;
-  /// The lookup could not serve this vehicle (no keys, no record, vendor down),
-  /// so the detail fields are shown and the user fills them in by hand.
-  bool _manualMode = false;
+  /// Manual entry: every detail field is shown and typed in by hand.
+  ///
+  /// Starts TRUE because no verification vendor is set up yet - gating the form
+  /// behind a Fetch that cannot work would just block people. The Fetch button
+  /// stays available, so the moment the API keys are added it fills the form in
+  /// and nothing else has to change.
+  bool _manualMode = true;
 
   /// Editing an already-saved vehicle always shows the fields - we are not
   /// going to make someone re-fetch to change a colour.
@@ -936,6 +946,7 @@ class _VehicleFormState extends State<_VehicleForm> {
                       decoration: _dec(Icons.confirmation_number_outlined, hint: 'e.g. GJ01AB1234'),
                     ),
                   ),
+                  if (kVerificationEnabled) ...[
                   SizedBox(width: 10.w),
                   SizedBox(
                     height: 48.h,
@@ -952,6 +963,7 @@ class _VehicleFormState extends State<_VehicleForm> {
                           : Text('Fetch'.tr, style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 14.sp)),
                     ),
                   ),
+                  ],
                 ],
               ),
               if (_rcBanner != null) ...[SizedBox(height: 10.h), _rcBanner!],
@@ -1152,8 +1164,9 @@ class _DriverFormState extends State<_DriverForm> {
   String? _ocrMessage;
   bool? _ocrNameMatched;
   bool _ocrSuspect = false;
-  /// The lookup can't serve this driver, or the user chose to type it in.
-  bool _dlManual = false;
+  /// Manual entry for the driver, for the same reason as the vehicle form:
+  /// no verification vendor is configured yet. Fetch still works once it is.
+  bool _dlManual = true;
 
   /// Editing a saved driver always shows the fields.
   bool get _showDriverFields => _isEdit || _dlManual;
@@ -1453,6 +1466,22 @@ class _DriverFormState extends State<_DriverForm> {
   /// The licence lookup, which is now the whole identity step: a number, a date
   /// of birth, and the RTO record fills in the rest.
   Widget _licenceCard() {
+    // No verification vendor configured: this is just a licence-number field,
+    // so drop the card chrome and the talk of fetching from the RTO record.
+    if (!kVerificationEnabled) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _fieldLabel('Driving Licence (DL) Number'),
+          TextFormField(
+            controller: _dlCtrl,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _fieldDec(Icons.badge_outlined, hint: 'e.g. GJ0120210001234'),
+          ),
+        ],
+      );
+    }
+
     final tone = _dlExpired
         ? AppColors.error
         : _dlVerified
@@ -1513,6 +1542,7 @@ class _DriverFormState extends State<_DriverForm> {
               ),
             ),
           ],
+          if (kVerificationEnabled) ...[
           SizedBox(height: 12.h),
 
           SizedBox(
@@ -1531,6 +1561,7 @@ class _DriverFormState extends State<_DriverForm> {
                       style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, fontSize: 13.sp)),
             ),
           ),
+          ],
 
           // Nobody gets stuck on a form they cannot finish.
           if (!_showDriverFields && !_dlVerified) ...[
