@@ -1,3 +1,4 @@
+import { UserRole } from '../../common/enums/user-role.enum';
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -28,7 +29,23 @@ export class SettingsService {
     };
 
     if (!userId || !Types.ObjectId.isValid(userId)) return { data: globalContact };
-    const user = await this.userModel.findById(userId).select('city').lean();
+    const user = await this.userModel.findById(userId).select('city role').lean();
+
+    // A franchise is a city partner that looks after the DRIVERS in its city,
+    // so a partner asking for support should reach them. Customers get their
+    // own line instead - one number, every city, never a franchise.
+    if ((user as any)?.role === UserRole.CUSTOMER) {
+      const csPhone = (settings as any).customerServicePhone?.trim() || '';
+      const csWhatsapp = (settings as any).customerServiceWhatsapp?.trim() || '';
+      return {
+        data: {
+          phone: csPhone || globalContact.phone,
+          whatsapp: csWhatsapp || csPhone || globalContact.whatsapp,
+          source: 'global' as const,
+        },
+      };
+    }
+
     const city = (user as any)?.city?.trim();
     if (!city) return { data: globalContact };
 
@@ -127,6 +144,8 @@ export class SettingsService {
     razorpayWebhookSecret?: string;
     supportPhone?: string;
     supportPhone2?: string;
+    customerServicePhone?: string;
+    customerServiceWhatsapp?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
     minDeposit?: number;

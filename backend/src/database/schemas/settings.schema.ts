@@ -59,6 +59,22 @@ export class PlatformSettings {
   @Prop({ default: '', trim: true, lowercase: true })
   supportEmail: string;
 
+  /**
+   * Customer service line, used by the customer app only.
+   *
+   * The numbers above are the partner side's, where a city's franchise can
+   * answer instead. Customers always reach this one number, whatever city they
+   * are in. Blank falls back to supportPhone, so nothing breaks before it is
+   * filled in.
+   */
+  @Prop({ default: '', trim: true })
+  customerServicePhone: string;
+
+  /** WhatsApp for the same customer line. Blank falls back to the number above. */
+  @Prop({ default: '', trim: true })
+  customerServiceWhatsapp: string;
+
+
   // ─── Wallet limits (₹) — enforced on the wallet actions, shown in the app ───
   /** Minimum amount a user can add to their wallet in one go. */
   @Prop({ default: 1, min: 0 })

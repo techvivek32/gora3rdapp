@@ -283,6 +283,8 @@ export const adminApi = {
     razorpayWebhookSecret?: string;
     supportPhone?: string;
     supportPhone2?: string;
+    customerServicePhone?: string;
+    customerServiceWhatsapp?: string;
     supportWhatsapp?: string;
     supportEmail?: string;
     minDeposit?: number;
