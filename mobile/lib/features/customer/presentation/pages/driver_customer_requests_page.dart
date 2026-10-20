@@ -474,7 +474,7 @@ class MyOfferCard extends StatelessWidget {
                   paymentBadge(b),
                   if (subType.isNotEmpty) ...[
                     SizedBox(height: 6.h),
-                    filledChip(tripTag, AppColors.primary),
+                    filledChip(tripTag, barColor),
                   ],
                   if (isRound && roundDays != null) ...[
                     SizedBox(height: 4.h),
@@ -488,19 +488,19 @@ class MyOfferCard extends StatelessWidget {
           if (isRound && returnLabel.isNotEmpty) ...[
             SizedBox(height: 6.h),
             Row(children: [
-              Icon(Icons.event_repeat_rounded, size: 14.sp, color: AppColors.primary),
+              Icon(Icons.event_repeat_rounded, size: 14.sp, color: barColor),
               SizedBox(width: 5.w),
               Text('Return: $returnLabel · bring customer back to pickup',
-                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: barColor)),
             ]),
           ],
           if (isLocal) ...[
             SizedBox(height: 6.h),
             Row(children: [
-              Icon(Icons.timelapse_rounded, size: 14.sp, color: AppColors.primary),
+              Icon(Icons.timelapse_rounded, size: 14.sp, color: barColor),
               SizedBox(width: 5.w),
               Text('In-city hourly package${packageHours > 0 ? ' · $packageHours hours' : ''}',
-                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600, color: barColor)),
             ]),
           ],
           SizedBox(height: 10.h),
@@ -551,8 +551,8 @@ class MyOfferCard extends StatelessWidget {
           ],
           Row(children: [
             // The rupee sign says it; the words in front were only noise.
-            Icon(Icons.currency_rupee_rounded, size: 15.sp, color: AppColors.primary),
-            Text('$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            Icon(Icons.currency_rupee_rounded, size: 15.sp, color: barColor),
+            Text('$quoted', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: barColor)),
             const Spacer(),
             if (hold != 0) Text('Hold: ₹$hold', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ]),

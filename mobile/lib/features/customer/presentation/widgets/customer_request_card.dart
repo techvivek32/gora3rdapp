@@ -81,10 +81,14 @@ class CustomerRequestCard extends StatelessWidget {
         ?.group(1)
         ?.trim();
 
+    // One colour for the whole card: the tag, the date box, the icons and the
+    // action button all follow it, so nothing is left wearing the brand orange.
+    const accent = AppColors.memberPremium;
+
     return brandCard(
       // Customer-app bookings read as violet, so they are distinct from the
       // partner-posted cards in the same feed.
-      color: AppColors.memberPremium,
+      color: accent,
       stamp: stamp?.$1,
       stampColor: stamp?.$2,
       child: Column(
@@ -118,7 +122,7 @@ class CustomerRequestCard extends StatelessWidget {
                   paymentBadge(b),
                   if (subType.isNotEmpty) ...[
                     SizedBox(height: 6.h),
-                    filledChip(subType.toUpperCase(), AppColors.primary),
+                    filledChip(subType.toUpperCase(), accent),
                   ],
                   if (days != null) ...[
                     SizedBox(height: 4.h),
@@ -141,7 +145,7 @@ class CustomerRequestCard extends StatelessWidget {
             children: [
               Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
               SizedBox(width: 10.w),
-              dateTimeBox(date, (b['travelTime'] ?? '').toString(), AppColors.primary),
+              dateTimeBox(date, (b['travelTime'] ?? '').toString(), accent),
             ],
           ),
           SizedBox(height: 4.h),
@@ -149,7 +153,7 @@ class CustomerRequestCard extends StatelessWidget {
           SizedBox(height: 10.h),
           Row(children: [
             if ((b['vehicleType'] ?? '').toString().isNotEmpty) ...[
-              Icon(Icons.local_taxi_rounded, size: 15.sp, color: AppColors.primary),
+              Icon(Icons.local_taxi_rounded, size: 15.sp, color: accent),
               SizedBox(width: 5.w),
               Flexible(
                 child: Text(
@@ -183,17 +187,19 @@ class CustomerRequestCard extends StatelessWidget {
           if (returnDate != null) ...[
             SizedBox(height: 8.h),
             Row(children: [
-              Icon(Icons.event_repeat_rounded, size: 14.sp, color: AppColors.primary),
+              Icon(Icons.event_repeat_rounded, size: 14.sp, color: accent),
               SizedBox(width: 5.w),
               Text('Return: ${DateFormat('dd MMM yyyy').format(returnDate)}',
-                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                  style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600, color: accent)),
             ]),
           ],
           // Fare inclusions/exclusions (one clean line, no boxed background).
           SizedBox(height: 10.h),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // Best Price leaves toll / state tax / parking for the driver to
+            // collect on the road, so it is a caution, not a reassurance.
             Icon(isInclusive ? Icons.verified_rounded : Icons.info_outline_rounded,
-                size: 15.sp, color: isInclusive ? AppColors.success : AppColors.warning),
+                size: 15.sp, color: isInclusive ? AppColors.warning : AppColors.error),
             SizedBox(width: 6.w),
             Expanded(
               child: Text(
@@ -201,7 +207,7 @@ class CustomerRequestCard extends StatelessWidget {
                     ? 'All Inclusive — Toll, State tax, Car parking, Driver allowance & GST included'
                     : 'Best Price — Toll, state tax & parking excluded (collect from customer)',
                 style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.w600,
-                    color: isInclusive ? AppColors.success : AppColors.warning),
+                    color: isInclusive ? AppColors.warning : AppColors.error),
               ),
             ),
           ]),
@@ -227,7 +233,7 @@ class CustomerRequestCard extends StatelessWidget {
                   icon: Icon(applied ? Icons.check_rounded : Icons.check_circle_rounded, size: 18.sp),
                   label: Text(applied ? 'Accepted' : 'Accept'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: applied ? AppColors.textHint : AppColors.primary,
+                    backgroundColor: applied ? AppColors.textHint : accent,
                     foregroundColor: Colors.white,
                     padding: EdgeInsets.symmetric(vertical: 11.h),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
