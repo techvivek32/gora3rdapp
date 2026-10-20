@@ -40,8 +40,8 @@ export class CustomerBookingsController {
 
   @Get('my-applications')
   @ApiOperation({ summary: 'Driver/Vendor: bookings I applied to' })
-  getMyApplications(@CurrentUser('sub') userId: string) {
-    return this.service.getMyApplications(userId);
+  getMyApplications(@CurrentUser('sub') userId: string, @Query('serviceType') serviceType?: string) {
+    return this.service.getMyApplications(userId, serviceType);
   }
 
   // ── Advance payment (literal routes before :id) ──

@@ -9,7 +9,8 @@ import '../../../../core/theme/app_theme.dart';
 ///
 /// One posted booking can attract many drivers, each with their own 1:1 thread.
 /// A flat list made those look unrelated, so this screen shows one card per
-/// BOOKING with how many drivers messaged; tapping it reveals those threads.
+/// BOOKING with how many drivers messaged; tapping one opens its threads on
+/// their own page.
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
 
@@ -21,8 +22,6 @@ class _ChatListPageState extends State<ChatListPage> {
   List<Map<String, dynamic>> _groups = [];
   bool _loading = true;
   String? _error;
-  // Booking keys whose thread list is expanded.
-  final Set<String> _open = {};
 
   @override
   void initState() {
@@ -37,8 +36,6 @@ class _ChatListPageState extends State<ChatListPage> {
       if (!mounted) return;
       setState(() {
         _groups = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-        // A single booking opens straight away — there's nothing to choose between.
-        if (_groups.length == 1) _open.add(_groups.first['key'].toString());
         _loading = false;
         _error = null;
       });
@@ -49,14 +46,6 @@ class _ChatListPageState extends State<ChatListPage> {
         _error = 'Could not load messages';
       });
     }
-  }
-
-  String _when(dynamic iso) {
-    final t = DateTime.tryParse(iso?.toString() ?? '')?.toLocal();
-    if (t == null) return '';
-    final now = DateTime.now();
-    final sameDay = t.year == now.year && t.month == now.month && t.day == now.day;
-    return sameDay ? DateFormat('h:mm a').format(t) : DateFormat('dd MMM').format(t);
   }
 
   @override
@@ -98,14 +87,12 @@ class _ChatListPageState extends State<ChatListPage> {
     );
   }
 
-  /// One booking: a header row (route + driver count) that expands to its threads.
+  /// One booking: a row showing the route and how many drivers wrote in.
   Widget _bookingGroup(Map<String, dynamic> g) {
-    final key = g['key'].toString();
     final booking = g['booking'] is Map ? Map<String, dynamic>.from(g['booking'] as Map) : null;
     final chats = ((g['chats'] as List?) ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
     final drivers = (g['driverCount'] as num?)?.toInt() ?? chats.length;
     final unread = (g['unreadCount'] as num?)?.toInt() ?? 0;
-    final expanded = _open.contains(key);
 
     final from = (booking?['pickupCity'] ?? '').toString().split(',').first.trim();
     final to = (booking?['dropCity'] ?? '').toString().split(',').first.trim();
@@ -124,7 +111,12 @@ class _ChatListPageState extends State<ChatListPage> {
       child: Column(
         children: [
           InkWell(
-            onTap: () => setState(() => expanded ? _open.remove(key) : _open.add(key)),
+            onTap: () async {
+              await Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => _BookingThreadsPage(title: title, bookingId: bookingId, chats: chats),
+              ));
+              if (mounted) _load(); // unread counts change while you are in there
+            },
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
               child: Row(
@@ -160,64 +152,121 @@ class _ChatListPageState extends State<ChatListPage> {
                     ),
                     const SizedBox(width: 6),
                   ],
-                  Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                      color: AppColors.textSecondary),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
                 ],
               ),
             ),
           ),
-          if (expanded)
-            ...chats.map((c) {
-              final other = c['otherUser'] is Map ? Map<String, dynamic>.from(c['otherUser'] as Map) : null;
-              final name = (other?['fullName'] ?? other?['agencyName'] ?? 'User').toString();
-              final last = (c['lastMessageText'] ?? '').toString();
-              final n = (c['unreadCount'] as num?)?.toInt() ?? 0;
-              return Container(
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: AppColors.border)),
-                ),
-                child: ListTile(
-                  dense: true,
-                  leading: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
-                  ),
-                  title: Text(name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-                  subtitle: Text(last.isEmpty ? 'No messages yet' : last,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(_when(c['lastMessageAt']),
-                          style: const TextStyle(fontSize: 10.5, color: AppColors.textHint)),
-                      if (n > 0) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(9)),
-                          child: Text('$n',
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  onTap: () async {
-                    await context.push('/chats/${c['_id']}');
-                    if (mounted) _load(); // unread counts change while you're in the room
-                  },
-                ),
-              );
-            }),
         ],
       ),
     );
+  }
+}
+
+
+/// The drivers who messaged about one booking. Reached by tapping that booking
+/// on the Messages list.
+class _BookingThreadsPage extends StatefulWidget {
+  final String title;
+  final String bookingId;
+  final List<Map<String, dynamic>> chats;
+
+  const _BookingThreadsPage({required this.title, required this.bookingId, required this.chats});
+
+  @override
+  State<_BookingThreadsPage> createState() => _BookingThreadsPageState();
+}
+
+class _BookingThreadsPageState extends State<_BookingThreadsPage> {
+  @override
+  Widget build(BuildContext context) {
+    final chats = widget.chats;
+    return Scaffold(
+      backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+            if (widget.bookingId.isNotEmpty)
+              Text(widget.bookingId,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: Colors.white70)),
+          ],
+        ),
+      ),
+      body: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: chats.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.border),
+        itemBuilder: (_, i) {
+          final c = chats[i];
+
+        final other = c['otherUser'] is Map ? Map<String, dynamic>.from(c['otherUser'] as Map) : null;
+        final name = (other?['fullName'] ?? other?['agencyName'] ?? 'User').toString();
+        final last = (c['lastMessageText'] ?? '').toString();
+        final n = (c['unreadCount'] as num?)?.toInt() ?? 0;
+        return Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
+          child: ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+              child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
+            ),
+            title: Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
+            subtitle: Text(last.isEmpty ? 'No messages yet' : last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            trailing: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(_when(c['lastMessageAt']),
+                    style: const TextStyle(fontSize: 10.5, color: AppColors.textHint)),
+                if (n > 0) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    decoration: BoxDecoration(color: AppColors.error, borderRadius: BorderRadius.circular(9)),
+                    child: Text('$n',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ),
+                ],
+              ],
+            ),
+            onTap: () async {
+              await context.push('/chats/${c['_id']}');
+              // Reading a thread clears its badge; repaint so this page agrees.
+              // The Messages list behind reloads when this page is popped.
+              if (mounted) setState(() => c['unreadCount'] = 0);
+            },
+          ),
+        );
+        },
+      ),
+    );
+  }
+
+  String _when(dynamic iso) {
+    if (iso == null) return '';
+    final d = DateTime.tryParse(iso.toString())?.toLocal();
+    if (d == null) return '';
+    final now = DateTime.now();
+    final sameDay = d.year == now.year && d.month == now.month && d.day == now.day;
+    return sameDay ? DateFormat('h:mm a').format(d) : DateFormat('d MMM').format(d);
   }
 }

@@ -96,8 +96,9 @@ class CustomerRepository {
     await _api.post('/customer-bookings/$id/accept', data: selection);
   }
 
-  Future<List<Map<String, dynamic>>> myApplications() async {
-    final res = await _api.get('/customer-bookings/my-applications');
+  Future<List<Map<String, dynamic>>> myApplications({String? serviceType}) async {
+    final res = await _api.get('/customer-bookings/my-applications',
+        params: {if (serviceType != null) 'serviceType': serviceType});
     return _list(res.data['data']);
   }
 

@@ -64,7 +64,9 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
   Future<void> _loadMine() async {
     setState(() { _loadingM = true; _errM = null; });
     try {
-      final d = await _repo.myApplications();
+      // Same filter the Available tab uses, so this screen only ever shows
+      // offers for the service it is about.
+      final d = await _repo.myApplications(serviceType: widget.serviceType);
       if (!mounted) return;
       setState(() { _mine = d; _loadingM = false; });
     } catch (e) {

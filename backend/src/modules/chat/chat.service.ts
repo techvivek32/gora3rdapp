@@ -19,19 +19,18 @@ export class ChatService {
 
   async getOrCreateChat(userId1: string, userId2: string, requirementId?: string) {
     const reqId = requirementId && Types.ObjectId.isValid(requirementId) ? new Types.ObjectId(requirementId) : undefined;
+
+    // The booking is part of the key. Looking up by participants alone meant a
+    // second booking with the same driver landed in the first booking's thread,
+    // mixing the two conversations together.
     const existingChat = await this.chatModel.findOne({
       participants: { $all: [new Types.ObjectId(userId1), new Types.ObjectId(userId2)] },
+      ...(reqId
+        ? { relatedRequirement: reqId }
+        : { relatedRequirement: { $in: [null, undefined] } }),
     });
 
-    if (existingChat) {
-      // Link (or re-link) to the booking this chat was opened from so the list
-      // + header can show the booking id / route / date.
-      if (reqId && existingChat.relatedRequirement?.toString() !== reqId.toString()) {
-        existingChat.relatedRequirement = reqId;
-        await existingChat.save();
-      }
-      return existingChat;
-    }
+    if (existingChat) return existingChat;
 
     const chat = await this.chatModel.create({
       participants: [new Types.ObjectId(userId1), new Types.ObjectId(userId2)],

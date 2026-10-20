@@ -1574,7 +1574,7 @@ export class CustomerBookingsService {
     }
   }
 
-  async getMyApplications(driverId: string) {
+  async getMyApplications(driverId: string, serviceType?: string) {
     // Two ways a booking belongs to "my bookings":
     //  1. I accepted it (my offer is on it) — the owner/vendor account.
     //  2. I'm the driver the owner assigned, matched by my phone number — even if
@@ -1585,7 +1585,9 @@ export class CustomerBookingsService {
     if (myPhone) or.push({ assignedDriverPhone: myPhone });
 
     const data = await this.bookingModel
-      .find({ $or: or })
+      // Each screen asks for one kind of booking, the same way the Available
+      // tab does - otherwise Hire a Driver lists cab offers too.
+      .find({ $or: or, ...(serviceType ? { serviceType } : {}) })
       .sort({ createdAt: -1 })
       .populate('customerId', 'fullName mobile')
       .lean();
