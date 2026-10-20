@@ -423,10 +423,16 @@ class _AssignDriverSheetState extends State<_AssignDriverSheet> {
       final res = await _api.get('/users/lookup', params: {'mobile': phone});
       final user = res.data['data'] as Map<String, dynamic>?;
       if (!mounted) return;
+      // The lookup happily returns your own profile now; assigning a booking to
+      // yourself is still refused, so say it here rather than at Confirm.
+      if (user?['isSelf'] == true) {
+        setState(() => _error = 'That is your own number - pick another driver');
+        return;
+      }
       setState(() => _driver = user);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'No user found with this number');
+      setState(() => _error = serverMessage(e, fallback: 'No user found with this number'));
     } finally {
       if (mounted) setState(() => _searching = false);
     }

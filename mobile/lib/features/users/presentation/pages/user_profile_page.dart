@@ -181,6 +181,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
     final rating = (user['rating'] as num?)?.toDouble() ?? 0;
     final mobile = user['mobile'] as String?;
     final vehicles = (user['vehicles'] as List?) ?? const [];
+    // The cars this member owns. `vehicles` above are their live Available
+    // Car listings, which the Availability section already summarises.
+    final garageVehicles = (user['garageVehicles'] as List?) ?? const [];
     // "No. Posts" is derived from the live (non-deleted) totals so it always
     // reconciles with the Booking + Availability sections below. (The user's
     // `requirementsPosted`/`vehiclesPosted` counters are lifetime totals that also
@@ -454,6 +457,27 @@ class _UserProfilePageState extends State<UserProfilePage> {
               ['Expired', 'expired'],
             ],
           ),
+
+          // The member's vehicles. The server already sends these; they were
+          // fetched and then never shown.
+          if (garageVehicles.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+              child: Center(
+                child: Text(
+                  'Vehicles (${garageVehicles.length})',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+            for (final v in garageVehicles)
+              _VehicleCard(vehicle: Map<String, dynamic>.from(v as Map)),
+          ],
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -524,9 +548,12 @@ class _VehicleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Reads a garage vehicle (modelName / registrationNumber / approvalStatus)
+    // and falls back to the listing field names.
     final type = (vehicle['vehicleType'] ?? '').toString();
-    final number = (vehicle['vehicleNumber'] ?? '').toString();
-    final status = (vehicle['status'] ?? '').toString();
+    final model = (vehicle['modelName'] ?? vehicle['vehicleModel'] ?? '').toString();
+    final number = (vehicle['registrationNumber'] ?? vehicle['vehicleNumber'] ?? '').toString();
+    final status = (vehicle['approvalStatus'] ?? vehicle['status'] ?? '').toString();
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.all(16),
@@ -537,16 +564,24 @@ class _VehicleCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(vehicleTypeLabel(type),
+          Text(model.isNotEmpty ? model : vehicleTypeLabel(type),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          if (model.isNotEmpty && type.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(vehicleTypeLabel(type),
+                style: const TextStyle(fontSize: 12, color: AppColors.textHint)),
+          ],
           const SizedBox(height: 4),
-          Text(number, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+          Text(number, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(status == 'available' ? Icons.check_circle : Icons.info,
-                  color: status == 'available' ? AppColors.memberVerified : Colors.grey, size: 16),
+              Icon(status == 'available' || status == 'approved' ? Icons.check_circle : Icons.info,
+                  color: status == 'available' || status == 'approved'
+                      ? AppColors.memberVerified
+                      : Colors.grey,
+                  size: 16),
               const SizedBox(width: 4),
               Text(status.isNotEmpty ? '${status[0].toUpperCase()}${status.substring(1)}' : '—',
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),

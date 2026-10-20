@@ -454,6 +454,11 @@ class _WalletPageState extends State<WalletPage> {
             try {
               final res = await _api.get('/users/lookup', params: {'mobile': phone});
               final user = Map<String, dynamic>.from(res.data['data'] as Map);
+              if (user['isSelf'] == true) {
+                setSheet(() => searching = false);
+                _snack('You cannot transfer money to yourself');
+                return;
+              }
               setSheet(() {
                 recipient = user;
                 searching = false;

@@ -4,6 +4,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { User, UserSchema } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleSchema } from '../../database/schemas/available-vehicle.schema';
+import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garage-vehicle.schema';
 import { Rating, RatingSchema } from '../../database/schemas/rating.schema';
 import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../database/schemas/account-deletion-request.schema';
 import { Requirement, RequirementSchema } from '../../database/schemas/requirement.schema';
@@ -14,6 +15,7 @@ import { StorageModule } from '../storage/storage.module';
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: AvailableVehicle.name, schema: AvailableVehicleSchema },
+      { name: GarageVehicle.name, schema: GarageVehicleSchema },
       { name: Rating.name, schema: RatingSchema },
       { name: AccountDeletionRequest.name, schema: AccountDeletionRequestSchema },
       { name: Requirement.name, schema: RequirementSchema },

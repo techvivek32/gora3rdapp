@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { AvailableVehicle, AvailableVehicleDocument } from '../../database/schemas/available-vehicle.schema';
+import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
 import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
 import { Rating, RatingDocument } from '../../database/schemas/rating.schema';
 import {
@@ -33,6 +34,7 @@ export class UsersService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(AvailableVehicle.name) private vehicleModel: Model<AvailableVehicleDocument>,
+    @InjectModel(GarageVehicle.name) private garageModel: Model<GarageVehicleDocument>,
     @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
     @InjectModel(Rating.name) private ratingModel: Model<RatingDocument>,
     @InjectModel(AccountDeletionRequest.name)
@@ -91,13 +93,28 @@ export class UsersService {
 
   // Attaches the user's active vehicle listings so a profile shows "My Vehicles".
   private async withVehicles(user: any) {
-    const vehicles = await this.vehicleModel
-      .find({ postedBy: user._id, isDeleted: false })
-      .select('listingId vehicleType vehicleNumber vehicleModel vehicleColor currentCity currentState status driverName driverRating')
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean();
-    return { ...user, vehicles };
+    // `vehicles` = the Available Car listings they have up right now.
+    // `garageVehicles` = the cars they actually own, which is what the profile
+    // shows under "Vehicles".
+    const [vehicles, garageVehicles] = await Promise.all([
+      this.vehicleModel
+        .find({ postedBy: user._id, isDeleted: false })
+        .select('listingId vehicleType vehicleNumber vehicleModel vehicleColor currentCity currentState status driverName driverRating')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean(),
+      this.garageModel
+        // Only vehicles fit to be shown publicly. Excluding pending/rejected
+        // rather than requiring 'approved' keeps the ~1,000 vehicles that
+        // predate the approval feature visible - they have no status at all,
+        // and hiding them would empty most profiles.
+        .find({ userId: user._id, approvalStatus: { $nin: ['pending', 'rejected'] } })
+        .select('vehicleType modelName registrationNumber fuelType seatingCapacity color approvalStatus')
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean(),
+    ]);
+    return { ...user, vehicles, garageVehicles };
   }
 
   async lookupByMobile(mobile: string, currentUserId?: string) {
@@ -114,14 +131,16 @@ export class UsersService {
       .select(PUBLIC_PROFILE_SELECT)
       .lean();
     if (!user) throw new NotFoundException('No user found with this number');
-    // Never return the caller's own account — you can't assign yourself as a
-    // driver, send money to yourself, etc. (this is the same account showing in
-    // both customer and driver mode of a dual-role user).
-    if (currentUserId && (user as any)._id?.toString() === currentUserId) {
-      throw new BadRequestException('This is your own number.');
-    }
+    // Looking yourself up is fine - people check their own profile. It is only
+    // ACTING on yourself that is refused, and those checks live where the action
+    // happens (assignDriver, transferFunds), so they hold whatever the caller
+    // does here. `isSelf` lets the app hide the buttons that would be refused.
+    const isSelf = !!currentUserId && (user as any)._id?.toString() === currentUserId;
 
-    return { message: 'User found', data: await this.withVehicles(user) };
+    return {
+      message: isSelf ? 'This is you' : 'User found',
+      data: { ...(await this.withVehicles(user)), isSelf },
+    };
   }
 
   async getProfile(userId: string) {

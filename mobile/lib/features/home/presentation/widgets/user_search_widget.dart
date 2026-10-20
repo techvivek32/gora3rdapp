@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../users/presentation/widgets/user_card_sheet.dart';
+import '../../../../core/utils/api_error.dart';
 
 /// A phone-number search box that looks up a partner by mobile number and shows
 /// their profile card.
@@ -46,8 +47,10 @@ class _UserSearchWidgetState extends State<UserSearchWidget> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
+      // The server says WHY - "This is your own number.", "No user found ...".
+      // The old catch-all made every failure look like a missing account.
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No user found with this number')),
+        SnackBar(content: Text(serverMessage(e, fallback: 'No user found with this number'))),
       );
     }
   }
