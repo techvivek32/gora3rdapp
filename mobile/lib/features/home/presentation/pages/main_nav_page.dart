@@ -19,25 +19,19 @@ class MainNavPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _getSelectedIndex(context);
-    // Settings has its own pinned "switch mode" bar at the bottom, and the
-    // docked + sat on top of it. Posting isn't something you do from Settings
-    // anyway, so the button (and its notch) are dropped on that tab only.
-    final hideFab = selectedIndex == 3;
-
     return Scaffold(
       body: child,
-      floatingActionButton: hideFab
-          ? null
-          : FloatingActionButton(
-              backgroundColor: Colors.black,
-              onPressed: () => _showPostOptions(context),
-              child: const Icon(Icons.add, color: Colors.white),
-            ),
+      // On every tab, Settings included: the switch-mode bar that used to sit
+      // under it there has moved into the settings list, so nothing collides.
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.black,
+        onPressed: () => _showPostOptions(context),
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
         color: AppColors.primary,
-        // No notch without the button, or the bar keeps an empty cut-out.
-        shape: hideFab ? null : const CircularNotchedRectangle(),
+        shape: const CircularNotchedRectangle(),
         notchMargin: 8.0,
         height: 65.h,
         padding: EdgeInsets.zero,

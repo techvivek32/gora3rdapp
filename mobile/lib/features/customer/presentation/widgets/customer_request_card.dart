@@ -241,27 +241,35 @@ class CustomerRequestCard extends StatelessWidget {
                 ),
               )
             else
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 12.w),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.workspace_premium_rounded, size: 18.sp, color: AppColors.warning),
-                    SizedBox(width: 8.w),
-                    Flexible(
-                      child: Text(
-                        'Golden membership required to accept',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.warning),
+              // Telling someone they need Golden and leaving them to find the
+              // plans themselves is a dead end - this opens them.
+              InkWell(
+                onTap: () => context.push('/subscriptions'),
+                borderRadius: BorderRadius.circular(10.r),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 11.h, horizontal: 12.w),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.workspace_premium_rounded, size: 18.sp, color: AppColors.warning),
+                      SizedBox(width: 8.w),
+                      Flexible(
+                        child: Text(
+                          'Golden membership required to accept',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w700, color: AppColors.warning),
+                        ),
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 6.w),
+                      Icon(Icons.arrow_forward_rounded, size: 15.sp, color: AppColors.warning),
+                    ],
+                  ),
                 ),
               ),
           ],

@@ -27,7 +27,6 @@ class CustomerProfilePage extends StatelessWidget {
           // Switching sides is not a settings row — it changes which app you're in.
           // It stays pinned just above the bottom nav so it is always reachable,
           // instead of scrolling off the end of the list.
-          bottomNavigationBar: _switchModeBar(context),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -73,6 +72,10 @@ class CustomerProfilePage extends StatelessWidget {
               _action(Icons.privacy_tip_outlined, 'Privacy Policy', '', () => context.push('/policy/privacy')),
               const SizedBox(height: 12),
               _action(Icons.logout_rounded, 'Sign Out', '', () => _signOut(context), danger: true),
+              const SizedBox(height: 16),
+              _switchModeCard(context),
+              // Clear of the docked + button at the bottom centre.
+              const SizedBox(height: 90),
             ],
           ),
         );
@@ -100,27 +103,15 @@ class CustomerProfilePage extends StatelessWidget {
 
   /// Pinned bar holding the mode-switch card: a hairline rule, then the card,
   /// padded clear of the system gesture bar underneath.
-  Widget _switchModeBar(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: SafeArea(top: false, child: _switchModeCard(context)),
-      );
-
-  /// The "go to the other side of the app" card. Tinted and outlined in the
-  /// brand colour so it stands clear of the plain settings rows above it.
+  /// The "go to the other side of the app" card. Filled in the brand colour so
+  /// it still stands clear of the plain settings rows above it.
   Widget _switchModeCard(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
+          color: AppColors.primary,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.45), width: 1.4),
         ),
         child: ListTile(
           onTap: () => switchRole(context, 'driver'),
-          // Compact: this bar is always on screen, so it should take as little
-          // room from the settings list as possible.
           dense: true,
           visualDensity: VisualDensity.compact,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
@@ -129,12 +120,15 @@ class CustomerProfilePage extends StatelessWidget {
           leading: Container(
             width: 30,
             height: 30,
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 17),
           ),
           title: const Text('Switch to Driver / Vendor',
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
-          trailing: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 16),
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white)),
+          trailing: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
         ),
       );
 

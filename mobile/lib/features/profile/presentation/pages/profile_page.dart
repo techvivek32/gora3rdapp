@@ -36,9 +36,6 @@ class ProfilePage extends StatelessWidget {
         final planLabel = config['label'] as String;
 
         return Scaffold(
-          // Same as the customer side: switching modes isn't a settings row, so it
-          // stays pinned above the bottom nav rather than scrolling off the end.
-          bottomNavigationBar: _switchModeBar(context),
           backgroundColor: AppColors.background,
           body: CustomScrollView(
             slivers: [
@@ -172,7 +169,10 @@ class ProfilePage extends StatelessWidget {
                         color: AppColors.error,
                         onTap: () => _confirmDeleteAccount(context),
                       ),
-                      SizedBox(height: 140.h),
+                      SizedBox(height: 16.h),
+                      _switchModeCard(context),
+                      // Clear of the docked + button at the bottom centre.
+                      SizedBox(height: 90.h),
                     ],
                   ),
                 ),
@@ -189,22 +189,12 @@ class ProfilePage extends StatelessWidget {
   /// Pinned bar holding the mode-switch card: a hairline rule, then the card,
   /// padded clear of the system gesture bar underneath. Mirrors the customer
   /// Settings page so both sides behave the same.
-  Widget _switchModeBar(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-          color: AppColors.background,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: SafeArea(top: false, child: _switchModeCard(context)),
-      );
-
-  /// "Go to the other side of the app" — tinted and outlined in the brand colour
-  /// so it reads as a mode change, not another settings row.
+  /// "Go to the other side of the app" — filled in the brand colour so it still
+  /// reads as a mode change now that it sits among the settings rows.
   Widget _switchModeCard(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.08),
+          color: AppColors.primary,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.primary.withValues(alpha: 0.45), width: 1.4),
         ),
         child: ListTile(
           onTap: () => switchRole(context, 'customer'),
@@ -216,12 +206,15 @@ class ProfilePage extends StatelessWidget {
           leading: Container(
             width: 30,
             height: 30,
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(8),
+            ),
             child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 17),
           ),
           title: Text('Switch to Customer'.tr,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.primary)),
-          trailing: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary, size: 16),
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white)),
+          trailing: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 16),
         ),
       );
 
