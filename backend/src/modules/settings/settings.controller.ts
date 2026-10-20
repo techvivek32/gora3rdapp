@@ -60,6 +60,7 @@ export class SettingsController {
     appSuggestedFareEnabled?: boolean;
     viewsEnabled?: boolean;
     minBillKm?: number;
+    localPackageKm?: { hours: number; km: number }[];
     tollTaxPerKm?: number;
     gstPercent?: number;
     platformCommissionPercent?: number;

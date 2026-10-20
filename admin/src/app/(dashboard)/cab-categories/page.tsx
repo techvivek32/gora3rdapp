@@ -37,6 +37,7 @@ export default function CabCategoriesPage() {
   useEffect(() => {
     const s = (settingsData as any)?.data;
     if (typeof s?.minBillKm === 'number') setMinBillKm(s.minBillKm);
+    if (Array.isArray(s?.localPackageKm)) setLocalPackageKm(s.localPackageKm);
     if (typeof s?.tollTaxPerKm === 'number') setTollTaxPerKm(s.tollTaxPerKm);
     if (typeof s?.gstPercent === 'number') setGstPercent(s.gstPercent);
     if (typeof s?.driverHirePerDay === 'number') setDriverHirePerDay(s.driverHirePerDay);
@@ -47,7 +48,7 @@ export default function CabCategoriesPage() {
     if (typeof s?.platformCommissionPercent === 'number') setPlatformCommissionPercent(s.platformCommissionPercent);
   }, [settingsData]);
   const saveMinKmMutation = useMutation({
-    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0, platformCommissionPercent: Number(platformCommissionPercent) || 0, driverHireKmPerDay: Number(driverHireKmPerDay) || 0, driverHireExtraKmPrice: Number(driverHireExtraKmPrice) || 0, driverHireFoodPerDay: Number(driverHireFoodPerDay) || 0, driverHireReturnByCustomer: !!driverHireReturnByCustomer }),
+    mutationFn: () => adminApi.updateSettings({ minBillKm: Number(minBillKm) || 0, tollTaxPerKm: Number(tollTaxPerKm) || 0, gstPercent: Number(gstPercent) || 0, driverHirePerDay: Number(driverHirePerDay) || 0, platformCommissionPercent: Number(platformCommissionPercent) || 0, driverHireKmPerDay: Number(driverHireKmPerDay) || 0, driverHireExtraKmPrice: Number(driverHireExtraKmPrice) || 0, driverHireFoodPerDay: Number(driverHireFoodPerDay) || 0, driverHireReturnByCustomer: !!driverHireReturnByCustomer, localPackageKm: LOCAL_HOURS.map((h) => ({ hours: h, km: Number(localPackageKm.find((p) => p.hours === h)?.km) || 0 })).filter((p) => p.km > 0) }),
     onSuccess: () => {
       toast.success('Cab settings saved');
       queryClient.invalidateQueries({ queryKey: ['admin-settings-cab'] });
@@ -71,6 +72,11 @@ export default function CabCategoriesPage() {
   });
 
   /** The page does two separate jobs; show one at a time. */
+  // Km included in each Local package - the same for every cab, so it is set
+  // once here instead of on each one.
+  const LOCAL_HOURS = [6, 8, 10, 12];
+  const [localPackageKm, setLocalPackageKm] = useState<{ hours: number; km: number }[]>([]);
+
   const [tab, setTab] = useState<'pricing' | 'cabs'>('pricing');
 
   return (
@@ -259,6 +265,42 @@ export default function CabCategoriesPage() {
               </p>
             </div>
         </div>
+        <div className="pt-2">
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Local (hourly package) — included KM</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Km included in each Local package. The same for every cab — only the price differs, and that is set on
+            the cab itself under <b>Cabs → Edit → KM &amp; Rental</b>. Leave a row at 0 and that package falls
+            back to the cab&apos;s own KM/hour rule.
+          </p>
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-w-md">
+            <div className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-400">
+              <div className="bg-white dark:bg-gray-900 px-3 py-2">Package</div>
+              <div className="bg-white dark:bg-gray-900 px-3 py-2">Included KM</div>
+            </div>
+            {LOCAL_HOURS.map((h) => {
+              const row = localPackageKm.find((p) => p.hours === h);
+              return (
+                <div key={h} className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-700">
+                  <div className="bg-white dark:bg-gray-900 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white flex items-center">
+                    {h} hrs
+                  </div>
+                  <div className="bg-white dark:bg-gray-900 px-2 py-1.5">
+                    <input
+                      type="number" min={0} placeholder="e.g. 60"
+                      value={row?.km ?? 0}
+                      onChange={(e) => {
+                        const rest = localPackageKm.filter((p) => p.hours !== h);
+                        setLocalPackageKm([...rest, { hours: h, km: Number(e.target.value) }].sort((a, b) => a.hours - b.hours));
+                      }}
+                      className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <button
           onClick={() => saveMinKmMutation.mutate()}
           disabled={saveMinKmMutation.isPending}

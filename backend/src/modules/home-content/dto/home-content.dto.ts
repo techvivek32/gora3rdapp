@@ -2,6 +2,11 @@ import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max,
 import { Type } from 'class-transformer';
 import { HomeSectionType } from '../../../database/schemas/home-content.schema';
 
+class LocalPackageDto {
+  @IsInt() hours: number;
+  @IsOptional() @IsNumber() @Min(0) price?: number;
+}
+
 export class StatePriceDto {
   @IsString() state: string;
   @IsOptional() @IsNumber() petrol?: number;
@@ -57,6 +62,7 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;
   @IsOptional() @IsNumber() extraHourPrice?: number;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => LocalPackageDto) localPackages?: LocalPackageDto[];
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) inclusions?: string[];
@@ -85,6 +91,7 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsNumber() extraKmPrice?: number;
   @IsOptional() @IsNumber() packageKmPerHour?: number;
   @IsOptional() @IsNumber() extraHourPrice?: number;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => LocalPackageDto) localPackages?: LocalPackageDto[];
   @IsOptional() @IsInt() seats?: number;
   @IsOptional() @IsString() bags?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) inclusions?: string[];

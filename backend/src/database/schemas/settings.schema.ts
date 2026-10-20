@@ -115,6 +115,19 @@ export class PlatformSettings {
   minBillKm: number;
 
   /**
+   * Km included in each Local (in-city hourly) package. The same for every cab
+   * - only the price differs per cab - so it lives here rather than being
+   * repeated on each one.
+   *
+   * Empty falls back to the per-cab packageKmPerHour x hours rule.
+   */
+  @Prop({
+    type: [{ hours: Number, km: Number, _id: false }],
+    default: [],
+  })
+  localPackageKm: { hours: number; km: number }[];
+
+  /**
    * Estimated toll + state-tax per km (₹), used for the "All Inclusive" fare ONLY
    * when Google's Routes API returns no toll amount for a route (common on long
    * Indian inter-state routes, and Google never includes state tax). 0 = disabled.

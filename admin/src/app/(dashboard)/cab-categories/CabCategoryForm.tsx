@@ -7,6 +7,10 @@ import { adminApi } from '@/lib/api';
 import { INDIAN_STATES } from '@/lib/indian-states';
 import toast from 'react-hot-toast';
 
+// The Local package lengths offered in the app. Keep in step with the chips on
+// the customer booking form.
+const LOCAL_HOURS = [6, 8, 10, 12];
+
 export interface StatePrice { state: string; petrol?: number; diesel?: number; cng?: number }
 
 export interface CabCategory {
@@ -27,6 +31,7 @@ export interface CabCategory {
   dailyKmLimit?: number;
   extraKmPrice?: number;
   packageKmPerHour?: number;
+  localPackages?: { hours: number; price: number }[];
   extraHourPrice?: number;
   seats?: number;
   bags?: string;
@@ -46,6 +51,8 @@ const EMPTY_FORM = {
   allowanceDailyRate: 0, allowanceDistanceThreshold: 0, allowanceBaseRate: 0, allowanceMaxRate: 0,
   dailyKmLimit: 0, extraKmPrice: 0,
   packageKmPerHour: 0, extraHourPrice: 0,
+  // typed so the empty default is not inferred as never[]
+  localPackages: [] as { hours: number; price: number }[],
   seats: 0, bags: '',
   inclusions: [] as string[], exclusions: [] as string[], facilities: [] as string[], terms: [] as string[],
   order: 0, isActive: true,
@@ -146,6 +153,7 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
       dailyKmLimit: it.dailyKmLimit ?? 0,
       extraKmPrice: it.extraKmPrice ?? 0,
       packageKmPerHour: it.packageKmPerHour ?? 0,
+      localPackages: it.localPackages ?? [],
       extraHourPrice: it.extraHourPrice ?? 0,
       seats: it.seats ?? 0,
       bags: it.bags ?? '',
@@ -230,6 +238,14 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
     dailyKmLimit: Number(form.dailyKmLimit) || 0,
     extraKmPrice: Number(form.extraKmPrice) || 0,
     packageKmPerHour: Number(form.packageKmPerHour) || 0,
+    // Only rows the admin actually filled in are sent; a blank row means "this
+    // package is priced the old way".
+    localPackages: LOCAL_HOURS
+      .map((h) => {
+        const row = (form.localPackages ?? []).find((p) => p.hours === h);
+        return { hours: h, price: Number(row?.price) || 0 };
+      })
+      .filter((p) => p.price > 0),
     extraHourPrice: Number(form.extraHourPrice) || 0,
     seats: Number(form.seats) || 0,
     bags: form.bags.trim(),
@@ -558,9 +574,47 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                 </p>
 
                 <h3 className="text-sm font-semibold text-gray-900 dark:text-white pt-2">Local (hourly package)</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <p className="text-xs text-gray-500">
+                  This cab&apos;s price for each package. e.g. ₹1,000 an hour → 6,000 against 6 hrs, 8,000 against
+                  8 hrs. The included km is the same for every cab and is set once under
+                  <b> Cab Categories → Pricing</b>. Leave a row at 0 and that package falls back to the KM/hour
+                  rule below.
+                </p>
+                <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden max-w-md">
+                  <div className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-400">
+                    <div className="bg-white dark:bg-gray-900 px-3 py-2">Package</div>
+                    <div className="bg-white dark:bg-gray-900 px-3 py-2">Price (₹)</div>
+                  </div>
+                  {LOCAL_HOURS.map((h) => {
+                    const row = (form.localPackages ?? []).find((p) => p.hours === h);
+                    return (
+                      <div key={h} className="grid grid-cols-2 gap-px bg-gray-200 dark:bg-gray-700">
+                        <div className="bg-white dark:bg-gray-900 px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white flex items-center">
+                          {h} hrs
+                        </div>
+                        <div className="bg-white dark:bg-gray-900 px-2 py-1.5">
+                          <input
+                            type="number" min={0} placeholder="e.g. 6000"
+                            value={row?.price ?? 0}
+                            onChange={(e) => {
+                              const rest = (form.localPackages ?? []).filter((p) => p.hours !== h);
+                              setForm({
+                                ...form,
+                                localPackages: [...rest, { hours: h, price: Number(e.target.value) }]
+                                  .sort((a, b) => a.hours - b.hours),
+                              });
+                            }}
+                            className={inputCls}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <label className={labelCls}>Local package KM / hour</label>
+                    <label className={labelCls}>Local package KM / hour (fallback)</label>
                     <input type="number" min={0} placeholder="e.g. 10 (0 = no Local packages)" value={form.packageKmPerHour} onChange={(e) => setForm({ ...form, packageKmPerHour: Number(e.target.value) })} className={inputCls} />
                   </div>
                   <div>
@@ -569,8 +623,9 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                   </div>
                 </div>
                 <p className="text-xs text-gray-500 -mt-1">
-                  Local (in-city hourly): a 6/8/10/12-hour package includes KM/hour × hours (e.g. 10 × 8 = 80 km) at the per-km
-                  rate. Time used beyond the package is billed at the extra ₹/hr; km beyond the included allowance at the extra ₹/km.
+                  A package with no price in the table above is charged the old way: KM/hour × hours (e.g. 10 × 8 = 80 km)
+                  at the per-km rate. Set KM/hour to 0 and this cab offers no Local packages at all. Time used beyond the
+                  booked package is billed at the extra ₹/hr; km beyond the included allowance at the extra ₹/km.
                 </p>
               </>
             )}

@@ -84,6 +84,15 @@ export class CabCategory {
   // Km included per hour of a Local package (e.g. 10 → an 8-hour package = 80 km).
   // 0 = Local packages not offered for this cab. Package fare = includedKm × per-km rate.
   @Prop({ default: 0 }) packageKmPerHour: number;
+  // Price of each Local package for THIS cab. The included km is global (see
+  // PlatformSettings.localPackageKm) because it is the same for every cab;
+  // only the price differs. Empty = fall back to packageKmPerHour x hours
+  // priced at the per-km rate.
+  @Prop({
+    type: [{ hours: Number, price: Number, _id: false }],
+    default: [],
+  })
+  localPackages: { hours: number; price: number }[];
   // ₹ charged per hour beyond the booked Local package (admin-managed).
   @Prop({ default: 0 }) extraHourPrice: number;
   // Per-cab info shown as tabs on the customer Confirm Booking screen.

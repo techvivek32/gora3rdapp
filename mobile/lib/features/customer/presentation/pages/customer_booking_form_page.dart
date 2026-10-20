@@ -73,6 +73,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   int _passengers = 1;
   int _durationHours = 4;
   int _localHours = 8; // Local (hourly rental) package length
+  /// Included km per package length, from the admin's table. Empty = fall
+  /// back to the km/hour figure below.
+  Map<int, int> _localKmByHours = const {};
   String? _subType;
   String? _vehicle;
   DateTime? _endDate; // trip end (round-trip return / general trip end)
@@ -314,6 +317,7 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     try {
       final res = await getIt<ApiClient>().get('/home-content/cab-categories');
       final cats = (res.data['data'] as List?) ?? const [];
+
       final perHrs = cats
           .map((e) => ((e as Map)['packageKmPerHour'] as num?)?.toDouble() ?? 0)
           .where((v) => v > 0)
@@ -334,6 +338,17 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
   Future<void> _loadHireRate() async {
     try {
       final res = await getIt<ApiClient>().get('/settings');
+      // Included km per Local package - set once in the global Pricing settings,
+      // so every cab's chips show the same figure.
+      final pk = (res.data['data']?['localPackageKm'] as List?) ?? const [];
+      final byHours = <int, int>{};
+      for (final p in pk) {
+        if (p is! Map) continue;
+        final h = (p['hours'] as num?)?.toInt() ?? 0;
+        final km = (p['km'] as num?)?.toInt() ?? 0;
+        if (h > 0 && km > 0) byHours[h] = km;
+      }
+      if (byHours.isNotEmpty && mounted) setState(() => _localKmByHours = byHours);
       final d = (res.data['data'] as Map?) ?? const {};
       if (!mounted) return;
       setState(() {
@@ -1500,9 +1515,9 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
                     child: Column(
                       children: [
                         Text('$h hrs', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w800, color: sel ? Colors.white : AppColors.textPrimary, fontFamily: 'Poppins')),
-                        if (_localKmPerHour > 0) ...[
+                        if (_localKmByHours[h] != null || _localKmPerHour > 0) ...[
                           SizedBox(height: 3.h),
-                          Text('${(_localKmPerHour * h).round()} km', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.primary, fontFamily: 'Poppins')),
+                          Text('${_localKmByHours[h] ?? (_localKmPerHour * h).round()} km', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 8.5.sp, fontWeight: FontWeight.w700, color: sel ? Colors.white : AppColors.primary, fontFamily: 'Poppins')),
                         ],
                       ],
                     ),

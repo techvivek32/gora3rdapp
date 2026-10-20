@@ -68,14 +68,44 @@ class _CabResultsPageState extends State<CabResultsPage> {
     return diff < 0 ? 1 : diff + 1;
   }
 
-  // Km included in a Local package for this cab = hours × the cab's km/hour.
+  /// Included km per package, from the global settings (same for every cab).
+  List<dynamic> _localPackageKm = const [];
+
+  /// The admin's row for the chosen package length, if they set one up.
+  Map<String, dynamic>? _localPackage(Map<String, dynamic> cat) {
+    for (final p in (cat['localPackages'] as List?) ?? const []) {
+      if (p is Map && ((p['hours'] as num?)?.toInt() ?? 0) == _localHours) {
+        return Map<String, dynamic>.from(p);
+      }
+    }
+    return null;
+  }
+
+  // Km included in a Local package. The same for every cab, so it comes from
+  // the global settings; only the price below is per-cab. Falls back to the old
+  // rule of hours × the cab's km/hour when the admin has not set a table.
   int _localIncludedKm(Map<String, dynamic> cat) {
+    for (final p in _localPackageKm) {
+      if (p is Map && ((p['hours'] as num?)?.toInt() ?? 0) == _localHours) {
+        final km = (p['km'] as num?)?.toInt() ?? 0;
+        if (km > 0) return km;
+      }
+    }
     final perHr = (cat['packageKmPerHour'] as num?)?.toDouble() ?? 0;
     return (perHr * _localHours).round();
   }
 
+  /// The admin's price for this package. 0 means they did not set one, and the
+  /// fare falls back to included km × the per-km rate.
+  int _localPackagePrice(Map<String, dynamic> cat) =>
+      (_localPackage(cat)?['price'] as num?)?.toInt() ?? 0;
+
   // True when this cab offers Local packages (admin set a km/hour rate).
-  bool _localOffered(Map<String, dynamic> cat) => ((cat['packageKmPerHour'] as num?)?.toDouble() ?? 0) > 0;
+  // A cab offers Local packages if the admin priced any package for it, or
+  // left the old km/hour rate in place.
+  bool _localOffered(Map<String, dynamic> cat) =>
+      ((cat['localPackages'] as List?) ?? const []).isNotEmpty ||
+      ((cat['packageKmPerHour'] as num?)?.toDouble() ?? 0) > 0;
 
   // When a bookingId is passed in, this screen edits that booking instead of
   // creating a new one (the Edit Booking flow reuses the cab-class picker).
@@ -129,6 +159,9 @@ class _CabResultsPageState extends State<CabResultsPage> {
       minKm = ((res.data['data']?['minBillKm']) as num?)?.toDouble() ?? 0;
       tollTaxPerKm = ((res.data['data']?['tollTaxPerKm']) as num?)?.toDouble() ?? 0;
       gst = ((res.data['data']?['gstPercent']) as num?)?.toDouble() ?? 0;
+      // Included km per Local package - global, so every cab shows the same.
+      final pk = (res.data['data']?['localPackageKm'] as List?) ?? const [];
+      if (pk.isNotEmpty) _localPackageKm = pk;
     } catch (_) {}
     // Toll for "All Inclusive" = the admin per-km rate × distance (the single
     // source of truth). 0 = no toll. Google toll auto-detect is intentionally
@@ -293,7 +326,11 @@ class _CabResultsPageState extends State<CabResultsPage> {
   // Local package fare = included km (hours × km/hr) × per-km rate. Otherwise
   // distance-based (at least the per-day minimum included km).
   int _baseFare(Map<String, dynamic> cat) =>
-      _isLocal ? (_localIncludedKm(cat) * _rate(cat)).round() : (_billableKmFor(cat) * _rate(cat)).round();
+      _isLocal
+          ? (_localPackagePrice(cat) > 0
+              ? _localPackagePrice(cat)
+              : (_localIncludedKm(cat) * _rate(cat)).round())
+          : (_billableKmFor(cat) * _rate(cat)).round();
 
   // Per-fuel rate: pickup state's rate first, then the base fuel rate, then pricePerKm.
   double _rateForFuel(Map<String, dynamic> cat, String fuel) {
@@ -306,7 +343,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
   }
 
   int _baseFareForFuel(Map<String, dynamic> cat, String fuel) =>
-      _isLocal ? (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round() : (_billableKmFor(cat) * _rateForFuel(cat, fuel)).round();
+      _isLocal
+          // A packaged price is the price - it does not change with fuel.
+          ? (_localPackagePrice(cat) > 0
+              ? _localPackagePrice(cat)
+              : (_localIncludedKm(cat) * _rateForFuel(cat, fuel)).round())
+          : (_billableKmFor(cat) * _rateForFuel(cat, fuel)).round();
 
   // Original (pre-discount) per-fuel fare = base+toll + allowance + GST(on base+allowance).
   int _rawFareForFuel(Map<String, dynamic> cat, String fuel) {
