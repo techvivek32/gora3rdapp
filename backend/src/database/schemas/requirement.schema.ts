@@ -94,6 +94,15 @@ export class Requirement {
   @Prop({ type: Boolean })
   isAppSuggested: boolean;
 
+  /**
+   * What the fare covers, chosen by the poster:
+   *   'inclusive' - toll, state tax and parking are already in the fare.
+   *   'exclusive' - the driver pays those on top, out of their own pocket.
+   * Empty on older bookings, which simply show nothing.
+   */
+  @Prop({ type: String, enum: ['', 'inclusive', 'exclusive'], default: '' })
+  fareType: string;
+
   // "Secure this booking": the acceptor pays the commission in advance (payment-
   // fraud / cancellation protection). Enables the hideProfile option.
   @Prop({ type: Boolean, default: false })

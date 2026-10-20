@@ -37,6 +37,8 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   DateTime? _returnDate;
   TimeOfDay? _returnTime;
   bool _useCustomFare = false;
+  /// What the fare covers: '' (not stated), 'inclusive' or 'exclusive'.
+  String _fareType = '';
   bool _secureBooking = false; // acceptor pays commission in advance
   bool _hideProfile = false; // hide name/photo until assigned (secure only)
   bool _submitting = false; // blocks a double-tap from posting twice
@@ -130,6 +132,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _hideProfile = r['hideProfile'] == true;
     // Secure bookings always use a custom fare (App Suggested is locked off).
     if (r['isAppSuggested'] == false || _secureBooking) _useCustomFare = true;
+    _fareType = (r['fareType'] ?? '').toString();
     if (r['estimatedDistance'] != null) _computedDistance = (r['estimatedDistance'] as num).toDouble();
     if (r['travelDate'] != null) {
       try {
@@ -336,6 +339,7 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       'commission': _commission.round(),
       'totalAmount': _total.round(),
       'isAppSuggested': !_useCustomFare,
+      if (_fareType.isNotEmpty) 'fareType': _fareType,
       'secureBooking': _secureBooking,
       'hideProfile': _secureBooking && _hideProfile,
       if (_pickupLat != null && _pickupLng != null)
@@ -351,6 +355,35 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     }
     setState(() => _submitting = true);
     bloc.add(CreateRequirementEvent(data: data));
+  }
+
+  /// One of the two fare-cover choices. Tapping the selected one clears it,
+  /// so a poster who is not sure can leave it unsaid rather than guess.
+  Widget _fareTypeButton(String value, String label) {
+    final selected = _fareType == value;
+    return GestureDetector(
+      onTap: () => setState(() => _fareType = selected ? '' : value),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 10.w),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.grey[100],
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: 2),
+        ),
+        child: Center(
+          child: Text(
+            label.tr,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Poppins',
+              fontWeight: FontWeight.w600,
+              fontSize: 13.sp,
+              color: selected ? Colors.white : AppColors.textHint,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   /// "Secure this booking" + "Hide my profile" toggles.
@@ -707,6 +740,20 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
 
                 // Secure booking + hide-profile toggles.
                 _buildSecureToggles(),
+                SizedBox(height: 20.h),
+
+                // What the fare covers. Without this a driver cannot tell whether
+                // toll, state tax and parking come out of the fare or not.
+                Text('What does the fare cover?'.tr,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp, fontFamily: 'Poppins', color: AppColors.textPrimary)),
+                SizedBox(height: 12.h),
+                Row(
+                  children: [
+                    Expanded(child: _fareTypeButton('inclusive', 'All Inclusive')),
+                    SizedBox(width: 10.w),
+                    Expanded(child: _fareTypeButton('exclusive', 'All Exclusive')),
+                  ],
+                ),
                 SizedBox(height: 20.h),
 
                 // Fare Selection Section

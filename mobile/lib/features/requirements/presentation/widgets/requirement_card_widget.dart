@@ -171,6 +171,9 @@ class RequirementCardWidget extends StatelessWidget {
         final (statusLabel, statusColor) = _statusInfo(requirement['status'] as String?);
         final num total = (requirement['totalAmount'] as num?) ?? 0;
         final num driverEarning = (requirement['fare'] as num?) ?? 0;
+        // What the fare covers, as the poster stated it. Empty on older
+        // bookings, where nothing is shown rather than a guess.
+        final fareType = (requirement['fareType'] ?? '').toString();
         final num commission = (requirement['commission'] as num?) ?? 0;
         final bool isAppSuggested = requirement['isAppSuggested'] == true;
         // Hide the fare block for app-suggested cards when the admin turned the
@@ -460,6 +463,34 @@ class RequirementCardWidget extends StatelessWidget {
                                   ],
                                 ),
                               ),
+                            // All Inclusive / All Exclusive, the same way the
+                            // customer cards state it.
+                            if (fareType.isNotEmpty) ...[
+                              SizedBox(height: 6.h),
+                              Row(
+                                children: [
+                                  Icon(
+                                    fareType == 'inclusive' ? Icons.verified_rounded : Icons.info_outline_rounded,
+                                    size: 14.sp,
+                                    color: fareType == 'inclusive' ? AppColors.warning : AppColors.error,
+                                  ),
+                                  SizedBox(width: 5.w),
+                                  Expanded(
+                                    child: Text(
+                                      fareType == 'inclusive'
+                                          ? 'All Inclusive — toll, state tax & parking included'
+                                          : 'All Exclusive — driver pays toll, state tax & parking',
+                                      style: TextStyle(
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w600,
+                                        height: 1.3,
+                                        color: fareType == 'inclusive' ? AppColors.warning : AppColors.error,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             SizedBox(height: 6.h),
                             Divider(height: 1, color: Colors.black26),
                             SizedBox(height: 2.h),
