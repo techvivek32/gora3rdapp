@@ -275,6 +275,18 @@ export class AuthService {
       throw new UnauthorizedException('Account temporarily locked. Try again later');
     }
 
+    // Accounts created with mobile + OTP never get a password. bcrypt.compare()
+    // throws "Illegal arguments: string, undefined" on those, which reached the
+    // client as a 500 instead of a failed login — answer like any other bad
+    // credential and point them at the sign-in they actually have. No
+    // handleFailedLogin() here: these accounts can never pass this check, so
+    // counting attempts would only let anyone lock a stranger out.
+    if (!user.password) {
+      throw new UnauthorizedException(
+        'This account signs in with a mobile number and OTP, not a password.',
+      );
+    }
+
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
     if (!isPasswordValid) {
       await this.handleFailedLogin(user);
@@ -509,7 +521,17 @@ export class AuthService {
     if (this.isDriverRole(user.role)) user.driverOnboarded = true;
     if (dto.city) user.city = dto.city;
     if (dto.profileImage) user.profileImage = dto.profileImage;
-    if (dto.email && !user.email) user.email = dto.email.toLowerCase();
+    if (dto.email && !user.email) {
+      // `email` is a unique index, so an address another member already uses
+      // made user.save() throw E11000 and the switch failed with a 500. Say so
+      // instead; the member can retype it or leave it blank.
+      const email = dto.email.toLowerCase().trim();
+      const taken = await this.userModel.exists({ email, _id: { $ne: user._id } });
+      if (taken) {
+        throw new BadRequestException('That email is already registered to another account.');
+      }
+      user.email = email;
+    }
     user.customerOnboarded = true;
     user.role = UserRole.CUSTOMER;
     await user.save();

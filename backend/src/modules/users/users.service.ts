@@ -275,6 +275,18 @@ export class UsersService {
       throw new BadRequestException('Your account deletion is pending. You cannot modify your profile.');
     }
 
+    // `email` is a unique index. Writing one that another member already holds
+    // made this update fail with a raw E11000 and a 500 — check first and say
+    // what is wrong in a sentence the member can act on.
+    if (dto.email) {
+      const email = dto.email.toLowerCase().trim();
+      const taken = await this.userModel.exists({ email, _id: { $ne: new Types.ObjectId(userId) } });
+      if (taken) {
+        throw new BadRequestException('That email is already registered to another account.');
+      }
+      dto.email = email;
+    }
+
     const updated = await this.userModel.findByIdAndUpdate(
       userId,
       { $set: dto },
