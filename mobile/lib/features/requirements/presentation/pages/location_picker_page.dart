@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/location_ping.dart';
 
 class LocationPickerResult {
   final String address;
@@ -175,17 +176,16 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   Future<void> _goToCurrentLocation() async {
     setState(() => _locating = true);
     try {
-      LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      if (perm == LocationPermission.deniedForever || perm == LocationPermission.denied) {
+      // Through the shared helper, never Geolocator.requestPermission() direct —
+      // Play requires the in-app disclosure immediately before the OS prompt, on
+      // every screen that can raise it.
+      if (!await ensureLocationPermission(context)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Location permission denied')),
           );
+          setState(() => _locating = false);
         }
-        setState(() => _locating = false);
         return;
       }
       final pos = await Geolocator.getCurrentPosition(

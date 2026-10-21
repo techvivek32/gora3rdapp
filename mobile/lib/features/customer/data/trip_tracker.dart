@@ -59,9 +59,13 @@ class TripTracker {
     await _stopStreamOnly();
 
     if (!await Geolocator.isLocationServiceEnabled()) return false;
-    var perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return false;
+    // CHECK only — never request here. This runs with no BuildContext, so it
+    // cannot show the in-app disclosure Play requires immediately before the OS
+    // prompt, and asking anyway is what got the release rejected. The screens
+    // that start a trip ask through ensureLocationPermission() first; if that
+    // was declined we just report false and the caller tells the driver.
+    final perm = await Geolocator.checkPermission();
+    if (perm != LocationPermission.always && perm != LocationPermission.whileInUse) return false;
 
     _bookingId = bookingId;
     await _restoreFor(bookingId); // sets _km / _last from disk if same booking, else 0

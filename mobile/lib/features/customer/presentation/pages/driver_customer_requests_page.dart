@@ -5,6 +5,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/utils/location_ping.dart';
 import '../../data/customer_repository.dart';
 import '../../data/trip_tracker.dart';
 import '../utils/invoice_actions.dart';
@@ -191,6 +192,10 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     try {
       final updated = await _repo.verifyTripOtp(id, action, otp.trim());
       if (action == 'start') {
+        // The tracker only CHECKS the permission — the disclosure + OS prompt
+        // have to happen here, where there is a BuildContext to show them on.
+        if (mounted) await ensureLocationPermission(context);
+        if (!mounted) return;
         final ok = await TripTracker.instance.start(id);
         if (!ok && mounted) _snack('Enable location to record trip distance.');
       } else {

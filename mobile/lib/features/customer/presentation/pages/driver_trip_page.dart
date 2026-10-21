@@ -16,6 +16,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/utils/location_ping.dart';
 import '../../data/customer_repository.dart';
 import '../../data/trip_tracker.dart';
 import 'driver_trip_summary_page.dart';
@@ -183,7 +184,6 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
     _startLocation();
     _fetchRoute();
     _ticker = createTicker(_onTick)..start();
-    if (!_isReq && _status == 'ongoing') TripTracker.instance.resumeIfActive(ongoingBookingId: _id);
   }
 
   @override
@@ -304,18 +304,50 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
 
   Future<void> _startLocation() async {
     try {
-      var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
+      // Through the shared helper, never Geolocator.requestPermission() direct:
+      // Play rejected the release over the system prompt appearing on THIS screen
+      // with no in-app disclosure in front of it.
+      if (!await ensureLocationPermission(context)) return;
+      if (!mounted) return;
       // Seed the camera from the cached last fix — getLastKnownPosition does NOT
       // open a GNSS session, so it avoids the main-thread NMEA teardown
       // (removeNmeaListener) that hangs under the emulator's flooding GPS.
       final pos = await Geolocator.getLastKnownPosition();
       if (pos != null) _onPos(pos, first: true);
+      // A trip already running (app relaunched mid-trip) has to claim the stream
+      // BEFORE the map does, or it inherits one with no foreground service — see
+      // _startForegroundTracking for why geolocator makes the order matter.
+      if (!_isReq && _status == 'ongoing') {
+        await TripTracker.instance.resumeIfActive(ongoingBookingId: _id);
+        if (!mounted) return;
+      }
       _posSub = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 8),
       ).listen((p) => _onPos(p));
     } catch (_) {}
+  }
+
+  /// Hand the GPS over to [TripTracker] so the trip records in a FOREGROUND
+  /// service ("Trip in progress"), which is what lets it keep counting with the
+  /// app in the background and the screen off.
+  ///
+  /// Order matters. geolocator keeps one position stream per engine and hands
+  /// that same stream to every later caller, ignoring the settings they pass
+  /// (geolocator_android: `if (_positionStream != null) return _positionStream!`).
+  /// This page already opened a plain stream for the map, so the tracker would
+  /// inherit it, the service would never be promoted, and the kilometres the
+  /// extra-km charge is billed from would stop the moment the driver left the
+  /// app. Cancelling the map's subscription first drops the cached stream
+  /// (asBroadcastStream's onCancel clears it); the tracker then creates the
+  /// foreground one, and the map re-attaches to that.
+  Future<void> _startForegroundTracking() async {
+    await _posSub?.cancel();
+    _posSub = null;
+    await TripTracker.instance.start(_id);
+    if (!mounted) return;
+    _posSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 8),
+    ).listen((p) => _onPos(p));
   }
 
   void _onPos(Position p, {bool first = false}) {
@@ -934,7 +966,7 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       final updated = await _apiVerifyOtp(action, otp, carPhoto: carUrl, driverPhoto: driverUrl);
       if (!mounted) return;
       if (action == 'start') {
-        if (!_isReq) TripTracker.instance.start(_id); // no GPS extra-km for requirements
+        if (!_isReq) await _startForegroundTracking(); // no GPS extra-km for requirements
         setState(() {
           _status = 'ongoing';
           _b['status'] = 'ongoing';
