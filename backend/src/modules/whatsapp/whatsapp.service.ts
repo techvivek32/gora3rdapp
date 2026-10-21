@@ -149,7 +149,11 @@ export class WhatsappService {
       // computed so the booking still posts).
       await this.applyPricing(dto, parsed);
 
-      const res = await this.requirementsService.create(user._id.toString(), dto);
+      // A booking texted in over WhatsApp is not an app post — dropping it over
+      // the sender's KYC state would lose a real customer's booking silently.
+      const res = await this.requirementsService.create(user._id.toString(), dto, {
+        enforceVerification: false,
+      });
       const bookingId = (res as any)?.data?.bookingId ?? '';
       const distanceLine = dto.estimatedDistance ? `Distance: ${dto.estimatedDistance} km\n` : '';
       const pricingLines =

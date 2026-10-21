@@ -11,7 +11,7 @@ import { CreateRequirementDto } from './dto/create-requirement.dto';
 import { UpdateRequirementDto } from './dto/update-requirement.dto';
 import { FilterRequirementsDto } from './dto/filter-requirements.dto';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
-import { MembershipType } from '../../common/enums/user-role.enum';
+import { MembershipType, VerificationStatus } from '../../common/enums/user-role.enum';
 import { ChatService } from '../chat/chat.service';
 import {
   generateBookingId,
@@ -68,7 +68,45 @@ export class RequirementsService {
     }
   }
 
-  async create(userId: string, dto: CreateRequirementDto) {
+  /**
+   * Only a member whose KYC documents an admin has approved may post a booking.
+   *
+   * Throws with a `code` the app keys off to send the member to the KYC screen,
+   * and a message that says what to do next for each state — "pending" is a wait,
+   * "rejected" needs a re-upload, "none" has not started.
+   */
+  private async assertVerifiedPoster(userId: string) {
+    const user: any = await this.userModel.findById(userId).select('verificationStatus').lean();
+    const status = user?.verificationStatus || VerificationStatus.NONE;
+    if (status === VerificationStatus.VERIFIED) return;
+
+    const message =
+      status === VerificationStatus.PENDING
+        ? 'Your documents are with our team for review. You can post a booking as soon as they are approved.'
+        : status === VerificationStatus.REJECTED
+          ? 'Your documents were not approved. Please upload them again to post a booking.'
+          : 'Please submit your documents for verification to post a booking.';
+    // The code rides in `errors` because that is the only extra field the global
+    // HttpExceptionFilter forwards — anything else on the body is stripped.
+    throw new ForbiddenException({
+      message,
+      errors: { code: 'VERIFICATION_REQUIRED', verificationStatus: status },
+    });
+  }
+
+  /**
+   * [opts.enforceVerification] defaults to TRUE so a new caller is gated unless it
+   * deliberately opts out. The two that do are the admin posting on a member's
+   * behalf (the admin has already seen who they are) and the WhatsApp webhook,
+   * where silently dropping a customer's booking would be worse than posting it.
+   */
+  async create(
+    userId: string,
+    dto: CreateRequirementDto,
+    opts: { enforceVerification?: boolean } = {},
+  ) {
+    if (opts.enforceVerification !== false) await this.assertVerifiedPoster(userId);
+
     // ── Duplicate-post guard ────────────────────────────────────────────────
     // Protects against double-tap on the Post button, an auth-refresh/network
     // retry re-sending the same POST, a franchise operator double-submitting,

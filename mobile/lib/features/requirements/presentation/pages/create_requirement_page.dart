@@ -8,6 +8,7 @@ import '../../../../core/localization/app_translations.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../bloc/requirements_bloc.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../../core/widgets/address_autocomplete_field.dart';
 import 'location_picker_page.dart' show haversineDistanceKm;
 
@@ -97,6 +98,10 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   void initState() {
     super.initState();
     _fetchSettings();
+    // Refresh the cached profile so the verification gate below reads today's
+    // status: a member the admin approved an hour ago would otherwise be told to
+    // verify again, because the cached user is only written at login.
+    context.read<AuthBloc>().add(const AuthReloadProfileEvent());
     if (widget.existing != null) _populateFromExisting(widget.existing!);
   }
 
@@ -302,10 +307,49 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
     _updateDistance();
   }
 
+  /// Only a KYC-verified member may post a booking. The server enforces this too
+  /// (and is the authority); checking here first means the driver gets a way to
+  /// fix it instead of filling the whole form and hitting a red snackbar.
+  bool _isVerified() {
+    final authState = context.read<AuthBloc>().state;
+    final user = authState is AuthAuthenticated ? authState.user as Map<String, dynamic>? : null;
+    return user?['verificationStatus'] == 'verified';
+  }
+
+  void _promptKyc() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verification Required', style: TextStyle(fontFamily: 'Poppins')),
+        content: const Text(
+          'Only verified members can post a booking. Submit your documents and we '
+          'will review them shortly.',
+          style: TextStyle(fontFamily: 'Poppins'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Later')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push('/kyc');
+            },
+            child: const Text('Verify Now'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     // Guard against a fast double-tap dispatching two create events in the same
     // frame (before the button rebuilds disabled) → duplicate bookings.
     if (_submitting) return;
+    // Editing an existing booking is not a new post, so the gate only applies to
+    // posting; an already-posted booking stays editable.
+    if (!_isEdit && !_isVerified()) {
+      _promptKyc();
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_travelDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please select travel date'.tr), backgroundColor: AppColors.error));

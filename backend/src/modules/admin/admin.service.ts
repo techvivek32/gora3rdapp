@@ -1330,7 +1330,9 @@ export class AdminService {
     await this.assertUserInCity(userId, franchiseCity);
     const user = await this.userModel.findById(userId).select('_id');
     if (!user) throw new NotFoundException('User not found');
-    return this.requirementsService.create(userId, dto);
+    // Posting on a member's behalf: the admin/franchise operator has already
+    // decided who this is, so the KYC gate that applies in the app is skipped.
+    return this.requirementsService.create(userId, dto, { enforceVerification: false });
   }
 
   /** Same, for an available-cab listing. */
