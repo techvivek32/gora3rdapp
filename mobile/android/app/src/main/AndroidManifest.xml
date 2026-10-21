@@ -8,8 +8,15 @@
          app can capture the user's last GPS location ("Last Login: … <address>"). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-    <!-- Background trip-distance tracking (foreground location service). -->
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
+    <!-- Background trip-distance tracking runs in a FOREGROUND service (type
+         location), which is allowed to keep receiving updates while the app is
+         backgrounded on the plain "while using the app" grant.
+
+         ACCESS_BACKGROUND_LOCATION is deliberately NOT declared. Nothing ever
+         requested it (it sat in the manifest ungranted), the trip meter does not
+         need it, and merely declaring it makes Play treat the app as collecting
+         background location — which pulls in the strictest prominent-disclosure
+         review, a background-location declaration and a walkthrough video. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <!-- Location is optional: the location permission would otherwise implicitly
          REQUIRE GPS hardware and drop devices without it (tablets, etc.). Declaring

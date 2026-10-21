@@ -341,10 +341,21 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
   /// (asBroadcastStream's onCancel clears it); the tracker then creates the
   /// foreground one, and the map re-attaches to that.
   Future<void> _startForegroundTracking() async {
+    // Ask here too. A driver who tapped "Not now" when the screen opened is now
+    // starting a trip, which is exactly the use the disclosure describes — and
+    // without the permission the tracker silently records nothing, so the trip
+    // ends at 0 km and the extra-kilometre charge is billed off a wrong total.
+    final allowed = await ensureLocationPermission(context);
+    if (!mounted) return;
+    if (!allowed) {
+      _snack('Location is off, so this trip\'s distance will not be recorded.');
+      return;
+    }
     await _posSub?.cancel();
     _posSub = null;
-    await TripTracker.instance.start(_id);
+    final started = await TripTracker.instance.start(_id);
     if (!mounted) return;
+    if (!started) _snack('Could not start distance recording — turn location on and reopen the trip.');
     _posSub = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 8),
     ).listen((p) => _onPos(p));

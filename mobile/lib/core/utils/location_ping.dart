@@ -21,7 +21,12 @@ Future<bool?> _showLocationDisclosure(BuildContext context) {
   return showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) => AlertDialog(
+    // barrierDismissible alone still lets the back gesture pop the dialog. Play
+    // wants the disclosure answered by an affirmative choice, so back does
+    // nothing and the user has to pick "Not now" or "Allow".
+    builder: (ctx) => PopScope(
+      canPop: false,
+      child: AlertDialog(
       title: const Text('Allow location access?'),
       content: const SingleChildScrollView(
         child: Text(
@@ -45,6 +50,7 @@ Future<bool?> _showLocationDisclosure(BuildContext context) {
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Not now')),
         FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Allow')),
       ],
+      ),
     ),
   );
 }

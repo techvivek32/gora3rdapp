@@ -55,6 +55,17 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   // Current location
   bool _locating = false;
 
+  /// Drives the map's blue "my location" dot. Starts FALSE and is only turned on
+  /// once we hold the permission.
+  ///
+  /// The Maps SDK asks for ACCESS_FINE_LOCATION itself the moment a map is built
+  /// with myLocationEnabled: true — natively, before any Dart code runs and with
+  /// no disclosure in front of it. That is the prompt Play rejected the release
+  /// over ("runtime permission not immediately preceded by an in-app
+  /// disclosure"); it fired just from opening this screen. The dot now appears
+  /// only after the user has been through ensureLocationPermission().
+  bool _myLocationOn = false;
+
   @override
   void initState() {
     super.initState();
@@ -62,6 +73,12 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       widget.initialLat ?? _defaultLat,
       widget.initialLng ?? _defaultLng,
     );
+    // Reading the status never prompts — so a user who has already granted
+    // location still gets the blue dot the moment the screen opens.
+    Geolocator.checkPermission().then((p) {
+      final granted = p == LocationPermission.always || p == LocationPermission.whileInUse;
+      if (granted && mounted) setState(() => _myLocationOn = true);
+    });
   }
 
   @override
@@ -188,6 +205,8 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
         }
         return;
       }
+      // Permission is in hand, so the map may now show the blue dot.
+      if (mounted && !_myLocationOn) setState(() => _myLocationOn = true);
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
       );
@@ -233,7 +252,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             },
             onCameraMove: _onCameraMove,
             onCameraIdle: _onCameraIdle,
-            myLocationEnabled: true,
+            myLocationEnabled: _myLocationOn,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
