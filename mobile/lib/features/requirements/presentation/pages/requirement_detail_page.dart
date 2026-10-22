@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/directions_button.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/requirements_bloc.dart';
 
@@ -901,6 +902,11 @@ class _RequirementDetailPageState extends State<RequirementDetailPage> {
                                   Text('KM', style: TextStyle(fontSize: 10.sp, color: Colors.grey[600])),
                                 ],
                               ),
+                            // Straight to Google Maps on this exact route. The
+                            // Row is already wrapped in IntrinsicHeight, so the
+                            // button can sit at the top of the route block.
+                            SizedBox(width: 10.w),
+                            DirectionsButton.forBooking(req).topAligned(),
                           ],
                         ),
                       ),

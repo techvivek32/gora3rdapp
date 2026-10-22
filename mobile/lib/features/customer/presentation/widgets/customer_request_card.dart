@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/directions_button.dart';
 import 'booking_card_ui.dart';
 
 /// Shared "customer request" card, used by the Customer Rides page. A driver
@@ -145,7 +146,18 @@ class CustomerRequestCard extends StatelessWidget {
             children: [
               Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
               SizedBox(width: 10.w),
-              dateTimeBox(date, (b['travelTime'] ?? '').toString(), accent),
+              // Maps shortcut stacked directly above the date box. Straight to
+              // Google Maps on this exact route — pickup → stops → drop.
+              // Customer bookings keep their coordinates on the pickup / drop
+              // objects, so point the button at those.
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DirectionsButton.forBooking(b, color: accent, fromCoordsKey: 'pickup', toCoordsKey: 'drop'),
+                  SizedBox(height: 8.h),
+                  dateTimeBox(date, (b['travelTime'] ?? '').toString(), accent),
+                ],
+              ),
             ],
           ),
           SizedBox(height: 4.h),

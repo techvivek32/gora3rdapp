@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/directions_button.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/location_ping.dart';
@@ -513,13 +514,21 @@ class MyOfferCard extends StatelessWidget {
           SizedBox(height: 10.h),
           const Divider(height: 1, color: Colors.black26),
           SizedBox(height: 10.h),
-          // Route (FROM → TO) on the left, colored date/time box on the right.
+          // Route (FROM → TO) on the left; on the right the Maps shortcut
+          // stacked above the colored date/time box.
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
               SizedBox(width: 10.w),
-              dateTimeBox(tripDate(b['travelDate']), (b['travelTime'] ?? '').toString(), barColor),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DirectionsButton.forBooking(b, color: barColor, fromCoordsKey: 'pickup', toCoordsKey: 'drop'),
+                  SizedBox(height: 8.h),
+                  dateTimeBox(tripDate(b['travelDate']), (b['travelTime'] ?? '').toString(), barColor),
+                ],
+              ),
             ],
           ),
           SizedBox(height: 4.h),

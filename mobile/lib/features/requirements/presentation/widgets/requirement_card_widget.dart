@@ -10,6 +10,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/directions_button.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -365,20 +366,29 @@ class RequirementCardWidget extends StatelessWidget {
                               final totalKm = roadKm != null
                                   ? roadKm.toStringAsFixed(0)
                                   : _totalRouteKm(fromCoord, stops, dropCoord);
-                              return Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  // Total distance, vertical, on the left of the route.
-                                  if (totalKm != null) ...[
-                                    RotatedBox(
-                                      quarterTurns: 3,
-                                      child: Text('$totalKm KM',
-                                          style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: topBarColor)),
-                                    ),
+                              // IntrinsicHeight so the Maps button can pin itself
+                              // to the TOP of the route block — a Row in a list
+                              // otherwise has no resolved height to align against.
+                              return IntrinsicHeight(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // Total distance, vertical, on the left of the route.
+                                    if (totalKm != null) ...[
+                                      RotatedBox(
+                                        quarterTurns: 3,
+                                        child: Text('$totalKm KM',
+                                            style: TextStyle(fontSize: 11.sp, fontWeight: FontWeight.bold, color: topBarColor)),
+                                      ),
+                                      SizedBox(width: 8.w),
+                                    ],
+                                    Expanded(child: timeline),
+                                    // Straight to Google Maps on this exact route —
+                                    // pickup → stops → drop.
                                     SizedBox(width: 8.w),
+                                    DirectionsButton.forBooking(requirement, color: topBarColor).topAligned(),
                                   ],
-                                  Expanded(child: timeline),
-                                ],
+                                ),
                               );
                             }),
                             SizedBox(height: 4.h),
