@@ -129,6 +129,14 @@ export class User {
   @Prop({ default: 0, min: 0 })
   heldBalance: number;
 
+  // Customer-mode wallet, kept SEPARATE from walletBalance above. The two sides
+  // of the app share one account but not one balance: money added as a customer
+  // is spendable only as a customer, and never counts towards the driver-side
+  // minimum-balance gate (MIN_WALLET_BALANCE). Customers have no held balance —
+  // holds are a driver's booking commitments.
+  @Prop({ default: 0, min: 0 })
+  customerWalletBalance: number;
+
   @Prop({ default: 0, min: 0, max: 5 })
   rating: number;
 

@@ -29,7 +29,7 @@ export class WalletAdminController {
 
   @Post(':id/adjust')
   // Admin only — a franchise can view wallets but not adjust user balances.
-  @ApiOperation({ summary: "Add or cut a user's wallet balance with a reason" })
+  @ApiOperation({ summary: "Add or cut a user's wallet balance with a reason (dto.wallet picks driver vs customer wallet)" })
   adjust(
     @CurrentUser('sub') adminId: string,
     @Param('id') userId: string,
@@ -41,7 +41,9 @@ export class WalletAdminController {
 
   @Post(':id/transfer')
   // Admin only — franchises cannot move money out of user wallets.
-  @ApiOperation({ summary: "Transfer from this user's wallet to another user (same as the app's transfer)" })
+  // Main (driver/vendor) wallet only — to move money in a customer wallet, use
+  // the adjust endpoint above with wallet: 'customer'.
+  @ApiOperation({ summary: "Transfer from this user's driver/vendor wallet to another user (same as the app's transfer)" })
   transfer(@Param('id') userId: string, @Body() dto: TransferFundsDto, @CurrentUser('franchiseCity') city?: string) {
     // Reuses the app's transfer: race-safe debit, insufficient-balance guard and
     // the two matching transaction records. :id is the SENDER.
@@ -80,8 +82,12 @@ export class WalletAdminController {
   // it would swallow GET /admin/wallets/withdrawals as id="withdrawals".
   @Get(':id')
   @Roles(...FRANCHISE_ROLES)
-  @ApiOperation({ summary: "One user's wallet balance + transactions" })
-  getOne(@Param('id') userId: string, @CurrentUser('franchiseCity') city?: string) {
-    return this.walletService.getWallet(userId, city);
+  @ApiOperation({ summary: "One user's wallet balance + transactions (?wallet=customer for the customer wallet)" })
+  getOne(
+    @Param('id') userId: string,
+    @Query('wallet') wallet?: string,
+    @CurrentUser('franchiseCity') city?: string,
+  ) {
+    return this.walletService.getWallet(userId, city, wallet === 'customer' ? 'customer' : 'main');
   }
 }

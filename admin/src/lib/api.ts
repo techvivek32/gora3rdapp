@@ -116,8 +116,10 @@ export const adminApi = {
 
   // ─── Wallets ───────────────────────────────────────────────────────────────
   getWallets: (params: any) => apiClient.get('/admin/wallets', { params }),
-  getUserWallet: (userId: string) => apiClient.get(`/admin/wallets/${userId}`),
-  adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string }) =>
+  getUserWallet: (userId: string, wallet?: 'main' | 'customer') =>
+    apiClient.get(`/admin/wallets/${userId}`, { params: wallet ? { wallet } : undefined }),
+  // `wallet` picks which of the user's two separate balances to move (default main).
+  adjustWallet: (userId: string, data: { amount: number; type: 'credit' | 'debit'; reason: string; wallet?: 'main' | 'customer' }) =>
     apiClient.post(`/admin/wallets/${userId}/adjust`, data),
   // Sends from `userId`'s wallet to the user with that mobile number.
   transferWallet: (userId: string, data: { mobile: string; amount: number; note?: string }) =>

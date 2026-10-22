@@ -337,9 +337,16 @@ class AppRouter {
         path: '/leaderboard',
         builder: (_, __) => const LeaderboardPage(),
       ),
+      // Two wallets, two routes, one screen. The balances are separate on the
+      // server (walletBalance vs customerWalletBalance), so which one is shown
+      // comes from the route the user took to get here.
       GoRoute(
         path: '/wallet',
         builder: (_, __) => const WalletPage(),
+      ),
+      GoRoute(
+        path: '/customer/wallet',
+        builder: (_, __) => const WalletPage(customer: true),
       ),
       GoRoute(
         path: '/my-reports',

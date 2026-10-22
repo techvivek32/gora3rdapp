@@ -39,6 +39,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   static const _navy = Color(0xFF12213D);
 
+  // Wallet balance shown in the hero pill. Null until the first fetch lands, so
+  // the pill shows just the icon instead of a misleading "₹0".
+  num? _walletBalance;
+
   // Admin-managed dynamic home content (per-city hero + travel/offers/explore).
   Map<String, dynamic>? _home;
   final _explorePage = PageController();
@@ -66,9 +70,22 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     super.initState();
     _fetchSupportContacts();
     _loadHome();
+    _loadWallet();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) maybeShowAdPopup(context, _api);
     });
+  }
+
+  /// Balance for the hero pill, from the CUSTOMER wallet — a separate pot from
+  /// the driver/vendor wallet on the same account. Failures are silent; the pill
+  /// just stays without an amount.
+  Future<void> _loadWallet() async {
+    try {
+      final res = await _api.get('/customer-wallet');
+      final data = res.data['data'] as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() => _walletBalance = (data['balance'] as num?) ?? 0);
+    } catch (_) {}
   }
 
   Future<void> _loadHome() async {
@@ -270,6 +287,8 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                         ],
                       ),
                       const Spacer(),
+                      _walletPill(),
+                      SizedBox(width: 8.w),
                       _circleBtn(Icons.notifications_none_rounded, () => context.push('/notifications')),
                     ],
                   ),
@@ -347,6 +366,45 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
         SizedBox(width: 4.w),
         Text(city.isEmpty ? 'Set city' : city, style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Poppins')),
       ]),
+    );
+  }
+
+  /// Wallet shortcut in the hero: wallet icon plus the live balance once known.
+  /// Opens the shared wallet screen, then refreshes in case money was added.
+  Widget _walletPill() {
+    final balance = _walletBalance;
+    return GestureDetector(
+      onTap: () async {
+        await context.push('/customer/wallet');
+        if (mounted) _loadWallet();
+      },
+      child: Container(
+        height: 36.r,
+        padding: EdgeInsets.symmetric(horizontal: balance == null ? 8.w : 10.w),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.22),
+          borderRadius: BorderRadius.circular(18.r),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.account_balance_wallet_rounded, color: Colors.white, size: 18.sp),
+            if (balance != null) ...[
+              SizedBox(width: 5.w),
+              // Bounded so a very large balance can never push the brand block
+              // in the same row into an overflow.
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 70.w),
+                child: Text('₹${balance.toStringAsFixed(0)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w800, color: Colors.white, fontFamily: 'Poppins')),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -677,6 +735,18 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
             Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2))),
             SizedBox(height: 8.h),
             ListTile(leading: const Icon(Icons.receipt_long_rounded, color: AppColors.primary), title: const Text('My Rides', style: TextStyle(fontFamily: 'Poppins')), onTap: () { Navigator.pop(ctx); context.go('/customer/bookings'); }),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
+              title: const Text('My Wallet', style: TextStyle(fontFamily: 'Poppins')),
+              subtitle: _walletBalance == null
+                  ? null
+                  : Text('Balance ₹${_walletBalance!.toStringAsFixed(0)}', style: const TextStyle(fontSize: 12, fontFamily: 'Poppins')),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await context.push('/customer/wallet');
+                if (mounted) _loadWallet();
+              },
+            ),
             ListTile(leading: const FaIcon(FontAwesomeIcons.whatsapp, color: Color(0xFF25D366)), title: const Text('WhatsApp Support', style: TextStyle(fontFamily: 'Poppins')), onTap: () { Navigator.pop(ctx); openWhatsApp(_supportWhatsapp, message: 'Hello, I need help with Gora Cabs'); }),
             ListTile(leading: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.info), title: const Text('Chat Support', style: TextStyle(fontFamily: 'Poppins')), onTap: () { Navigator.pop(ctx); context.push('/support-chat'); }),
             ListTile(leading: const Icon(Icons.call_rounded, color: AppColors.success), title: const Text('Call Us', style: TextStyle(fontFamily: 'Poppins')), onTap: () { Navigator.pop(ctx); callNumber(_supportPhone); }),

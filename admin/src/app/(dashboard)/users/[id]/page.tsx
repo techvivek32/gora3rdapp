@@ -1011,6 +1011,9 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             // Balance comes from the wallet endpoint — the user record's copy can be
             // stale right after an adjustment.
             walletBalance: (walletData as any)?.data?.balance ?? user.walletBalance ?? 0,
+            // The customer wallet is a separate balance; the wallet endpoint above
+            // only fetches the driver/vendor one, so this comes off the user record.
+            customerWalletBalance: (user as any).customerWalletBalance ?? 0,
           }}
           onClose={() => setAdjustOpen(false)}
           onDone={() => {

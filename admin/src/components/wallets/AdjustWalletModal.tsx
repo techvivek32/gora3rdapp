@@ -9,12 +9,15 @@ import { X, Plus, Minus, ArrowLeftRight, Search, CheckCircle2 } from 'lucide-rea
 import toast from 'react-hot-toast';
 
 /** The bits of a user this modal needs — shared by the Wallets list and the
- *  Wallet tab on the user-detail page. */
+ *  Wallet tab on the user-detail page. The account carries TWO independent
+ *  balances; `customerWalletBalance` may be absent on callers that only know
+ *  the driver/vendor one, and reads as 0. */
 export interface AdjustWalletUser {
   _id: string;
   fullName: string;
   mobile: string;
   walletBalance: number;
+  customerWalletBalance?: number;
 }
 
 interface Recipient {
@@ -26,6 +29,8 @@ interface Recipient {
 }
 
 type Mode = 'credit' | 'debit' | 'transfer';
+/** Which of the user's two separate wallets is being adjusted. */
+type Wallet = 'main' | 'customer';
 
 export function AdjustWalletModal({
   user,
@@ -37,6 +42,7 @@ export function AdjustWalletModal({
   onDone: () => void;
 }) {
   const [mode, setMode] = useState<Mode>('credit');
+  const [wallet, setWallet] = useState<Wallet>('main');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
 
@@ -46,9 +52,12 @@ export function AdjustWalletModal({
   const [lookupError, setLookupError] = useState('');
   const [looking, setLooking] = useState(false);
 
-  const balance = user.walletBalance ?? 0;
+  const isCustomerWallet = wallet === 'customer';
+  const balance = (isCustomerWallet ? user.customerWalletBalance : user.walletBalance) ?? 0;
   const amt = Number(amount);
-  const isTransfer = mode === 'transfer';
+  // Transfer is driver/vendor-wallet only (the admin transfer endpoint moves the
+  // main balance), so picking the customer wallet drops out of transfer mode.
+  const isTransfer = mode === 'transfer' && !isCustomerWallet;
 
   const lookup = async () => {
     const digits = phone.replace(/\D/g, '');
@@ -80,7 +89,7 @@ export function AdjustWalletModal({
             amount: amt,
             note: reason.trim() || undefined,
           })
-        : adminApi.adjustWallet(user._id, { amount: amt, type: mode, reason: reason.trim() }),
+        : adminApi.adjustWallet(user._id, { amount: amt, type: mode as 'credit' | 'debit', reason: reason.trim(), wallet }),
     onSuccess: (res: any) => {
       toast.success(res?.message || (isTransfer ? 'Funds transferred' : 'Wallet updated'));
       onDone();
@@ -109,6 +118,25 @@ export function AdjustWalletModal({
     </button>
   );
 
+  const walletTab = (w: Wallet, label: string, sub: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        setWallet(w);
+        // Transfer exists only for the driver/vendor wallet.
+        if (w === 'customer' && mode === 'transfer') setMode('credit');
+      }}
+      className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+        wallet === w
+          ? 'border-orange-500 bg-orange-500/10'
+          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+      }`}
+    >
+      <div className="text-sm font-medium text-gray-900 dark:text-white">{label}</div>
+      <div className="text-xs text-gray-500">{sub}</div>
+    </button>
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
@@ -129,16 +157,29 @@ export function AdjustWalletModal({
               <div className="text-xs text-gray-500 font-mono">{user.mobile}</div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-gray-500">Current balance</div>
+              <div className="text-xs text-gray-500">
+                {isCustomerWallet ? 'Customer wallet' : 'Driver / vendor wallet'}
+              </div>
               <div className="font-bold text-gray-900 dark:text-white">₹{balance.toLocaleString('en-IN')}</div>
             </div>
           </div>
 
-          {/* Credit / Debit / Transfer */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* The account holds two independent balances — pick which one to move. */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5">Which wallet</label>
+            <div className="grid grid-cols-2 gap-2">
+              {walletTab('main', 'Driver / Vendor', `₹${(user.walletBalance ?? 0).toLocaleString('en-IN')}`)}
+              {walletTab('customer', 'Customer', `₹${(user.customerWalletBalance ?? 0).toLocaleString('en-IN')}`)}
+            </div>
+          </div>
+
+          {/* Credit / Debit / Transfer. Transfer moves the driver/vendor balance
+              only, so it is not offered for the customer wallet. */}
+          <div className={`grid gap-2 ${isCustomerWallet ? 'grid-cols-2' : 'grid-cols-3'}`}>
             {tab('credit', 'Add', <Plus className="w-4 h-4" />, 'bg-emerald-500 border-emerald-500 text-white')}
             {tab('debit', 'Cut', <Minus className="w-4 h-4" />, 'bg-red-500 border-red-500 text-white')}
-            {tab('transfer', 'Transfer', <ArrowLeftRight className="w-4 h-4" />, 'bg-orange-500 border-orange-500 text-white')}
+            {!isCustomerWallet &&
+              tab('transfer', 'Transfer', <ArrowLeftRight className="w-4 h-4" />, 'bg-orange-500 border-orange-500 text-white')}
           </div>
 
           {/* Transfer: find the recipient by phone, exactly like the app does. */}
@@ -218,7 +259,10 @@ export function AdjustWalletModal({
                 <span className="text-gray-500">balance left: ₹{newBalance.toLocaleString('en-IN')}</span>
               </>
             ) : (
-              <>New balance: <span className="font-bold">₹{newBalance.toLocaleString('en-IN')}</span></>
+              <>
+                New {isCustomerWallet ? 'customer wallet' : 'driver / vendor wallet'} balance:{' '}
+                <span className="font-bold">₹{newBalance.toLocaleString('en-IN')}</span>
+              </>
             )}
           </div>
         </div>

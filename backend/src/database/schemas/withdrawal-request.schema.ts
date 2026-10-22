@@ -11,6 +11,12 @@ export class WithdrawalRequest {
   @Prop({ required: true }) // amount in rupees
   amount: number;
 
+  /** Which wallet the amount was debited from, so a rejection refunds it to the
+   *  right one. Requests raised before the customer wallet existed default to
+   *  the main (driver/vendor) wallet. */
+  @Prop({ type: String, enum: ['main', 'customer'], default: 'main' })
+  wallet: string;
+
   /** How the payout should be made. Records created before this default to bank. */
   @Prop({ type: String, enum: ['bank', 'upi'], default: 'bank' })
   method: string;

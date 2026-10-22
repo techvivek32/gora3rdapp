@@ -11,6 +11,12 @@ import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, 
 import { SettingsService } from '../settings/settings.service';
 import { dateRangeFilter } from '../../common/utils/pagination.util';
 
+/** A user has two independent wallets on one account: 'main' is the
+ *  driver/vendor wallet, 'customer' the customer-mode one. Money never crosses
+ *  between them, and only 'main' counts towards MIN_WALLET_BALANCE. Every
+ *  balance read and write below is scoped to exactly one of the two. */
+export type WalletScope = 'main' | 'customer';
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -65,6 +71,35 @@ export class WalletService {
     return rows.map((r) => r._id as Types.ObjectId);
   }
 
+  // ─── Wallet scoping helpers ─────────────────────────────────────────────────
+
+  /** The User field holding this wallet's available balance. */
+  private balanceField(scope: WalletScope): 'walletBalance' | 'customerWalletBalance' {
+    return scope === 'customer' ? 'customerWalletBalance' : 'walletBalance';
+  }
+
+  /** Transaction / withdrawal filter for one wallet. Rows written before the
+   *  customer wallet existed carry no `wallet` field, so the main wallet matches
+   *  "not customer" rather than "== main" — that way no backfill is needed. */
+  private walletFilter(scope: WalletScope): Record<string, unknown> {
+    return scope === 'customer' ? { wallet: 'customer' } : { wallet: { $ne: 'customer' } };
+  }
+
+  /** This wallet's available balance off a (possibly lean) user doc. */
+  private balanceOf(user: unknown, scope: WalletScope): number {
+    return ((user as any)?.[this.balanceField(scope)] as number) ?? 0;
+  }
+
+  /** The scope a stored row belongs to, tolerating legacy rows with no field. */
+  private scopeOf(row: unknown): WalletScope {
+    return (row as any)?.wallet === 'customer' ? 'customer' : 'main';
+  }
+
+  /** Human label used in messages, so a user knows which wallet moved. */
+  private scopeLabel(scope: WalletScope): string {
+    return scope === 'customer' ? 'customer wallet' : 'wallet';
+  }
+
   // Read Razorpay keys from admin settings (DB), so admin can set them dynamically.
   private async getRazorpay(): Promise<Razorpay> {
     const { keyId, keySecret } = await this.settingsService.getRazorpayKeys();
@@ -75,18 +110,25 @@ export class WalletService {
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
-  async getWallet(userId: string, franchiseCity?: any) {
+  async getWallet(userId: string, franchiseCity?: any, scope: WalletScope = 'main') {
     await this.assertUserInCity(userId, franchiseCity);
+    const field = this.balanceField(scope);
     const [user, transactions] = await Promise.all([
-      this.userModel.findById(userId).select('walletBalance heldBalance').lean(),
+      this.userModel.findById(userId).select(`${field} heldBalance`).lean(),
       // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
       // Also hide the intermediate booking 'hold' and 'release' ledger rows: a
       // commitment shows to the user only once, as the final 'settle' (commission)
       // if the driver won, or not at all if it was released (net-zero). The amount
       // currently locked is already shown as the wallet's Held balance.
       // Transfers carry the other party so the app can show their name/number.
+      // Scoped to ONE wallet, so the two sides never show each other's history.
       this.txModel
-        .find({ userId: new Types.ObjectId(userId), status: 'success', source: { $nin: ['hold', 'release'] } })
+        .find({
+          userId: new Types.ObjectId(userId),
+          status: 'success',
+          source: { $nin: ['hold', 'release'] },
+          ...this.walletFilter(scope),
+        })
         .populate('counterpartyId', 'fullName agencyName mobile')
         .sort({ createdAt: -1 })
         .limit(20)
@@ -94,11 +136,16 @@ export class WalletService {
     ]);
     return {
       message: 'Wallet retrieved',
-      data: { balance: user?.walletBalance ?? 0, heldBalance: (user as any)?.heldBalance ?? 0, transactions },
+      data: {
+        balance: this.balanceOf(user, scope),
+        // Holds are a driver's booking commitments — the customer wallet has none.
+        heldBalance: scope === 'customer' ? 0 : ((user as any)?.heldBalance ?? 0),
+        transactions,
+      },
     };
   }
 
-  async createTopUpOrder(userId: string, dto: CreateTopUpDto) {
+  async createTopUpOrder(userId: string, dto: CreateTopUpDto, scope: WalletScope = 'main') {
     const amount = Math.round(dto.amount);
     const { minDeposit } = await this.settingsService.getWalletLimits();
     if (amount < minDeposit) throw new BadRequestException(`Minimum amount to add is ₹${minDeposit}`);
@@ -109,7 +156,7 @@ export class WalletService {
         amount: amount * 100, // paise (wallet amount is entered in rupees)
         currency: 'INR',
         receipt: `wallet_${Date.now()}`,
-        notes: { userId, type: 'wallet_topup' },
+        notes: { userId, type: 'wallet_topup', wallet: scope },
       });
     } catch (e: any) {
       const reason = e?.error?.description || e?.description || e?.message || 'unknown error';
@@ -117,8 +164,11 @@ export class WalletService {
       throw new BadRequestException(`Payment could not start: ${reason}`);
     }
 
+    // The scope is stored on the pending row, so verifyTopUp credits the wallet
+    // the money was actually added to without having to be told again.
     await this.txModel.create({
       userId: new Types.ObjectId(userId),
+      wallet: scope,
       amount,
       type: 'credit',
       status: 'pending',
@@ -161,16 +211,19 @@ export class WalletService {
     );
     if (!tx) throw new NotFoundException('Transaction not found or already processed');
 
-    // Credit the order's owner (== caller, enforced above).
+    // Credit the order's owner (== caller, enforced above), in the wallet the
+    // top-up was started from — carried on the pending row, never from the client.
+    const scope = this.scopeOf(tx);
+    const field = this.balanceField(scope);
     const user = await this.userModel.findByIdAndUpdate(
       tx.userId,
-      { $inc: { walletBalance: tx.amount } },
+      { $inc: { [field]: tx.amount } },
       { new: true },
-    ).select('walletBalance');
+    ).select(field);
 
     return {
       message: 'Wallet credited successfully',
-      data: { balance: user?.walletBalance ?? 0, amount: tx.amount },
+      data: { balance: this.balanceOf(user, scope), amount: tx.amount },
     };
   }
 
@@ -195,7 +248,7 @@ export class WalletService {
     const [users, total] = await Promise.all([
       this.userModel
         .find(filter)
-        .select('fullName mobile email agencyName city walletBalance membershipType')
+        .select('fullName mobile email agencyName city walletBalance customerWalletBalance membershipType')
         .sort({ walletBalance: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -212,19 +265,22 @@ export class WalletService {
     };
   }
 
-  /** Manually add (credit) or cut (debit) a user's wallet balance with a reason. */
+  /** Manually add (credit) or cut (debit) a user's wallet balance with a reason.
+   *  `dto.wallet` picks which of the user's two wallets to touch (default main). */
   async adjustWallet(adminId: string, userId: string, dto: AdjustWalletDto, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
     if (amount < 1) throw new BadRequestException('Enter a valid amount');
 
-    const user = await this.userModel.findById(userId).select('walletBalance fullName');
+    const scope: WalletScope = dto.wallet === 'customer' ? 'customer' : 'main';
+    const field = this.balanceField(scope);
+    const user = await this.userModel.findById(userId).select(`${field} fullName`);
     if (!user) throw new NotFoundException('User not found');
 
-    const current = user.walletBalance ?? 0;
+    const current = this.balanceOf(user, scope);
     if (dto.type === 'debit' && amount > current) {
       throw new BadRequestException(
-        `Cannot cut ₹${amount}. User's balance is only ₹${current}.`,
+        `Cannot cut ₹${amount}. User's ${this.scopeLabel(scope)} balance is only ₹${current}.`,
       );
     }
 
@@ -233,6 +289,7 @@ export class WalletService {
     // Record the transaction first (visible in the user's app wallet history).
     await this.txModel.create({
       userId: new Types.ObjectId(userId),
+      wallet: scope,
       amount,
       type: dto.type,
       status: 'success',
@@ -242,14 +299,14 @@ export class WalletService {
     });
 
     const updated = await this.userModel
-      .findByIdAndUpdate(userId, { $inc: { walletBalance: delta } }, { new: true })
-      .select('walletBalance');
+      .findByIdAndUpdate(userId, { $inc: { [field]: delta } }, { new: true })
+      .select(field);
 
     return {
       message: dto.type === 'credit'
-        ? `Added ₹${amount} to ${user.fullName}'s wallet`
-        : `Cut ₹${amount} from ${user.fullName}'s wallet`,
-      data: { balance: updated?.walletBalance ?? 0 },
+        ? `Added ₹${amount} to ${user.fullName}'s ${this.scopeLabel(scope)}`
+        : `Cut ₹${amount} from ${user.fullName}'s ${this.scopeLabel(scope)}`,
+      data: { balance: this.balanceOf(updated, scope) },
     };
   }
 
@@ -257,7 +314,7 @@ export class WalletService {
 
   /** User requests a withdrawal. Amount is debited immediately and held until an
    *  admin approves (kept) or rejects (refunded). */
-  async requestWithdrawal(userId: string, dto: RequestWithdrawalDto) {
+  async requestWithdrawal(userId: string, dto: RequestWithdrawalDto, scope: WalletScope = 'main') {
     const amount = Math.round(dto.amount);
     const { minWithdrawal } = await this.settingsService.getWalletLimits();
     if (amount < minWithdrawal) throw new BadRequestException(`Minimum withdrawal is ₹${minWithdrawal}`);
@@ -265,22 +322,24 @@ export class WalletService {
     // Atomic, conditional debit — the `$gte` guard makes this safe against
     // concurrent withdrawal requests that would otherwise each pass a stale
     // read-check and drive the balance negative / over-withdraw.
+    const field = this.balanceField(scope);
     const updated = await this.userModel
       .findOneAndUpdate(
-        { _id: userId, walletBalance: { $gte: amount } },
-        { $inc: { walletBalance: -amount } },
+        { _id: userId, [field]: { $gte: amount } },
+        { $inc: { [field]: -amount } },
         { new: true },
       )
-      .select('walletBalance');
+      .select(field);
     if (!updated) {
-      const u = await this.userModel.findById(userId).select('walletBalance');
+      const u = await this.userModel.findById(userId).select(field);
       if (!u) throw new NotFoundException('User not found');
-      throw new BadRequestException(`You can withdraw at most ₹${u.walletBalance ?? 0}.`);
+      throw new BadRequestException(`You can withdraw at most ₹${this.balanceOf(u, scope)}.`);
     }
 
     // Record the debit only after it actually succeeded (held against the request).
     await this.txModel.create({
       userId: new Types.ObjectId(userId),
+      wallet: scope,
       amount,
       type: 'debit',
       status: 'success',
@@ -288,10 +347,12 @@ export class WalletService {
       source: 'withdrawal',
     });
 
-    // Store only the fields that belong to the chosen payout method.
+    // Store only the fields that belong to the chosen payout method. The wallet
+    // is stored too, so a rejection refunds the money where it came from.
     const method = dto.method ?? 'bank';
     const request = await this.withdrawalModel.create({
       userId: new Types.ObjectId(userId),
+      wallet: scope,
       amount,
       method,
       accountHolderName: dto.accountHolderName,
@@ -303,15 +364,19 @@ export class WalletService {
 
     return {
       message: 'Withdrawal request submitted. It will be processed after review.',
-      data: { balance: updated?.walletBalance ?? 0, request },
+      data: { balance: this.balanceOf(updated, scope), request },
     };
   }
 
   // ─── Wallet-to-wallet transfer ─────────────────────────────────────────────
 
   /** Send money from the current user's wallet to another user, found by mobile.
-   *  Fails (without moving anything) when the sender's balance is short. */
-  async transferFunds(userId: string, dto: TransferFundsDto, franchiseCity?: any) {
+   *  Fails (without moving anything) when the sender's balance is short.
+   *
+   *  Stays INSIDE one wallet scope: a customer-wallet transfer lands in the
+   *  recipient's customer wallet, never in their driver wallet. That keeps the
+   *  two balances separate even when both users have both. */
+  async transferFunds(userId: string, dto: TransferFundsDto, franchiseCity?: any, scope: WalletScope = 'main') {
     // The sender (:id) must be in the franchise's city. The recipient may be anywhere.
     await this.assertUserInCity(userId, franchiseCity);
     const amount = Math.round(dto.amount);
@@ -329,9 +394,10 @@ export class WalletService {
       throw new BadRequestException('You cannot transfer money to yourself');
     }
 
-    const sender = await this.userModel.findById(userId).select('walletBalance fullName');
+    const field = this.balanceField(scope);
+    const sender = await this.userModel.findById(userId).select(`${field} fullName`);
     if (!sender) throw new NotFoundException('User not found');
-    const balance = sender.walletBalance ?? 0;
+    const balance = this.balanceOf(sender, scope);
     if (amount > balance) {
       throw new BadRequestException(`Insufficient balance. You have ₹${balance}.`);
     }
@@ -339,18 +405,18 @@ export class WalletService {
     // Debit conditionally so two concurrent transfers can't overdraw the wallet.
     const debited = await this.userModel
       .findOneAndUpdate(
-        { _id: new Types.ObjectId(userId), walletBalance: { $gte: amount } },
-        { $inc: { walletBalance: -amount } },
+        { _id: new Types.ObjectId(userId), [field]: { $gte: amount } },
+        { $inc: { [field]: -amount } },
         { new: true },
       )
-      .select('walletBalance');
+      .select(field);
     if (!debited) throw new BadRequestException('Insufficient balance');
 
     try {
-      await this.userModel.findByIdAndUpdate(recipient._id, { $inc: { walletBalance: amount } });
+      await this.userModel.findByIdAndUpdate(recipient._id, { $inc: { [field]: amount } });
     } catch (e) {
       // Put the money back — never leave it debited without a matching credit.
-      await this.userModel.findByIdAndUpdate(userId, { $inc: { walletBalance: amount } });
+      await this.userModel.findByIdAndUpdate(userId, { $inc: { [field]: amount } });
       this.logger.error(`Wallet transfer credit failed: ${e?.message ?? e}`);
       throw new BadRequestException('Transfer failed. Please try again.');
     }
@@ -360,6 +426,7 @@ export class WalletService {
     await this.txModel.create([
       {
         userId: new Types.ObjectId(userId),
+        wallet: scope,
         counterpartyId: recipient._id,
         amount,
         type: 'debit',
@@ -369,6 +436,7 @@ export class WalletService {
       },
       {
         userId: recipient._id,
+        wallet: scope,
         counterpartyId: new Types.ObjectId(userId),
         amount,
         type: 'credit',
@@ -380,7 +448,7 @@ export class WalletService {
 
     return {
       message: `₹${amount} sent to ${toName}.`,
-      data: { balance: debited.walletBalance ?? 0, to: { name: toName, mobile: recipient.mobile } },
+      data: { balance: this.balanceOf(debited, scope), to: { name: toName, mobile: recipient.mobile } },
     };
   }
 
@@ -407,7 +475,7 @@ export class WalletService {
 
     const requests = await this.withdrawalModel
       .find(filter)
-      .populate('userId', 'fullName mobile email agencyName city walletBalance')
+      .populate('userId', 'fullName mobile email agencyName city walletBalance customerWalletBalance')
       .sort({ createdAt: -1 })
       .limit(200)
       .lean();
@@ -438,9 +506,11 @@ export class WalletService {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
 
-    // Refund the held amount back to the user's wallet.
+    // Refund the held amount back to the SAME wallet it was debited from.
+    const scope = this.scopeOf(request);
     await this.txModel.create({
       userId: request.userId,
+      wallet: scope,
       amount: request.amount,
       type: 'credit',
       status: 'success',
@@ -448,7 +518,9 @@ export class WalletService {
       source: 'refund',
       adminId: new Types.ObjectId(adminId),
     });
-    await this.userModel.findByIdAndUpdate(request.userId, { $inc: { walletBalance: request.amount } });
+    await this.userModel.findByIdAndUpdate(request.userId, {
+      $inc: { [this.balanceField(scope)]: request.amount },
+    });
 
     request.status = 'rejected';
     request.rejectionReason = dto.reason;

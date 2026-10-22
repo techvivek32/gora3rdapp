@@ -5,8 +5,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../role_switch.dart';
 
-/// Customer profile: identity, switch to Driver/Vendor, help, sign out. Kept intentionally
-/// light — customers don't have KYC/wallet screens.
+/// Customer profile: identity, wallet, switch to Driver/Vendor, help, sign out.
+/// Kept intentionally light — customers have no KYC screen. The wallet here is
+/// the CUSTOMER wallet (`/customer/wallet`), a separate balance from the
+/// driver/vendor one on the same account.
 class CustomerProfilePage extends StatelessWidget {
   const CustomerProfilePage({super.key});
 
@@ -66,6 +68,7 @@ class CustomerProfilePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
+              _action(Icons.account_balance_wallet_outlined, 'My Wallet', 'Separate customer balance · add money, withdraw & history', () => context.push('/customer/wallet')),
               _action(Icons.receipt_long_rounded, 'My Bookings', 'View your bookings', () => context.go('/customer/bookings')),
               _action(Icons.notifications_none_rounded, 'Notifications', 'Booking & trip updates', () => context.push('/notifications')),
               _action(Icons.help_outline_rounded, 'Help & Support', 'Raise a complaint', () => context.push('/customer/support')),

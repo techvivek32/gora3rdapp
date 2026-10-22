@@ -5,6 +5,9 @@ import '../network/api_client.dart';
 
 /// Minimum wallet balance (₹) required to post a requirement, post an available
 /// vehicle, or buy a plan. Mirrors the backend gate (MIN_WALLET_BALANCE).
+///
+/// This gate reads the DRIVER/VENDOR wallet (`/wallet`) only. The customer-mode
+/// wallet is a separate balance, so topping that up never unlocks these actions.
 const kMinWalletBalance = 500;
 
 /// Returns `true` when the user has at least [kMinWalletBalance] in their wallet.

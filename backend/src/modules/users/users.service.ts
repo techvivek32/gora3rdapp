@@ -18,7 +18,7 @@ import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
 // Public-facing profile fields (no credentials / private data).
-// SECURITY: never include `walletBalance` here — this select feeds
+// SECURITY: never include `walletBalance` or `customerWalletBalance` here — this select feeds
 // lookupByMobile / getUserCard, which any authenticated user can call for
 // ANOTHER user, and a customer must never see a driver/vendor wallet balance.
 // Self balance comes only from the owner's wallet/profile endpoints.

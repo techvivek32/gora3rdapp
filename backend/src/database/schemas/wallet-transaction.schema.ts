@@ -8,6 +8,13 @@ export class WalletTransaction {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   userId: Types.ObjectId;
 
+  /** Which of the user's two wallets this row belongs to: 'main' is the
+   *  driver/vendor wallet, 'customer' the customer-mode one. Rows written before
+   *  the customer wallet existed carry no value, so reads of the main wallet
+   *  match "not customer" rather than "== main" (no backfill needed). */
+  @Prop({ type: String, enum: ['main', 'customer'], default: 'main' })
+  wallet: string;
+
   @Prop({ required: true }) // amount in rupees
   amount: number;
 
@@ -51,3 +58,4 @@ export class WalletTransaction {
 
 export const WalletTransactionSchema = SchemaFactory.createForClass(WalletTransaction);
 WalletTransactionSchema.index({ userId: 1, createdAt: -1 });
+WalletTransactionSchema.index({ userId: 1, wallet: 1, createdAt: -1 });

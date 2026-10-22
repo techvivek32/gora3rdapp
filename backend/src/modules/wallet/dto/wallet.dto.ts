@@ -117,4 +117,10 @@ export class AdjustWalletDto {
   @IsNotEmpty()
   @MaxLength(200)
   reason: string;
+
+  /** Which of the user's two wallets to adjust. Defaults to the driver/vendor one. */
+  @ApiPropertyOptional({ enum: ['main', 'customer'], default: 'main' })
+  @IsOptional()
+  @IsIn(['main', 'customer'])
+  wallet?: 'main' | 'customer';
 }

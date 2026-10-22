@@ -16,12 +16,16 @@ interface WithdrawalUser {
   agencyName?: string;
   city?: string;
   walletBalance?: number;
+  customerWalletBalance?: number;
 }
 
 interface Withdrawal {
   _id: string;
   userId: WithdrawalUser | null;
   amount: number;
+  /** Which of the user's two balances was debited. Older records have none and
+   *  came out of the driver/vendor wallet. */
+  wallet?: 'main' | 'customer';
   method?: 'bank' | 'upi';
   accountHolderName: string;
   bankName?: string;
@@ -127,7 +131,14 @@ export default function WithdrawalsPage() {
             <div key={w._id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
               {/* Header: amount + status */}
               <div className="flex items-center justify-between">
-                <div className="text-xl font-bold text-gray-900 dark:text-white">₹{w.amount.toLocaleString('en-IN')}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-xl font-bold text-gray-900 dark:text-white">₹{w.amount.toLocaleString('en-IN')}</div>
+                  {w.wallet === 'customer' && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                      Customer wallet
+                    </span>
+                  )}
+                </div>
                 <span className={`text-xs font-semibold px-2 py-1 rounded-full capitalize ${statusBadge(w.status)}`}>{w.status}</span>
               </div>
 
@@ -136,9 +147,16 @@ export default function WithdrawalsPage() {
                 <div className="font-semibold text-gray-800 dark:text-gray-100">{w.userId?.fullName || 'Unknown user'}</div>
                 <div className="text-gray-500 font-mono text-xs">{w.userId?.mobile}</div>
                 {w.userId?.agencyName && <div className="text-gray-500 text-xs">{w.userId.agencyName}{w.userId?.city ? ` · ${w.userId.city}` : ''}</div>}
-                {typeof w.userId?.walletBalance === 'number' && (
-                  <div className="text-gray-400 text-xs mt-0.5">Current wallet: ₹{w.userId.walletBalance.toLocaleString('en-IN')}</div>
-                )}
+                {(() => {
+                  const isCustomer = w.wallet === 'customer';
+                  const bal = isCustomer ? w.userId?.customerWalletBalance : w.userId?.walletBalance;
+                  if (typeof bal !== 'number') return null;
+                  return (
+                    <div className="text-gray-400 text-xs mt-0.5">
+                      Current {isCustomer ? 'customer wallet' : 'wallet'}: ₹{bal.toLocaleString('en-IN')}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Payout details — bank transfer or UPI (older records default to bank) */}

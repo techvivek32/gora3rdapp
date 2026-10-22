@@ -22,6 +22,7 @@ interface WalletUser {
   city?: string;
   membershipType: string;
   walletBalance: number;
+  customerWalletBalance?: number;
 }
 
 export default function WalletsPage() {
@@ -71,12 +72,26 @@ export default function WalletsPage() {
       cell: ({ getValue }) => <MembershipBadge type={getValue() as string} />,
     },
     {
-      header: 'Balance',
+      // The driver/vendor wallet — the one the ₹500 posting gate reads.
+      header: 'Driver Wallet',
       accessorKey: 'walletBalance',
       cell: ({ getValue }) => {
         const bal = (getValue() as number) ?? 0;
         return (
           <span className={`font-bold text-sm ${bal >= 500 ? 'text-emerald-600' : 'text-red-500'}`}>
+            ₹{bal.toLocaleString()}
+          </span>
+        );
+      },
+    },
+    {
+      // Separate balance used in customer mode — no minimum applies to it.
+      header: 'Customer Wallet',
+      accessorKey: 'customerWalletBalance',
+      cell: ({ getValue }) => {
+        const bal = (getValue() as number) ?? 0;
+        return (
+          <span className={`font-bold text-sm ${bal > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400'}`}>
             ₹{bal.toLocaleString()}
           </span>
         );
@@ -103,7 +118,7 @@ export default function WalletsPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Wallet Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {meta?.total?.toLocaleString() ?? 0} users · add or cut wallet balance with a reason
+            {meta?.total?.toLocaleString() ?? 0} users · two separate wallets per account (driver/vendor and customer) · add or cut either with a reason
           </p>
         </div>
         <PeriodFilter onChange={setRange} />

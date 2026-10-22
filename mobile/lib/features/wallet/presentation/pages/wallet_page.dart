@@ -10,8 +10,17 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 
+/// Wallet screen, used by BOTH sides of the app against two separate balances.
+///
+/// A user has one account but two independent wallets: the driver/vendor wallet
+/// (`/wallet`) and the customer-mode wallet (`/customer-wallet`). Money never
+/// crosses between them, so which one this screen shows is decided by the route
+/// that opened it — `/wallet` vs `/customer/wallet` — not by the user's role.
 class WalletPage extends StatefulWidget {
-  const WalletPage({super.key});
+  /// true → the customer-mode wallet (`customerWalletBalance` on the server).
+  final bool customer;
+
+  const WalletPage({super.key, this.customer = false});
 
   @override
   State<WalletPage> createState() => _WalletPageState();
@@ -60,7 +69,7 @@ class _WalletPageState extends State<WalletPage> {
     // here are non-fatal — the minimums simply keep their last/default value.
     _loadLimits();
     try {
-      final res = await _api.get('/wallet');
+      final res = await _api.get(_base);
       final data = res.data['data'] as Map<String, dynamic>;
       setState(() {
         _balance = (data['balance'] as num?) ?? 0;
@@ -91,6 +100,9 @@ class _WalletPageState extends State<WalletPage> {
       // keep defaults
     }
   }
+
+  /// API prefix for whichever of the two wallets this screen is showing.
+  String get _base => widget.customer ? '/customer-wallet' : '/wallet';
 
   void _snack(String msg, {bool error = true}) {
     if (!mounted) return;
@@ -123,7 +135,7 @@ class _WalletPageState extends State<WalletPage> {
       _processing = true;
     });
     try {
-      final res = await _api.post('/wallet/create-order', data: {'amount': amount});
+      final res = await _api.post('$_base/create-order', data: {'amount': amount});
       final order = res.data['data'] as Map<String, dynamic>;
       _openRazorpay(order);
     } catch (e) {
@@ -153,7 +165,7 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _onPaymentSuccess(PaymentSuccessResponse response) async {
     try {
-      await _api.post('/wallet/verify', data: {
+      await _api.post('$_base/verify', data: {
         'razorpayOrderId': response.orderId,
         'razorpayPaymentId': response.paymentId,
         'razorpaySignature': response.signature,
@@ -271,7 +283,7 @@ class _WalletPageState extends State<WalletPage> {
             setSheet(() { amountError = null; formError = null; submitting = true; });
             final amt = int.parse(amountCtrl.text.trim());
             try {
-              await _api.post('/wallet/withdraw', data: {
+              await _api.post('$_base/withdraw', data: {
                 'amount': amt,
                 'method': method,
                 'accountHolderName': nameCtrl.text.trim(),
@@ -479,7 +491,7 @@ class _WalletPageState extends State<WalletPage> {
             setSheet(() { amountError = null; formError = null; submitting = true; });
             final amt = int.parse(amountCtrl.text.trim());
             try {
-              await _api.post('/wallet/transfer', data: {
+              await _api.post('$_base/transfer', data: {
                 'mobile': phoneCtrl.text.trim(),
                 'amount': amt,
                 if (noteCtrl.text.trim().isNotEmpty) 'note': noteCtrl.text.trim(),
@@ -628,8 +640,12 @@ class _WalletPageState extends State<WalletPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text('Money moves instantly to the recipient. Transfers cannot be reversed.',
-                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                    Text(
+                      widget.customer
+                          ? "Money moves instantly to the recipient's customer wallet. Transfers cannot be reversed."
+                          : 'Money moves instantly to the recipient. Transfers cannot be reversed.',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
                   ],
                 ],
               ),
@@ -796,10 +812,13 @@ class _WalletPageState extends State<WalletPage> {
               ),
             ),
           ],
-          const SizedBox(height: 6),
-          const SizedBox(height: 4),
-          const Text('Held amount is your booking commitments — released back when not selected.',
-              style: TextStyle(color: Colors.white70, fontSize: 11)),
+          const SizedBox(height: 10),
+          Text(
+            widget.customer
+                ? 'This is your customer wallet — separate from your driver / vendor wallet.'
+                : 'Held amount is your booking commitments — released back when not selected.',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
         ],
       ),
     );
