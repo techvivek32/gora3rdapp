@@ -17,7 +17,33 @@ export class ChatService {
     private firebaseService: FirebaseService,
   ) {}
 
-  async getOrCreateChat(userId1: string, userId2: string, requirementId?: string) {
+  /**
+   * True when the user currently has a paid membership. Mirrors
+   * RequirementsService.isPaidMember and the app's `canContactPosters`, expiry
+   * included: a lapsed plan is the free tier even before the downgrade sweep.
+   */
+  private isPaidMember(user: any): boolean {
+    if (!user) return false;
+    if (user.membershipExpiresAt && new Date(user.membershipExpiresAt) < new Date()) {
+      return false;
+    }
+    return ['active', 'verified', 'premium', 'golden'].includes(user.membershipType) || user.isPremium === true;
+  }
+
+  /**
+   * @param requirePaidToStart gate for user-initiated chats: reaching out to a
+   *   poster is a paid feature, like Call and WhatsApp. Only STARTING a new
+   *   thread is gated — an existing one still opens, so a driver whose chat the
+   *   owner opened (see postDriverDetails) is never locked out of it, and
+   *   neither is anyone who chatted while their plan was live. Internal callers
+   *   leave this off.
+   */
+  async getOrCreateChat(
+    userId1: string,
+    userId2: string,
+    requirementId?: string,
+    requirePaidToStart = false,
+  ) {
     const reqId = requirementId && Types.ObjectId.isValid(requirementId) ? new Types.ObjectId(requirementId) : undefined;
 
     // The booking is part of the key. Looking up by participants alone meant a
@@ -31,6 +57,16 @@ export class ChatService {
     });
 
     if (existingChat) return existingChat;
+
+    if (requirePaidToStart) {
+      const starter = await this.userModel
+        .findById(userId1)
+        .select('membershipType membershipExpiresAt isPremium')
+        .lean();
+      if (!this.isPaidMember(starter)) {
+        throw new ForbiddenException('Buy a membership plan to chat with posters.');
+      }
+    }
 
     const chat = await this.chatModel.create({
       participants: [new Types.ObjectId(userId1), new Types.ObjectId(userId2)],

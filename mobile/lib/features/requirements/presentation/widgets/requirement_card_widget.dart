@@ -10,6 +10,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/api_error.dart';
 import '../../../../core/widgets/directions_button.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
@@ -635,7 +636,12 @@ class RequirementCardWidget extends StatelessWidget {
                             // 8. actions (gated)
                             // Hidden-profile secure booking: ONLY the Chat button —
                             // no phone/whatsapp/advice/rating/report until assigned.
-                            if (hiddenProfile)
+                            //
+                            // Chat is a way to REACH the poster, so it needs the same
+                            // active plan Phone/WhatsApp need. Without `canContact` here
+                            // a free user got a working Chat button on every secure
+                            // booking and never saw the upgrade line.
+                            if (hiddenProfile && canContact)
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
@@ -832,8 +838,12 @@ class RequirementCardWidget extends StatelessWidget {
       final chatId = (data is Map) ? (data['_id'] ?? data['id'])?.toString() : null;
       if (chatId == null) throw Exception('no chat id');
       router.push('/chats/$chatId');
-    } catch (_) {
-      messenger.showSnackBar(const SnackBar(content: Text('Could not open chat. Please try again.')));
+    } catch (e) {
+      // Surface the server's reason — the backend refuses a NEW chat without an
+      // active plan, and "try again" would send the user in circles.
+      messenger.showSnackBar(
+        SnackBar(content: Text(serverMessage(e, fallback: 'Could not open chat. Please try again.'))),
+      );
     }
   }
 

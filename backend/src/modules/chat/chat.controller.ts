@@ -35,7 +35,9 @@ export class ChatController {
     @Query('requirementId') requirementId?: string,
     @Body() body?: { requirementId?: string },
   ) {
-    return this.chatService.getOrCreateChat(userId, targetUserId, requirementId || body?.requirementId);
+    // User-initiated → paid members only (same gate as Call / WhatsApp). An
+    // already-open thread is unaffected.
+    return this.chatService.getOrCreateChat(userId, targetUserId, requirementId || body?.requirementId, true);
   }
 
   @Get(':chatId')
