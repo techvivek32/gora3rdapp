@@ -16,12 +16,12 @@ class Env {
   /// local server with the flag; never by changing this default.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:7001/api/v1',
+    defaultValue: 'https://backend.goracabs.com/api/v1',
   );
 
   /// Socket.IO host root (NO `/api/v1` prefix).
   static const String socketBaseUrl = String.fromEnvironment(
     'SOCKET_BASE_URL',
-    defaultValue: 'http://localhost:7001',
+    defaultValue: 'https://backend.goracabs.com',
   );
 }
