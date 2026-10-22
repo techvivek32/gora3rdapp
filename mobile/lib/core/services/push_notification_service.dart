@@ -27,7 +27,7 @@ const _channel = AndroidNotificationChannel(
   playSound: false,
 );
 
-// Everything that is NOT a new requirement (driver assigned, trip OTP, trip
+// Everything that is NOT one of the loud alerts (driver assigned, trip OTP, trip
 // started/ended, admin messages) uses this quieter channel — the default system
 // tone, no loud gora_ring and no full-screen/ring popup.
 const _updatesChannelId = 'gora_cabs_updates';
@@ -38,6 +38,28 @@ const _updatesChannel = AndroidNotificationChannel(
   importance: Importance.high,
   playSound: true,
 );
+
+/// Push types that get the LOUD treatment: the user's ringtone, the full-screen
+/// call-style channel and the popup alert card (or the floating overlay when the
+/// app is in the background — see `firebaseMessagingBackgroundHandler`).
+///
+/// All three are "new work just landed" events the partner is waiting for:
+/// another agent's requirement, a customer's own booking, and a car someone
+/// listed as available. Every other push is a quiet update.
+///
+/// The backend sends all three with the same payload keys (pickupCity, dropCity,
+/// vehicleType, tripType, travelDate, travelTime, stops, notes, posterMobile),
+/// which is what lets one alert card render them all.
+const _loudAlertTypes = {'new_requirement', 'customer_booking_new', 'new_vehicle'};
+
+bool isLoudAlertType(String type) => _loudAlertTypes.contains(type);
+
+/// Feed to open behind a tapped alert card. 'new_requirement' is absent on
+/// purpose — its feed is the home screen the user is already on.
+const _loudAlertFeed = {
+  'customer_booking_new': '/customer-requests',
+  'new_vehicle': '/vehicles',
+};
 
 /// Handles FCM: permission, token registration, foreground heads-up
 /// notifications (with Call / WhatsApp actions) and tap navigation.
@@ -103,18 +125,19 @@ class PushNotificationService {
     final n = message.notification;
     final data = message.data;
 
-    // Only a brand-new requirement gets the loud ring + full-screen popup card.
-    // Everything else (driver assigned, trip OTP, trip started/ended, admin
-    // messages) is just a quiet notification — no ring, no popup.
-    final isNewRequirement = (data['type'] ?? '').toString() == 'new_requirement';
+    // New work (requirement / customer booking / available car) gets the loud
+    // ring + full-screen popup card. Everything else (driver assigned, trip OTP,
+    // trip started/ended, admin messages) is just a quiet notification — no
+    // ring, no popup.
+    final isLoud = isLoudAlertType((data['type'] ?? '').toString());
     // Booking alerts are opt-in: if the user hasn't turned them on, no ring and
     // no pop-up — not even the loud notification below.
     // Offline means not working: no popup, no ring, not even the loud
     // notification - regardless of the alert settings.
-    if (isNewRequirement && !(await alertsEnabled())) return;
-    if (isNewRequirement && !(await isOnline())) return;
+    if (isLoud && !(await alertsEnabled())) return;
+    if (isLoud && !(await isOnline())) return;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx != null && isNewRequirement) {
+    if (ctx != null && isLoud) {
       playRequirementRing(kind: RingKind.popup);
       showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
@@ -145,17 +168,17 @@ class PushNotificationService {
       body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          isNewRequirement ? _channel.id : _updatesChannel.id,
-          isNewRequirement ? _channel.name : _updatesChannel.name,
-          channelDescription: isNewRequirement ? _channel.description : _updatesChannel.description,
+          isLoud ? _channel.id : _updatesChannel.id,
+          isLoud ? _channel.name : _updatesChannel.name,
+          channelDescription: isLoud ? _channel.description : _updatesChannel.description,
           importance: Importance.high,
           priority: Priority.high,
-          // New requirements pop over the lock screen like a call but stay SILENT
+          // New-work alerts pop over the lock screen like a call but stay SILENT
           // here — the app plays the chosen notification tone itself. Other updates
           // use the normal system sound.
-          fullScreenIntent: isNewRequirement,
-          category: isNewRequirement ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
-          playSound: !isNewRequirement,
+          fullScreenIntent: isLoud,
+          category: isLoud ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
+          playSound: !isLoud,
           sound: null,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty
@@ -210,10 +233,16 @@ class PushNotificationService {
       return;
     }
 
-    // Customer Mode: a new customer booking for drivers/vendors → Customer Rides.
     final type = (data['type'] ?? '').toString();
-    if (type == 'customer_booking_new') {
-      ctx.push('/customer-requests');
+
+    // New work: open the matching feed FIRST, then show the same rich popup card
+    // the foreground path shows — so a tapped alert looks identical whether the
+    // app was open or not, and closing the card leaves the user on the right
+    // list. Requirements need no push: that feed is already the home screen.
+    if (isLoudAlertType(type)) {
+      final feed = _loudAlertFeed[type];
+      if (feed != null) ctx.push(feed);
+      showRequirementAlert(ctx, Map<String, dynamic>.from(data));
       return;
     }
     // Other customer-booking events (offer / confirmed / trip / arriving / cancel) → My Rides.
@@ -232,11 +261,6 @@ class PushNotificationService {
       return;
     }
 
-    // Show the rich popup card only for NEW requirements, else open the feed/inbox.
-    if ((data['type'] ?? '').toString() == 'new_requirement') {
-      showRequirementAlert(ctx, Map<String, dynamic>.from(data));
-      return;
-    }
     // Admin broadcast: follow its action URL, otherwise land on the inbox.
     final actionUrl = (data['actionUrl'] ?? '').toString().trim();
     if (actionUrl.isNotEmpty) {

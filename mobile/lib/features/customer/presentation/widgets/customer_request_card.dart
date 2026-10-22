@@ -374,7 +374,11 @@ Widget _holdPoint(String label, String body) {
 
 /// Centered accept dialog: the owner picks a vehicle + driver from their garage
 /// (via dropdowns) before accepting a customer booking. Returns the selection
-/// payload (vehicle + driver) to send with the accept call, or null if cancelled.
+/// payload to send with the accept call, or null if cancelled.
+///
+/// For a **Hire a Driver** booking the customer already has the car — only the
+/// driver is being hired — so the vehicle dropdown is dropped and the payload
+/// carries the driver alone.
 Future<Map<String, dynamic>?> showAcceptVehicleDriverSheet(BuildContext context, Map<String, dynamic> booking) {
   return showDialog<Map<String, dynamic>>(
     context: context,
@@ -403,6 +407,10 @@ class _AcceptDialogState extends State<_AcceptDialog> {
   bool _loading = true;
   String? _err;
 
+  /// "Hire a Driver" means the customer brings the car — so there is no vehicle
+  /// to pick and the dialog asks for the driver only.
+  bool get _driverOnly => (widget.booking['serviceType'] ?? '').toString() == 'hire_driver';
+
   @override
   void initState() {
     super.initState();
@@ -412,13 +420,16 @@ class _AcceptDialogState extends State<_AcceptDialog> {
   Future<void> _load() async {
     try {
       // Only admin-APPROVED vehicles & drivers can be used to accept a booking.
-      final v = await _api.get('/garage', params: {'approvedOnly': 'true'});
-      final d = await _api.get('/garage/drivers', params: {'approvedOnly': 'true'});
       List<Map<String, dynamic>> parse(dynamic raw) =>
           (raw as List? ?? []).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+      // Driver-only bookings never show the vehicle list, so don't fetch it.
+      final vehicles = _driverOnly
+          ? const <Map<String, dynamic>>[]
+          : parse((await _api.get('/garage', params: {'approvedOnly': 'true'})).data['data']);
+      final d = await _api.get('/garage/drivers', params: {'approvedOnly': 'true'});
       if (!mounted) return;
       setState(() {
-        _vehicles = parse(v.data['data']);
+        _vehicles = vehicles;
         _drivers = parse(d.data['data']);
         _loading = false;
       });
@@ -451,8 +462,10 @@ class _AcceptDialogState extends State<_AcceptDialog> {
         .toInt();
     // What accepting will hold from their wallet (our commission + GST).
     final hold = ((widget.booking['platformDue'] as num?) ?? 0).toInt();
-    final canSubmit = _vehicle != null && _driver != null;
-    final emptyGarage = !_loading && _err == null && (_vehicles.isEmpty || _drivers.isEmpty);
+    final canSubmit = _driver != null && (_driverOnly || _vehicle != null);
+    final emptyGarage = !_loading &&
+        _err == null &&
+        (_drivers.isEmpty || (!_driverOnly && _vehicles.isEmpty));
 
     return Padding(
       padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 16.h),
@@ -464,9 +477,11 @@ class _AcceptDialogState extends State<_AcceptDialog> {
           SizedBox(height: 4.h),
           Text(
             fare != 0
-                ? "Choose the vehicle & driver for this trip. You earn ₹$fare"
+                ? "${_driverOnly ? 'Choose the driver for this job' : 'Choose the vehicle & driver for this trip'}. You earn ₹$fare"
                     "${hold > 0 ? ' — ₹$hold (commission + GST) is held from your wallet' : ''}."
-                : 'Choose the vehicle & driver for this trip.',
+                : (_driverOnly
+                    ? 'Choose the driver for this job — the customer provides the car.'
+                    : 'Choose the vehicle & driver for this trip.'),
             style: TextStyle(fontSize: 12.5.sp, color: AppColors.textSecondary),
           ),
           SizedBox(height: 18.h),
@@ -482,11 +497,13 @@ class _AcceptDialogState extends State<_AcceptDialog> {
                 Icon(Icons.info_outline_rounded, size: 18.sp, color: AppColors.warning),
                 SizedBox(width: 10.w),
                 Expanded(child: Text(
-                  _vehicles.isEmpty && _drivers.isEmpty
-                      ? 'To accept a booking you need at least one approved vehicle and one approved driver. Add them in Settings → My Vehicles & Drivers. An admin reviews each one before you can use it.'
-                      : _vehicles.isEmpty
-                          ? 'You have no approved vehicle yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.'
-                          : 'You have no approved driver yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.',
+                  // Driver-only never needs a vehicle, so it only ever complains
+                  // about a missing driver.
+                  _driverOnly || (_drivers.isEmpty && _vehicles.isNotEmpty)
+                      ? 'You have no approved driver yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.'
+                      : _vehicles.isEmpty && _drivers.isEmpty
+                          ? 'To accept a booking you need at least one approved vehicle and one approved driver. Add them in Settings → My Vehicles & Drivers. An admin reviews each one before you can use it.'
+                          : 'You have no approved vehicle yet. Add one in Settings → My Vehicles & Drivers, or wait for admin approval.',
                   style: TextStyle(fontSize: 12.5.sp, fontWeight: FontWeight.w600, color: AppColors.warning),
                 )),
               ]),
@@ -496,23 +513,26 @@ class _AcceptDialogState extends State<_AcceptDialog> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () { Navigator.pop(context); context.push('/my-vehicles-garage'); },
-                icon: Icon(Icons.directions_car_filled_rounded, size: 18.sp),
-                label: const Text('Add Vehicle / Driver'),
+                icon: Icon(_driverOnly ? Icons.person_add_alt_1_rounded : Icons.directions_car_filled_rounded, size: 18.sp),
+                label: Text(_driverOnly ? 'Add Driver' : 'Add Vehicle / Driver'),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, padding: EdgeInsets.symmetric(vertical: 12.h)),
               ),
             ),
           ] else ...[
-            _label('Select Vehicle'),
-            SizedBox(height: 6.h),
-            _dropdown<Map<String, dynamic>>(
-              hint: 'Choose a vehicle',
-              icon: Icons.directions_car_rounded,
-              value: _vehicle,
-              items: _vehicles,
-              labelFor: _vehicleLabel,
-              onChanged: (v) => setState(() => _vehicle = v),
-            ),
-            SizedBox(height: 16.h),
+            // No vehicle step for Hire a Driver — the customer brings the car.
+            if (!_driverOnly) ...[
+              _label('Select Vehicle'),
+              SizedBox(height: 6.h),
+              _dropdown<Map<String, dynamic>>(
+                hint: 'Choose a vehicle',
+                icon: Icons.directions_car_rounded,
+                value: _vehicle,
+                items: _vehicles,
+                labelFor: _vehicleLabel,
+                onChanged: (v) => setState(() => _vehicle = v),
+              ),
+              SizedBox(height: 16.h),
+            ],
             _label('Select Driver'),
             SizedBox(height: 6.h),
             _dropdown<Map<String, dynamic>>(
@@ -538,15 +558,19 @@ class _AcceptDialogState extends State<_AcceptDialog> {
                 child: ElevatedButton(
                   onPressed: canSubmit
                       ? () {
-                          final v = _vehicle!;
+                          final v = _vehicle;
                           final d = _driver!;
-                          final photos = (v['carPhotos'] as List?)?.whereType<String>().toList() ?? const [];
-                          final name = (v['modelName'] ?? '').toString().trim();
-                          final type = (v['vehicleType'] ?? '').toString().trim();
+                          final photos = (v?['carPhotos'] as List?)?.whereType<String>().toList() ?? const [];
+                          final name = (v?['modelName'] ?? '').toString().trim();
+                          final type = (v?['vehicleType'] ?? '').toString().trim();
                           Navigator.pop(context, {
-                            'vehicle': name.isNotEmpty ? name : type,
-                            'vehicleNumber': (v['registrationNumber'] ?? '').toString(),
-                            if (photos.isNotEmpty) 'vehicleImage': photos.first,
+                            // Driver-only (Hire a Driver): no vehicle keys at all,
+                            // so nothing blank is stored on the offer.
+                            if (v != null) ...{
+                              'vehicle': name.isNotEmpty ? name : type,
+                              'vehicleNumber': (v['registrationNumber'] ?? '').toString(),
+                              if (photos.isNotEmpty) 'vehicleImage': photos.first,
+                            },
                             'driverName': (d['fullName'] ?? '').toString(),
                             'driverPhone': (d['phone'] ?? '').toString(),
                           });

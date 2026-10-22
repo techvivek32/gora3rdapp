@@ -34,14 +34,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp();
     debugPrint('Background FCM: ${message.notification?.title}');
-    // App is in the background/terminated — float the requirement card over
-    // whatever the user is doing (Truecaller-style), if it's a requirement push
-    // and the "Display over other apps" permission was granted.
+    // App is in the background/terminated — float the alert card over whatever
+    // the user is doing (Truecaller-style), if it's a new-work push and the
+    // "Display over other apps" permission was granted.
     final data = message.data;
-    // ONLY a brand-new requirement floats the overlay + rings. Driver-assigned,
-    // trip OTP and trip start/end pushes also carry a requirementId, so gate on the
-    // type — otherwise the popup + ring fired for all of them.
-    if ((data['type'] ?? '').toString() == 'new_requirement') {
+    // ONLY new work floats the overlay + rings: a new requirement, a new customer
+    // booking or a newly listed available car. Driver-assigned, trip OTP and trip
+    // start/end pushes also carry a requirementId, so gate on the type —
+    // otherwise the popup + ring fired for all of them.
+    if (isLoudAlertType((data['type'] ?? '').toString())) {
       // Respect the user's alert toggle even from the background/terminated
       // isolate — no overlay, no ring when alerts are off.
       if (!await alertsEnabled()) return;

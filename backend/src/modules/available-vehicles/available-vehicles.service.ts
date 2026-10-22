@@ -29,8 +29,10 @@ export class AvailableVehiclesService {
 
     await this.userModel.findByIdAndUpdate(userId, { $inc: { vehiclesPosted: 1 } });
 
-    // Notify the poster (self-confirmation)
-    this.notificationsService.notifyVehiclePosted(listing).catch(() => {});
+    // Loud alert (ring + popup card) to every opted-in user whose business city
+    // and alert filters match this listing — same treatment a new requirement
+    // gets. Fire-and-forget: never blocks posting.
+    this.notificationsService.notifyNewVehicle(listing).catch(() => {});
 
     return { message: 'Vehicle listing posted successfully', data: listing };
   }

@@ -4,7 +4,48 @@ import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument, NotificationType } from '../../database/schemas/notification.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { FirebaseService } from '../firebase/firebase.service';
+import { UserRole } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
+
+/**
+ * SILENT high-importance channel shared by the three "new work" alerts: a new
+ * requirement, a new customer booking and a newly listed available vehicle.
+ * All three ring + show the popup card, and the app plays the user's chosen
+ * ringtone itself, so the channel must not also play a sound.
+ */
+const BOOKING_CHANNEL_ID = 'gora_cabs_notifications_v4';
+
+/** Paid tiers — only these get a contact number in an alert payload. */
+const PAID_TIERS = ['active', 'verified', 'premium', 'golden'];
+
+/** Service labels for a customer booking's push title/body. */
+const SERVICE_LABEL: Record<string, string> = {
+  cab: 'cab',
+  hire_driver: 'driver',
+  luxury: 'luxury car',
+  car_pool: 'car pool',
+};
+
+const titleCase = (s: any) =>
+  `${s ?? ''}`.replace(/_/g, ' ').split(' ').filter(Boolean)
+    .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+
+const fmtDate = (d: any) => {
+  if (!d) return '';
+  const dt = new Date(d);
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${dt.getUTCDate()} ${months[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
+};
+
+const fmtTime = (t: any) => {
+  const parts = `${t ?? ''}`.split(':');
+  if (parts.length < 2) return '';
+  let h = parseInt(parts[0], 10);
+  const m = parts[1].padStart(2, '0');
+  const ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 === 0 ? 12 : h % 12;
+  return `${h}:${m}${ampm}`;
+};
 
 @Injectable()
 export class NotificationsService {
@@ -33,6 +74,67 @@ export class NotificationsService {
     } catch (e: any) {
       this.logger.warn(`notifyUser failed: ${e?.message ?? e}`);
     }
+  }
+
+  // ─── Shared plumbing for the three "new work" alerts ──────────────────────
+
+  /** Multicast in 500-token batches on the silent booking channel. One failed
+   *  batch is logged and never stops the rest. */
+  private async sendAlertPush(
+    tokens: string[],
+    payload: { title: string; body: string; data: Record<string, string> },
+  ): Promise<void> {
+    const batchSize = 500;
+    for (let i = 0; i < tokens.length; i += batchSize) {
+      try {
+        await this.firebaseService.sendPushNotification(tokens.slice(i, i + batchSize), {
+          ...payload,
+          // Silent booking channel — the app plays the user's chosen ring itself.
+          channelId: BOOKING_CHANNEL_ID,
+        });
+      } catch (error: any) {
+        this.logger.error(`FCM batch send failed: ${error?.message ?? error}`);
+      }
+    }
+  }
+
+  /**
+   * Everyone who should get a "new work" alert for something touching `cities`.
+   *
+   * City targeting matches notifyNewRequirement: a user who picked business
+   * cities hears only about those, a user who picked none counts as "all
+   * cities". `notificationsEnabled` is the master booking-alert switch, so an
+   * opted-out user is never pushed. With no cities at all the filter is skipped
+   * and everyone eligible is included.
+   */
+  private async alertAudience(opts: { cities: string[]; excludeUserId?: any; roles?: string[] }) {
+    const filter: any = {
+      notificationsEnabled: true,
+      isActive: true,
+      isBlocked: false,
+      fcmTokens: { $exists: true, $ne: [] },
+    };
+    if (opts.cities.length) {
+      filter.$or = [
+        { businessCities: { $in: opts.cities } }, // picked cities → only those
+        { businessCities: { $size: 0 } },         // picked none → all cities
+        { businessCities: { $exists: false } },
+      ];
+    }
+    if (opts.roles?.length) filter.role = { $in: opts.roles };
+    if (opts.excludeUserId) filter._id = { $ne: opts.excludeUserId };
+    return this.userModel
+      .find(filter)
+      .select('fcmTokens _id alertVehicleTypes alertTripTypes membershipType isPremium')
+      .lean();
+  }
+
+  private isPaidTier(u: any): boolean {
+    return PAID_TIERS.includes(u?.membershipType) || !!u?.isPremium;
+  }
+
+  private tokensOf(users: any[]): string[] {
+    return users.flatMap((u) => u.fcmTokens ?? []).filter(Boolean);
   }
 
   async notifyNewRequirement(requirement: any) {
@@ -81,25 +183,6 @@ export class NotificationsService {
       .select('mobile fullName agencyName')
       .lean();
 
-    const titleCase = (s: any) =>
-      `${s ?? ''}`.replace(/_/g, ' ').split(' ').filter(Boolean)
-        .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
-    const fmtDate = (d: any) => {
-      if (!d) return '';
-      const dt = new Date(d);
-      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      return `${dt.getUTCDate()} ${months[dt.getUTCMonth()]} ${dt.getUTCFullYear()}`;
-    };
-    const fmtTime = (t: any) => {
-      const parts = `${t ?? ''}`.split(':');
-      if (parts.length < 2) return '';
-      let h = parseInt(parts[0], 10);
-      const m = parts[1].padStart(2, '0');
-      const ampm = h >= 12 ? 'pm' : 'am';
-      h = h % 12 === 0 ? 12 : h % 12;
-      return `${h}:${m}${ampm}`;
-    };
-
     // Push format:
     //   Gora Taxi booking One Way trip
     //   Jodhpur → Surat
@@ -137,23 +220,8 @@ export class NotificationsService {
         .filter(Boolean)
         .join('\n')}`,
     };
-    const sendToTokens = async (tokens: string[], posterMobile: string) => {
-      const batchSize = 500;
-      for (let i = 0; i < tokens.length; i += batchSize) {
-        const batch = tokens.slice(i, i + batchSize);
-        try {
-          await this.firebaseService.sendPushNotification(batch, {
-            title,
-            body,
-            data: { ...baseData, posterMobile },
-            // Silent booking channel — the app plays the user's chosen ring itself.
-            channelId: 'gora_cabs_notifications_v4',
-          });
-        } catch (error) {
-          this.logger.error('FCM batch send failed:', error.message);
-        }
-      }
-    };
+    const sendToTokens = (tokens: string[], posterMobile: string) =>
+      this.sendAlertPush(tokens, { title, body, data: { ...baseData, posterMobile } });
 
     // WhatsApp-imported bookings carry the customer's number in contactMobile;
     // use it for the popup/notification Call & WhatsApp buttons, else the poster's.
@@ -168,6 +236,140 @@ export class NotificationsService {
   async notifyRequirementPosted(_requirement: any) {}
 
   async notifyVehiclePosted(_vehicle: any) {}
+
+  /**
+   * Fan a brand-new CUSTOMER BOOKING out to eligible drivers/vendors as a loud
+   * alert — the same treatment a new requirement gets: a silent-channel push
+   * carrying the whole trip, so the app rings and shows its popup card (and the
+   * floating overlay when it arrives in the background).
+   *
+   * The payload deliberately reuses the requirement alert's key names
+   * (pickupCity / dropCity / vehicleType / tripType / travelDate / travelTime /
+   * stops / notes), because the popup and the overlay read those keys — one
+   * alert UI then renders every alert kind.
+   *
+   * No per-driver inbox rows: like new requirements, writing one row per
+   * targeted user per booking only floods that list, and the Bookings feed is
+   * where these are browsed.
+   */
+  async notifyNewCustomerBooking(booking: any) {
+    try {
+      const cities = [booking.pickupCity, booking.dropCity].filter(Boolean);
+      const targets = await this.alertAudience({
+        cities,
+        excludeUserId: booking.customerId,
+        roles: [UserRole.DRIVER, UserRole.TRAVEL_AGENCY, UserRole.FLEET_OWNER],
+      });
+      // The per-user alertVehicleTypes / alertTripTypes filters are NOT applied
+      // here on purpose: a customer booking's vehicleType is an admin-managed cab
+      // CATEGORY NAME ("Innova Crysta"), not the VehicleType enum those filters
+      // hold, and subType is free-form per service — matching on either would
+      // silence everyone. City + the opt-in switch are the gates.
+      if (!targets.length) return;
+
+      const label = SERVICE_LABEL[booking.serviceType] || 'ride';
+      const route = [booking.pickupCity, booking.dropCity].filter(Boolean).join(' \→ ');
+      const title = `Gora Taxi customer ${label} booking`;
+      const bodyLines = [
+        route || 'New customer booking',
+        booking.vehicleType ? `Car type - ${titleCase(booking.vehicleType)}` : '',
+        `Date time - ${fmtDate(booking.travelDate)} | ${fmtTime(booking.travelTime)}`,
+      ].filter(Boolean);
+
+      const data: Record<string, string> = {
+        type: 'customer_booking_new',
+        customerBookingId: `${booking._id ?? ''}`,
+        bookingId: `${booking.bookingId ?? ''}`,
+        serviceType: `${booking.serviceType ?? ''}`,
+        pickupCity: `${booking.pickupCity ?? ''}`,
+        dropCity: `${booking.dropCity ?? ''}`,
+        vehicleType: `${booking.vehicleType ?? ''}`,
+        // The card's trip tag: the booking's own sub-option (One Way / Round
+        // Trip / Local / Hourly…), falling back to the service name.
+        tripType: `${booking.subType || titleCase(label)}`,
+        travelDate: `${booking.travelDate ? new Date(booking.travelDate).toISOString() : ''}`,
+        travelTime: `${booking.travelTime ?? ''}`,
+        notes: `${booking.notes ?? ''}`,
+        stops: `${(booking.stops ?? [])
+          .map((s: any) => `${s?.address ?? ''}`.trim())
+          .filter(Boolean)
+          .join('\n')}`,
+        // Empty on purpose: a customer's number stays hidden until a driver is
+        // actually assigned (the booking has a contact-reveal window), so the
+        // popup's Call / WhatsApp buttons stay disabled for these.
+        posterMobile: '',
+        posterName: '',
+      };
+
+      await this.sendAlertPush(this.tokensOf(targets), { title, body: bodyLines.join('\n'), data });
+      this.logger.log(`Customer booking ${booking.bookingId}: alerted ${targets.length} drivers`);
+    } catch (e: any) {
+      this.logger.warn(`notifyNewCustomerBooking failed: ${e?.message ?? e}`);
+    }
+  }
+
+  /**
+   * Fan a newly listed AVAILABLE VEHICLE out as a loud alert, same as a new
+   * requirement — agents watching for an empty car get the ring + popup card.
+   *
+   * A listing's `vehicleType` and `tripType` ARE the same enums the per-user
+   * alert filters hold, so unlike customer bookings both filters are honoured
+   * here (an empty filter means "all").
+   */
+  async notifyNewVehicle(vehicle: any) {
+    try {
+      const cities = [vehicle.currentCity, vehicle.destinationCity].filter(Boolean);
+      const candidates = await this.alertAudience({ cities, excludeUserId: vehicle.postedBy });
+      const targets = candidates.filter((u: any) => {
+        const vOk = !u.alertVehicleTypes?.length || u.alertVehicleTypes.includes(vehicle.vehicleType);
+        const tOk = !u.alertTripTypes?.length || u.alertTripTypes.includes(vehicle.tripType);
+        return vOk && tOk;
+      });
+      if (!targets.length) return;
+
+      const poster: any = await this.userModel
+        .findById(vehicle.postedBy)
+        .select('mobile fullName agencyName')
+        .lean();
+
+      const route = [vehicle.currentCity, vehicle.destinationCity].filter(Boolean).join(' \→ ');
+      const title = `Car available \— ${titleCase(vehicle.tripType)}`;
+      const body = [
+        route || 'New car available',
+        `Car type - ${titleCase(vehicle.vehicleType)}`,
+        `Date time - ${fmtDate(vehicle.availableDate)} | ${fmtTime(vehicle.availableTime)}`,
+      ].join('\n');
+
+      // Same key names as the requirement alert (see notifyNewCustomerBooking):
+      // currentCity / destinationCity are mapped onto pickupCity / dropCity so the
+      // one popup card renders an A \→ B route for a listing too.
+      const baseData: Record<string, string> = {
+        type: NotificationType.NEW_VEHICLE,
+        vehicleId: `${vehicle._id ?? ''}`,
+        bookingId: `${vehicle.listingId ?? ''}`,
+        pickupCity: `${vehicle.currentCity ?? ''}`,
+        dropCity: `${vehicle.destinationCity ?? ''}`,
+        vehicleType: `${vehicle.vehicleType ?? ''}`,
+        tripType: `${vehicle.tripType ?? ''}`,
+        travelDate: `${vehicle.availableDate ? new Date(vehicle.availableDate).toISOString() : ''}`,
+        travelTime: `${vehicle.availableTime ?? ''}`,
+        notes: `${vehicle.notes ?? ''}`,
+        stops: '',
+        posterName: `${poster?.agencyName || poster?.fullName || ''}`,
+      };
+
+      // Contact is a paid feature, exactly as for requirements: only paid tiers
+      // get a number, everyone else sees Call / WhatsApp disabled.
+      const contact = `${vehicle.driverMobile || poster?.mobile || ''}`;
+      const paid = targets.filter((u) => this.isPaidTier(u));
+      const basic = targets.filter((u) => !this.isPaidTier(u));
+      await this.sendAlertPush(this.tokensOf(paid), { title, body, data: { ...baseData, posterMobile: contact } });
+      await this.sendAlertPush(this.tokensOf(basic), { title, body, data: { ...baseData, posterMobile: '' } });
+      this.logger.log(`Vehicle ${vehicle.listingId}: alerted ${targets.length} users`);
+    } catch (e: any) {
+      this.logger.warn(`notifyNewVehicle failed: ${e?.message ?? e}`);
+    }
+  }
 
   /**
    * Tell the driver a booking was handed to them: an inbox row they'll see next

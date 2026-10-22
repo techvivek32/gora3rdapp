@@ -448,43 +448,19 @@ export class CustomerBookingsService {
     return { message: 'Booking request created', data: booking };
   }
 
-  private static readonly SERVICE_LABEL: Record<string, string> = {
-    cab: 'cab ride',
-    hire_driver: 'driver',
-    luxury: 'luxury car',
-    car_pool: 'car pool ride',
-  };
-
   /**
    * Push a "New Customer Booking" alert to every eligible driver/vendor whose
    * business city matches the trip, so the request shows up for them to quote.
    * Fire-and-forget — never blocks booking creation.
+   *
+   * Delegates to NotificationsService, which sends it as a LOUD alert (silent
+   * high-importance channel + the full trip in the payload) so the app rings
+   * and shows the popup card, exactly like a new requirement. It used to be one
+   * quiet per-driver notifyUser call — which also wrote 500 inbox rows per
+   * booking and never rang.
    */
   private async notifyEligibleDrivers(booking: any) {
-    try {
-      const cities = [booking.pickupCity, booking.dropCity].filter(Boolean);
-      const filter: any = {
-        role: { $in: [UserRole.DRIVER, UserRole.TRAVEL_AGENCY, UserRole.FLEET_OWNER] },
-        isBlocked: { $ne: true },
-        _id: { $ne: booking.customerId },
-      };
-      // Prefer city-matched drivers; if the trip has no city, skip the filter.
-      if (cities.length) filter.businessCities = { $in: cities };
-      const drivers = await this.userModel.find(filter).select('_id').limit(500).lean();
-      const label = CustomerBookingsService.SERVICE_LABEL[booking.serviceType] || 'ride';
-      const from = booking.pickupCity || 'a nearby area';
-      for (const d of drivers) {
-        this.notifications.notifyUser(
-          d._id,
-          '🚕 New Customer Booking',
-          `A customer needs a ${label} from ${from}. Open "Customer Rides" to send your offer.`,
-          { type: 'customer_booking_new', bookingId: booking.bookingId },
-        ).catch(() => {});
-      }
-      this.logger.log(`Customer booking ${booking.bookingId}: notified ${drivers.length} eligible drivers`);
-    } catch (e: any) {
-      this.logger.warn(`notifyEligibleDrivers failed: ${e?.message}`);
-    }
+    await this.notifications.notifyNewCustomerBooking(booking);
   }
 
   async getMyBookings(customerId: string, status?: string) {

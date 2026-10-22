@@ -1,7 +1,10 @@
-/// Builds the pre-filled WhatsApp message for the requirement popups (the in-app
-/// Alert and the floating Overlay), from the flat FCM push payload. It mirrors the
+/// Builds the pre-filled WhatsApp message for the alert popups (the in-app Alert
+/// and the floating Overlay), from the flat FCM push payload. It mirrors the
 /// requirement card's share message, using the fields the push actually carries
 /// (requirementId/bookingId, trip, vehicle, route + stops, date/time, poster).
+///
+/// Serves all three alert kinds, since they share those payload keys — only the
+/// heading is picked from `type`.
 String buildRequirementWhatsAppMessage(Map<String, dynamic> data) {
   String s(String k) => (data[k] ?? '').toString().trim();
 
@@ -41,8 +44,15 @@ String buildRequirementWhatsAppMessage(Map<String, dynamic> data) {
 
   final stops = s('stops').split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
+  // Same payload serves all three alert kinds (requirement / customer booking /
+  // available car), so only the heading changes.
+  const headings = {
+    'new_vehicle': '🚗 *Car Available*',
+    'customer_booking_new': '📢 *Customer Booking*',
+  };
+
   final b = StringBuffer();
-  b.writeln('📢 *Booking*');
+  b.writeln(headings[s('type')] ?? '📢 *Booking*');
   b.writeln('*Gora Taxi Partner App*');
   b.writeln();
 
