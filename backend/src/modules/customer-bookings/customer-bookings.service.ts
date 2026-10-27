@@ -215,6 +215,28 @@ export class CustomerBookingsService {
   }
 
   /** Verify the in-app checkout signature, then credit the booking advance. */
+  /**
+   * Apply a booking advance straight from the Razorpay WEBHOOK, by order id.
+   *
+   * Same gap as the wallet: `verifyAdvance` is the only thing that marks the
+   * advance paid, so a dropped call left the customer charged with the booking
+   * still showing as unpaid. The webhook's body HMAC authenticates this, so no
+   * checkout signature is involved — keep it off any route.
+   *
+   * `bookingRef` is what tells a booking advance apart from a subscription
+   * order; idempotent via the conditional status flip.
+   */
+  async applyAdvanceByOrderId(razorpayOrderId: string, razorpayPaymentId?: string): Promise<void> {
+    const payment = await this.paymentModel.findOneAndUpdate(
+      { razorpayOrderId, bookingRef: { $ne: null }, status: { $ne: PaymentStatus.SUCCESS } },
+      { status: PaymentStatus.SUCCESS, ...(razorpayPaymentId ? { razorpayPaymentId } : {}) },
+      { new: true },
+    );
+    if (!payment) return; // not a booking advance, or already applied
+    await this.applyAdvanceToBooking(payment);
+    this.logger.log(`Booking advance applied via webhook for order ${razorpayOrderId}`);
+  }
+
   async verifyAdvance(customerId: string, data: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
     const keys = await this.settings.getRazorpayKeys();
     const expected = crypto.createHmac('sha256', keys.keySecret)

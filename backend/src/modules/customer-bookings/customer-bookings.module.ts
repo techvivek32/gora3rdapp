@@ -28,5 +28,7 @@ import { SettingsModule } from '../settings/settings.module';
   ],
   controllers: [CustomerBookingsController],
   providers: [CustomerBookingsService],
+  // The Razorpay webhook settles booking advances too — PaymentsModule needs this.
+  exports: [CustomerBookingsService],
 })
 export class CustomerBookingsModule {}

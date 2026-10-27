@@ -110,8 +110,63 @@ export class WalletService {
     return new Razorpay({ key_id: keyId, key_secret: keySecret });
   }
 
+  /**
+   * Settle top-ups that Razorpay took the money for but nobody credited.
+   *
+   * The app credits a top-up by calling `verifyTopUp` right after checkout. If
+   * that call never lands — network drops, the app is killed or backgrounded,
+   * the user closes it — the payment sits captured at Razorpay and the row
+   * stays `pending` forever. That is the "paid but the balance did not update"
+   * report.
+   *
+   * The webhook now covers this too, but it is NOT configured in the Razorpay
+   * dashboard (nginx has never seen a single webhook request), and relying on
+   * someone remembering to set it up is how this stays broken. So the wallet
+   * also heals itself: every time it is opened, any recent pending top-up is
+   * checked against Razorpay and credited if it was actually paid.
+   *
+   * Deliberately cheap: only rows from the last 24h that have an order id, at
+   * most 5 at a time — in the normal case there are none and this costs one
+   * indexed query. Best-effort throughout; reading a wallet must never fail
+   * because Razorpay is slow.
+   */
+  private async reconcilePendingTopUps(userId: string): Promise<void> {
+    try {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const pending = await this.txModel
+        .find({
+          userId: new Types.ObjectId(userId),
+          status: 'pending',
+          razorpayOrderId: { $exists: true, $nin: [null, ''] },
+          createdAt: { $gte: since },
+        })
+        .select('razorpayOrderId')
+        .limit(5)
+        .lean();
+      if (!pending.length) return;
+
+      const razorpay = await this.getRazorpay();
+      for (const tx of pending) {
+        try {
+          const res: any = await razorpay.orders.fetchPayments((tx as any).razorpayOrderId);
+          const captured = (res?.items ?? []).find((p: any) => p?.status === 'captured');
+          if (captured) {
+            await this.creditTopUpByOrderId((tx as any).razorpayOrderId, captured.id);
+          }
+        } catch (e: any) {
+          this.logger.warn(`Top-up reconcile failed for ${(tx as any).razorpayOrderId}: ${e?.message ?? e}`);
+        }
+      }
+    } catch (e: any) {
+      this.logger.warn(`Top-up reconcile skipped: ${e?.message ?? e}`);
+    }
+  }
+
   async getWallet(userId: string, franchiseCity?: any, scope: WalletScope = 'main') {
     await this.assertUserInCity(userId, franchiseCity);
+    // Catch anything Razorpay charged for but never credited, before the
+    // balance below is read — otherwise the customer sees the stale figure.
+    await this.reconcilePendingTopUps(userId);
     const field = this.balanceField(scope);
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select(`${field} heldBalance`).lean(),
@@ -283,6 +338,38 @@ export class WalletService {
       message: 'Wallet credited successfully',
       data: { status: 'success', amount: claimed.amount, balance: this.balanceOf(user, walletScope) },
     };
+  }
+
+  /**
+   * Credit a top-up straight from the Razorpay WEBHOOK, by order id.
+   *
+   * The app normally calls `verifyTopUp` right after checkout, but that call is
+   * the only thing that credits the wallet — so if it never lands (network
+   * drops, the app is killed or backgrounded, the user closes it), Razorpay has
+   * the money and the wallet stays empty with nothing to reconcile it. That is
+   * the "paid but balance did not update" report.
+   *
+   * No signature is checked here because there is none to check: the webhook's
+   * own body HMAC was already verified by the controller, which is what makes
+   * this order authentic. Never expose this on a route.
+   *
+   * Idempotent: the status flip is a conditional update, so a webhook retry (or
+   * a late `verifyTopUp` racing it) can only credit the wallet once.
+   */
+  async creditTopUpByOrderId(razorpayOrderId: string, razorpayPaymentId?: string): Promise<void> {
+    const claimed = await this.txModel.findOneAndUpdate(
+      { razorpayOrderId, status: 'pending' },
+      { status: 'success', ...(razorpayPaymentId ? { razorpayPaymentId } : {}) },
+      { new: true },
+    );
+    // Not a wallet order, or already credited — either way nothing to do.
+    if (!claimed) return;
+
+    const scope = this.scopeOf(claimed);
+    await this.userModel.findByIdAndUpdate(claimed.userId, {
+      $inc: { [this.balanceField(scope)]: claimed.amount },
+    });
+    this.logger.log(`Wallet credited ₹${claimed.amount} via webhook for order ${razorpayOrderId}`);
   }
 
   async verifyTopUp(userId: string, dto: VerifyTopUpDto) {

@@ -20,5 +20,7 @@ import { SettingsModule } from '../settings/settings.module';
   ],
   controllers: [WalletController, CustomerWalletController, WalletAdminController],
   providers: [WalletService],
+  // The Razorpay webhook settles wallet top-ups too, so PaymentsModule needs this.
+  exports: [WalletService],
 })
 export class WalletModule {}
