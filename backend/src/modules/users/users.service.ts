@@ -17,13 +17,22 @@ import { SubmitVerificationDto } from './dto/submit-verification.dto';
 import { VerificationStatus } from '../../common/enums/user-role.enum';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 
-// Public-facing profile fields (no credentials / private data).
-// SECURITY: never include `walletBalance` or `customerWalletBalance` here — this select feeds
-// lookupByMobile / getUserCard, which any authenticated user can call for
-// ANOTHER user, and a customer must never see a driver/vendor wallet balance.
-// Self balance comes only from the owner's wallet/profile endpoints.
+// Public-facing profile fields (no credentials).
+//
+// `walletBalance` IS exposed here, deliberately: the member profile shows it as
+// a trust signal (can this poster cover the commission?). It was removed by the
+// Sep 2026 audit and put back on 27 Oct 2026 at the owner's explicit request
+// after the trade-off was spelled out. **Do not "fix" this again without
+// asking** — the cost is understood and accepted:
+//   this select feeds lookupByMobile / getUserCard, which ANY authenticated
+//   user can call for ANOTHER user, so any member can read any other member's
+//   balance, including by typing a mobile number they do not know.
+//
+// SECURITY: `customerWalletBalance` stays OUT. Customers are riders, not
+// counterparties — nobody needs a trust signal about them, so there is no
+// reason to expose it.
 const PUBLIC_PROFILE_SELECT =
-  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus isActive isBlocked rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted createdAt';
+  'fullName agencyName profileImage coverImage membershipType isVerified verificationStatus isActive isBlocked rating totalRatings lastActive lastLocationAddress lastLocationAt city state mobile role businessCities requirementsPosted vehiclesPosted walletBalance createdAt';
 
 // Paid membership tiers (mirrors the app's `canContactPosters` gate) — used to
 // decide whether the VIEWER may see another user's last location.
