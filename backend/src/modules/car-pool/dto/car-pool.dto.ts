@@ -1,4 +1,4 @@
-import { IsArray, IsInt, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEmail, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class GeoDto {
@@ -40,6 +40,17 @@ export class UpdatePoolRideDto {
 export class BookSeatsDto {
   @IsInt() @Min(1) seats: number;
   @IsOptional() @IsString() pickupPoint?: string;
+}
+
+/** Booking a seat from the website without signing in: name + mobile only.
+ *  The number is unverified by design — see `resolveGuestUser`. */
+export class GuestBookSeatsDto extends BookSeatsDto {
+  @IsString() @IsNotEmpty() @MaxLength(80) guestName: string;
+
+  @IsString() @Matches(/^[6-9]\d{9}$/, { message: 'Enter a valid 10-digit mobile number' })
+  guestMobile: string;
+
+  @IsOptional() @IsEmail() guestEmail?: string;
 }
 
 export class PickupDto {

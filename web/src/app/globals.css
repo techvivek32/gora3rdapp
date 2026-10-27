@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-[#F6F7F9] text-ink antialiased;
+  }
+  /* Date/time inputs are a core part of the booking form, so make their native
+     picker icon visible and clickable rather than the browser's faint default. */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.6;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl bg-white shadow-card ring-1 ring-hairline;
+  }
+  .field {
+    @apply w-full rounded-xl border border-hairline bg-white px-3.5 py-2.5 text-[15px] outline-none
+           transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-50;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-semibold
+           transition disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
+  }
+  .btn-outline {
+    @apply btn border border-brand-500 bg-white text-brand-600 hover:bg-brand-50;
+  }
+  .btn-ghost {
+    @apply btn border border-hairline bg-white text-ink hover:bg-gray-50;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1;
+  }
+}

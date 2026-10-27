@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles, Public } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -20,7 +20,13 @@ import {
 export class HomeContentController {
   constructor(private readonly service: HomeContentService) {}
 
+  // The four reads below are @Public: the website shows the home page and
+  // prices a cab BEFORE anyone identifies themselves (guest booking), and the
+  // class-level JwtAuthGuard was 401ing all of them for signed-out visitors.
+  // None of them return anything private — they are admin-authored content.
+
   // Customer: the whole home payload for their city.
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Customer: dynamic home content for a city' })
   getForCustomer(@Query('city') city?: string) {
@@ -28,6 +34,7 @@ export class HomeContentController {
   }
 
   // Customer: active cab categories for the Explore Cabs results.
+  @Public()
   @Get('cab-categories')
   @ApiOperation({ summary: 'Customer: active cab categories (name, image, price/km, seats)' })
   cabCategories() {
@@ -35,6 +42,7 @@ export class HomeContentController {
   }
 
   // Customer: the "All Inclusive" list shown on the cab-results screen.
+  @Public()
   @Get('inclusions')
   @ApiOperation({ summary: 'Customer: admin-managed "all inclusive" items' })
   inclusions() {
@@ -42,6 +50,7 @@ export class HomeContentController {
   }
 
   // Customer: the 4 cab-booking info tabs (inclusions/exclusions/facilities/terms).
+  @Public()
   @Get('cab-info')
   @ApiOperation({ summary: 'Customer: cab booking info tabs' })
   cabInfo() {

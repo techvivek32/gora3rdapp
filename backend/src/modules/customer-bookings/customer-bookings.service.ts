@@ -20,8 +20,10 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { buildInvoicePdf } from './invoice.util';
+import { resolveGuestUser } from '../../common/utils/guest-user.util';
 import {
   CreateCustomerBookingDto,
+  CreateGuestBookingDto,
   UpdateCustomerBookingDto,
   ApplyBookingDto,
   RateBookingDto,
@@ -113,6 +115,34 @@ export class CustomerBookingsService {
   }
 
   /** In-app Razorpay checkout order for a booking advance. */
+  /**
+   * Advance order for a booking placed without an account.
+   *
+   * The guest has no session, so the booking reference + the mobile they booked
+   * with stand in for one: both must match the same booking before any order is
+   * created. That is deliberately a pair — a booking reference alone is
+   * guessable, and a mobile alone would let anyone pay against any of that
+   * number's bookings.
+   */
+  async createGuestAdvanceOrder(bookingId: string, mobile: string, percent: number) {
+    const ref = (bookingId || '').trim();
+    const last10 = (mobile || '').replace(/\D/g, '').slice(-10);
+    if (!ref || last10.length !== 10) throw new BadRequestException('Booking reference and mobile number are required');
+
+    const booking = await this.bookingModel.findOne({ bookingId: ref }).select('_id customerId').lean();
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    const customer: any = await this.userModel.findById((booking as any).customerId).select('mobile').lean();
+    const ownerMobile = (customer?.mobile || '').replace(/\D/g, '').slice(-10);
+    if (!ownerMobile || ownerMobile !== last10) {
+      // Same message either way, so this can't be used to probe which
+      // references exist or whose number owns them.
+      throw new NotFoundException('Booking not found');
+    }
+
+    return this.createAdvanceOrder((booking as any).customerId.toString(), (booking as any)._id.toString(), percent);
+  }
+
   async createAdvanceOrder(customerId: string, id: string, percent: number) {
     const { booking, percent: p, rupees, amountPaise } = await this.advanceContext(customerId, id, percent);
     const orderId = generatePaymentOrderId();
@@ -398,6 +428,47 @@ export class CustomerBookingsService {
   }
 
   // ─── Customer side ─────────────────────────────────────────────────────────
+
+  /**
+   * Place a booking for someone who has NOT signed in — the website collects a
+   * name and a mobile number and nothing else.
+   *
+   * The number is unverified, so this is treated as a claim, never as proof of
+   * identity:
+   *
+   *  - It issues NO tokens and returns NO account data. If it did, typing a
+   *    stranger's number would be a complete authentication bypass — this is the
+   *    one line that must never move.
+   *  - An existing account with that number is reused, so a customer who books
+   *    here sees the booking in the app when they next sign in. It also means a
+   *    mistyped number files the booking under someone else's account; that is
+   *    accepted (a booking is not sensitive data) and is the cost of skipping
+   *    OTP. The owner can cancel it.
+   *  - A number with no account gets a minimal customer account created for it —
+   *    no password, so nothing can be signed into until they register properly.
+   *
+   * Abuse is bounded only by the global per-IP throttler, so that must stay on.
+   */
+  async createGuestBooking(dto: CreateGuestBookingDto) {
+    const { userId, created } = await resolveGuestUser(this.userModel, {
+      name: dto.guestName,
+      mobile: dto.guestMobile,
+      email: dto.guestEmail,
+    });
+    if (created) this.logger.log(`Guest booking: created a customer account for a new number`);
+
+    // Strip the guest fields before they reach the booking document — they are
+    // routing information for this endpoint, not part of a booking.
+    const { guestName: _n, guestMobile: _m, guestEmail: _e, ...bookingDto } = dto as any;
+    const result = await this.create(userId, bookingDto);
+
+    // Deliberately narrow: the booking only, never the user it was filed against.
+    const booking: any = (result as any)?.data ?? {};
+    return {
+      message: 'Booking request created',
+      data: { _id: booking._id, bookingId: booking.bookingId, status: booking.status },
+    };
+  }
 
   async create(customerId: string, dto: CreateCustomerBookingDto) {
     const travelDate = dto.travelDate ? new Date(dto.travelDate) : undefined;

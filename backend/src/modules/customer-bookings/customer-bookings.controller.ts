@@ -9,6 +9,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import {
   CreateCustomerBookingDto,
+  CreateGuestBookingDto,
   UpdateCustomerBookingDto,
   ApplyBookingDto,
   AcceptBookingDto,
@@ -25,6 +26,48 @@ export class CustomerBookingsController {
   constructor(private readonly service: CustomerBookingsService) {}
 
   // ── Literal routes first (so they don't collide with :id) ──
+
+  /**
+   * Book from the website without signing in: name + mobile only.
+   *
+   * @Public, so it is reachable with no token — which is exactly why it is kept
+   * narrow. It creates a booking and nothing else: no tokens are issued and no
+   * account data is returned, so knowing someone's number can never be turned
+   * into access to their account. The global per-IP throttler is the only thing
+   * standing between this and spam, so it must stay enabled.
+   */
+  @Public()
+  @Post('guest')
+  @ApiOperation({ summary: 'Place a booking without signing in (name + mobile only)' })
+  createGuest(@Body() dto: CreateGuestBookingDto) {
+    return this.service.createGuestBooking(dto);
+  }
+
+  /**
+   * Start a Razorpay order for a GUEST booking's advance.
+   *
+   * @Public, so ownership is proved by the pair the guest already has: the
+   * booking reference AND the mobile they booked with. Knowing only one is not
+   * enough, and the service still refuses if the two don't match.
+   */
+  @Public()
+  @Post('guest/advance/order')
+  @ApiOperation({ summary: 'Guest: create a Razorpay order for a booking advance' })
+  guestAdvanceOrder(@Body() body: { bookingId: string; mobile: string; percent: number }) {
+    return this.service.createGuestAdvanceOrder(body?.bookingId, body?.mobile, body?.percent);
+  }
+
+  /**
+   * Verify a guest's advance payment. Safe to leave @Public: it is the HMAC of
+   * (orderId|paymentId) that authorises this, not the caller — a forged call
+   * without Razorpay's signature is rejected.
+   */
+  @Public()
+  @Post('guest/advance/verify')
+  @ApiOperation({ summary: 'Guest: verify an advance payment' })
+  guestAdvanceVerify(@Body() data: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string }) {
+    return this.service.verifyAdvance('', data);
+  }
 
   @Get('my')
   @ApiOperation({ summary: "Customer: my bookings (optional ?status=)" })

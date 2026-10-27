@@ -1,7 +1,6 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { PlacesService } from './places.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Places')
 @Controller('places')
@@ -20,20 +19,21 @@ export class PlacesController {
     return this.placesService.autocomplete(input, '(cities)');
   }
 
-  // Guarded: Directions is the expensive Google call and is only used in the
-  // (post-login) booking flow, so require auth to stop anonymous quota/billing abuse.
-  // autocomplete/cities stay public (registration city-select needs them pre-login)
-  // and are protected by the global per-IP throttler.
-  @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
+  // Public since the website prices a trip BEFORE the visitor identifies
+  // themselves (guest booking) — a guard here would break the fare page for
+  // every signed-out customer.
+  //
+  // Directions is the expensive Google call, so the global per-IP throttler is
+  // now the only thing limiting spend on it. Keep that throttler enabled, and
+  // watch the Google billing dashboard after this ships.
   @Get('route')
   @ApiOperation({ summary: 'Google Directions driving distance through ordered points "lat,lng;lat,lng;..."' })
   route(@Query('points') points: string) {
     return this.placesService.route(points);
   }
 
-  @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
+  // Public for the same reason as `route` above: a guest has to be able to turn
+  // the place they picked into coordinates before the fare can be worked out.
   @Get('details')
   @ApiOperation({ summary: 'Resolve a place_id to address + coordinates + city' })
   details(@Query('placeId') placeId: string) {

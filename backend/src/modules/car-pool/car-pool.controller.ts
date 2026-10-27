@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { Roles, Public } from '../../common/decorators/roles.decorator';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -9,6 +9,7 @@ import { CarPoolService } from './car-pool.service';
 import {
   BookSeatsDto,
   CancelDto,
+  GuestBookSeatsDto,
   CompleteRideDto,
   CreatePoolRideDto,
   PickupDto,
@@ -43,10 +44,21 @@ export class CarPoolController {
   }
 
   // ── Passenger ───────────────────────────────────────────────────────────────
+  // Public: the website lets a signed-out visitor search rides and book a seat
+  // with just a name + mobile. Only ACTIVE rides with free seats are returned,
+  // and passenger lists are never included, so there is nothing private here.
+  @Public()
   @Get('available')
   @ApiOperation({ summary: 'Passenger: search available pool rides' })
-  available(@CurrentUser('sub') userId: string, @Query('from') from?: string, @Query('to') to?: string, @Query('date') date?: string) {
+  available(@CurrentUser('sub') userId?: string, @Query('from') from?: string, @Query('to') to?: string, @Query('date') date?: string) {
     return this.service.searchAvailable(userId, { from, to, date });
+  }
+
+  @Public()
+  @Post(':id/guest-book')
+  @ApiOperation({ summary: 'Book seats without signing in (name + mobile only)' })
+  guestBook(@Param('id') id: string, @Body() dto: GuestBookSeatsDto) {
+    return this.service.guestBookSeats(id, dto);
   }
 
   @Get('my-bookings')
@@ -65,6 +77,10 @@ export class CarPoolController {
   }
 
   // ── By id (keep AFTER literal routes) ───────────────────────────────────────
+  // Public for the same reason as `available`: a guest has to see the ride
+  // before booking it. getRide only returns the caller's own booking, so a
+  // signed-out caller sees the ride and no passenger data at all.
+  @Public()
   @Get(':id')
   @ApiOperation({ summary: 'Ride details (owner sees passengers; others see own booking)' })
   getRide(@CurrentUser('sub') userId: string, @Param('id') id: string) {

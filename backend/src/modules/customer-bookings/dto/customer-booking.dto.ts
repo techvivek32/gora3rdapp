@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsNumber, IsInt, Min, ValidateNested } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsInt, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CustomerServiceType } from '../../../database/schemas/customer-booking.schema';
 
@@ -46,6 +46,24 @@ export class CreateCustomerBookingDto {
   // Local hourly-package snapshot (from the chosen cab category).
   @IsOptional() @IsNumber() packageHours?: number;
   @IsOptional() @IsNumber() extraHourPrice?: number;
+}
+
+/**
+ * A booking placed from the website WITHOUT signing in — the customer gives only
+ * a name and a mobile number.
+ *
+ * The number is NOT verified (no OTP), which is a deliberate product choice, so
+ * everything downstream treats it as a claim rather than proof: the endpoint
+ * issues no tokens and returns no account data, and the booking is simply filed
+ * against whoever owns that number.
+ */
+export class CreateGuestBookingDto extends CreateCustomerBookingDto {
+  @IsString() @IsNotEmpty() @MaxLength(80) guestName: string;
+
+  @IsString() @Matches(/^[6-9]\d{9}$/, { message: 'Enter a valid 10-digit mobile number' })
+  guestMobile: string;
+
+  @IsOptional() @IsEmail() guestEmail?: string;
 }
 
 /** Customer edits an OPEN booking. serviceType cannot change (that's a new booking). */

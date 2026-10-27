@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { PoolRide, PoolRideDocument, PoolRideStatus, SeatBookingStatus } from '../../database/schemas/pool-ride.schema';
 import { User, UserDocument } from '../../database/schemas/user.schema';
+import { resolveGuestUser } from '../../common/utils/guest-user.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   BookSeatsDto,
@@ -259,11 +260,13 @@ export class CarPoolService {
 
   // ─── Passenger: search / book ───────────────────────────────────────────────
 
-  async searchAvailable(userId: string, q: { from?: string; to?: string; date?: string }): Promise<{ message: string; data: any }> {
+  async searchAvailable(userId: string | undefined, q: { from?: string; to?: string; date?: string }): Promise<{ message: string; data: any }> {
     const filter: any = {
       status: PoolRideStatus.ACTIVE,
       seatsAvailable: { $gt: 0 },
-      driverId: { $ne: this.oid(userId) },
+      // Signed-out visitors (guest booking on the website) have no rides of
+      // their own to hide, so the exclusion only applies when we know who is asking.
+      ...(userId ? { driverId: { $ne: this.oid(userId) } } : {}),
     };
     if (q.from) filter.fromCity = new RegExp(`^${escapeRegex(q.from)}`, 'i');
     if (q.to) filter.toCity = new RegExp(`^${escapeRegex(q.to)}`, 'i');
@@ -386,7 +389,25 @@ export class CarPoolService {
 
   // ─── Shared: ride details ────────────────────────────────────────────────────
 
-  async getRide(userId: string, id: string): Promise<{ message: string; data: any }> {
+  /**
+   * Book seats without signing in: name + mobile only.
+   *
+   * Resolves the account the same way the customer-booking guest endpoint does
+   * (see `resolveGuestUser` for why the number is treated as a claim, not as
+   * identity), then runs the normal booking path so every seat/availability
+   * rule still applies. Returns the booking only — never tokens or account data.
+   */
+  async guestBookSeats(id: string, dto: BookSeatsDto & { guestName?: string; guestMobile?: string; guestEmail?: string }) {
+    const { userId } = await resolveGuestUser(this.userModel, {
+      name: dto.guestName,
+      mobile: dto.guestMobile,
+      email: dto.guestEmail,
+    });
+    const result: any = await this.bookSeats(userId, id, { seats: dto.seats, pickupPoint: dto.pickupPoint });
+    return { message: result?.message ?? 'Seat booked', data: { booked: true } };
+  }
+
+  async getRide(userId: string | undefined, id: string): Promise<{ message: string; data: any }> {
     const ride = await this.rideModel.findById(this.oid(id)).lean();
     if (!ride) throw new NotFoundException('Ride not found');
     const isOwner = ride.driverId.toString() === userId;

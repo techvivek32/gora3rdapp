@@ -18,11 +18,11 @@ export class SettingsController {
     return this.settingsService.getPublicSettings();
   }
 
+  // Public: the website shows support numbers to signed-out visitors too. With
+  // no user there is no city to match, so this falls back to the global numbers.
   @Get('support-contact')
-  @ApiBearerAuth('access-token')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "Support numbers for the current user — their city's franchise, else global" })
-  getSupportContact(@CurrentUser('sub') userId: string) {
+  getSupportContact(@CurrentUser('sub') userId?: string) {
     return this.settingsService.resolveSupportContact(userId);
   }
 
