@@ -43,14 +43,18 @@ const _updatesChannel = AndroidNotificationChannel(
 /// call-style channel and the popup alert card (or the floating overlay when the
 /// app is in the background — see `firebaseMessagingBackgroundHandler`).
 ///
-/// All three are "new work just landed" events the partner is waiting for:
-/// another agent's requirement, a customer's own booking, and a car someone
-/// listed as available. Every other push is a quiet update.
+/// These are the "work I can win right now" events a partner is waiting for:
+/// another agent's requirement, and a customer's own booking.
 ///
-/// The backend sends all three with the same payload keys (pickupCity, dropCity,
+/// A newly listed AVAILABLE CAR is deliberately NOT here. It is useful to know
+/// about but nobody is racing for it, and the popup kept covering whatever the
+/// user was doing (it would appear over Settings, mid-form, anywhere). It gets
+/// an ordinary notification instead — see `_isNewVehicle` below.
+///
+/// The backend sends these with the same payload keys (pickupCity, dropCity,
 /// vehicleType, tripType, travelDate, travelTime, stops, notes, posterMobile),
 /// which is what lets one alert card render them all.
-const _loudAlertTypes = {'new_requirement', 'customer_booking_new', 'new_vehicle'};
+const _loudAlertTypes = {'new_requirement', 'customer_booking_new'};
 
 bool isLoudAlertType(String type) => _loudAlertTypes.contains(type);
 
@@ -234,6 +238,13 @@ class PushNotificationService {
     }
 
     final type = (data['type'] ?? '').toString();
+
+    // An available-car notification just opens the vehicles feed — no card, by
+    // the same reasoning as above.
+    if (type == 'new_vehicle') {
+      ctx.push(_loudAlertFeed[type]!);
+      return;
+    }
 
     // New work: open the matching feed FIRST, then show the same rich popup card
     // the foreground path shows — so a tapped alert looks identical whether the

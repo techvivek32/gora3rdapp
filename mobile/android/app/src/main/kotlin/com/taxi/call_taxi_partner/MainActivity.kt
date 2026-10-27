@@ -62,6 +62,17 @@ class MainActivity : FlutterActivity() {
                         launchIntent(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
                         result.success(true)
                     }
+                    "openApp" -> {
+                        // Tapping the floating bubble brings the app forward. Use
+                        // the launcher intent (not a fresh MainActivity) so an
+                        // already-running task is resumed rather than stacked.
+                        val launch = packageManager.getLaunchIntentForPackage(packageName)
+                        if (launch != null) {
+                            launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                            launchIntent(launch)
+                        }
+                        result.success(true)
+                    }
                     else -> result.notImplemented()
                 }
             }

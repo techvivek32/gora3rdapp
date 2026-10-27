@@ -52,15 +52,30 @@ export class GarageService {
    * Prevent the same phone number being saved twice in one account's driver list.
    * Compares on the last 10 digits; `exceptId` skips the driver being edited.
    */
+  /**
+   * A driver's number may sit in ONE garage across the whole platform.
+   *
+   * This used to scope the check to `userId`, so the same driver could be added
+   * by several vendors at once and each would offer them for the same slot. The
+   * message distinguishes the two cases: your own garage is something you can
+   * fix yourself, another account is not.
+   *
+   * A REJECTED row is ignored so an admin turning someone down cannot leave the
+   * number locked away from whoever legitimately employs that driver.
+   */
   private async assertPhoneNotDuplicate(userId: string, phone?: string, exceptId?: string): Promise<void> {
     const last10 = (phone || '').replace(/\D/g, '').slice(-10);
     if (last10.length !== 10) return; // format already validated elsewhere
-    const query: any = { userId: new Types.ObjectId(userId), phone: last10 };
+    const query: any = { phone: last10, approvalStatus: { $ne: 'rejected' } };
     if (exceptId) query._id = { $ne: new Types.ObjectId(exceptId) };
-    const existing = await this.driverModel.findOne(query).select('_id').lean();
-    if (existing) {
-      throw new BadRequestException('You have already added a driver with this number.');
-    }
+    const existing: any = await this.driverModel.findOne(query).select('userId').lean();
+    if (!existing) return;
+    const mine = existing.userId?.toString() === userId;
+    throw new BadRequestException(
+      mine
+        ? 'You have already added a driver with this number.'
+        : 'This driver is already registered in another account. Contact support if they work for you.',
+    );
   }
 
   async list(userId: string, approvedOnly = false) {
@@ -82,6 +97,47 @@ export class GarageService {
    * treated as a mismatch - that would lock every user out of their own garage
    * the moment the vendor has a bad day.
    */
+  /**
+   * A registration number identifies one physical car, so it may exist in one
+   * garage only — across the WHOLE platform, not just this account.
+   *
+   * Without this the same car could be added by several vendors and each would
+   * offer it for the same slot. There was no duplicate check at all before:
+   * not cross-account, not even within an account.
+   *
+   * A REJECTED row is ignored: an admin turning someone down must not leave the
+   * number locked so the rightful owner can never add it. `exceptId` lets an
+   * edit keep its own number.
+   */
+  private async assertRcNotInAnotherGarage(
+    userId: string,
+    registrationNumber?: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const rc = (registrationNumber || '').replace(/\s+/g, '').toUpperCase();
+    if (!rc) return;
+
+    const query: any = {
+      // Stored uppercase by the schema, but old rows and spacing vary — match
+      // on the normalised form so "RJ 19 AB 1234" and "RJ19AB1234" collide.
+      $expr: {
+        $eq: [{ $toUpper: { $replaceAll: { input: '$registrationNumber', find: ' ', replacement: '' } } }, rc],
+      },
+      approvalStatus: { $ne: 'rejected' },
+    };
+    if (exceptId) query._id = { $ne: new Types.ObjectId(exceptId) };
+
+    const existing: any = await this.garageModel.findOne(query).select('userId').lean();
+    if (!existing) return;
+
+    const mine = existing.userId?.toString() === userId;
+    throw new BadRequestException(
+      mine
+        ? 'This vehicle is already in your garage.'
+        : 'This vehicle is already registered in another account. Contact support if it belongs to you.',
+    );
+  }
+
   private async assertRcOwnedByUser(userId: string, registrationNumber?: string): Promise<void> {
     const s: any = await this.settings.getSettings().catch(() => null);
     if (s?.verifyEnforceNameMatch !== true) return;
@@ -101,6 +157,7 @@ export class GarageService {
   }
 
   async create(userId: string, dto: CreateGarageVehicleDto) {
+    await this.assertRcNotInAnotherGarage(userId, dto.registrationNumber);
     await this.assertRcOwnedByUser(userId, dto.registrationNumber);
     const vehicle = await this.garageModel.create({
       ...dto,
@@ -111,6 +168,12 @@ export class GarageService {
 
   async update(userId: string, id: string, dto: UpdateGarageVehicleDto) {
     const vehicle = await this.owned(userId, id);
+    // Changing the plate must clear the same bar as adding one, or the check
+    // on create is trivially sidestepped by adding then editing.
+    if (dto.registrationNumber !== undefined && dto.registrationNumber !== vehicle.registrationNumber) {
+      await this.assertRcNotInAnotherGarage(userId, dto.registrationNumber, id);
+      await this.assertRcOwnedByUser(userId, dto.registrationNumber);
+    }
     Object.assign(vehicle, dto);
     // Any edit sends the vehicle back for admin review — details changed, so the
     // previous approval no longer applies.

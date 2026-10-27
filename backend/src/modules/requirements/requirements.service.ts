@@ -233,7 +233,21 @@ export class RequirementsService {
     const user = await this.userModel.findById(userId);
     const filter: any = {
       isDeleted: false,
-      status: { $in: [BookingStatus.ACTIVE, BookingStatus.ON_HOLD, BookingStatus.ACCEPTED, BookingStatus.CANCELLED] },
+      // Every status except deleted: a booking that was assigned, finished or
+      // expired still belongs in the feed (stamped) until the 7-day travelDate
+      // window below drops it. COMPLETED and EXPIRED were missing, so a booking
+      // disappeared the moment its trip ended rather than ageing out with the
+      // rest — the same complaint as the customer feed's 24-hour cut-off.
+      status: {
+        $in: [
+          BookingStatus.ACTIVE,
+          BookingStatus.ON_HOLD,
+          BookingStatus.ACCEPTED,
+          BookingStatus.COMPLETED,
+          BookingStatus.CANCELLED,
+          BookingStatus.EXPIRED,
+        ],
+      },
     };
 
     // Filter by user's business cities if they have set them. Match leniently:

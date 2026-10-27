@@ -126,6 +126,74 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
   }
 }
 
+/// Marks the overlay payload as "just the floating bubble", not an alert card.
+/// The overlay engine renders one or the other off this flag.
+const _kBubblePayload = '{"_bubble":true}';
+
+/// Float a small Gora logo over other apps while the partner is ONLINE.
+///
+/// It is the same overlay window the alert card uses — the plugin allows one at
+/// a time — so the engine decides what to draw from the payload. A new booking
+/// replaces the bubble with the full card; closing the card puts the bubble
+/// back (see `restoreOnlineBubble`).
+///
+/// No-ops without the "Display over other apps" permission, like every other
+/// overlay call here.
+Future<void> showOnlineBubble() async {
+  try {
+    if (!Platform.isAndroid) return;
+    if (!await FlutterOverlayWindow.isPermissionGranted()) return;
+    if (!await isOnline()) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kOverlayPayloadKey, _kBubblePayload);
+    } catch (_) {}
+
+    if (await FlutterOverlayWindow.isActive()) await FlutterOverlayWindow.closeOverlay();
+
+    await FlutterOverlayWindow.showOverlay(
+      height: 200,
+      width: 200,
+      alignment: OverlayAlignment.centerRight,
+      flag: OverlayFlag.defaultFlag,
+      visibility: NotificationVisibility.visibilityPublic,
+      // Snap to the nearest edge after a drag, like a chat head.
+      positionGravity: PositionGravity.auto,
+      enableDrag: true,
+      overlayTitle: 'Gora Taxi',
+      overlayContent: 'You are online',
+    );
+    for (final ms in [0, 400, 1000]) {
+      await Future.delayed(Duration(milliseconds: ms));
+      try {
+        await FlutterOverlayWindow.shareData(_kBubblePayload);
+      } catch (_) {}
+    }
+  } catch (_) {
+    // Best effort — being online must never depend on the bubble appearing.
+  }
+}
+
+/// Take the bubble away (going offline, or signing out).
+Future<void> hideOnlineBubble() async {
+  try {
+    if (!Platform.isAndroid) return;
+    if (await FlutterOverlayWindow.isActive()) await FlutterOverlayWindow.closeOverlay();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kOverlayPayloadKey);
+    } catch (_) {}
+  } catch (_) {}
+}
+
+/// Put the bubble back after an alert card is dismissed, but only if the
+/// partner is still online — otherwise closing a card would resurrect a bubble
+/// they had already turned off.
+Future<void> restoreOnlineBubble() async {
+  if (await isOnline()) await showOnlineBubble();
+}
+
 /// Root widget rendered inside the overlay engine (see `overlayMain`).
 class RequirementOverlay extends StatefulWidget {
   const RequirementOverlay({super.key});
@@ -218,6 +286,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     try {
       await FlutterOverlayWindow.closeOverlay();
     } catch (_) {}
+    // The card took the bubble's window, so hand it back when still online.
+    try {
+      await restoreOnlineBubble();
+    } catch (_) {}
   }
 
   Future<void> _call() async {
@@ -273,8 +345,54 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     return [datePart, timePart].where((e) => e.isNotEmpty).join(' • ');
   }
 
+  /// Bring the app forward when the bubble is tapped. The overlay engine has no
+  /// plugins, so this goes through the native channel like Call/WhatsApp do.
+  Future<void> _openApp() async {
+    try {
+      await _overlayActionChannel.invokeMethod('openApp');
+    } catch (_) {}
+  }
+
+  /// The floating Gora logo shown while the partner is online. Deliberately
+  /// small and transparent around the edges so it sits over other apps like a
+  /// chat head rather than blocking them.
+  Widget _buildBubble() {
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: GestureDetector(
+          onTap: _openApp,
+          child: Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: _primary, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
+            ),
+            padding: const EdgeInsets.all(4),
+            child: ClipOval(
+              child: Image.asset(
+                'assets/images/gora_logo_white.png',
+                fit: BoxFit.contain,
+                // The overlay engine loads assets from the same bundle, but if
+                // anything goes wrong a blank circle would look broken.
+                errorBuilder: (_, __, ___) => const Icon(Icons.local_taxi_rounded, color: _primary, size: 28),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // One overlay window, two faces: the bubble while idle, the full alert card
+    // when a booking lands. The payload says which.
+    if (_data['_bubble'] == true) return _buildBubble();
+
     final dateTime = _dateTimeLabel();
     final poster = dateTime.isNotEmpty
         ? dateTime

@@ -1115,15 +1115,33 @@ export class CustomerBookingsService {
     // "Golden membership required" note in its place.
     const canAccept = this.isGoldenActive(driver);
     const cities = ((driver as any)?.businessCities ?? []).filter(Boolean);
-    // Keep confirmed/booked ones visible (with a BOOKED stamp) for 7 days after
-    // they were taken, like the requirements feed — then they drop off.
+    // A booking that is no longer open stays in the feed (with its stamp) for 7
+    // days, whatever ended it — booked, finished, cancelled or expired.
+    //
+    // This used to list only CONFIRMED/ONGOING/COMPLETED and key the window off
+    // `confirmedAt`, which meant a booking nobody took vanished the moment the
+    // expiry cron flipped it to EXPIRED — i.e. 24h after its travel date, since
+    // `expiresAt` is travelDate + 24h. To a driver that read as "history only
+    // goes back a day".
+    //
+    // The window is keyed off travelDate (with confirmedAt as a fallback,
+    // because an EXPIRED booking never gets a confirmedAt) so every status is
+    // retained by the same rule the requirements feed uses.
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const statusCond = {
       $or: [
         { status: CustomerBookingStatus.OPEN },
         {
-          status: { $in: [CustomerBookingStatus.CONFIRMED, CustomerBookingStatus.ONGOING, CustomerBookingStatus.COMPLETED] },
-          confirmedAt: { $gte: sevenDaysAgo },
+          status: {
+            $in: [
+              CustomerBookingStatus.CONFIRMED,
+              CustomerBookingStatus.ONGOING,
+              CustomerBookingStatus.COMPLETED,
+              CustomerBookingStatus.CANCELLED,
+              CustomerBookingStatus.EXPIRED,
+            ],
+          },
+          $or: [{ travelDate: { $gte: sevenDaysAgo } }, { confirmedAt: { $gte: sevenDaysAgo } }],
         },
       ],
     };

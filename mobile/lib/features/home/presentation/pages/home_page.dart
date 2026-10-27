@@ -71,6 +71,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     isOnline().then((v) {
       if (mounted) setState(() => _online = v);
+      // The overlay window does not survive an app restart or a reboot, so put
+      // the bubble back for someone who was already online.
+      if (v) showOnlineBubble();
     });
     // Show the admin popup ad once per app launch, after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -125,6 +128,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _toggleOnline(bool value) async {
     setState(() => _online = value);
     await setOnline(value); // every isolate reads this, so it takes effect at once
+    // Float the Gora logo over other apps while online, so a partner can jump
+    // back in from anywhere; it goes away the moment they go offline.
+    if (value) {
+      await showOnlineBubble();
+    } else {
+      await hideOnlineBubble();
+    }
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
