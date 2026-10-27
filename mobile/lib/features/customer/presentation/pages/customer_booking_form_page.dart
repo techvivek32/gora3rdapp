@@ -250,9 +250,13 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
       _loadExtras();
       if (widget.existing == null) _restoreLastSearch();
     }
-    // Hire a Driver: default the end date to the next day and fetch the per-day rate.
+    // Hire a Driver: default the end date to the next day.
     if (widget.serviceType == 'hire_driver') {
       _endDate ??= _date.add(const Duration(days: 1));
+    }
+    // Both services need /settings — Cab for the Local package km table, Hire a
+    // Driver for the per-day rate.
+    if (widget.serviceType == 'cab' || widget.serviceType == 'hire_driver') {
       _loadHireRate();
     }
     // Pre-fill from the existing booking when editing.
@@ -334,7 +338,14 @@ class _CustomerBookingFormPageState extends State<CustomerBookingFormPage> {
     } catch (_) {}
   }
 
-  // Hire a Driver: admin-set per-day rate.
+  /// Admin pricing settings this form needs: the Local package km table (Cab →
+  /// Local chips) and the Hire-a-Driver per-day rate.
+  ///
+  /// Both live in /settings, and this used to run for Hire a Driver only — so on
+  /// the Cab → Local tab the km table was never loaded and the chips fell back
+  /// to "hours x the cab's km/hour". That showed "8 hrs — 96 km" while the
+  /// results screen priced the real table figure of 80 km: the customer picked
+  /// one number and was quoted another.
   Future<void> _loadHireRate() async {
     try {
       final res = await getIt<ApiClient>().get('/settings');

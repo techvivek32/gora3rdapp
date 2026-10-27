@@ -51,7 +51,9 @@ class SubscriptionBloc extends Bloc<SubscriptionEvent, SubscriptionState> {
 
   Future<void> _onLoadMy(LoadMySubscriptionEvent event, Emitter<SubscriptionState> emit) async {
     try {
-      final res = await apiClient.get('/subscriptions/my');
+      // Route is my-subscription, not my — this asked for a path that does not
+      // exist and always 404'd.
+      final res = await apiClient.get('/subscriptions/my-subscription');
       final subscription = res.data['data'] as Map<String, dynamic>?;
       emit(MySubscriptionLoaded(subscription: subscription));
     } catch (e) {

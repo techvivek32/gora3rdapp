@@ -549,7 +549,7 @@ export class AuthService {
    */
   async switchToDriver(
     userId: string,
-    dto: { city?: string; state?: string; agencyName?: string; role?: string },
+    dto: { city?: string; state?: string; agencyName?: string; role?: string; referralCode?: string },
   ) {
     const user = await this.userModel.findById(userId);
     if (!user) throw new NotFoundException('User not found');
@@ -562,7 +562,25 @@ export class AuthService {
     if (dto.agencyName) user.agencyName = dto.agencyName;
     user.driverOnboarded = true;
     user.role = target;
+
+    // An invite code entered on the driver setup form. Only honoured when this
+    // account has never been referred and the code is not their own: a referrer
+    // is credited once per person, and switching roles does not make someone a
+    // new person. A bad code is ignored rather than refused — it must never
+    // block the switch itself.
+    let newlyReferred: Types.ObjectId | null = null;
+    if (dto.referralCode && !user.referredBy) {
+      const referrer = await this.resolveReferrer(dto.referralCode);
+      if (referrer && referrer.toString() !== user._id.toString()) {
+        user.referredBy = referrer;
+        newlyReferred = referrer;
+      }
+    }
+
     await user.save();
+    if (newlyReferred) {
+      await this.userModel.findByIdAndUpdate(newlyReferred, { $inc: { referralCount: 1 } });
+    }
 
     const sessionId = randomUUID();
     const tokens = await this.generateTokens(user, sessionId);

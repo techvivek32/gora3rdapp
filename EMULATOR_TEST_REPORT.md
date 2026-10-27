@@ -208,3 +208,154 @@ You can check it yourself right now: the account **8547963210 ("test")** has a K
 - A pending KYC on 8547963210 — approve or reject it from the admin panel.
 
 Nothing else. The test driver was deleted in-app, and no database rows were written by hand.
+
+---
+---
+
+# Round 5 — full service sweep, both sides
+Date: 2026-10-27 (later). Driven through the app as a user; nothing written into the database by hand.
+Driver account: Mj Rajput / 6354348913 (Golden). Customer side: same account via Switch to Customer.
+
+## DRIVER SIDE
+
+| Service | Result |
+|---|---|
+| Home | Loads, Offline by default, no bubble, banners + ad carousel, partner phone search |
+| **Booking feed** | Loads, vehicle-type filter chips, nav arrow, customer bookings with no contact shown |
+| **Available Car — post** | Posted Rajkot → Any, Sedan, 29 Oct through the real form. Appeared in the feed instantly with Call / WhatsApp / User Detail and a GOLDEN USER badge |
+| **Available Car — feed** | Empty state before the post, populated after. Ad slot renders |
+| **Hire a Driver** | Available + My Offers tabs. Accepted state greyed correctly |
+| **My Offers** | PENDING / COMPLETED / CANCELLED, wallet hold shown per card, **View Bill & Invoice** on completed |
+| **Car Pooling** | My Pool Rides, Active/Past, seats booked, ₹/seat, Post Ride |
+| **Recharge Plans** | Current plan (Golden, valid till 26 Jan 2027, 90 days left), Active + Golden tiers with savings, Feature Comparison |
+| **Notifications** | Full lifecycle inbox: vehicle blocked, booking assigned, commission received, trip started/completed, OTP to start and end |
+| **My Bookings** | Running / Booked / Assigned, KM badge, nav arrow, earnings split (earning / commission / total), Phone / WhatsApp / Advice / Rating / Report |
+| **Chat** | Grouped per booking with unread counts + Direct messages. Thread opens with trip summary, the auto-posted **Driver & Vehicle Details** cards with Share, **and a sent message went through** |
+| **Wallet** | ₹31,498 available, ₹520 on hold, Add Money / Pay by QR / Withdraw / Transfer, transaction list |
+| **Withdraw** | Bank Account + UPI ID tabs, full form, "held until an admin reviews" note |
+| **Transfer** | Recipient lookup by mobile |
+| **Post Booking** | Form renders complete (route, stops, trip/vehicle/fuel, date-time, notes, secure toggles) |
+| **My Garage** | Vehicles + Drivers tabs with counts, add / edit / remove, approval badges |
+| **KYC** | Corrected copy, camera upload, both-documents validation, submits to Pending Review |
+
+## CUSTOMER SIDE
+
+| Service | Result |
+|---|---|
+| Home | City hero image, wallet chip, notification bell, Cab Booking / Car Pool / Book a Driver, offers carousel |
+| **Cab — One Way** | Places autocomplete live, cab list, Cab Details with fuel choice + fare breakdown, Review page, Confirm → booking created |
+| **Cab — Round Trip** | Trip Start + **Trip End** both shown, same flow |
+| **Cab — Local** | Hourly packages 6 / 8 / 10 / 12 hrs; search returned cabs with "8 hrs · 80 km", extra ₹/km, discount, Fare breakup |
+| **Car Pool** | Search by from/to/date. **Found the pool ride posted from the driver side** (Rajkot → Surat, 2 seats, ₹700/seat) — cross-role data flows correctly |
+| **Book a Driver** | One Way / Round Trip, start+end date-time, Manual / Automatic, Sedan / SUV, price, Post Request |
+| **My Bookings** | Upcoming / Ongoing / History. Upcoming shows Cancel / Edit / Track per booking |
+| **Wallet** | ₹0, labelled *"This is your customer wallet — separate from your driver / vendor wallet"*. Withdraw and Transfer correctly disabled at zero balance |
+| **Notifications** | Opens and lists |
+| Switch roles | Driver ⇄ Customer both ways, no re-login |
+
+## Two things worth a look (neither is from today's changes)
+
+**1. Local package km does not match between the two screens.** The package selector offers *"8 hrs — 96 km"*, but the cab results for that same package say *"8 hrs · 80 km"*. The selector seems to use a flat 12 km/hr estimate while each cab category carries its own included km. A customer picking "96 km" and then being shown 80 km will read that as a bait-and-switch. Worth aligning the selector to the real category figure.
+
+**2. The customer Notifications inbox shows driver notifications.** On an account that is both, the customer side lists "Commission received", "Vehicle blocked", "OTP to start trip" and so on. Harmless for a dual-role user, but if a pure customer ever ends up with driver rows it would be confusing. The inbox is not filtered by role.
+
+## Left behind
+One Available Car listing (Rajkot, 29 Oct) posted during this sweep, and one chat message ("test message") in the Rajkot → Mumbai thread. Both are normal records — delete them from the app if you don't want them.
+
+---
+---
+
+# Round 6 — driver-switch form + payment check
+Date: 2026-10-27 (later).
+
+## 1. Customer → Driver switch now asks what Registration asks
+
+**Before:** someone switching to Driver Mode gave only a city (and an optional business name). They became a driver with **no account type and no KYC at all** — a weaker account than one created through Register, for the same job.
+
+**Now** the form asks for everything Registration does, minus name/mobile (already verified on the account) and the OTP (already signed in):
+
+| Field | Register | Switch (before) | Switch (now) |
+|---|---|---|---|
+| Profile picture | optional | — | optional |
+| Full name / Mobile | typed | read-only | read-only |
+| **Account Type** (Driver / Travel Agency) | yes | **—** | **yes** |
+| Agency name | only for Travel Agency | always shown | only for Travel Agency |
+| **Referral code** | optional | **—** | **optional** |
+| City | required | required | required |
+| **State** | yes | hidden | **yes** |
+| **Aadhaar + Licence, front & back** | **required** | **—** | **required** |
+
+The two forms now share one widget — `mobile/lib/core/widgets/kyc_doc_fields.dart` — and `register_page.dart` was moved onto it as well, so they cannot drift apart again.
+
+**Backend** (`auth.service.switchToDriver`) now also takes `referralCode`. It is applied **only** when the account has never been referred and the code is not their own — switching roles does not make someone a new person, and a referrer is credited once. A bad code is ignored rather than refused, so it can never block the switch.
+
+### Verified through the API on the real account `6777777777` ("Fff")
+- `role: customer → travel_agency`, `city`, `state`, `agencyName` all saved, `driverOnboarded: true`.
+- Referral applied: `referredBy` set, referrer's `referralCount` 9 → 10.
+- **Switching again with a different code did NOT re-credit** — `referredBy` unchanged, count still 10.
+- The account was then **restored to customer-only** (role, driverOnboarded, city/state/agency/referredBy cleared, referrer count back to 9) so you can walk the new form yourself.
+
+**Not seen on screen.** The emulator's `adb input text` kept dropping a digit from the OTP (the boxes showed `1 3 4 5 6`), so I could not get that account signed in inside the app to screenshot the form. The code analyzes clean and the APK is installed — open it yourself: sign in as `6777777777` → role screen → **Driver / Vendor**.
+
+## 2. Payment check
+
+| Path | Result |
+|---|---|
+| Checkout signature — wallet, booking advance, subscription | All three use the correct `HMAC(orderId\|paymentId, keySecret)`. All three are **idempotent** (conditional PENDING→SUCCESS claim) and the wallet one is **ownership-bound** (you cannot verify someone else's order into your wallet) |
+| Razorpay **webhook** | Credits wallet top-ups, booking advances and subscriptions. Tested earlier: ₹777 credited once, replayed 3× with no double credit, bad signature rejected |
+| Wallet **Add Money** / **Pay by QR** / customer wallet / subscription / booking advance | Order creation all fail locally with *"Authentication failed"* — the local DB holds dummy keys (`RZP_2164…`). Code path is correct; needs real keys to exercise |
+| Amount validation | Fires **before** Razorpay: *"Minimum amount to add is ₹100"* |
+| **Withdraw** | *"Minimum withdrawal is ₹500"*; *"You can withdraw at most ₹18540."* Bank + UPI forms both present; amount held until an admin reviews |
+| **Transfer** | Unknown number → *"No user found with this number"*; self → *"You cannot transfer money to yourself"*; over balance → *"Insufficient balance. You have ₹18540."* |
+| **Transfer, real money** | Sent ₹100 between two real accounts: sender 18540 → 18440, recipient 31498 → 31598, both ledger rows written. **Transferred back**, balances restored exactly |
+
+### Still outstanding (not a code problem)
+The **Razorpay webhook is not configured in your dashboard**. Until it is, a top-up whose app-side verify call never lands is only rescued by the self-heal on wallet open. Add:
+`https://backend.goracabs.com/api/v1/payments/webhook/razorpay` — events `payment.captured` and `qr_code.credited`.
+
+---
+---
+
+# Round 7 — cross-check / mismatch audit
+Date: 2026-10-27 (later). Compared mobile ↔ backend ↔ admin ↔ web for drift: API paths, fare rules, enums, validation constants.
+
+## Method
+- Extracted all 130 API paths the app calls and all 269 backend routes, normalised the `:id`/`${}` segments and diffed them. Same for admin (119 paths) and web.
+- Read the web fare engine and the mobile fare engine side by side, rule for rule.
+- Grouped the real DB by every enum-ish field to see what is actually stored.
+- Compared client-side and server-side validation constants.
+
+## FIXED — 2 real defects
+
+**1. Local package km disagreed between the two screens.**
+The package chips showed *"8 hrs — 96 km"* while the results screen priced *"8 hrs · 80 km"*. The customer picked one number and was quoted another.
+
+Cause: `_localKmByHours` (the admin's km table from `/settings`) is filled by `_loadHireRate()`, and that was called **only when `serviceType == 'hire_driver'`**. On the Cab → Local tab it never ran, so the chips fell back to *hours × the cab's km/hour* — 12 × 8 = 96 — while the results page read the real table (8 → 80).
+
+Fixed in `customer_booking_form_page.dart`: the settings fetch now runs for Cab as well as Hire a Driver.
+**Verified on screen:** chips now read 60 / 80 / 100 / 120 km, and the results page for the 8-hour package says 80 km. They agree.
+
+**2. The app asked for a subscription route that does not exist.**
+`subscription_bloc` called `GET /subscriptions/my`; the backend route is `GET /subscriptions/my-subscription`. Live check: old path **404**, corrected path **200**. Nothing currently dispatches that event, so it was dormant — but it would have 404'd the moment anyone wired it up.
+Also removed `approveManualPayment` from `admin/src/lib/api.ts`: it pointed at `/admin/payments/:id/approve`, which the backend does not have (404) and no admin screen used.
+
+## Checked and CLEAN
+- **Fare engine, web vs mobile** — every rule matches 1:1: included km, package price, discount, allowance (local 0 / round days×daily / one-way threshold), min km (round dailyKmLimit×days else minBillKm), per-km rate (state → fuel → flat), base fare, toll (never on Best Price or Local), and GST on (net + allowance).
+- **API paths** — every other mobile, admin and web path resolves to a real backend route.
+- **Phone validation** — `^[6-9]\d{9}$` identically in login, register, customer login, customer register, garage driver, and on the server.
+- **Wallet minimums** — deposit / withdrawal / transfer all read the same `/settings` values on both sides, same wording.
+- **KYC document keys** — `aadhar` / `drivingLicense` with the same labels in the shared widget, the KYC page and the server's `REQUIRED_DOCS`.
+- **Vehicle-type values** — `requirements` and `availableVehicles` are consistently the lowercase enum, and the feed filter matches on it exactly.
+
+## RISKS worth knowing (not fixed — they need your call)
+
+**A. `subType` is free text that four code paths exact-match against display strings.**
+The DB already holds six formats for `customerBookings.subType`: `One Way`(48), `Round Trip`(17), `Local`(12), `one_way`(5), `6 Hours`(3), `Hourly`(1), `Sedan`(1), `""`(1).
+Meanwhile the web fare engine (`subType === 'Round Trip'` / `'Local'`), the mobile one (same), the backend (`booking.subType === 'Local'`) and the invoice builder all compare against the exact display string, and the DTO validates it only as `@IsString()`.
+Today this is harmless — the odd values are all one-way-ish, and one-way is the fall-through. But if any writer ever stores `round_trip`, the fare engine will silently price it as a one-way. Worth either an enum on the DTO or a shared constant both ends import.
+
+**B. `customerBookings.vehicleType` holds cab *category names*, not the vehicle enum** — `Sedan`(35), `sedan`(13), `SRT`(25), `Luxury Sedan`, `Swift`, `SUV`, `""`(10). This is deliberate and documented in `notifyNewCustomerBooking`, and nothing filters on it, so it only affects display. Mentioned so it isn't mistaken for drift later.
+
+**C. Cosmetic:** the web fare engine excludes Local trips from the "minimum km applied" flag; the mobile one does not, so a Local card can show a minimum-applied note that means nothing there.
+
+**D.** `kyc_page.dart` still carries its own copy of the document list and tiles. Its UI genuinely differs (it shows stored images, per-document approval state and locked documents), so it was left alone — but the document list is now defined in three places.

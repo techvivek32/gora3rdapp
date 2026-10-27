@@ -137,7 +137,7 @@ export class AuthController {
   @ApiOperation({ summary: 'First-time driver onboarding for a logged-in account, then switch to Driver' })
   switchToDriver(
     @CurrentUser('sub') userId: string,
-    @Body() body: { city?: string; state?: string; agencyName?: string; role?: string },
+    @Body() body: { city?: string; state?: string; agencyName?: string; role?: string; referralCode?: string },
   ) {
     return this.authService.switchToDriver(userId, body || {});
   }

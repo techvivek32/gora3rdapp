@@ -102,7 +102,6 @@ export const adminApi = {
 
   // ─── Payments ──────────────────────────────────────────────────────────────
   getPayments: (params: any) => apiClient.get('/admin/payments', { params }),
-  approveManualPayment: (id: string) => apiClient.post(`/admin/payments/${id}/approve`),
 
   // ─── Support Chats ─────────────────────────────────────────────────────────
   getSupportChats: () => apiClient.get('/admin/support/conversations'),

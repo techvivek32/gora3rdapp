@@ -13,15 +13,7 @@ import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../bloc/auth_bloc.dart';
-
-/// A single KYC document the user must provide (front + back image, both required).
-class _DocField {
-  final String key; // matches backend: aadhar, pan, drivingLicense, vehicleRc
-  final String label;
-  Uint8List? bytes; // front side
-  Uint8List? backBytes; // back side
-  _DocField(this.key, this.label);
-}
+import '../../../../core/widgets/kyc_doc_fields.dart';
 
 class RegisterPage extends StatefulWidget {
   /// Pre-filled when the login page sends an unregistered number here, so the
@@ -59,13 +51,9 @@ class _RegisterPageState extends State<RegisterPage> {
     {'value': 'driver', 'label': 'Driver'},
   ];
 
-  final Map<String, _DocField> _docs = {
-    'aadhar': _DocField('aadhar', 'Aadhaar Card'),
-    'drivingLicense': _DocField('drivingLicense', 'Driving License'),
-  };
-
-  // Only Aadhaar and Driving License are collected (PAN and Vehicle RC removed).
-  List<String> get _visibleDocKeys => ['aadhar', 'drivingLicense'];
+  // The same two documents, and the same tiles, the customer→driver switch
+  // asks for — one definition so the two forms cannot drift apart.
+  final List<KycDocField> _docs = defaultKycDocs();
 
   @override
   void initState() {
@@ -113,23 +101,6 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _profileBytes = bytes);
   }
 
-  Future<void> _pickDoc(_DocField doc, {required bool back}) async {
-    final picked = await pickImageFromCameraOrGallery(
-      context,
-      maxWidth: 1200,
-      title: '${doc.label} — ${back ? 'Back' : 'Front'}',
-    );
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
-    setState(() {
-      if (back) {
-        doc.backBytes = bytes;
-      } else {
-        doc.bytes = bytes;
-      }
-    });
-  }
-
   Future<String> _uploadImage(
     Uint8List bytes,
     String name, {
@@ -156,12 +127,10 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) return;
 
     // KYC documents are mandatory — both front and back images for each.
-    for (final key in _visibleDocKeys) {
-      final d = _docs[key]!;
-      if (d.bytes == null || d.backBytes == null) {
-        _snack('Please upload both front and back images of ${d.label}.');
-        return;
-      }
+    final missingDocs = missingKycDocLabels(_docs);
+    if (missingDocs.isNotEmpty) {
+      _snack('Upload front and back photos of: ${missingDocs.join(' and ')}');
+      return;
     }
 
     // Step 1 — send an OTP to the mobile number (also checks email/mobile aren't
@@ -239,24 +208,10 @@ class _RegisterPageState extends State<RegisterPage> {
         await _apiClient.dio.put('/users/profile', data: {'profileImage': profileUrl});
       }
 
-      // Front + back images are required (validated before OTP), so always upload
-      // both for every KYC document. No document number is collected anymore.
-      final body = <String, dynamic>{};
-      for (final key in _visibleDocKeys) {
-        final d = _docs[key]!;
-        if (d.bytes == null || d.backBytes == null) continue;
-        setState(() => _status = 'Uploading documents...');
-        body[key] = {
-          'image': await _uploadImage(d.bytes!, '${key}_front'),
-          'backImage': await _uploadImage(d.backBytes!, '${key}_back'),
-        };
-      }
-
-      // Submit for verification (documents are mandatory).
-      if (body.isNotEmpty) {
-        setState(() => _status = 'Submitting documents...');
-        await _apiClient.dio.post('/users/verification', data: body);
-      }
+      // Front + back images are required (validated before OTP). Uploading and
+      // submitting them is shared with the driver-switch form.
+      setState(() => _status = 'Uploading documents...');
+      await submitKycDocs(_apiClient, _docs);
 
       if (!mounted) return true;
       _snack('Account created successfully.', error: false);
@@ -413,7 +368,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ..._visibleDocKeys.map((key) => _buildDocTile(_docs[key]!)),
+                ..._docs.map((d) => KycDocTile(doc: d, onChanged: () => setState(() {}))),
 
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -449,103 +404,4 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  // One full-width upload box for a document side (front or back).
-  Widget _docSideBox(_DocField doc, {required bool back}) {
-    final Uint8List? bytes = back ? doc.backBytes : doc.bytes;
-    final label = back ? 'Back Side' : 'Front Side';
-    final primary = Theme.of(context).primaryColor;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(back ? Icons.flip_to_back : Icons.flip_to_front, size: 14, color: Colors.grey.shade600),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade700)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        InkWell(
-          onTap: () => _pickDoc(doc, back: back),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 150,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: bytes != null ? Colors.grey.shade100 : primary.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: bytes != null ? Colors.grey.shade300 : primary.withValues(alpha: 0.35),
-                width: 1.2,
-              ),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: bytes != null
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.memory(bytes, fit: BoxFit.cover),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                          child: const Icon(Icons.edit, color: Colors.white, size: 16),
-                        ),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.add_a_photo_outlined, color: primary, size: 28),
-                      const SizedBox(height: 8),
-                      Text('Tap to upload $label', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                    ],
-                  ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDocTile(_DocField doc) {
-    // Complete only when BOTH sides are uploaded (both are required).
-    final hasData = doc.bytes != null && doc.backBytes != null;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Theme(
-        // Hide the default ExpansionTile top/bottom dividers.
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: PageStorageKey('doc_${doc.key}'),
-          maintainState: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          leading: const Icon(Icons.description_outlined),
-          title: Text(doc.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          trailing: hasData
-              ? const Icon(Icons.check_circle, color: Colors.green, size: 20)
-              : const Icon(Icons.keyboard_arrow_down),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Upload clear photos of both sides (required).',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-            ),
-            const SizedBox(height: 12),
-            _docSideBox(doc, back: false),
-            const SizedBox(height: 12),
-            _docSideBox(doc, back: true),
-          ],
-        ),
-      ),
-    );
-  }
 }

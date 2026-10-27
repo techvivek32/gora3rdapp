@@ -197,11 +197,22 @@ class CustomerRepository {
 
   /// First-time driver onboarding for a logged-in (customer-first) account →
   /// switches to Driver. Full KYC is completed later from the driver profile.
-  Future<String> switchToDriver({String? city, String? state, String? agencyName}) async {
+  /// Turn this (customer) account into a driver one. `role` picks between a
+  /// plain driver and a travel agency, exactly as registration does; the server
+  /// falls back to driver for anything else.
+  Future<String> switchToDriver({
+    String? city,
+    String? state,
+    String? agencyName,
+    String? role,
+    String? referralCode,
+  }) async {
     final res = await _api.post('/auth/switch-to-driver', data: {
       if (city != null && city.isNotEmpty) 'city': city,
       if (state != null && state.isNotEmpty) 'state': state,
       if (agencyName != null && agencyName.isNotEmpty) 'agencyName': agencyName,
+      if (role != null && role.isNotEmpty) 'role': role,
+      if (referralCode != null && referralCode.isNotEmpty) 'referralCode': referralCode,
     });
     final d = Map<String, dynamic>.from(res.data['data'] as Map);
     await _storeTokens(d);
