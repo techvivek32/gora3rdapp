@@ -103,6 +103,14 @@ export class CustomerBooking {
   @Prop({ default: 0 }) durationHours: number; // Hire-a-Driver
   @Prop({ default: '' }) notes: string;
 
+  // Who to call for THIS trip — often the account owner, but not always (people
+  // book for a friend or a guest). Kept as real fields rather than inside
+  // `notes`, because notes are shown to every driver in the feed while these
+  // are revealed only to the selected driver, under the same contact-reveal
+  // window as `customer.mobile`.
+  @Prop({ default: '' }) contactName: string;
+  @Prop({ default: '' }) contactMobile: string;
+
   @Prop({ default: 0 }) estimatedFare: number; // customer-facing total (incl. GST)
   // Fare breakdown, snapshotted at booking time so the driver side can show a
   // GST-exclusive amount and later GST-% changes don't rewrite old bookings.

@@ -34,6 +34,9 @@ export class CreateCustomerBookingDto {
   @IsOptional() @IsString() vehicleType?: string;
   @IsOptional() @IsNumber() durationHours?: number;
   @IsOptional() @IsString() notes?: string;
+  // Revealed only to the selected driver — see CustomerBooking.contactName.
+  @IsOptional() @IsString() @MaxLength(80) contactName?: string;
+  @IsOptional() @IsString() @MaxLength(20) contactMobile?: string;
   @IsOptional() @IsNumber() estimatedFare?: number;
   @IsOptional() @IsNumber() baseFare?: number;
   @IsOptional() @IsNumber() driverAllowance?: number;
@@ -85,6 +88,9 @@ export class UpdateCustomerBookingDto {
   @IsOptional() @IsString() vehicleType?: string;
   @IsOptional() @IsNumber() durationHours?: number;
   @IsOptional() @IsString() notes?: string;
+  // Revealed only to the selected driver — see CustomerBooking.contactName.
+  @IsOptional() @IsString() @MaxLength(80) contactName?: string;
+  @IsOptional() @IsString() @MaxLength(20) contactMobile?: string;
   @IsOptional() @IsNumber() estimatedFare?: number;
   @IsOptional() @IsNumber() baseFare?: number;
   @IsOptional() @IsNumber() driverAllowance?: number;

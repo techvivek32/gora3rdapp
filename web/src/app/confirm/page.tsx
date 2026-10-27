@@ -65,6 +65,11 @@ function Confirm() {
       const booking = await apiPost<Booking>('/customer-bookings/guest', {
         guestName: guest.name.trim(),
         guestMobile: guest.mobile,
+        // Who the assigned driver calls for this trip. A real field, not a note:
+        // notes are shown to every driver, this is revealed only to the one who
+        // actually gets the booking.
+        contactName: guest.name.trim(),
+        contactMobile: guest.mobile,
         serviceType: 'cab',
         subType: trip.subType,
         pickup: { address: trip.pickup?.address, lat: trip.pickup?.lat ?? 0, lng: trip.pickup?.lng ?? 0 },

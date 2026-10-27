@@ -204,8 +204,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
     final notes = <String>[];
     if (t['notes'] != null && (t['notes'] as String).isNotEmpty) notes.add(t['notes'].toString());
     notes.add('Fuel: $_fuel');
-    final contact = [_nameCtrl.text.trim(), _mobileCtrl.text.trim(), _emailCtrl.text.trim()].where((s) => s.isNotEmpty).join(', ');
-    if (contact.isNotEmpty) notes.add('Contact: $contact');
+    // The rider's contact does NOT go into notes: notes are shown to every
+    // driver in the feed, while the number is meant to reach only the driver
+    // who is actually assigned. It travels as contactName/contactMobile, which
+    // the server reveals under the same window as the customer's own number.
     if (_isLocal) {
       notes.add('Local $_packageHours-hour package');
     } else if (_isBestPrice) {
@@ -255,6 +257,11 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (_isLocal && _packageHours > 0) 'packageHours': _packageHours,
       if (_isLocal && _extraHourPrice > 0) 'extraHourPrice': _extraHourPrice,
       'notes': notes.join(' • '),
+      // Who the assigned driver should call for this trip — often the account
+      // owner, but people also book for a friend. Server-side these are
+      // revealed only to the selected driver (see redactContactFromNotes).
+      'contactName': _nameCtrl.text.trim(),
+      'contactMobile': _mobileCtrl.text.trim(),
     };
     try {
       final repo = getIt<CustomerRepository>();

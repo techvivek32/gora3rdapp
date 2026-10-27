@@ -826,6 +826,32 @@ export class CustomerBookingsService {
   }
 
   /**
+   * Strip contact details out of a booking's free-text `notes` for anyone who
+   * is not the revealed driver.
+   *
+   * `notes` is shown to EVERY driver in the feed, the alert card and the
+   * floating overlay, while the rider's number is supposed to reach only the
+   * selected driver once the reveal window opens. The app used to append
+   * "Contact: name, 9876543210" to notes, which bypassed that gate completely —
+   * and those rows are already in the database, so fixing only the app would
+   * leave every existing booking leaking.
+   *
+   * Deliberately narrow: the "Contact: …" segment the app wrote, and bare
+   * 10-digit Indian mobile numbers a rider may have typed themselves. It must
+   * not eat ordinary text like "6 seater" or a 4-digit flight number.
+   */
+  private redactContactFromNotes(notes?: string): string {
+    let out = (notes || '').toString();
+    if (!out) return out;
+    // The segment the app appended, up to the next bullet separator.
+    out = out.replace(/Contact:\s*[^•|]*/gi, '').trim();
+    // Any bare Indian mobile number left in free text.
+    out = out.replace(/(?<!\d)(?:\+?91[-\s]?)?[6-9]\d{9}(?!\d)/g, '[hidden]');
+    // Tidy up separators left behind by the removals.
+    return out.replace(/\s*•\s*•\s*/g, ' • ').replace(/^\s*•\s*|\s*•\s*$/g, '').trim();
+  }
+
+  /**
    * Whether the driver↔customer phone numbers may be shown for this booking yet.
    * Hidden until `contactRevealHoursBeforePickup` hours before pickup (admin setting).
    * 0 hours = always revealed; an unparseable pickup time also reveals (don't block).
@@ -1180,6 +1206,11 @@ export class CustomerBookingsService {
         const { due } = await this.platformDueFor(b);
         return {
           ...b,
+          // Nobody browsing the feed is the selected driver yet, so the rider's
+          // contact never belongs here.
+          notes: this.redactContactFromNotes(b.notes),
+          contactName: '',
+          contactMobile: '',
           offerCount: (b.offers ?? []).filter((o: any) => o.status !== 'released').length,
           alreadyApplied: (b.offers ?? []).some((o: any) => o.driverId.toString() === uid && o.status !== 'released'),
           platformDue: due,
@@ -1691,6 +1722,11 @@ export class CustomerBookingsService {
       const total = Math.round(b.finalFare || b.estimatedFare || 0);
       return {
         ...b,
+        // Same gate as `customer` above: the rider's contact only once this
+        // driver is selected AND the reveal window has opened.
+        notes: revealed ? b.notes : this.redactContactFromNotes(b.notes),
+        contactName: revealed ? (b.contactName || '') : '',
+        contactMobile: revealed ? (b.contactMobile || '') : '',
         customerId: c && typeof c === 'object' ? c._id : c,
         customer,
         // Selected driver, but the number isn't shown yet → let the app explain why.

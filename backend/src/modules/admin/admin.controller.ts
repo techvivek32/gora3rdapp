@@ -256,6 +256,7 @@ export class AdminController {
     return this.adminService.blacklistGarageDriver(id, body?.reason ?? '', adminId, body?.value !== false, city);
   }
 
+<<<<<<< HEAD
   // Admin-only, like blacklist. Deleting FREES the registration/phone for
   // re-adding, so it is for junk entries — a real ban is blacklist.
   @Delete('garage/vehicles/:id')
@@ -270,6 +271,8 @@ export class AdminController {
     return this.adminService.deleteGarageDriver(id, city);
   }
 
+=======
+>>>>>>> 86d9ced481682581350b436273a522947784ab60
   // Everything one member has in their garage, for their admin detail page.
   @Get('users/:id/garage')
   @Roles(...FRANCHISE_ROLES)

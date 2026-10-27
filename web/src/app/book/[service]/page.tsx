@@ -152,6 +152,8 @@ function BookForm() {
       const booking = await apiPost<Booking>('/customer-bookings/guest', {
         guestName: guest.name.trim(),
         guestMobile: guest.mobile,
+        contactName: guest.name.trim(),
+        contactMobile: guest.mobile,
         serviceType: 'hire_driver',
         subType,
         pickup: { address: pickup!.address, lat: pickup!.lat ?? 0, lng: pickup!.lng ?? 0 },

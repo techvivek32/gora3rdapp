@@ -164,7 +164,10 @@ class _DriverTripPageState extends State<DriverTripPage> with SingleTickerProvid
       .toString();
   String get _custMobile => (_isReq
           ? (_b['contactMobile'] ?? (_b['postedBy'] as Map?)?['mobile'] ?? '')
-          : (((_b['customer'] as Map?)?['mobile']) ?? ''))
+          // Prefer the number the rider gave for THIS trip (they may have booked
+          // for someone else); fall back to the account's own. Both are blanked
+          // by the server until this driver is selected.
+          : (_b['contactMobile'] ?? ((_b['customer'] as Map?)?['mobile']) ?? ''))
       .toString();
 
   @override
