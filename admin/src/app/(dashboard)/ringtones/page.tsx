@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
-import { Music, Upload, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { Music, Upload, Trash2, CheckCircle2, Circle, Bell, MessageSquare } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Ringtone {
@@ -11,6 +11,10 @@ interface Ringtone {
   title: string;
   audioUrl: string;
   isActive: boolean;
+  /** The tone new users hear for the in-app popup until they choose their own. */
+  isDefaultPopup?: boolean;
+  /** Same, for the background notification. */
+  isDefaultNotification?: boolean;
   sortOrder: number;
 }
 
@@ -45,6 +49,13 @@ export default function RingtonesPage() {
     mutationFn: (id: string) => adminApi.updateRingtone(id, { isActive: true }),
     onSuccess: () => { toast.success('Active ringtone set'); invalidate(); },
     onError: (e: any) => toast.error(e?.message || 'Could not update'),
+  });
+
+  const setDefault = useMutation({
+    mutationFn: (v: { id: string; kind: 'popup' | 'notification'; value: boolean }) =>
+      adminApi.setDefaultRingtone(v.id, v.kind, v.value),
+    onSuccess: (res: any) => { toast.success(res?.message || 'Default updated'); invalidate(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not update the default'),
   });
 
   const remove = useMutation({
@@ -145,6 +156,16 @@ export default function RingtonesPage() {
                       <CheckCircle2 className="w-3.5 h-3.5" /> Active
                     </span>
                   )}
+                  {r.isDefaultPopup && (
+                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-orange-500/15 text-orange-500">
+                      <MessageSquare className="w-3.5 h-3.5" /> Default popup
+                    </span>
+                  )}
+                  {r.isDefaultNotification && (
+                    <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold bg-blue-500/15 text-blue-500">
+                      <Bell className="w-3.5 h-3.5" /> Default notification
+                    </span>
+                  )}
                 </div>
                 <audio controls src={r.audioUrl} preload="metadata" className="h-9 ml-auto" />
                 <a href={r.audioUrl} target="_blank" rel="noreferrer" className="text-xs text-orange-500 whitespace-nowrap">Open ↗</a>
@@ -158,6 +179,30 @@ export default function RingtonesPage() {
                       <Circle className="w-4 h-4" /> Set Active
                     </button>
                   )}
+                  <button
+                    onClick={() => setDefault.mutate({ id: r._id, kind: 'popup', value: !r.isDefaultPopup })}
+                    disabled={setDefault.isPending}
+                    title="The tone new users hear for the in-app popup"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium disabled:opacity-60 ${
+                      r.isDefaultPopup
+                        ? 'border-orange-500 bg-orange-500/10 text-orange-600'
+                        : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <MessageSquare className="w-4 h-4" /> {r.isDefaultPopup ? 'Default popup' : 'Make popup default'}
+                  </button>
+                  <button
+                    onClick={() => setDefault.mutate({ id: r._id, kind: 'notification', value: !r.isDefaultNotification })}
+                    disabled={setDefault.isPending}
+                    title="The tone new users hear for the background notification"
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium disabled:opacity-60 ${
+                      r.isDefaultNotification
+                        ? 'border-blue-500 bg-blue-500/10 text-blue-600'
+                        : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <Bell className="w-4 h-4" /> {r.isDefaultNotification ? 'Default notification' : 'Make notification default'}
+                  </button>
                   <button
                     onClick={() => { if (confirm(`Delete "${r.title}"?`)) remove.mutate(r._id); }}
                     disabled={remove.isPending}

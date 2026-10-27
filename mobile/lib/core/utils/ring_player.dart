@@ -83,6 +83,92 @@ String _ringUrlKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_url' : '
 String _ringTitleKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_title' : 'ringtone_notification_title';
 String _ringPathKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_path' : 'ringtone_notification_path';
 
+// ─── Admin-set default tone ──────────────────────────────────────────────────
+// The tone a user hears before they pick one themselves. The admin marks it in
+// the Ringtones page; the app mirrors it into SharedPreferences (and caches the
+// audio) so the FCM background isolate — which has no network guarantee and no
+// DI — can play it like any other choice.
+String _defaultUrlKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_default_url' : 'ringtone_notification_default_url';
+String _defaultTitleKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_default_title' : 'ringtone_notification_default_title';
+String _defaultPathKey(RingKind k) => k == RingKind.popup ? 'ringtone_popup_default_path' : 'ringtone_notification_default_path';
+
+/// Title of the admin's default tone for [kind], or '' when they set none.
+/// The Alert Sound screen shows this so "Default" names an actual tone.
+Future<String> getAdminDefaultTitle(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_defaultTitleKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+/// Mirror the admin's defaults from a `/ringtones` payload.
+///
+/// Call it wherever the app already has that list — it is cheap when nothing
+/// changed (the audio is only re-downloaded when the URL actually differs), and
+/// it is what makes a brand-new install ring with the admin's tone instead of
+/// the bundled one.
+Future<void> syncAdminDefaultRingtones(List<Map<String, dynamic>> ringtones) async {
+  for (final kind in RingKind.values) {
+    final flag = kind == RingKind.popup ? 'isDefaultPopup' : 'isDefaultNotification';
+    Map<String, dynamic>? pick;
+    for (final r in ringtones) {
+      if (r[flag] == true) {
+        pick = r;
+        break;
+      }
+    }
+    final url = (pick?['audioUrl'] ?? '').toString().trim();
+    final title = (pick?['title'] ?? '').toString().trim();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final current = prefs.getString(_defaultUrlKey(kind)) ?? '';
+      if (url.isEmpty) {
+        // The admin cleared it (or deleted the tone) — drop ours so playback
+        // falls back to the bundled asset rather than a stale file.
+        await prefs.remove(_defaultUrlKey(kind));
+        await prefs.remove(_defaultTitleKey(kind));
+        await prefs.remove(_defaultPathKey(kind));
+        continue;
+      }
+      await prefs.setString(_defaultUrlKey(kind), url);
+      await prefs.setString(_defaultTitleKey(kind), title);
+      // Only re-download when it actually changed, or when we have no file yet.
+      final cached = prefs.getString(_defaultPathKey(kind)) ?? '';
+      final haveFile = cached.isNotEmpty && File(cached).existsSync();
+      if (url != current || !haveFile) {
+        final path = await _downloadRingtone(kind, url, nameSuffix: '_default');
+        if (path != null) await prefs.setString(_defaultPathKey(kind), path);
+      }
+    } catch (_) {
+      // Never let a ringtone sync break whatever the caller was doing.
+    }
+  }
+}
+
+Future<String> _adminDefaultPath(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_defaultPathKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
+Future<String> _adminDefaultUrl(RingKind kind) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return prefs.getString(_defaultUrlKey(kind)) ?? '';
+  } catch (_) {
+    return '';
+  }
+}
+
 /// Local cached file path for the chosen ringtone (downloaded once). Empty if
 /// none/uncached — playback then falls back to the URL, then the default tone.
 Future<String> getRingtonePath(RingKind kind) async {
@@ -98,14 +184,16 @@ Future<String> getRingtonePath(RingKind kind) async {
 /// Downloads [url] into the app's support dir so the tone plays from disk every
 /// time (no network on each alert, works in the background). Returns the local
 /// path, or null if the download failed.
-Future<String?> _downloadRingtone(RingKind kind, String url) async {
+Future<String?> _downloadRingtone(RingKind kind, String url, {String nameSuffix = ''}) async {
   try {
     final dir = await getApplicationSupportDirectory();
     final ringDir = Directory('${dir.path}/ringtones');
     if (!ringDir.existsSync()) ringDir.createSync(recursive: true);
     final rawExt = url.split('?').first.split('.').last.toLowerCase();
     final ext = (rawExt.isNotEmpty && rawExt.length <= 4) ? rawExt : 'mp3';
-    final file = File('${ringDir.path}/${kind.name}.$ext');
+    // The admin default is cached under its own name so it never overwrites the
+    // file for a tone the user chose themselves.
+    final file = File('${ringDir.path}/${kind.name}$nameSuffix.$ext');
     await Dio().download(url, file.path);
     return file.existsSync() ? file.path : null;
   } catch (_) {
@@ -245,15 +333,24 @@ Future<void> playRequirementRing({bool awaitEnd = false, RingKind kind = RingKin
     _player = player;
     // Play ONCE — release (not loop) so the tone ends by itself after one play.
     await player.setReleaseMode(ReleaseMode.release);
-    // The user's chosen tone for this kind (popup vs notification); empty → the
-    // bundled default. Fall back to the default if the URL can't be played.
+    // Resolution order, most specific first:
+    //   1. the tone this user chose (cached file, else its URL)
+    //   2. the tone the ADMIN set as the default (cached file, else its URL)
+    //   3. the bundled asset — the last resort, not the first
+    // Step 2 is why a brand-new install rings with the admin's tone.
     final cachedPath = await getRingtonePath(kind);
     final url = await getRingtoneUrl(kind);
+    final defaultPath = await _adminDefaultPath(kind);
+    final defaultUrl = await _adminDefaultUrl(kind);
     try {
       if (cachedPath.isNotEmpty && File(cachedPath).existsSync()) {
         await player.play(DeviceFileSource(cachedPath)); // from disk — no network
       } else if (url.isNotEmpty) {
         await player.play(UrlSource(url));
+      } else if (defaultPath.isNotEmpty && File(defaultPath).existsSync()) {
+        await player.play(DeviceFileSource(defaultPath));
+      } else if (defaultUrl.isNotEmpty) {
+        await player.play(UrlSource(defaultUrl));
       } else {
         await player.play(AssetSource(_defaultAsset(kind)));
       }

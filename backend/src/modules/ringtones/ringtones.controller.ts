@@ -34,6 +34,12 @@ export class RingtonesController {
     return this.ringtonesService.update(id, data);
   }
 
+  @Put(':id/default')
+  @ApiOperation({ summary: "Set (or clear) this tone as the default for new users, per alert kind" })
+  setDefault(@Param('id') id: string, @Body() body: { kind?: 'popup' | 'notification'; value?: boolean }) {
+    return this.ringtonesService.setDefault(id, body?.kind === 'notification' ? 'notification' : 'popup', body?.value !== false);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete a ringtone' })
   remove(@Param('id') id: string) {

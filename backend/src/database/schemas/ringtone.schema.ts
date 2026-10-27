@@ -16,6 +16,20 @@ export class Ringtone {
   @Prop({ default: false, index: true })
   isActive: boolean;
 
+  /**
+   * The tone a user hears when they have NOT picked one themselves — set by the
+   * admin, one per alert kind. Separate flags (rather than one field) so the
+   * same tone can be the default for both, which is the common case.
+   *
+   * Without these every new install fell back to the bundled asset, so the
+   * admin's uploaded tones only ever reached users who went and chose one.
+   */
+  @Prop({ default: false, index: true })
+  isDefaultPopup: boolean;
+
+  @Prop({ default: false, index: true })
+  isDefaultNotification: boolean;
+
   @Prop({ default: 0 })
   sortOrder: number;
 }

@@ -35,6 +35,9 @@ class _SoundSettingsPageState extends State<SoundSettingsPage> {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .where((r) => (r['audioUrl'] ?? '').toString().isNotEmpty)
           .toList();
+      // Opening this screen is also a good moment to refresh the admin's
+      // defaults — the admin may have changed them since the last launch.
+      await syncAdminDefaultRingtones(_ringtones);
     } catch (_) {}
     await _reloadTitles();
     if (mounted) setState(() => _loading = false);
@@ -43,10 +46,18 @@ class _SoundSettingsPageState extends State<SoundSettingsPage> {
   Future<void> _reloadTitles() async {
     final pt = await getRingtoneTitle(RingKind.popup);
     final nt = await getRingtoneTitle(RingKind.notification);
+    // When the user has not chosen, say WHICH tone they will actually hear —
+    // a bare "Default" gave no clue that the admin had set one.
+    final pd = await getAdminDefaultTitle(RingKind.popup);
+    final nd = await getAdminDefaultTitle(RingKind.notification);
+    String label(String chosen, String adminDefault) {
+      if (chosen.isNotEmpty) return chosen;
+      return adminDefault.isEmpty ? 'Default' : 'Default ($adminDefault)';
+    }
     if (!mounted) return;
     setState(() {
-      _popupTitle = pt.isEmpty ? 'Default' : pt;
-      _notifTitle = nt.isEmpty ? 'Default' : nt;
+      _popupTitle = label(pt, pd);
+      _notifTitle = label(nt, nd);
     });
   }
 

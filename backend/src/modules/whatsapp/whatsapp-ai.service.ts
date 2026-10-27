@@ -85,34 +85,84 @@ export class WhatsappAiService {
    * Returns null when AI is not configured or the call fails — callers then
    * fall back to the fixed-format parser.
    */
+  /**
+   * The model this runs on, newest-first.
+   *
+   * There IS a fallback list because a single hard-coded model is a time bomb:
+   * `gpt-4.1-nano` was deprecated by OpenAI around 25 Oct 2026 and every parse
+   * 404'd for days before anyone noticed — to a customer on WhatsApp that just
+   * looked like "duty is off". If the first entry dies, the next one answers
+   * while someone updates the list.
+   *
+   * `WHATSAPP_AI_MODEL` still overrides and is tried first.
+   */
+  private static readonly MODELS = ['gpt-5.4-nano', 'gpt-4.1-mini', 'gpt-4o-mini'];
+
+  /**
+   * GPT-5 and newer reject `max_tokens` outright ("Unsupported parameter") and
+   * want `max_completion_tokens`; the 4.x family only understands the old name.
+   * Sending the wrong one fails the call entirely, so pick per model.
+   */
+  private tokenLimitField(model: string): 'max_tokens' | 'max_completion_tokens' {
+    return /^(gpt-5|o[1-9])/i.test(model) ? 'max_completion_tokens' : 'max_tokens';
+  }
+
+  private async callModel(client: OpenAI, model: string, body: string): Promise<ParsedWhatsappBooking | null> {
+    const res = await client.chat.completions.create({
+      model,
+      // Reasoning models spend this budget thinking before they emit anything,
+      // so keep it roomy — too small and the reply comes back empty.
+      [this.tokenLimitField(model)]: 1024,
+      // Constrain the reply to our JSON shape via OpenAI structured outputs.
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'whatsapp_booking', schema: SCHEMA, strict: true },
+      },
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: body.slice(0, 4000) },
+      ],
+    } as any);
+
+    const content = res?.choices?.[0]?.message?.content;
+    // A reasoning model that burns its whole budget thinking returns an empty
+    // string with no error. Treat that as a failure so the next model is tried,
+    // rather than silently parsing nothing.
+    if (!content || !content.trim()) return null;
+    return { ...EMPTY, ...JSON.parse(content) };
+  }
+
   async parse(text: string): Promise<ParsedWhatsappBooking | null> {
     const client = this.openai;
     const body = (text || '').trim();
     if (!client || !body) return null;
 
-    const model = process.env.WHATSAPP_AI_MODEL || 'gpt-4.1-nano';
-    try {
-      const res = await client.chat.completions.create({
-        model,
-        max_tokens: 1024,
-        // Constrain the reply to our JSON shape via OpenAI structured outputs.
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'whatsapp_booking', schema: SCHEMA, strict: true },
-        },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: body.slice(0, 4000) },
-        ],
-      });
+    const override = (process.env.WHATSAPP_AI_MODEL || '').trim();
+    const models = override
+      ? [override, ...WhatsappAiService.MODELS.filter((m) => m !== override)]
+      : [...WhatsappAiService.MODELS];
 
-      const content = res?.choices?.[0]?.message?.content;
-      if (!content) return null;
-      const parsed = JSON.parse(content);
-      return { ...EMPTY, ...parsed };
-    } catch (e: any) {
-      this.logger.warn(`WhatsApp AI parse failed (${model}): ${e?.message ?? e}`);
-      return null;
+    const failures: string[] = [];
+    for (const model of models) {
+      try {
+        const parsed = await this.callModel(client, model, body);
+        if (parsed) {
+          // Worth knowing: the configured model is dead and a fallback is
+          // carrying WhatsApp bookings. Someone should update the list/env.
+          if (model !== models[0]) {
+            this.logger.warn(`WhatsApp AI fell back to "${model}" — "${models[0]}" failed. Update WHATSAPP_AI_MODEL.`);
+          }
+          return parsed;
+        }
+        failures.push(`${model}: empty reply`);
+      } catch (e: any) {
+        failures.push(`${model}: ${e?.message ?? e}`);
+      }
     }
+
+    // Every model failed — the fixed-format parser is all that is left, so most
+    // free-form messages will go unanswered. Log loudly; this is an outage.
+    this.logger.error(`WhatsApp AI parse FAILED on every model — free-form messages will not be understood. ${failures.join(' | ')}`);
+    return null;
   }
 }

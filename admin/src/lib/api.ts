@@ -191,6 +191,10 @@ export const adminApi = {
     apiClient.post('/admin/ringtones', data),
   updateRingtone: (id: string, data: { title?: string; sortOrder?: number; isActive?: boolean }) =>
     apiClient.put(`/admin/ringtones/${id}`, data),
+  // Which tone a user hears before they pick one, per alert kind. Exclusive —
+  // setting one clears it from the others.
+  setDefaultRingtone: (id: string, kind: 'popup' | 'notification', value: boolean) =>
+    apiClient.put(`/admin/ringtones/${id}/default`, { kind, value }),
   deleteRingtone: (id: string) => apiClient.delete(`/admin/ringtones/${id}`),
   uploadRingtone: (file: File) => {
     const fd = new FormData();

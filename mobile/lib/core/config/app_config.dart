@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../network/api_client.dart';
+import '../utils/ring_player.dart';
 
 /// Small cache of app-wide platform settings the UI reads synchronously (e.g.
 /// booking cards). Seeded from SharedPreferences on launch (so it has a value
@@ -36,5 +37,21 @@ class AppConfig {
       await prefs.setBool(_kFareKey, appSuggestedFareEnabled);
       await prefs.setBool(_kViewsKey, viewsEnabled);
     } catch (_) {}
+
+    // Mirror the admin's default alert tones on every launch. This is what makes
+    // a brand-new install ring with the admin's tone — waiting for the user to
+    // open Alert Sound would mean most never hear it. Separate try: a ringtone
+    // failure must not lose the settings above.
+    try {
+      final res = await api.get('/ringtones');
+      final list = ((res.data['data'] as List?) ?? [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      await syncAdminDefaultRingtones(list);
+    } catch (_) {
+      // Not logged in yet, or offline — the next launch picks it up. Alerts
+      // cannot arrive before login anyway.
+    }
   }
 }
