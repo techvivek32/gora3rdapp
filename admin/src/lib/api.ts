@@ -185,6 +185,24 @@ export const adminApi = {
   updateCabCategory: (id: string, data: any) => apiClient.put(`/home-content/admin/cab-categories/${id}`, data),
   deleteCabCategory: (id: string) => apiClient.delete(`/home-content/admin/cab-categories/${id}`),
 
+  // ─── One member's garage (vehicles + drivers) ────────────────────────────────
+  getUserGarage: (userId: string) => apiClient.get(`/admin/users/${userId}/garage`),
+  // Blacklist is a BAN, not a rejection — value:false lifts it back to pending.
+  blacklistGarageVehicle: (id: string, reason: string, value = true) =>
+    apiClient.post(`/admin/garage/vehicles/${id}/blacklist`, { reason, value }),
+  blacklistGarageDriver: (id: string, reason: string, value = true) =>
+    apiClient.post(`/admin/garage/drivers/${id}/blacklist`, { reason, value }),
+  approveGarageVehicleById: (id: string) => apiClient.post(`/admin/garage/vehicles/${id}/approve`),
+  approveGarageDriverById: (id: string) => apiClient.post(`/admin/garage/drivers/${id}/approve`),
+  rejectGarageVehicleById: (id: string, reason: string) =>
+    apiClient.post(`/admin/garage/vehicles/${id}/reject`, { reason }),
+  rejectGarageDriverById: (id: string, reason: string) =>
+    apiClient.post(`/admin/garage/drivers/${id}/reject`, { reason }),
+  // Deleting RELEASES the registration/phone for re-adding — blacklist is the
+  // one that keeps it reserved.
+  deleteGarageVehicleById: (id: string) => apiClient.delete(`/admin/garage/vehicles/${id}`),
+  deleteGarageDriverById: (id: string) => apiClient.delete(`/admin/garage/drivers/${id}`),
+
   // ─── Ringtones (admin only) ──────────────────────────────────────────────────
   getRingtones: () => apiClient.get('/admin/ringtones'),
   createRingtone: (data: { title: string; audioUrl: string; sortOrder?: number }) =>

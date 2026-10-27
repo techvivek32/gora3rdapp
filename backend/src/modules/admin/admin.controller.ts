@@ -232,6 +232,52 @@ export class AdminController {
     return this.adminService.rejectGarageVehicle(id, reason, adminId, city);
   }
 
+  // Blacklist = a ban, not a rejection. Admin-only: a franchise can review its
+  // city's garage but banning a vehicle/driver outright is a platform decision.
+  @Post('garage/vehicles/:id/blacklist')
+  @ApiOperation({ summary: 'Blacklist a garage vehicle (body.value=false lifts it)' })
+  blacklistGarageVehicle(
+    @Param('id') id: string,
+    @Body() body: { reason?: string; value?: boolean },
+    @CurrentUser('sub') adminId: string,
+    @CurrentUser('franchiseCity') city?: string,
+  ) {
+    return this.adminService.blacklistGarageVehicle(id, body?.reason ?? '', adminId, body?.value !== false, city);
+  }
+
+  @Post('garage/drivers/:id/blacklist')
+  @ApiOperation({ summary: 'Blacklist a garage driver (body.value=false lifts it)' })
+  blacklistGarageDriver(
+    @Param('id') id: string,
+    @Body() body: { reason?: string; value?: boolean },
+    @CurrentUser('sub') adminId: string,
+    @CurrentUser('franchiseCity') city?: string,
+  ) {
+    return this.adminService.blacklistGarageDriver(id, body?.reason ?? '', adminId, body?.value !== false, city);
+  }
+
+  // Admin-only, like blacklist. Deleting FREES the registration/phone for
+  // re-adding, so it is for junk entries — a real ban is blacklist.
+  @Delete('garage/vehicles/:id')
+  @ApiOperation({ summary: 'Delete a garage vehicle' })
+  deleteGarageVehicle(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.deleteGarageVehicle(id, city);
+  }
+
+  @Delete('garage/drivers/:id')
+  @ApiOperation({ summary: 'Delete a garage driver' })
+  deleteGarageDriver(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.deleteGarageDriver(id, city);
+  }
+
+  // Everything one member has in their garage, for their admin detail page.
+  @Get('users/:id/garage')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: "One member's garage vehicles + drivers" })
+  getGarageForUser(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getGarageForUser(id, city);
+  }
+
   @Post('garage/drivers/:id/approve')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Approve a garage driver' })

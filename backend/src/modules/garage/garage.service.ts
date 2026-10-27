@@ -168,6 +168,13 @@ export class GarageService {
 
   async update(userId: string, id: string, dto: UpdateGarageVehicleDto) {
     const vehicle = await this.owned(userId, id);
+    // Any edit drops the row back to `pending` (below), which would hand a
+    // blacklisted owner a one-tap way out of the ban. Refuse instead.
+    if (vehicle.approvalStatus === 'blacklisted') {
+      throw new BadRequestException(
+        'This vehicle has been blocked by our team and cannot be edited. Please contact support.',
+      );
+    }
     // Changing the plate must clear the same bar as adding one, or the check
     // on create is trivially sidestepped by adding then editing.
     if (dto.registrationNumber !== undefined && dto.registrationNumber !== vehicle.registrationNumber) {
@@ -228,6 +235,12 @@ export class GarageService {
 
   async updateDriver(userId: string, id: string, dto: UpdateGarageDriverDto) {
     const driver = await this.ownedDriver(userId, id);
+    // Same escape hatch as vehicles — see update().
+    if (driver.approvalStatus === 'blacklisted') {
+      throw new BadRequestException(
+        'This driver has been blocked by our team and cannot be edited. Please contact support.',
+      );
+    }
     // Re-validate whenever the phone is being set/changed.
     if (dto.phone !== undefined && dto.phone !== driver.phone) {
       this.assertValidPhone(dto.phone);
