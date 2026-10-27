@@ -225,7 +225,15 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final result = await repository.updateRequirement(event.id, event.data);
     result.fold(
       (f) => emit(RequirementsError(message: f.message, code: f.code)),
-      (data) => emit(RequirementUpdated(requirement: data['data'] as Map<String, dynamic>? ?? data)),
+      (data) {
+        emit(RequirementUpdated(requirement: data['data'] as Map<String, dynamic>? ?? data));
+        // Refetch, the way _onCreate does. Without this the lists keep serving
+        // the PRE-edit copy, so turning "Secure booking" off still showed the
+        // card as "Hidden until assigned" until something else refreshed it —
+        // which reads as the setting not saving at all.
+        add(const LoadMyRequirementsEvent());
+        add(const LoadRequirementsEvent());
+      },
     );
   }
 
@@ -234,7 +242,10 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final result = await repository.cancelRequirement(event.id, event.reason);
     result.fold(
       (f) => emit(RequirementsError(message: f.message, code: f.code)),
-      (_) => emit(RequirementCancelled()),
+      (_) {
+        emit(RequirementCancelled());
+        add(const LoadMyRequirementsEvent());
+      },
     );
   }
 

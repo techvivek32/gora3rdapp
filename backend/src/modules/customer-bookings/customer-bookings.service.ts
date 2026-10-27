@@ -563,7 +563,15 @@ export class CustomerBookingsService {
    * booking and never rang.
    */
   private async notifyEligibleDrivers(booking: any) {
-    await this.notifications.notifyNewCustomerBooking(booking);
+    // The alert payload carries `notes` verbatim into the popup card and the
+    // floating overlay on EVERY eligible driver's phone — so it is a broadcast,
+    // and the rider's contact must be stripped here too. Redacting only the
+    // feed left this path wide open: the push reaches far more drivers than the
+    // feed ever does, and it arrives whether or not anyone opens the app.
+    await this.notifications.notifyNewCustomerBooking({
+      ...(booking?.toObject?.() ?? booking),
+      notes: this.redactContactFromNotes(booking?.notes),
+    });
   }
 
   async getMyBookings(customerId: string, status?: string) {
