@@ -56,7 +56,11 @@ export class GarageDriver {
    * used to accept bookings until an admin `approved`s it. `rejected` carries a
    * reason the owner can read and fix.
    */
-  @Prop({ type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending', index: true })
+  // 'blacklisted' is a BAN, not a rejection: rejected means "fix it and
+  // resubmit", blacklisted means this driver must never be used again.
+  // It is a status rather than a separate flag so every existing
+  // `approvalStatus === 'approved'` gate blocks it automatically.
+  @Prop({ type: String, enum: ['pending', 'approved', 'rejected', 'blacklisted'], default: 'pending', index: true })
   approvalStatus: string;
 
   @Prop({ trim: true, default: '' })

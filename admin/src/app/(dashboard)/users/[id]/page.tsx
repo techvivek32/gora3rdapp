@@ -98,7 +98,7 @@ const TABS = [
   { id: 'reviews', label: 'Review History', icon: Star },
   { id: 'documents', label: 'Documents', icon: FileCheck },
   { id: 'requests', label: 'Request List', icon: ClipboardList },
-
+  { id: 'garage', label: 'Vehicles & Drivers', icon: Car },
 ];
 
 function verificationBadge(status?: string) {
@@ -326,6 +326,30 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     queryKey: ['user-subscriptions', id],
     queryFn: () => adminApi.getUserSubscriptions(id),
     enabled: activeTab === 'subscription',
+  });
+
+  const { data: garageData } = useQuery({
+    queryKey: ['user-garage', id],
+    queryFn: () => adminApi.getUserGarage(id),
+    enabled: activeTab === 'garage',
+  });
+
+  const refreshGarage = () => queryClient.invalidateQueries({ queryKey: ['user-garage', id] });
+
+  const blacklistMutation = useMutation({
+    mutationFn: (v: { kind: 'vehicle' | 'driver'; rowId: string; reason: string; value: boolean }) =>
+      v.kind === 'vehicle'
+        ? adminApi.blacklistGarageVehicle(v.rowId, v.reason, v.value)
+        : adminApi.blacklistGarageDriver(v.rowId, v.reason, v.value),
+    onSuccess: (res: any) => { toast.success(res?.message || 'Updated'); refreshGarage(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not update'),
+  });
+
+  const approveGarageMutation = useMutation({
+    mutationFn: (v: { kind: 'vehicle' | 'driver'; rowId: string }) =>
+      v.kind === 'vehicle' ? adminApi.approveGarageVehicleById(v.rowId) : adminApi.approveGarageDriverById(v.rowId),
+    onSuccess: (res: any) => { toast.success(res?.message || 'Approved'); refreshGarage(); },
+    onError: (e: any) => toast.error(e?.message || 'Could not approve'),
   });
 
   const blockMutation = useMutation({
@@ -846,6 +870,113 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     </table>
                   </div>
                 )}
+              </div>
+            );
+          })()}
+
+          {/* Vehicles & Drivers Tab — approve, or blacklist outright */}
+          {activeTab === 'garage' && (() => {
+            const g = (garageData as any)?.data ?? {};
+            const vehicles: any[] = g.vehicles ?? [];
+            const drivers: any[] = g.drivers ?? [];
+
+            const statusChip = (st?: string) => {
+              const map: Record<string, string> = {
+                approved: 'bg-green-500/15 text-green-600',
+                pending: 'bg-amber-500/15 text-amber-600',
+                rejected: 'bg-red-500/15 text-red-600',
+                blacklisted: 'bg-gray-900/10 text-gray-900 dark:bg-white/15 dark:text-white',
+              };
+              const label = st === 'blacklisted' ? 'Blacklisted' : (st ? st[0].toUpperCase() + st.slice(1) : 'Pending');
+              return <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${map[st ?? 'pending'] ?? map.pending}`}>{label}</span>;
+            };
+
+            const row = (kind: 'vehicle' | 'driver', item: any) => {
+              const banned = item.approvalStatus === 'blacklisted';
+              const title = kind === 'vehicle'
+                ? [item.modelName, item.registrationNumber].filter(Boolean).join(' · ')
+                : [item.fullName, item.phone].filter(Boolean).join(' · ');
+              const sub = kind === 'vehicle'
+                ? [item.vehicleType, item.fuelType].filter(Boolean).join(' · ')
+                : (item.licenceNumber || '');
+              return (
+                <div key={item._id} className="flex items-center gap-3 flex-wrap border border-gray-100 dark:border-gray-800 rounded-lg p-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-gray-900 dark:text-white truncate">{title || '—'}</div>
+                    {sub && <div className="text-xs text-gray-500 truncate">{sub}</div>}
+                    {banned && item.rejectionReason && (
+                      <div className="text-xs text-red-500 mt-0.5">Reason: {item.rejectionReason}</div>
+                    )}
+                  </div>
+                  <div className="ml-auto flex items-center gap-2">
+                    {statusChip(item.approvalStatus)}
+                    {item.approvalStatus !== 'approved' && !banned && (
+                      <button
+                        onClick={() => approveGarageMutation.mutate({ kind, rowId: item._id })}
+                        disabled={approveGarageMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg border border-green-300 dark:border-green-800 text-sm font-medium text-green-600 hover:bg-green-50 dark:hover:bg-green-950 disabled:opacity-60"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (banned) {
+                          if (!confirm('Remove from blacklist? It goes back to pending for review.')) return;
+                          blacklistMutation.mutate({ kind, rowId: item._id, reason: '', value: false });
+                          return;
+                        }
+                        const reason = prompt(`Why is this ${kind} being blacklisted? (shown to the owner)`);
+                        if (reason === null) return; // cancelled
+                        blacklistMutation.mutate({ kind, rowId: item._id, reason, value: true });
+                      }}
+                      disabled={blacklistMutation.isPending}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium disabled:opacity-60 ${
+                        banned
+                          ? 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          : 'border-red-300 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950'
+                      }`}
+                    >
+                      <Ban className="w-4 h-4" /> {banned ? 'Un-blacklist' : 'Blacklist'}
+                    </button>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Vehicles ({vehicles.length})</h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Blacklisting bans the vehicle: it cannot accept bookings, disappears from the member&apos;s
+                    public profile, and its registration number stays reserved so it cannot be re-added
+                    under another account.
+                  </p>
+                  {vehicles.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <Car className="w-10 h-10 text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-400">No vehicles in this garage.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">{vehicles.map((v) => row('vehicle', v))}</div>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Drivers ({drivers.length})</h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    A blacklisted driver cannot be assigned to any booking, and their number stays reserved.
+                  </p>
+                  {drivers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-center">
+                      <User className="w-10 h-10 text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-400">No drivers in this garage.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">{drivers.map((d) => row('driver', d))}</div>
+                  )}
+                </div>
               </div>
             );
           })()}

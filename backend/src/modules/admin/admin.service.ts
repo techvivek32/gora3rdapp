@@ -1052,6 +1052,53 @@ export class AdminService {
     return { message: 'Vehicle rejected', data: v };
   }
 
+  /**
+   * Ban a vehicle outright.
+   *
+   * Different from `reject`, which invites a resubmission: a blacklisted
+   * vehicle stays blocked, keeps its registration reserved (so nobody can add
+   * it under a fresh account), and drops off the owner's public profile.
+   * `value: false` lifts the ban back to `pending` for a fresh review rather
+   * than straight to approved — an un-ban should still be looked at.
+   */
+  async blacklistGarageVehicle(id: string, reason: string, adminId: string, value = true, franchiseCity?: any) {
+    const v = await this.loadGarageVehicleInScope(id, franchiseCity);
+    v.approvalStatus = value ? 'blacklisted' : 'pending';
+    v.rejectionReason = value ? (reason || 'Blacklisted by admin') : '';
+    v.reviewedAt = new Date();
+    v.reviewedBy = new Types.ObjectId(adminId);
+    await v.save();
+    await this.notifyGarageOwner(
+      v.userId, 'vehicle', value ? 'blacklisted' : 'pending', this.vehicleLabel(v), v.rejectionReason,
+    );
+    return { message: value ? 'Vehicle blacklisted' : 'Vehicle removed from blacklist', data: v };
+  }
+
+  /** Ban a driver outright. See blacklistGarageVehicle for the reasoning. */
+  async blacklistGarageDriver(id: string, reason: string, adminId: string, value = true, franchiseCity?: any) {
+    const d = await this.loadGarageDriverInScope(id, franchiseCity);
+    d.approvalStatus = value ? 'blacklisted' : 'pending';
+    d.rejectionReason = value ? (reason || 'Blacklisted by admin') : '';
+    d.reviewedAt = new Date();
+    d.reviewedBy = new Types.ObjectId(adminId);
+    await d.save();
+    await this.notifyGarageOwner(
+      d.userId, 'driver', value ? 'blacklisted' : 'pending', d.fullName, d.rejectionReason,
+    );
+    return { message: value ? 'Driver blacklisted' : 'Driver removed from blacklist', data: d };
+  }
+
+  /** Every garage vehicle + driver for ONE member, for their admin page. */
+  async getGarageForUser(userId: string, franchiseCity?: any) {
+    await this.assertUserInCity(userId, franchiseCity);
+    const uid = new Types.ObjectId(userId);
+    const [vehicles, drivers] = await Promise.all([
+      this.garageVehicleModel.find({ userId: uid }).sort({ createdAt: -1 }).lean(),
+      this.garageDriverModel.find({ userId: uid }).sort({ createdAt: -1 }).lean(),
+    ]);
+    return { message: 'Garage retrieved', data: { vehicles, drivers } };
+  }
+
   async approveGarageDriver(id: string, adminId: string, franchiseCity?: any) {
     const d = await this.loadGarageDriverInScope(id, franchiseCity);
     d.approvalStatus = 'approved';
@@ -1099,16 +1146,33 @@ export class AdminService {
   private async notifyGarageOwner(
     userId: Types.ObjectId,
     kind: 'vehicle' | 'driver',
-    outcome: 'approved' | 'rejected',
+    outcome: 'approved' | 'rejected' | 'blacklisted' | 'pending',
     label: string,
     reason?: string,
   ): Promise<void> {
     try {
       const noun = kind === 'vehicle' ? 'Vehicle' : 'Driver';
-      const title = outcome === 'approved' ? `${noun} approved` : `${noun} needs changes`;
-      const body = outcome === 'approved'
-        ? `Your ${kind} "${label}" is approved. You can now use it to accept bookings.`
-        : `Your ${kind} "${label}" was not approved${reason ? `: ${reason}` : '.'} Please update it and resubmit.`;
+      // A ban is not a rejection: telling someone to "update and resubmit" when
+      // they have been blacklisted would just generate support tickets.
+      const copy: Record<string, { title: string; body: string }> = {
+        approved: {
+          title: `${noun} approved`,
+          body: `Your ${kind} "${label}" is approved. You can now use it to accept bookings.`,
+        },
+        rejected: {
+          title: `${noun} needs changes`,
+          body: `Your ${kind} "${label}" was not approved${reason ? `: ${reason}` : '.'} Please update it and resubmit.`,
+        },
+        blacklisted: {
+          title: `${noun} blocked`,
+          body: `Your ${kind} "${label}" has been blocked${reason ? `: ${reason}` : '.'} Contact support if you believe this is a mistake.`,
+        },
+        pending: {
+          title: `${noun} under review`,
+          body: `Your ${kind} "${label}" is being reviewed again. We will let you know the outcome.`,
+        },
+      };
+      const { title, body } = copy[outcome] ?? copy.rejected;
       await this.notificationsService.notifyUser(userId, title, body, { type: 'garage_review', kind, outcome });
     } catch {
       /* best-effort — the status badge in the app is the source of truth */

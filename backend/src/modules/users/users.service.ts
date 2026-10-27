@@ -117,7 +117,7 @@ export class UsersService {
         // rather than requiring 'approved' keeps the ~1,000 vehicles that
         // predate the approval feature visible - they have no status at all,
         // and hiding them would empty most profiles.
-        .find({ userId: user._id, approvalStatus: { $nin: ['pending', 'rejected'] } })
+        .find({ userId: user._id, approvalStatus: { $nin: ['pending', 'rejected', 'blacklisted'] } })
         .select('vehicleType modelName registrationNumber fuelType seatingCapacity color approvalStatus')
         .sort({ createdAt: -1 })
         .limit(20)

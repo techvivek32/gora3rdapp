@@ -74,7 +74,13 @@ export class CustomerBookingsService {
         .select('approvalStatus')
         .lean();
       if (v && v.approvalStatus !== 'approved') {
-        throw new BadRequestException('This vehicle is awaiting admin approval. Please pick an approved vehicle.');
+        // A ban and a pending review both fail here, but telling someone to
+        // "wait for approval" when they are blocked is simply wrong.
+        throw new BadRequestException(
+          v.approvalStatus === 'blacklisted'
+            ? 'This vehicle has been blocked by our team and cannot be used. Please pick another.'
+            : 'This vehicle is awaiting admin approval. Please pick an approved vehicle.',
+        );
       }
     }
     const last10 = (selection.driverPhone || '').replace(/\D/g, '').slice(-10);
@@ -84,7 +90,11 @@ export class CustomerBookingsService {
         .select('approvalStatus')
         .lean();
       if (d && d.approvalStatus !== 'approved') {
-        throw new BadRequestException('This driver is awaiting admin approval. Please pick an approved driver.');
+        throw new BadRequestException(
+          d.approvalStatus === 'blacklisted'
+            ? 'This driver has been blocked by our team and cannot be used. Please pick another.'
+            : 'This driver is awaiting admin approval. Please pick an approved driver.',
+        );
       }
     }
   }
