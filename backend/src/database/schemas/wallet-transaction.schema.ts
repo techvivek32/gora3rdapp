@@ -30,6 +30,11 @@ export class WalletTransaction {
   @Prop()
   razorpayPaymentId: string;
 
+  /** Razorpay UPI-QR id for a "Pay by QR" top-up. The QR has no callback, so
+   *  the app polls and the server reconciles against Razorpay using this. */
+  @Prop()
+  razorpayQrId: string;
+
   @Prop()
   note: string;
 

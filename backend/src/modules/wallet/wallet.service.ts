@@ -187,6 +187,104 @@ export class WalletService {
     };
   }
 
+  /**
+   * "Pay by QR" top-up: a single-use Razorpay UPI QR for `amount`.
+   *
+   * Unlike the in-app checkout there is no success callback to trust, so the
+   * app polls `topUpQrStatus` and the SERVER decides, by asking Razorpay what
+   * it actually received. The wallet scope rides on the pending transaction so
+   * the money lands in the wallet the customer started from.
+   */
+  async createTopUpQr(userId: string, dto: CreateTopUpDto, scope: WalletScope = 'main') {
+    const amount = Math.round(dto.amount);
+    const { minDeposit } = await this.settingsService.getWalletLimits();
+    if (amount < minDeposit) throw new BadRequestException(`Minimum amount to add is ₹${minDeposit}`);
+
+    let qr: any;
+    try {
+      qr = await (await this.getRazorpay()).qrCode.create({
+        type: 'upi_qr',
+        name: 'Gora Cabs',
+        usage: 'single_use',
+        fixed_amount: true,
+        payment_amount: amount * 100, // paise
+        description: 'Wallet top-up',
+        notes: { userId, type: 'wallet_topup', wallet: scope },
+      } as any);
+    } catch (e: any) {
+      const reason = e?.error?.description || e?.description || e?.message || 'unknown error';
+      this.logger.error(`Razorpay wallet QR creation failed (amount=${amount}): ${reason}`);
+      throw new BadRequestException(`QR could not be created: ${reason}`);
+    }
+
+    const tx = await this.txModel.create({
+      userId: new Types.ObjectId(userId),
+      wallet: scope,
+      amount,
+      type: 'credit',
+      status: 'pending',
+      razorpayQrId: qr.id,
+      note: 'Wallet top-up (QR)',
+    });
+
+    return {
+      message: 'QR created',
+      data: { qrId: qr.id, imageUrl: qr.image_url, amount, currency: 'INR', paymentId: tx._id },
+    };
+  }
+
+  /**
+   * Poll a QR top-up: reconcile with Razorpay and credit the wallet once paid.
+   *
+   * Bound to the caller, so one user can never poll (or trigger a credit on)
+   * another's transaction. The status flip is a conditional update, so two
+   * polls racing can only credit the wallet once.
+   */
+  async topUpQrStatus(userId: string, txId: string) {
+    if (!Types.ObjectId.isValid(txId)) throw new NotFoundException('Transaction not found');
+    const tx = await this.txModel.findById(txId);
+    if (!tx || tx.userId.toString() !== userId) throw new NotFoundException('Transaction not found');
+
+    if (tx.status === 'success') {
+      return { message: 'Paid', data: { status: 'success', amount: tx.amount } };
+    }
+    if (tx.status !== 'pending' || !tx.razorpayQrId) {
+      return { message: 'Pending', data: { status: tx.status } };
+    }
+
+    let paid = false;
+    try {
+      const qr: any = await (await this.getRazorpay()).qrCode.fetch(tx.razorpayQrId);
+      const received = Number(qr?.payments_amount_received || 0);
+      const count = Number(qr?.payments_count_received || 0);
+      paid = count > 0 || (received > 0 && received >= Number(tx.amount || 0) * 100);
+    } catch (e: any) {
+      this.logger.warn(`Wallet QR fetch failed: ${e?.message ?? e}`);
+      return { message: 'Pending', data: { status: 'pending' } };
+    }
+    if (!paid) return { message: 'Pending', data: { status: 'pending' } };
+
+    // Claim the transaction before touching the balance — a second poll that
+    // loses this race must not credit the wallet twice.
+    const claimed = await this.txModel.findOneAndUpdate(
+      { _id: tx._id, status: 'pending' },
+      { status: 'success' },
+      { new: true },
+    );
+    if (!claimed) return { message: 'Paid', data: { status: 'success', amount: tx.amount } };
+
+    const walletScope = this.scopeOf(claimed);
+    const field = this.balanceField(walletScope);
+    const user = await this.userModel
+      .findByIdAndUpdate(claimed.userId, { $inc: { [field]: claimed.amount } }, { new: true })
+      .select(field);
+
+    return {
+      message: 'Wallet credited successfully',
+      data: { status: 'success', amount: claimed.amount, balance: this.balanceOf(user, walletScope) },
+    };
+  }
+
   async verifyTopUp(userId: string, dto: VerifyTopUpDto) {
     const keySecret = (await this.settingsService.getRazorpayKeys()).keySecret;
     const expected = crypto

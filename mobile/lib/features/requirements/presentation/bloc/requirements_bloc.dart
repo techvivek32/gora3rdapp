@@ -34,7 +34,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   Future<void> _onAssignDriver(AssignDriverEvent event, Emitter<RequirementsState> emit) async {
     final result = await repository.assignDriver(event.id, event.driverId);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) {
         emit(const DriverAssigned());
         add(const LoadMyRequirementsEvent());
@@ -45,7 +45,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   Future<void> _onUnassignDriver(UnassignDriverEvent event, Emitter<RequirementsState> emit) async {
     final result = await repository.unassignDriver(event.id);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) => add(const LoadMyRequirementsEvent()),
     );
   }
@@ -53,7 +53,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   Future<void> _onSetStatus(SetRequirementStatusEvent event, Emitter<RequirementsState> emit) async {
     final result = await repository.setStatus(event.id, event.status);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) => add(const LoadMyRequirementsEvent()),
     );
   }
@@ -68,7 +68,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final myAcceptedResult = await repository.getAcceptedByMe();
 
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) {
         _hasMore = data['meta']?['hasNextPage'] ?? false;
         final myAccepted = myAcceptedResult.fold(
@@ -156,7 +156,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.getRequirements(search: event.query);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) => emit(RequirementsLoaded(
         requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
         isLoadingMore: false,
@@ -169,7 +169,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.getRequirements(filters: event.filters);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) => emit(RequirementsLoaded(
         requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
         isLoadingMore: false,
@@ -184,7 +184,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.createRequirement(event.data);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) {
         emit(RequirementCreated(requirement: data));
         add(const LoadRequirementsEvent());
@@ -195,7 +195,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   Future<void> _onDelete(DeleteRequirementEvent event, Emitter<RequirementsState> emit) async {
     final result = await repository.deleteRequirement(event.id);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) => add(const LoadRequirementsEvent()),
     );
   }
@@ -204,7 +204,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.getRequirementById(event.id);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) => emit(RequirementDetailLoaded(requirement: data['data'] as Map<String, dynamic>? ?? data)),
     );
   }
@@ -212,7 +212,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
   Future<void> _onAccept(AcceptRequirementEvent event, Emitter<RequirementsState> emit) async {
     final result = await repository.acceptRequirement(event.id);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) {
         emit(RequirementAccepted());
         add(LoadRequirementDetailEvent(event.id));
@@ -224,7 +224,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.updateRequirement(event.id, event.data);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) => emit(RequirementUpdated(requirement: data['data'] as Map<String, dynamic>? ?? data)),
     );
   }
@@ -233,7 +233,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     emit(RequirementsLoading());
     final result = await repository.cancelRequirement(event.id, event.reason);
     result.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (_) => emit(RequirementCancelled()),
     );
   }
@@ -250,7 +250,7 @@ class RequirementsBloc extends Bloc<RequirementsEvent, RequirementsState> {
     final assigned = results[1];
 
     mine.fold(
-      (f) => emit(RequirementsError(message: f.message)),
+      (f) => emit(RequirementsError(message: f.message, code: f.code)),
       (data) => emit(MyRequirementsLoaded(
         requirements: List<Map<String, dynamic>>.from(data['data'] ?? []),
         // A failure here shouldn't blank the whole page — just show no assignments.

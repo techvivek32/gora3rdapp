@@ -75,5 +75,25 @@ class ErrorMapper {
     return null;
   }
 
+  /// The backend's machine-readable error code, when it sent one.
+  ///
+  /// NestJS strips extra fields off an exception body, so the server tucks the
+  /// code inside `errors` (see RequirementsService.assertVerifiedPoster):
+  /// `{ message, errors: { code: 'VERIFICATION_REQUIRED', ... } }`. Callers use
+  /// it to act on a specific refusal — e.g. send the member to the KYC screen —
+  /// instead of only showing the text.
+  static String? code(Object error) {
+    if (error is! DioException) return null;
+    final data = error.response?.data;
+    if (data is! Map) return null;
+    final errors = data['errors'];
+    if (errors is Map) {
+      final c = errors['code'];
+      if (c is String && c.isNotEmpty) return c;
+    }
+    final c = data['code'];
+    return (c is String && c.isNotEmpty) ? c : null;
+  }
+
   static String _clean(String raw) => raw.replaceAll('Exception: ', '').trim();
 }

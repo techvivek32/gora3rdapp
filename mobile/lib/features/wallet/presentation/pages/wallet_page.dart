@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -183,6 +184,121 @@ class _WalletPageState extends State<WalletPage> {
   void _onPaymentError(PaymentFailureResponse response) {
     if (mounted) setState(() => _processing = false);
     _snack('Payment failed: ${response.message ?? ''}');
+  }
+
+  /// "Pay by QR": show a Razorpay UPI QR and poll until the server confirms it.
+  ///
+  /// A QR has no success callback, so the SERVER decides when it is paid (it
+  /// asks Razorpay what it actually received) — the app only polls and reports.
+  Future<void> _payByQr(int amount) async {
+    if (amount < _minDeposit) {
+      setState(() => _addError = 'Minimum amount to add is ₹$_minDeposit');
+      return;
+    }
+    setState(() {
+      _addError = null;
+      _processing = true;
+    });
+
+    Map<String, dynamic> qr;
+    try {
+      final res = await _api.post('$_base/create-qr', data: {'amount': amount});
+      qr = Map<String, dynamic>.from(res.data['data'] as Map);
+    } catch (e) {
+      setState(() => _processing = false);
+      _snack(ErrorMapper.message(e));
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _processing = false);
+
+    final txId = (qr['paymentId'] ?? '').toString();
+    final imageUrl = (qr['imageUrl'] ?? '').toString();
+    Timer? poll;
+    var done = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          poll ??= Timer.periodic(const Duration(seconds: 4), (t) async {
+            if (done) return;
+            try {
+              final res = await _api.get('$_base/qr-status/$txId');
+              final d = Map<String, dynamic>.from(res.data['data'] as Map);
+              if ((d['status'] ?? '').toString() == 'success') {
+                done = true;
+                t.cancel();
+                if (ctx.mounted) Navigator.pop(ctx);
+              }
+            } catch (_) {
+              // Transient failure — keep polling; the QR is still valid.
+            }
+          });
+
+          return Padding(
+            padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(4)),
+                ),
+                const SizedBox(height: 16),
+                Text('Scan to add ₹$amount', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                const Text('Scan with any UPI app — PhonePe, Google Pay, Paytm.',
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(height: 16),
+                if (imageUrl.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      imageUrl,
+                      width: 240,
+                      height: 240,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        height: 240,
+                        child: Center(child: Text('Could not load the QR. Please try again.')),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                  SizedBox(width: 10),
+                  Text('Waiting for payment…', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                ]),
+                const SizedBox(height: 14),
+                const Text('Keep this open until the payment is confirmed. The money is added automatically.',
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    poll?.cancel();
+    if (!mounted) return;
+    if (done) {
+      _amountCtrl.clear();
+      _snack('Money added to your wallet!', error: false);
+    }
+    // Reload either way: the customer may have paid just as they closed the sheet.
+    await _load();
   }
 
   /// Selectable pill used to pick the payout method (bank vs UPI).
@@ -724,6 +840,29 @@ class _WalletPageState extends State<WalletPage> {
                       child: _processing
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : Text('Add Money'.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _processing
+                          ? null
+                          : () {
+                              final issue = _addAmountIssue(force: true);
+                              if (issue != null) {
+                                setState(() => _addError = issue);
+                                return;
+                              }
+                              _payByQr(int.parse(_amountCtrl.text.trim()));
+                            },
+                      icon: const Icon(Icons.qr_code_2_rounded, size: 20),
+                      label: Text('Pay by QR'.tr, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),

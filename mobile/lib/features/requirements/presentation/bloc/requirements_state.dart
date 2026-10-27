@@ -40,9 +40,14 @@ class RequirementsLoaded extends RequirementsState {
 
 class RequirementsError extends RequirementsState {
   final String message;
-  const RequirementsError({required this.message});
+
+  /// The backend's error code, when it sent one — e.g. 'VERIFICATION_REQUIRED',
+  /// which the post-booking page turns into a "Complete KYC" prompt.
+  final String? code;
+
+  const RequirementsError({required this.message, this.code});
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, code];
 }
 
 class RequirementCreated extends RequirementsState {

@@ -493,6 +493,29 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
           }
           if (state is RequirementsError) {
             if (_submitting) setState(() => _submitting = false);
+            // KYC gate: a snackbar leaves the member stuck with no idea what to
+            // do, so this refusal gets a dialog that takes them to the screen
+            // that fixes it.
+            if (state.code == 'VERIFICATION_REQUIRED') {
+              showDialog<void>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('Verification needed'.tr, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  content: Text(state.message, style: const TextStyle(fontSize: 13.5, color: AppColors.textSecondary)),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Later'.tr)),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.push('/kyc');
+                      },
+                      child: Text('Complete KYC'.tr),
+                    ),
+                  ],
+                ),
+              );
+              return;
+            }
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(state.message), backgroundColor: AppColors.error));
           }
         },

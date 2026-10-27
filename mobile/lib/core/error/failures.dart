@@ -1,10 +1,17 @@
 abstract class Failure {
   final String message;
-  const Failure({required this.message});
+
+  /// The backend's machine-readable code, when it sent one (see
+  /// `ErrorMapper.code`). Lets a page act on a specific refusal — e.g.
+  /// VERIFICATION_REQUIRED sends the member to KYC — rather than only showing
+  /// the message.
+  final String? code;
+
+  const Failure({required this.message, this.code});
 }
 
 class ServerFailure extends Failure {
-  const ServerFailure({required super.message});
+  const ServerFailure({required super.message, super.code});
 }
 
 class NetworkFailure extends Failure {

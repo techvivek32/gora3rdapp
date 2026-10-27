@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { WalletService } from './wallet.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -22,6 +22,18 @@ export class WalletController {
   @ApiOperation({ summary: 'Create a Razorpay order to add money to the wallet' })
   createOrder(@CurrentUser('sub') userId: string, @Body() dto: CreateTopUpDto) {
     return this.walletService.createTopUpOrder(userId, dto);
+  }
+
+  @Post('create-qr')
+  @ApiOperation({ summary: 'Create a Razorpay UPI QR to add money (Pay by QR)' })
+  createQr(@CurrentUser('sub') userId: string, @Body() dto: CreateTopUpDto) {
+    return this.walletService.createTopUpQr(userId, dto);
+  }
+
+  @Get('qr-status/:id')
+  @ApiOperation({ summary: 'Poll a QR top-up; credits the wallet once Razorpay confirms it' })
+  qrStatus(@CurrentUser('sub') userId: string, @Param('id') id: string) {
+    return this.walletService.topUpQrStatus(userId, id);
   }
 
   @Post('verify')

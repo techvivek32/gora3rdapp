@@ -3,6 +3,7 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../domain/repositories/requirements_repository.dart';
 import '../datasources/requirements_remote_datasource.dart';
+import '../../../../core/error/error_mapper.dart';
 
 class RequirementsRepositoryImpl implements RequirementsRepository {
   final RequirementsRemoteDataSource remote;
@@ -15,7 +16,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.getRequirements(params.map((k, v) => MapEntry(k, v.toString())));
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -25,7 +26,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.getById(id);
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -35,7 +36,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.create(data);
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -45,7 +46,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.update(id, data);
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -55,7 +56,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.delete(id);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -65,7 +66,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.accept(id);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -75,7 +76,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.cancel(id, reason);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -85,7 +86,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.setStatus(id, status);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -95,7 +96,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.getMy(status: status);
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -105,7 +106,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.getAcceptedByMe();
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -115,7 +116,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       final result = await remote.getAssignedToMe();
       return Right(result);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 
@@ -138,7 +139,7 @@ class RequirementsRepositoryImpl implements RequirementsRepository {
       await remote.unassignDriver(id);
       return const Right(null);
     } catch (e) {
-      return Left(ServerFailure(message: e.toString()));
+      return Left(ServerFailure(message: ErrorMapper.message(e), code: ErrorMapper.code(e)));
     }
   }
 }
