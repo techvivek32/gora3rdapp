@@ -30,6 +30,7 @@ import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { getPaginationParams, buildPaginatedResult, dateRangeFilter } from '../../common/utils/pagination.util';
 import { safeRegex } from '../../common/utils/regex.util';
 
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -486,6 +487,94 @@ export class AdminService {
       throw new NotFoundException('User not found');
     }
     return { message: 'User retrieved', data: user };
+  }
+
+  /**
+   * Other accounts that look like they belong to the same person.
+   *
+   * Account KYC captures the Aadhaar PHOTO but not the number (that field was
+   * removed on purpose), so there is no identifier to match on and nothing can
+   * be blocked automatically. These are HINTS for a human to judge, never a
+   * verdict — which is why this is a separate panel the admin reads rather
+   * than a rule that refuses anything.
+   *
+   * Two signals, both cheap:
+   *  - the same uploaded document FILE referenced by two accounts. Each upload
+   *    gets its own UUID filename, so an identical URL means the record was
+   *    literally copied — the strongest signal available here.
+   *  - the same full name on another account that has also submitted KYC.
+   *    Weak on its own (names repeat), which is why it is labelled as such.
+   *
+   * Deliberately capped and lean: an admin opening a user profile must not pay
+   * for a collection scan.
+   */
+  async getUserDuplicates(id: string, franchiseCity?: any) {
+    if (!Types.ObjectId.isValid(id)) throw new NotFoundException('User not found');
+    const user: any = await this.userModel
+      .findById(id)
+      .select('fullName documents verificationStatus')
+      .lean();
+    if (!user) throw new NotFoundException('User not found');
+    if (franchiseCity && !this.userInScope(user, franchiseCity)) {
+      throw new NotFoundException('User not found');
+    }
+
+    const hits = new Map<string, { _id: string; fullName: string; mobile: string; verificationStatus: string; reasons: string[] }>();
+    const add = (u: any, reason: string) => {
+      const key = u._id.toString();
+      const row = hits.get(key) ?? {
+        _id: key,
+        fullName: u.fullName ?? '',
+        mobile: u.mobile ?? '',
+        verificationStatus: u.verificationStatus ?? 'none',
+        reasons: [],
+      };
+      if (!row.reasons.includes(reason)) row.reasons.push(reason);
+      hits.set(key, row);
+    };
+
+    const SELECT = 'fullName mobile verificationStatus';
+
+    // 1. The same document file on another account.
+    const urls = Object.values(user.documents ?? {})
+      .flatMap((d: any) => [d?.image, d?.backImage])
+      .filter((u: any) => typeof u === 'string' && u.trim().length > 0);
+    if (urls.length) {
+      const sameFile = await this.userModel
+        .find({
+          _id: { $ne: user._id },
+          $or: urls.flatMap((u: string) =>
+            DOCUMENT_KEYS.flatMap((k) => [
+              { [`documents.${k}.image`]: u },
+              { [`documents.${k}.backImage`]: u },
+            ]),
+          ),
+        })
+        .select(SELECT)
+        .limit(10)
+        .lean();
+      sameFile.forEach((u) => add(u, 'Same document image file'));
+    }
+
+    // 2. The same name on another account that has also submitted KYC.
+    const name = (user.fullName ?? '').trim().replace(/\s+/g, ' ');
+    if (name.length >= 3) {
+      const sameName = await this.userModel
+        .find({
+          _id: { $ne: user._id },
+          // Case-insensitive EXACT match via $expr rather than a RegExp: a name
+          // is user input, and an exact comparison cannot be turned into a
+          // pattern the way an unescaped regex could.
+          $expr: { $eq: [{ $toLower: { $trim: { input: '$fullName' } } }, name.toLowerCase()] },
+          verificationStatus: { $in: ['pending', 'verified'] },
+        })
+        .select(SELECT)
+        .limit(10)
+        .lean();
+      sameName.forEach((u) => add(u, 'Same name, KYC also submitted'));
+    }
+
+    return { message: 'Possible duplicates', data: [...hits.values()] };
   }
 
   // The logged-in admin's own profile (for the admin panel's Profile page).

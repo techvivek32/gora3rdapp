@@ -78,6 +78,61 @@ export class GarageService {
     );
   }
 
+  /**
+   * A driver's Aadhaar and licence numbers identify one PERSON, so each may
+   * appear in one garage only — across the whole platform, not just this
+   * account. Same rule the registration number already has for vehicles.
+   *
+   * Without it the same driver could be saved by several vendors at once and
+   * each would offer them for the same slot, which is exactly what the
+   * registration-number check exists to stop. Phone was already unique, but a
+   * phone is easy to change — a document number is not.
+   *
+   * Digits only for Aadhaar and uppercase-no-space for a licence, so
+   * "9413 4584 9688" and "941345849688", or "mh09 20070270222" and
+   * "MH0920070270222", collide the way a person would expect.
+   *
+   * A REJECTED row is ignored, for the same reason as the other guards: an
+   * admin turning someone down must not leave the number locked away from
+   * whoever legitimately employs that driver.
+   */
+  private async assertDocNumberNotDuplicate(
+    userId: string,
+    field: 'aadharNumber' | 'dlNumber',
+    value?: string,
+    exceptId?: string,
+  ): Promise<void> {
+    const isAadhar = field === 'aadharNumber';
+    const bareJs = (value || '').replace(/[\s-]/g, '');
+    const norm = isAadhar ? bareJs : bareJs.toUpperCase();
+    // Too short to identify anyone — the DTO validates the real format.
+    if (isAadhar ? norm.length !== 12 : norm.length < 6) return;
+
+    // Mongo has no regex-replace, so strip the two separators people actually
+    // type ("9413 4584 9688", "9413-4584-9688"). This has to match what the JS
+    // side above does, or a stored row would never collide with a new one.
+    const stripped = (input: any, ch: string) => ({ $replaceAll: { input, find: ch, replacement: '' } });
+    const bare = stripped(stripped({ $ifNull: [`$${field}`, ''] }, ' '), '-');
+    const normExpr = isAadhar ? bare : { $toUpper: bare };
+
+    const query: any = {
+      $expr: { $eq: [normExpr, norm] },
+      approvalStatus: { $ne: 'rejected' },
+    };
+    if (exceptId) query._id = { $ne: new Types.ObjectId(exceptId) };
+
+    const existing: any = await this.driverModel.findOne(query).select('userId').lean();
+    if (!existing) return;
+
+    const label = isAadhar ? 'Aadhaar number' : 'licence number';
+    const mine = existing.userId?.toString() === userId;
+    throw new BadRequestException(
+      mine
+        ? `You have already added a driver with this ${label}.`
+        : `A driver with this ${label} is already registered in another account. Contact support if they work for you.`,
+    );
+  }
+
   async list(userId: string, approvedOnly = false) {
     const filter: any = { userId: new Types.ObjectId(userId) };
     if (approvedOnly) filter.approvalStatus = 'approved';
@@ -226,6 +281,9 @@ export class GarageService {
     // ...not your own number, and not one this account already saved.
     await this.assertNotOwnNumber(userId, dto.phone);
     await this.assertPhoneNotDuplicate(userId, dto.phone);
+    // One Aadhaar / one licence = one driver, platform-wide.
+    await this.assertDocNumberNotDuplicate(userId, 'aadharNumber', dto.aadharNumber);
+    await this.assertDocNumberNotDuplicate(userId, 'dlNumber', dto.dlNumber);
     const driver = await this.driverModel.create({
       ...dto,
       userId: new Types.ObjectId(userId),
@@ -246,6 +304,12 @@ export class GarageService {
       this.assertValidPhone(dto.phone);
       await this.assertNotOwnNumber(userId, dto.phone);
       await this.assertPhoneNotDuplicate(userId, dto.phone, id);
+    }
+    if (dto.aadharNumber !== undefined && dto.aadharNumber !== driver.aadharNumber) {
+      await this.assertDocNumberNotDuplicate(userId, 'aadharNumber', dto.aadharNumber, id);
+    }
+    if (dto.dlNumber !== undefined && dto.dlNumber !== driver.dlNumber) {
+      await this.assertDocNumberNotDuplicate(userId, 'dlNumber', dto.dlNumber, id);
     }
     Object.assign(driver, dto);
     // Any edit sends the driver back for admin review.

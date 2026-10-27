@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_source_picker.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../data/customer_repository.dart';
@@ -26,7 +26,6 @@ class CustomerOnboardingPage extends StatefulWidget {
 class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
   final _cityCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _picker = ImagePicker();
   final _api = getIt<ApiClient>();
   Uint8List? _photoBytes;
   bool _busy = false;
@@ -39,7 +38,7 @@ class _CustomerOnboardingPageState extends State<CustomerOnboardingPage> {
   }
 
   Future<void> _pickPhoto() async {
-    final p = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 80);
+    final p = await pickImageFromCameraOrGallery(context, maxWidth: 800, title: 'Profile photo');
     if (p == null) return;
     final b = await p.readAsBytes();
     setState(() => _photoBytes = b);

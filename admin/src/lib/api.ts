@@ -185,6 +185,10 @@ export const adminApi = {
   updateCabCategory: (id: string, data: any) => apiClient.put(`/home-content/admin/cab-categories/${id}`, data),
   deleteCabCategory: (id: string) => apiClient.delete(`/home-content/admin/cab-categories/${id}`),
 
+  // Other accounts that may be the same person. Hints for a human to judge —
+  // account KYC has no Aadhaar number to match on, so nothing is auto-blocked.
+  getUserDuplicates: (userId: string) => apiClient.get(`/admin/users/${userId}/duplicates`),
+
   // ─── One member's garage (vehicles + drivers) ────────────────────────────────
   getUserGarage: (userId: string) => apiClient.get(`/admin/users/${userId}/garage`),
   // Blacklist is a BAN, not a rejection — value:false lifts it back to pending.

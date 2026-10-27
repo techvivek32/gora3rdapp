@@ -4,11 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_source_picker.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
@@ -38,7 +38,6 @@ class _CustomerRegisterPageState extends State<CustomerRegisterPage> {
   String _status = '';
   bool _registered = false;
 
-  final _picker = ImagePicker();
   final _apiClient = getIt<ApiClient>();
   final _authRepo = getIt<AuthRepository>();
 
@@ -67,7 +66,7 @@ class _CustomerRegisterPageState extends State<CustomerRegisterPage> {
   }
 
   Future<void> _pickProfile() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final picked = await pickImageFromCameraOrGallery(context, maxWidth: 800, imageQuality: 85, title: 'Profile photo');
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() => _profileBytes = bytes);

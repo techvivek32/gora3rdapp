@@ -130,6 +130,10 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
 /// The overlay engine renders one or the other off this flag.
 const _kBubblePayload = '{"_bubble":true}';
 
+/// Diameter of the floating bubble, in logical pixels. The overlay WINDOW is
+/// sized from this (see `showOnlineBubble`) so the two always match.
+const double _kBubbleDiameter = 58;
+
 /// Float a small Gora logo over other apps while the partner is ONLINE.
 ///
 /// It is the same overlay window the alert card uses — the plugin allows one at
@@ -152,9 +156,20 @@ Future<void> showOnlineBubble() async {
 
     if (await FlutterOverlayWindow.isActive()) await FlutterOverlayWindow.closeOverlay();
 
+    // Size the WINDOW to the bubble. The plugin takes device pixels while the
+    // widget is drawn in logical ones, so a fixed 200x200 was a window roughly
+    // a third wider than the 58dp circle — and that invisible margin sits on
+    // top of the app and swallows taps. It ate the "Secure this booking"
+    // switch on the edit form, which just looked like a dead button.
+    //
+    // A few px of slack for the drop shadow, and a floor in case the view is
+    // not ready and the ratio comes back as 0.
+    final ratio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
+    final side = ((_kBubbleDiameter + 6) * (ratio > 0 ? ratio : 1)).round().clamp(120, 400);
+
     await FlutterOverlayWindow.showOverlay(
-      height: 200,
-      width: 200,
+      height: side,
+      width: side,
       alignment: OverlayAlignment.centerRight,
       flag: OverlayFlag.defaultFlag,
       visibility: NotificationVisibility.visibilityPublic,
@@ -363,8 +378,8 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
         child: GestureDetector(
           onTap: _openApp,
           child: Container(
-            width: 58,
-            height: 58,
+            width: _kBubbleDiameter,
+            height: _kBubbleDiameter,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,

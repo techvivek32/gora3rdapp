@@ -63,6 +63,13 @@ export class AdminController {
     return this.adminService.getUser(id, city);
   }
 
+  @Get('users/:id/duplicates')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: 'Other accounts that may belong to the same person (hints, not a verdict)' })
+  getUserDuplicates(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
+    return this.adminService.getUserDuplicates(id, city);
+  }
+
   @Put('users/:id')
   @Roles(...FRANCHISE_ROLES)
   @ApiOperation({ summary: 'Update user' })

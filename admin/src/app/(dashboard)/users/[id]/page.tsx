@@ -14,7 +14,7 @@ import {
   ArrowLeft, Phone, Mail, Building2, MapPin, ShieldCheck,
   FileText, ClipboardList, Car, Star, Wallet, Ban, CheckCircle2, Power, PowerOff,
   Calendar, User, CreditCard, ArrowUpRight, FileCheck, CheckSquare,
-  Eye, Pencil, Trash2, X, Plus, Upload,
+  Eye, Pencil, Trash2, X, Plus, Upload, AlertTriangle,
 } from 'lucide-react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { RequirementEditModal } from '@/components/requirements/RequirementEditModal';
@@ -333,6 +333,16 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     queryFn: () => adminApi.getUserGarage(id),
   });
 
+  // Only fetched on the Documents tab — this is a KYC-review aid, and it costs
+  // two extra queries on the server.
+  const { data: duplicatesData } = useQuery({
+    queryKey: ['user-duplicates', id],
+    queryFn: () => adminApi.getUserDuplicates(id),
+    enabled: activeTab === 'documents',
+  });
+  const duplicates: { _id: string; fullName: string; mobile: string; verificationStatus: string; reasons: string[] }[] =
+    (duplicatesData as any)?.data ?? [];
+
   const refreshGarage = () => queryClient.invalidateQueries({ queryKey: ['user-garage', id] });
 
   // Vehicles + drivers this member has saved, shown on the tab itself.
@@ -598,6 +608,47 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </h3>
                 {verificationBadge(user.verificationStatus)}
               </div>
+
+              {/*
+                Possible duplicate accounts. Account KYC stores the Aadhaar
+                PHOTO but not the number, so nothing can be matched exactly and
+                nothing is blocked automatically — this is a prompt to look,
+                and the admin decides.
+              */}
+              {duplicates.length > 0 && (
+                <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-900/20 p-3">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-semibold text-sm">
+                    <AlertTriangle className="w-4 h-4" />
+                    {duplicates.length} other account{duplicates.length > 1 ? 's' : ''} may be the same person
+                  </div>
+                  <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-300/80">
+                    Check the documents before approving — these are hints, not proof.
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {duplicates.map((d) => (
+                      <li key={d._id} className="flex flex-wrap items-center gap-2 text-sm">
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/users/${d._id}`)}
+                          className="font-medium text-amber-900 dark:text-amber-100 underline underline-offset-2"
+                        >
+                          {d.fullName || 'Unnamed'}
+                        </button>
+                        <span className="text-xs text-amber-700 dark:text-amber-300">{d.mobile}</span>
+                        {d.reasons.map((r) => (
+                          <span
+                            key={r}
+                            className="text-[11px] rounded-full bg-amber-200/70 dark:bg-amber-800/50 text-amber-900 dark:text-amber-100 px-2 py-0.5"
+                          >
+                            {r}
+                          </span>
+                        ))}
+                        {verificationBadge(d.verificationStatus)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {user.verificationSubmittedAt && (
                 <p className="text-xs text-gray-400 mb-3">Submitted on {formatDate(user.verificationSubmittedAt)}</p>

@@ -71,9 +71,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
     isOnline().then((v) {
       if (mounted) setState(() => _online = v);
-      // The overlay window does not survive an app restart or a reboot, so put
-      // the bubble back for someone who was already online.
-      if (v) showOnlineBubble();
+      // The bubble is NOT raised here. The overlay window does not survive an
+      // app restart, but we are on screen right now — over our own UI it only
+      // swallows taps. Leaving the app raises it again (lifecycle `paused` in
+      // main.dart), which is the only moment it is any use.
     });
     // Show the admin popup ad once per app launch, after the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -128,13 +129,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _toggleOnline(bool value) async {
     setState(() => _online = value);
     await setOnline(value); // every isolate reads this, so it takes effect at once
-    // Float the Gora logo over other apps while online, so a partner can jump
+    // Float the Gora logo over OTHER apps while online, so a partner can jump
     // back in from anywhere; it goes away the moment they go offline.
-    if (value) {
-      await showOnlineBubble();
-    } else {
-      await hideOnlineBubble();
-    }
+    //
+    // Going online does not raise it here: we are the app on screen right now,
+    // and over our own UI it is just a tap-swallowing circle. It appears when
+    // the app goes to the background — see didChangeAppLifecycleState. The
+    // snackbar below is what confirms the switch took effect.
+    if (!value) await hideOnlineBubble();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

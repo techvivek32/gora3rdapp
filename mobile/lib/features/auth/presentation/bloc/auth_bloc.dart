@@ -4,6 +4,8 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/register_usecase.dart';
 import '../../domain/usecases/verify_otp_usecase.dart';
+import '../../../../core/utils/ring_player.dart';
+import '../../../requirements/presentation/widgets/requirement_overlay.dart';
 
 part 'auth_event.dart';
 part 'auth_state.dart';
@@ -83,6 +85,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   Future<void> _onLogout(AuthLogoutEvent event, Emitter<AuthState> emit) async {
+    // Signing out ends the shift. The online flag lives in SharedPreferences,
+    // not in the session, so without this the floating bubble stayed up over
+    // the login screen and even over the launcher — and the next person to
+    // sign in on this phone started "online" without ever saying so.
+    //
+    // Done here rather than in the Sign Out button because every route out of
+    // the app funnels through this event: both profile pages, and the 401
+    // handler that signs you out when the session is gone.
+    await setOnline(false);
+    await hideOnlineBubble();
     await repository.logout();
     emit(AuthUnauthenticated());
   }

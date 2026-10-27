@@ -2,13 +2,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/api_error.dart';
+import '../../../../core/utils/image_source_picker.dart';
 
 /// Set to true once an RC / DL verification vendor is configured in the admin
 /// panel. While false the garage forms are plain manual entry: the Fetch
@@ -518,7 +518,6 @@ class _VehicleFormState extends State<_VehicleForm> {
   final _seatsCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
-  final _picker = ImagePicker();
 
   late String _vehicleType;
   late String _fuelType;
@@ -583,9 +582,9 @@ class _VehicleFormState extends State<_VehicleForm> {
     _rcBack = v?['rcBackImage'] as String?;
   }
 
-  /// Pick from the gallery and upload to storage; returns the URL slot updates.
+  /// Pick (camera or gallery) and upload to storage; returns the URL slot updates.
   Future<void> _pick(String slot) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1400, imageQuality: 80);
+    final picked = await pickImageFromCameraOrGallery(context, maxWidth: 1400);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() => _uploadingSlot = slot);
@@ -1138,7 +1137,6 @@ class _DriverForm extends StatefulWidget {
 class _DriverFormState extends State<_DriverForm> {
   final _api = getIt<ApiClient>();
   final _formKey = GlobalKey<FormState>();
-  final _picker = ImagePicker();
 
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
@@ -1178,6 +1176,11 @@ class _DriverFormState extends State<_DriverForm> {
   // Server-side error for the phone field (e.g. "not registered as driver/vendor"),
   // shown inline under the field instead of a snackbar the user might miss.
   String? _phoneServerError;
+  // A rejection belongs on the field it is about. These used to all land on the
+  // phone, so "a driver with this Aadhaar number is already registered" pointed
+  // at a phone number that was perfectly fine.
+  String? _aadharServerError;
+  String? _dlServerError;
   String? _photo;
   String? _dlFront;
   String? _dlBack;
@@ -1215,7 +1218,7 @@ class _DriverFormState extends State<_DriverForm> {
   }
 
   Future<void> _pick(String slot) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1400, imageQuality: 80);
+    final picked = await pickImageFromCameraOrGallery(context, maxWidth: 1400);
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() => _uploadingSlot = slot);
@@ -1477,6 +1480,11 @@ class _DriverFormState extends State<_DriverForm> {
             controller: _dlCtrl,
             textCapitalization: TextCapitalization.characters,
             decoration: _fieldDec(Icons.badge_outlined, hint: 'e.g. GJ0120210001234'),
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            onChanged: (_) {
+              if (_dlServerError != null) setState(() => _dlServerError = null);
+            },
+            validator: (_) => _dlServerError,
           ),
         ],
       );
@@ -1522,6 +1530,11 @@ class _DriverFormState extends State<_DriverForm> {
             controller: _dlCtrl,
             textCapitalization: TextCapitalization.characters,
             decoration: _fieldDec(Icons.badge_outlined, hint: 'e.g. GJ0120210001234'),
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            onChanged: (_) {
+              if (_dlServerError != null) setState(() => _dlServerError = null);
+            },
+            validator: (_) => _dlServerError,
           ),
           // The date of birth is collected by the picker on Fetch, not as a
           // second field - but once we have it, show what is being used.
@@ -1599,6 +1612,8 @@ class _DriverFormState extends State<_DriverForm> {
   Future<void> _save() async {
     // Clear any stale server error so validation reflects the latest input.
     _phoneServerError = null;
+    _aadharServerError = null;
+    _dlServerError = null;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     final body = {
@@ -1624,14 +1639,22 @@ class _DriverFormState extends State<_DriverForm> {
       if (!mounted) return;
       final msg = serverMessage(e, fallback: 'Could not save driver');
       final lower = msg.toLowerCase();
-      // Number-related rejections show inline under the Phone field so they don't
-      // disappear with a snackbar; other errors keep the snackbar.
-      final isPhoneError = lower.contains('number') || lower.contains('mobile') || lower.contains('driver/vendor');
+      // Pin the rejection to the field it names, so the user edits the right
+      // one. Order matters: the document messages also contain the word
+      // "number", which is why the phone case is checked last.
+      final isAadharError = lower.contains('aadhaar') || lower.contains('aadhar');
+      final isDlError = !isAadharError && (lower.contains('licence') || lower.contains('license'));
+      final isPhoneError = !isAadharError &&
+          !isDlError &&
+          (lower.contains('number') || lower.contains('mobile') || lower.contains('driver/vendor'));
+      final inline = isAadharError || isDlError || isPhoneError;
       setState(() {
         _saving = false;
+        _aadharServerError = isAadharError ? msg : null;
+        _dlServerError = isDlError ? msg : null;
         _phoneServerError = isPhoneError ? msg : null;
       });
-      if (isPhoneError) {
+      if (inline) {
         _formKey.currentState?.validate(); // surface it on the field
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1756,10 +1779,15 @@ class _DriverFormState extends State<_DriverForm> {
                 keyboardType: TextInputType.number,
                 inputFormatters: [_AadhaarInputFormatter()],
                 decoration: _fieldDec(Icons.credit_card_outlined, hint: 'e.g. 1234 5678 9012'),
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (_) {
+                  if (_aadharServerError != null) setState(() => _aadharServerError = null);
+                },
                 validator: (v) {
                   final t = (v ?? '').replaceAll(' ', '');
                   if (t.isEmpty) return null; // aadhaar optional
                   if (t.length != 12) return 'Aadhaar must be 12 digits';
+                  if (_aadharServerError != null) return _aadharServerError;
                   return null;
                 },
               ),
@@ -1916,6 +1944,10 @@ InputDecoration _fieldDec(IconData icon, {String? hint}) => InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(fontSize: 13.sp, color: AppColors.textHint, fontFamily: 'Poppins'),
       isDense: true,
+      // Server rejections are full sentences ("...already registered in another
+      // account. Contact support if they work for you."). On one line they were
+      // cut off mid-word and the user never saw what to do about it.
+      errorMaxLines: 3,
     );
 
 /// One tappable image box shared by both forms.

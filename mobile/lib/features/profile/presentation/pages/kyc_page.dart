@@ -2,11 +2,11 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_source_picker.dart';
 
 class _KycDoc {
   final String key; // backend: aadhar, pan, drivingLicense, vehicleRc
@@ -37,7 +37,6 @@ class KycPage extends StatefulWidget {
 
 class _KycPageState extends State<KycPage> {
   final _apiClient = getIt<ApiClient>();
-  final _picker = ImagePicker();
 
   bool _loading = true;
   bool _submitting = false;
@@ -65,13 +64,6 @@ class _KycPageState extends State<KycPage> {
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    for (final d in _docs.values) {
-    }
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -102,7 +94,11 @@ class _KycPageState extends State<KycPage> {
   }
 
   Future<void> _pickImage(_KycDoc doc, {required bool back}) async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 80);
+    final picked = await pickImageFromCameraOrGallery(
+      context,
+      maxWidth: 1200,
+      title: '${doc.label} — ${back ? 'Back' : 'Front'}',
+    );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     setState(() {
@@ -204,7 +200,8 @@ class _KycPageState extends State<KycPage> {
                         ? (_status == 'verified'
                             ? 'Your documents are verified and can no longer be changed.'
                             : 'Your documents are under review. You can\'t change them until the review is complete.')
-                        : 'Add your document number and a clear photo, then submit for verification.'.tr,
+                        // No number is asked for any more — only the photos.
+                        : 'Upload clear front and back photos of both documents, then submit for verification.'.tr,
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 12),

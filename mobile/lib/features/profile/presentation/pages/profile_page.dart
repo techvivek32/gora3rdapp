@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/localization/app_translations.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_source_picker.dart';
 import '../../../../core/widgets/places_city_field.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../customer/presentation/role_switch.dart';
@@ -458,7 +458,6 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   String? _uploadedImageUrl;
   bool _uploadingCover = false;
   String? _uploadedCoverUrl;
-  final _picker = ImagePicker();
   final _apiClient = getIt<ApiClient>();
 
   @override
@@ -479,10 +478,11 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Future<void> _pickAndUpload() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+    final picked = await pickImageFromCameraOrGallery(
+      context,
       maxWidth: 800,
       imageQuality: 85,
+      title: 'Profile photo',
     );
     if (picked == null || !mounted) return;
 
@@ -521,7 +521,7 @@ class _EditProfileSheetState extends State<_EditProfileSheet> {
   }
 
   Future<void> _pickAndUploadCover() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 80);
+    final picked = await pickImageFromCameraOrGallery(context, maxWidth: 1600, title: 'Cover photo');
     if (picked == null || !mounted) return;
 
     setState(() => _uploadingCover = true);

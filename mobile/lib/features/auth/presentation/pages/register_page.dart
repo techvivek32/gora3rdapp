@@ -4,10 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/error/error_mapper.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/image_source_picker.dart';
 import '../../../../core/utils/install_referrer.dart';
 import '../../../../core/widgets/otp_verify_dialog.dart';
 import '../../../../core/widgets/places_city_field.dart';
@@ -50,7 +50,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Uint8List? _profileBytes;
 
-  final _picker = ImagePicker();
   final _apiClient = getIt<ApiClient>();
   final _authRepo = getIt<AuthRepository>();
 
@@ -103,10 +102,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _pickProfile() async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+    final picked = await pickImageFromCameraOrGallery(
+      context,
       maxWidth: 800,
       imageQuality: 85,
+      title: 'Profile photo',
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
@@ -114,10 +114,10 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _pickDoc(_DocField doc, {required bool back}) async {
-    final picked = await _picker.pickImage(
-      source: ImageSource.gallery,
+    final picked = await pickImageFromCameraOrGallery(
+      context,
       maxWidth: 1200,
-      imageQuality: 80,
+      title: '${doc.label} — ${back ? 'Back' : 'Front'}',
     );
     if (picked == null) return;
     final bytes = await picked.readAsBytes();

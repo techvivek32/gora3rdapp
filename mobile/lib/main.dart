@@ -208,6 +208,21 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
     // Foregrounding is the moment a deleted user is most likely still staring at a
     // stale screen — verify the session right away.
     if (state == AppLifecycleState.resumed) _checkSession();
+
+    // The floating bubble is a way BACK INTO the app from somewhere else, so it
+    // has no job while Gora is the app on screen — there it is just a circle
+    // sitting on top of our own UI, and being a system overlay it swallows
+    // taps on whatever is beneath it (it ate the "Secure this booking" switch
+    // on the edit form, which read as a dead control).
+    //
+    // So: take it away on resume, put it back when the app goes away. Both are
+    // no-ops when the partner is offline — `showOnlineBubble` checks that
+    // itself, and `hideOnlineBubble` on an absent overlay does nothing.
+    if (state == AppLifecycleState.resumed) {
+      hideOnlineBubble();
+    } else if (state == AppLifecycleState.paused) {
+      showOnlineBubble();
+    }
   }
 
   @override
