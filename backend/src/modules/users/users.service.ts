@@ -329,6 +329,28 @@ export class UsersService {
       ),
     );
 
+    // Both ID proofs, both sides. Enforced here and not only in the app, because
+    // the app is not the only caller: an older build (which asked for just one
+    // document) or a direct API call would otherwise queue a half-complete KYC
+    // for an admin to waste time on. An already-approved document is exempt —
+    // it is final and must not be resubmitted.
+    const REQUIRED_DOCS: Record<string, string> = {
+      aadhar: 'Aadhaar Card',
+      drivingLicense: 'Driving License',
+    };
+    const incomplete = Object.entries(REQUIRED_DOCS)
+      .filter(([key]) => (current?.documents as any)?.[key]?.status !== 'approved')
+      .filter(([key]) => {
+        const d = (cleanedDocuments as any)[key] ?? (current?.documents as any)?.[key];
+        return !d?.image || !d?.backImage;
+      })
+      .map(([, label]) => label);
+    if (incomplete.length) {
+      throw new BadRequestException(
+        `Upload front and back photos of: ${incomplete.join(' and ')}.`,
+      );
+    }
+
     // Merge rather than overwrite. An admin may have approved the Aadhaar and
     // rejected only the PAN — replacing `documents` wholesale would drop the
     // Aadhaar's approval and force the user to redo a document that was fine.

@@ -1088,7 +1088,6 @@ export class AdminService {
     return { message: value ? 'Driver blacklisted' : 'Driver removed from blacklist', data: d };
   }
 
-<<<<<<< HEAD
   /**
    * Delete a garage vehicle outright.
    *
@@ -1111,8 +1110,6 @@ export class AdminService {
     return { message: 'Driver deleted', data: { _id: id } };
   }
 
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
   /** Every garage vehicle + driver for ONE member, for their admin page. */
   async getGarageForUser(userId: string, franchiseCity?: any) {
     await this.assertUserInCity(userId, franchiseCity);

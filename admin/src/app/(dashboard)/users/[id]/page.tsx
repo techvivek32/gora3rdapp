@@ -331,22 +331,15 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const { data: garageData } = useQuery({
     queryKey: ['user-garage', id],
     queryFn: () => adminApi.getUserGarage(id),
-<<<<<<< HEAD
-=======
-    enabled: activeTab === 'garage',
->>>>>>> 86d9ced481682581350b436273a522947784ab60
   });
 
   const refreshGarage = () => queryClient.invalidateQueries({ queryKey: ['user-garage', id] });
 
-<<<<<<< HEAD
   // Vehicles + drivers this member has saved, shown on the tab itself.
   const garageCount =
     (((garageData as any)?.data?.vehicles ?? []).length as number) +
     (((garageData as any)?.data?.drivers ?? []).length as number);
 
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
   const blacklistMutation = useMutation({
     mutationFn: (v: { kind: 'vehicle' | 'driver'; rowId: string; reason: string; value: boolean }) =>
       v.kind === 'vehicle'
@@ -363,7 +356,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     onError: (e: any) => toast.error(e?.message || 'Could not approve'),
   });
 
-<<<<<<< HEAD
   const rejectGarageMutation = useMutation({
     mutationFn: (v: { kind: 'vehicle' | 'driver'; rowId: string; reason: string }) =>
       v.kind === 'vehicle'
@@ -380,8 +372,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     onError: (e: any) => toast.error(e?.message || 'Could not delete'),
   });
 
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
   const blockMutation = useMutation({
     mutationFn: (block: boolean) => adminApi[block ? 'blockUser' : 'unblockUser'](id),
     onSuccess: (_, block) => { toast.success(block ? 'User blocked' : 'User unblocked'); queryClient.invalidateQueries({ queryKey: ['user', id] }); },
@@ -957,7 +947,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                         Approve
                       </button>
                     )}
-<<<<<<< HEAD
                     {/* Reject = "fix it and resubmit". Pointless once banned. */}
                     {item.approvalStatus !== 'rejected' && !banned && (
                       <button
@@ -972,8 +961,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                         Reject
                       </button>
                     )}
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
                     <button
                       onClick={() => {
                         if (banned) {
@@ -994,7 +981,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     >
                       <Ban className="w-4 h-4" /> {banned ? 'Un-blacklist' : 'Blacklist'}
                     </button>
-<<<<<<< HEAD
                     <button
                       onClick={() => {
                         // Spell out the catch: a deleted row stops reserving the
@@ -1010,8 +996,6 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                     >
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
                   </div>
                 </div>
               );

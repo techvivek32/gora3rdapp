@@ -11,7 +11,6 @@ import '../../../../core/theme/app_theme.dart';
 class _KycDoc {
   final String key; // backend: aadhar, pan, drivingLicense, vehicleRc
   final String label;
-  final TextEditingController numberCtrl = TextEditingController();
   String? existingImage; // front URL already on the server
   String? existingBackImage; // back URL already on the server
   Uint8List? newBytes; // freshly picked front image
@@ -71,7 +70,6 @@ class _KycPageState extends State<KycPage> {
   @override
   void dispose() {
     for (final d in _docs.values) {
-      d.numberCtrl.dispose();
     }
     super.dispose();
   }
@@ -84,7 +82,6 @@ class _KycPageState extends State<KycPage> {
       for (final key in _docs.keys) {
         final entry = documents[key] as Map?;
         if (entry != null) {
-          _docs[key]!.numberCtrl.text = (entry['number'] ?? '').toString();
           _docs[key]!.existingImage = entry['image'] as String?;
           _docs[key]!.existingBackImage = entry['backImage'] as String?;
           // Older rows have no status — treat them as pending.
@@ -138,14 +135,21 @@ class _KycPageState extends State<KycPage> {
     );
   }
 
+  /// Front AND back for this document, whether just picked or already stored.
+  bool _hasBothSides(_KycDoc d) =>
+      (d.newBytes != null || d.existingImage != null) &&
+      (d.newBackBytes != null || d.existingBackImage != null);
+
   Future<void> _submit() async {
-    // Require at least one document with both a number and an image.
-    final hasAny = _visibleKeys.any((k) {
-      final d = _docs[k]!;
-      return d.numberCtrl.text.trim().isNotEmpty && (d.newBytes != null || d.existingImage != null);
-    });
-    if (!hasAny) {
-      _snack('Add at least one document (number + photo) to submit');
+    // Every document, both sides — Aadhaar front/back and licence front/back.
+    // An already-approved document is not re-uploaded, so it counts as done.
+    final missing = _visibleKeys
+        .map((k) => _docs[k]!)
+        .where((d) => !d.isApproved && !_hasBothSides(d))
+        .map((d) => d.label)
+        .toList();
+    if (missing.isNotEmpty) {
+      _snack('Upload front and back photos of: ${missing.join(' and ')}');
       return;
     }
 
@@ -155,12 +159,10 @@ class _KycPageState extends State<KycPage> {
       final body = <String, dynamic>{};
       for (final key in _visibleKeys) {
         final d = _docs[key]!;
-        final hasNumber = d.numberCtrl.text.trim().isNotEmpty;
         final image = d.newBytes != null ? await _uploadImage(d.newBytes!, '${key}_front') : d.existingImage;
         final backImage = d.newBackBytes != null ? await _uploadImage(d.newBackBytes!, '${key}_back') : d.existingBackImage;
-        if (!hasNumber && image == null && backImage == null) continue;
+        if (image == null && backImage == null) continue;
         final entry = <String, dynamic>{};
-        if (hasNumber) entry['number'] = d.numberCtrl.text.trim();
         if (image != null) entry['image'] = image;
         if (backImage != null) entry['backImage'] = backImage;
         body[key] = entry;
@@ -300,8 +302,7 @@ class _KycPageState extends State<KycPage> {
     final hasData = doc.newBytes != null ||
         doc.existingImage != null ||
         doc.newBackBytes != null ||
-        doc.existingBackImage != null ||
-        doc.numberCtrl.text.trim().isNotEmpty;
+        doc.existingBackImage != null;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -367,17 +368,9 @@ class _KycPageState extends State<KycPage> {
                 ),
               ),
             ],
-            TextField(
-              controller: doc.numberCtrl,
-              enabled: !_docLocked(doc),
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: '${doc.label} Number',
-                isDense: true,
-                prefixIcon: const Icon(Icons.badge_outlined),
-              ),
-            ),
-            const SizedBox(height: 12),
+            // No document-number field: the admin verifies from the photo, and
+            // nothing server-side reads the typed number (the DL lookup lives in
+            // My Garage, not here). Asking for it was friction with no payoff.
             _sideBox(doc, back: false),
             const SizedBox(height: 12),
             _sideBox(doc, back: true),

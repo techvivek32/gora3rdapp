@@ -194,7 +194,6 @@ export const adminApi = {
     apiClient.post(`/admin/garage/drivers/${id}/blacklist`, { reason, value }),
   approveGarageVehicleById: (id: string) => apiClient.post(`/admin/garage/vehicles/${id}/approve`),
   approveGarageDriverById: (id: string) => apiClient.post(`/admin/garage/drivers/${id}/approve`),
-<<<<<<< HEAD
   rejectGarageVehicleById: (id: string, reason: string) =>
     apiClient.post(`/admin/garage/vehicles/${id}/reject`, { reason }),
   rejectGarageDriverById: (id: string, reason: string) =>
@@ -203,8 +202,6 @@ export const adminApi = {
   // one that keeps it reserved.
   deleteGarageVehicleById: (id: string) => apiClient.delete(`/admin/garage/vehicles/${id}`),
   deleteGarageDriverById: (id: string) => apiClient.delete(`/admin/garage/drivers/${id}`),
-=======
->>>>>>> 86d9ced481682581350b436273a522947784ab60
 
   // ─── Ringtones (admin only) ──────────────────────────────────────────────────
   getRingtones: () => apiClient.get('/admin/ringtones'),
