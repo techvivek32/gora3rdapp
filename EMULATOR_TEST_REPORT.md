@@ -359,3 +359,36 @@ Today this is harmless — the odd values are all one-way-ish, and one-way is th
 **C. Cosmetic:** the web fare engine excludes Local trips from the "minimum km applied" flag; the mobile one does not, so a Local card can show a minimum-applied note that means nothing there.
 
 **D.** `kyc_page.dart` still carries its own copy of the document list and tiles. Its UI genuinely differs (it shows stored images, per-document approval state and locked documents), so it was left alone — but the document list is now defined in three places.
+
+---
+---
+
+# Round 8 — re-sweep after the Round 6/7 changes
+Date: 2026-10-27 (later). Re-ran both sides, with extra attention to what the last two rounds touched.
+
+## The refactors held up
+
+**Register page** (its document code was replaced with the shared `KycDocTile`) — re-tested end to end:
+- Page renders exactly as before: profile picture, name, mobile, Account Type, agency, referral, city, state, both document tiles.
+- Expanded a tile, took a photo **with the camera** — thumbnail and edit pencil appear, back side still empty.
+- Submitted with documents incomplete → *"Upload front and back photos of: Aadhaar Card and Driving License"* — the same wording the KYC page and the driver-switch form use.
+
+**Local package km fix** — chips read 60 / 80 / 100 / 120 km and the results screen prices the 8-hour package at 80 km. They agree (before: 96 vs 80).
+
+**Recharge Plans** — current plan, tiers and Feature Comparison all load (this is the screen the corrected subscription route feeds).
+
+## Driver side — all working
+Booking feed (vehicle-type chips, nav arrow, BOOKED stamps, ads) · Available Cars (the listing posted earlier, Call / WhatsApp / User Detail, GOLDEN USER) · Hire a Driver (Available + My Offers) · Car Pooling · Recharge Plans · Notifications · My Bookings (Running / Booked / Assigned, KM badge, earnings split, Phone / WhatsApp / Advice / Rating / Report) · Chat (6 grouped threads with unread counts + Direct messages) · Wallet · My Garage · KYC.
+
+## Customer side — all working
+Home · Cab Booking (One Way / Round Trip / Local) · Car Pool · Book a Driver · My Bookings · Wallet (₹0, labelled separate) · Notifications · role switch both ways.
+
+## FIXED — one more mismatch, found during this sweep
+The Hire-a-Driver card showed the trip tag as **`ONE_WAY`** (raw snake_case) while the Booking feed showed **`ONE WAY`**. Same root cause as risk A from Round 7: `subType` arrives in several shapes and the card just uppercased it.
+`customer_request_card.dart` now normalises the separator for display, and its Local check is case-insensitive so it still matches whatever shape is stored.
+**Verified on screen:** the card now reads **ONE WAY**.
+
+## Still not seen on screen
+The **Set up Driver Mode** form. The emulator's `adb input text` drops a digit from the OTP — caught it red-handed this round: the boxes showed `1 2 4 5 6`, the `3` never arrived, so every login attempt for that account failed with a 400. (The reliable recipe turned out to be tapping the digits on the on-screen keypad **and** tapping Verify explicitly, which is how I got back in on the main account.)
+What *is* verified for that screen: it compiles, its backend contract was tested end to end over the API (role, agency, state, referral, and the referral-only-once rule), and it is built from the same `KycDocTile` whose rendering and camera flow I confirmed on the register page this round.
+To see it yourself: sign in as `6777777777` → role screen → **Driver / Vendor**.

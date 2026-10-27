@@ -40,7 +40,11 @@ class CustomerRequestCard extends StatelessWidget {
     final _gst = ((b['gstAmount'] as num?) ?? 0).toInt();
     final fare = ((b['driverEarning'] as num?) ?? (_total - _gst)).toInt();
     final applied = b['alreadyApplied'] == true;
-    final subType = (b['subType'] ?? '').toString();
+    // `subType` is free text and reaches us in several shapes — the app writes
+    // "One Way", older rows and other writers use "one_way". Uppercasing alone
+    // put a raw "ONE_WAY" on the card next to a tidy "ONE WAY" on the booking
+    // feed, so normalise the separator before display.
+    final subType = (b['subType'] ?? '').toString().replaceAll('_', ' ');
     final status = (b['status'] ?? 'open').toString();
     final isOpen = status == 'open';
     // Confirmed/booked ones stay in the feed for 7 days (backend) with a stamp.
@@ -69,7 +73,7 @@ class CustomerRequestCard extends StatelessWidget {
     final includedKm = (b['includedKm'] as num?)?.toInt() ?? 0;
     final extraKmPrice = (b['extraKmPrice'] as num?)?.toInt() ?? 0;
     // Local (in-city hourly package): show the package hours + extra ₹/hr.
-    final isLocal = subType == 'Local';
+    final isLocal = subType.toLowerCase() == 'local';
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final extraHourPrice = (b['extraHourPrice'] as num?)?.toInt() ?? 0;
     // Hire a Driver: the customer picks the gearbox of THEIR car — show it so the
