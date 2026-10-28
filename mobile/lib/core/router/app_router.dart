@@ -239,6 +239,9 @@ class AppRouter {
           return DriverCustomerRequestsPage(
             serviceType: st,
             title: st == 'hire_driver' ? 'Hire a Driver Requests' : null,
+            // Set when the user tapped Accept on a booking alert — the page
+            // opens its usual accept sheet for that booking once it loads.
+            acceptBookingId: state.uri.queryParameters['acceptBookingId'],
           );
         },
       ),

@@ -225,6 +225,13 @@ export class NotificationsService {
       travelDate: `${requirement.travelDate ? new Date(requirement.travelDate).toISOString() : ''}`,
       travelTime: `${requirement.travelTime ?? ''}`,
       posterName: `${poster?.agencyName || poster?.fullName || ''}`,
+      // Who posted it, so the alert can open a chat with them. Carried even
+      // for a hidden-profile booking — the identity stays hidden in the UI;
+      // the chat thread is how you reach them without it.
+      posterId: `${(requirement.postedBy as any)?._id ?? requirement.postedBy ?? ''}`,
+      // Hidden profile means Call/WhatsApp have nothing to dial, so the alert
+      // offers Chat in their place.
+      hideProfile: `${requirement.hideProfile === true}`,
       // Intermediate stops (addresses), one per line, shown between A and B.
       stops: `${(requirement.stops ?? [])
         .map((s: any) => `${s?.address ?? ''}`.trim())

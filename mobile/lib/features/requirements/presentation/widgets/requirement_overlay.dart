@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/utils/alert_actions.dart';
 import '../../../../core/utils/membership.dart';
 import '../../../../core/utils/requirement_message.dart';
 import '../../../../core/utils/ring_player.dart';
@@ -368,6 +369,31 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     } catch (_) {}
   }
 
+  /// Park "open the chat with the poster" and bring the app forward.
+  Future<void> _chatWithPoster() async {
+    requestStopRing();
+    await savePendingAlertAction(
+      kind: AlertAction.chat,
+      id: _s('posterId'),
+      requirementId: _s('requirementId'),
+    );
+    await _openApp();
+    await FlutterOverlayWindow.closeOverlay();
+    await restoreOnlineBubble();
+  }
+
+  /// Park "accept this booking" and bring the app forward.
+  Future<void> _acceptBooking() async {
+    requestStopRing();
+    await savePendingAlertAction(
+      kind: AlertAction.accept,
+      id: _s('customerBookingId'),
+    );
+    await _openApp();
+    await FlutterOverlayWindow.closeOverlay();
+    await restoreOnlineBubble();
+  }
+
   /// The floating Gora logo shown while the partner is online. Deliberately
   /// small and transparent around the edges so it sits over other apps like a
   /// chat head rather than blocking them.
@@ -420,6 +446,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     final note = _s('notes');
     final hasMobile = _s('posterMobile').isNotEmpty;
     final canContact = hasMobile && _userCanContact;
+    final action = alertActionFor(_data);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -565,39 +592,79 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
                               ),
                             },
                             const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: canContact ? _call : null,
-                                    icon: const Icon(Icons.call,
-                                        size: 18, color: Colors.white),
-                                    label: const Text('Call'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 11),
-                                    ),
+                            // Call/WhatsApp need a number to dial. A hidden
+                            // profile has none, and a customer's stays hidden
+                            // until a driver is selected — so those two show
+                            // the action that actually moves things forward.
+                            // The overlay has no router, so it parks the intent
+                            // and brings the app forward to carry it out.
+                            if (action == AlertAction.accept)
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _acceptBooking,
+                                  icon: const Icon(Icons.check_circle,
+                                      size: 18, color: Colors.white),
+                                  label: const Text('Accept Booking'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                   ),
                                 ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: canContact ? _whatsapp : null,
-                                    icon: const Icon(Icons.chat,
-                                        size: 18, color: Colors.white),
-                                    label: const Text('WhatsApp'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF25D366),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 11),
-                                    ),
+                              )
+                            else if (action == AlertAction.chat)
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _chatWithPoster,
+                                  icon: const Icon(Icons.chat_bubble,
+                                      size: 18, color: Colors.white),
+                                  label: const Text('Chat with Poster'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12),
                                   ),
                                 ),
-                              ],
-                            ),
+                              )
+                            else
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: canContact ? _call : null,
+                                      icon: const Icon(Icons.call,
+                                          size: 18, color: Colors.white),
+                                      label: const Text('Call'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 11),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: canContact ? _whatsapp : null,
+                                      icon: const Icon(Icons.chat,
+                                          size: 18, color: Colors.white),
+                                      label: const Text('WhatsApp'),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF25D366),
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 11),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             const SizedBox(height: 10),
                             // Same black "Close" button as the in-app Requirement
                             // Alert popup — closes the overlay and stops the ring.

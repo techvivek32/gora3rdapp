@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/alert_actions.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/membership.dart';
 import '../../../../core/utils/requirement_message.dart';
@@ -189,9 +190,56 @@ class _RequirementAlert extends StatelessWidget {
               Text('just now', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
               const SizedBox(height: 12),
 
-              // Actions — Call & WhatsApp (only enabled if user has active plan).
+              // Actions. Call & WhatsApp only make sense when there IS a number
+              // to reach: a hidden-profile booking has none, and a customer's
+              // number stays hidden until a driver is selected. Those two got
+              // two permanently greyed-out buttons — now they get the action
+              // that actually moves the booking forward.
               Builder(
                 builder: (ctx) {
+                  final action = alertActionFor(data);
+
+                  if (action == AlertAction.accept) {
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          requestStopRing();
+                          Navigator.of(ctx).pop();
+                          openCustomerBookingToAccept(ctx, _str('customerBookingId'));
+                        },
+                        icon: const Icon(Icons.check_circle, size: 18, color: Colors.white),
+                        label: const Text('Accept Booking', style: TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (action == AlertAction.chat) {
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          requestStopRing();
+                          Navigator.of(ctx).pop();
+                          openChatWith(ctx, _str('posterId'),
+                              requirementId: _str('requirementId'));
+                        },
+                        icon: const Icon(Icons.chat_bubble, size: 18, color: Colors.white),
+                        label: const Text('Chat with Poster', style: TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    );
+                  }
+
                   final canContact = mobile.isNotEmpty && _userCanContact(ctx);
                   return Row(
                     children: [

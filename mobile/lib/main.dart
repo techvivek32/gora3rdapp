@@ -17,6 +17,7 @@ import 'core/network/api_client.dart';
 import 'core/router/app_router.dart';
 import 'core/utils/install_referrer.dart';
 import 'core/utils/membership.dart';
+import 'core/utils/alert_actions.dart';
 import 'core/utils/ring_player.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
@@ -220,8 +221,32 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
     // itself, and `hideOnlineBubble` on an absent overlay does nothing.
     if (state == AppLifecycleState.resumed) {
       hideOnlineBubble();
+      _runPendingAlertAction();
     } else if (state == AppLifecycleState.paused) {
       showOnlineBubble();
+    }
+  }
+
+  /// Carry out whatever the floating overlay parked before bringing us forward.
+  ///
+  /// The overlay runs in its own engine with no router, so tapping Chat or
+  /// Accept there can only leave a note and open the app; this is the other
+  /// half of that hand-off. Nothing parked is the normal case, and costs one
+  /// SharedPreferences read.
+  Future<void> _runPendingAlertAction() async {
+    final pending = await consumePendingAlertAction();
+    if (pending == null || !mounted) return;
+    final ctx = AppRouter.rootNavigatorKey.currentContext;
+    if (ctx == null) return;
+    switch (pending.kind) {
+      case AlertAction.chat:
+        await openChatWith(ctx, pending.id, requirementId: pending.requirementId);
+        break;
+      case AlertAction.accept:
+        openCustomerBookingToAccept(ctx, pending.id);
+        break;
+      case AlertAction.contact:
+        break; // nothing to route to — Call/WhatsApp leave the app themselves
     }
   }
 

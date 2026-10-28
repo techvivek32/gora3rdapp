@@ -23,7 +23,18 @@ class DriverCustomerRequestsPage extends StatefulWidget {
   /// When set, only requests of this serviceType are shown (e.g. 'hire_driver').
   final String? serviceType;
   final String? title;
-  const DriverCustomerRequestsPage({super.key, this.serviceType, this.title});
+
+  /// Booking the user already chose to accept, from a notification alert. The
+  /// page finds it in the loaded list and opens the normal accept sheet, so
+  /// there is one accept flow rather than a second one for alerts.
+  final String? acceptBookingId;
+
+  const DriverCustomerRequestsPage({
+    super.key,
+    this.serviceType,
+    this.title,
+    this.acceptBookingId,
+  });
 
   @override
   State<DriverCustomerRequestsPage> createState() => _DriverCustomerRequestsPageState();
@@ -45,6 +56,30 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     _loadMine();
   }
 
+  /// Open the accept sheet for the booking the alert pointed at — once.
+  ///
+  /// If it is not in the list any more (someone else took it, or it expired)
+  /// say so plainly instead of leaving the user staring at a feed wondering
+  /// what happened.
+  bool _handledAlertAccept = false;
+  void _maybeAcceptFromAlert() {
+    final id = widget.acceptBookingId;
+    if (id == null || id.isEmpty || _handledAlertAccept) return;
+    _handledAlertAccept = true;
+    final booking = (_available ?? []).cast<Map<String, dynamic>?>().firstWhere(
+          (b) => (b?['_id'] ?? b?['id'] ?? '').toString() == id,
+          orElse: () => null,
+        );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (booking == null) {
+        _snack('That booking is no longer available.');
+        return;
+      }
+      _accept(booking);
+    });
+  }
+
   @override
   void dispose() {
     _tabs.dispose();
@@ -57,6 +92,7 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
       final d = await _repo.available(serviceType: widget.serviceType);
       if (!mounted) return;
       setState(() { _available = d; _loadingA = false; });
+      _maybeAcceptFromAlert();
     } catch (e) {
       if (!mounted) return;
       setState(() { _errA = '$e'; _loadingA = false; });
