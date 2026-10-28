@@ -986,6 +986,11 @@ class _WalletPageState extends State<WalletPage> {
     final ok = status == 'success';
     final note = (tx['note'] ?? '').toString().trim();
 
+    // The trip this money moved for, e.g. "Rajkot → Jamnagar". The server
+    // resolves it from the booking; a commission line showing only an id meant
+    // the driver had to go and look up which trip it was.
+    final route = (tx['route'] ?? '').toString().trim();
+
     // Transfers read "Transfer → 9876543210" on one line, with the note beneath it.
     final isTransfer = (tx['source'] ?? '').toString() == 'transfer';
     final other = tx['counterpartyId'] is Map ? Map<String, dynamic>.from(tx['counterpartyId'] as Map) : null;
@@ -1016,6 +1021,19 @@ class _WalletPageState extends State<WalletPage> {
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 if (isTransfer && note.isNotEmpty)
                   Text(note, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                if (route.isNotEmpty)
+                  Row(
+                    children: [
+                      const Icon(Icons.route_rounded, size: 12, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(route,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                      ),
+                    ],
+                  ),
                 Text(status, style: TextStyle(fontSize: 11, color: ok ? AppColors.success : AppColors.textHint)),
               ],
             ),

@@ -10,6 +10,8 @@ import { WithdrawalRequest, WithdrawalRequestDocument } from '../../database/sch
 import { AdjustWalletDto, CreateTopUpDto, VerifyTopUpDto, RequestWithdrawalDto, RejectWithdrawalDto, TransferFundsDto } from './dto/wallet.dto';
 import { SettingsService } from '../settings/settings.service';
 import { dateRangeFilter } from '../../common/utils/pagination.util';
+import { Requirement, RequirementDocument } from '../../database/schemas/requirement.schema';
+import { CustomerBooking, CustomerBookingDocument } from '../../database/schemas/customer-booking.schema';
 
 /** A user has two independent wallets on one account: 'main' is the
  *  driver/vendor wallet, 'customer' the customer-mode one. Money never crosses
@@ -25,6 +27,8 @@ export class WalletService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(WalletTransaction.name) private txModel: Model<WalletTransactionDocument>,
     @InjectModel(WithdrawalRequest.name) private withdrawalModel: Model<WithdrawalRequestDocument>,
+    @InjectModel(Requirement.name) private requirementModel: Model<RequirementDocument>,
+    @InjectModel(CustomerBooking.name) private bookingModel: Model<CustomerBookingDocument>,
     private configService: ConfigService,
     private settingsService: SettingsService,
   ) {}
@@ -162,6 +166,102 @@ export class WalletService {
     }
   }
 
+  /**
+   * Put the trip's route onto each transaction, so the wallet reads
+   * "Rajkot → Jamnagar" instead of only "Commission for booking GC57504310087".
+   * A driver seeing a ₹200 debit should not have to go and look the id up.
+   *
+   * Three ways in, because the ledger grew in stages:
+   *  - `requirementRef` / `bookingRef` on newer rows — a direct lookup;
+   *  - the booking id written into the note on older rows, which is all those
+   *    have. Parsed rather than left blank, otherwise every transaction that
+   *    already exists stays bare forever.
+   *
+   * Best-effort: two indexed queries, and a wallet must still open if either
+   * misses.
+   */
+  private async attachRoutes(transactions: any[]): Promise<any[]> {
+    if (!transactions.length) return transactions;
+
+    const reqIds = new Set<string>();
+    const bookIds = new Set<string>();
+    const legacyRefs = new Set<string>();
+
+    for (const t of transactions) {
+      if (t.requirementRef) reqIds.add(t.requirementRef.toString());
+      else if (t.bookingRef) bookIds.add(t.bookingRef.toString());
+      else {
+        // "Commission for booking GC57504310087" / "… booking CB123 reassigned"
+        const m = /booking\s+([A-Z]{2}\d+)/i.exec(`${t.note ?? ''}`);
+        if (m) legacyRefs.add(m[1]);
+      }
+    }
+    if (!reqIds.size && !bookIds.size && !legacyRefs.size) return transactions;
+
+    const route = (a?: string, b?: string) => {
+      const from = (a ?? '').trim();
+      const to = (b ?? '').trim();
+      if (!from && !to) return '';
+      return to ? `${from} → ${to}` : from;
+    };
+
+    const byId = new Map<string, string>();     // _id      -> route
+    const byCode = new Map<string, string>();   // bookingId -> route
+
+    try {
+      const [reqs, books] = await Promise.all([
+        reqIds.size || legacyRefs.size
+          ? this.requirementModel
+              .find({
+                $or: [
+                  { _id: { $in: [...reqIds].map((i) => new Types.ObjectId(i)) } },
+                  { bookingId: { $in: [...legacyRefs] } },
+                ],
+              })
+              .select('bookingId pickupCityName dropCityName pickupCity dropCity')
+              .lean()
+          : [],
+        bookIds.size || legacyRefs.size
+          ? this.bookingModel
+              .find({
+                $or: [
+                  { _id: { $in: [...bookIds].map((i) => new Types.ObjectId(i)) } },
+                  { bookingId: { $in: [...legacyRefs] } },
+                ],
+              })
+              .select('bookingId pickupCity dropCity')
+              .lean()
+          : [],
+      ]);
+
+      for (const r of reqs as any[]) {
+        const v = route(r.pickupCityName || r.pickupCity, r.dropCityName || r.dropCity);
+        if (!v) continue;
+        byId.set(r._id.toString(), v);
+        if (r.bookingId) byCode.set(r.bookingId, v);
+      }
+      for (const b of books as any[]) {
+        const v = route(b.pickupCity, b.dropCity);
+        if (!v) continue;
+        byId.set(b._id.toString(), v);
+        if (b.bookingId) byCode.set(b.bookingId, v);
+      }
+    } catch (e: any) {
+      this.logger.warn(`Could not resolve transaction routes: ${e?.message ?? e}`);
+      return transactions;
+    }
+
+    return transactions.map((t) => {
+      const direct = t.requirementRef?.toString() ?? t.bookingRef?.toString();
+      let r = direct ? byId.get(direct) : undefined;
+      if (!r) {
+        const m = /booking\s+([A-Z]{2}\d+)/i.exec(`${t.note ?? ''}`);
+        if (m) r = byCode.get(m[1]);
+      }
+      return r ? { ...t, route: r } : t;
+    });
+  }
+
   async getWallet(userId: string, franchiseCity?: any, scope: WalletScope = 'main') {
     await this.assertUserInCity(userId, franchiseCity);
     // Catch anything Razorpay charged for but never credited, before the
@@ -189,13 +289,15 @@ export class WalletService {
         .limit(20)
         .lean(),
     ]);
+    const withRoutes = await this.attachRoutes(transactions as any[]);
+
     return {
       message: 'Wallet retrieved',
       data: {
         balance: this.balanceOf(user, scope),
         // Holds are a driver's booking commitments — the customer wallet has none.
         heldBalance: scope === 'customer' ? 0 : ((user as any)?.heldBalance ?? 0),
-        transactions,
+        transactions: withRoutes,
       },
     };
   }

@@ -59,6 +59,13 @@ export class WalletTransaction {
   /** The customer booking a hold/release/settle relates to (ledger audit trail). */
   @Prop({ type: Types.ObjectId, ref: 'CustomerBooking' })
   bookingRef: Types.ObjectId;
+
+  /** The requirement a commission settle relates to. Same purpose as
+   *  `bookingRef`, for the other kind of booking — the wallet screen uses it to
+   *  show the route ("Rajkot → Jamnagar") next to the amount, instead of only a
+   *  booking id the driver has to go and look up. */
+  @Prop({ type: Types.ObjectId, ref: 'Requirement' })
+  requirementRef: Types.ObjectId;
 }
 
 export const WalletTransactionSchema = SchemaFactory.createForClass(WalletTransaction);

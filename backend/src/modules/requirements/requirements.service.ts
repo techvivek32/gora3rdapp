@@ -755,6 +755,7 @@ export class RequirementsService {
         type: 'debit',
         status: 'success',
         source: 'settle',
+        requirementRef: claimed._id,
         note: `Commission for booking ${ref}`.trim(),
       },
       {
@@ -764,6 +765,7 @@ export class RequirementsService {
         type: 'credit',
         status: 'success',
         source: 'settle',
+        requirementRef: claimed._id,
         note: `Commission from booking ${ref}`.trim(),
       },
     ]);
