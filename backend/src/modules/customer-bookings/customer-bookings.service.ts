@@ -21,6 +21,7 @@ import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { buildInvoicePdf } from './invoice.util';
 import { resolveGuestUser } from '../../common/utils/guest-user.util';
+import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 import {
   CreateCustomerBookingDto,
   CreateGuestBookingDto,
@@ -1171,7 +1172,7 @@ export class CustomerBookingsService {
   // ─── Driver / vendor side ──────────────────────────────────────────────────
 
   /** Open bookings a driver can apply to (not their own, not expired, city match). */
-  async listAvailable(driverId: string, serviceType?: string) {
+  async listAvailable(driverId: string, serviceType?: string, query: any = {}) {
     const driver = await this.userModel
       .findById(driverId)
       .select('businessCities isGolden membershipType membershipExpiresAt')
@@ -1224,7 +1225,15 @@ export class CustomerBookingsService {
         ],
       });
     }
-    const bookings = await this.bookingModel.find(filter).sort({ createdAt: -1 }).limit(100).lean();
+    // Paged, not a flat limit(100). The cap meant booking 101 onwards simply
+    // never reached the driver — no error, no "load more", it just was not
+    // there. The feed now pages like the requirements feed beside it, so
+    // scrolling keeps pulling the next slice.
+    const { page, limit, skip } = getPaginationParams({ ...query, limit: query.limit ?? 50 });
+    const [bookings, total] = await Promise.all([
+      this.bookingModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      this.bookingModel.countDocuments(filter),
+    ]);
     const uid = driverId;
     // Hide other drivers' quotes; only flag whether THIS driver already applied.
     const data = await Promise.all(
@@ -1251,7 +1260,9 @@ export class CustomerBookingsService {
         };
       }),
     );
-    return { message: 'Available bookings', data, canAccept, goldenRequired: !canAccept };
+    // `canAccept` also rides on each item (see above) because the response
+    // interceptor keeps only `data` and `meta`.
+    return { message: 'Available bookings', ...buildPaginatedResult(data, total, page, limit), canAccept, goldenRequired: !canAccept };
   }
 
   async apply(driverId: string, id: string, dto: ApplyBookingDto) {

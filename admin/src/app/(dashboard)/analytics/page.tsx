@@ -32,6 +32,21 @@ function useDark() {
 const cardCls = 'bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-6';
 const titleCls = 'font-semibold text-gray-900 dark:text-white mb-4';
 
+/**
+ * Legend label for a membership slice.
+ *
+ * The slice name comes straight from a Mongo `$group` on `membershipType`, so
+ * a user created before that field had a default groups under `_id: null` —
+ * and calling `.charAt(0)` on it threw, which React turns into the whole page
+ * blanking with "a client-side exception has occurred". Anything that is not
+ * a usable string is shown as Unknown instead.
+ */
+function membershipLabel(value: unknown): string {
+  const s = typeof value === 'string' ? value.trim() : '';
+  if (!s) return 'Unknown';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export default function AnalyticsPage() {
   const dark = useDark();
   const [range, setRange] = useState<PeriodRange>({});
@@ -152,16 +167,14 @@ export default function AnalyticsPage() {
                 dataKey="count"
                 nameKey="_id"
               >
-                {(analytics?.membershipBreakdown || []).map((entry: { _id: string }) => (
-                  <Cell key={entry._id} fill={MEMBERSHIP_COLORS[entry._id] || '#6B7280'} />
+                {(analytics?.membershipBreakdown || []).map((entry: { _id: string | null }, i: number) => (
+                  <Cell key={entry._id ?? `unknown-${i}`} fill={MEMBERSHIP_COLORS[entry._id ?? ''] || '#6B7280'} />
                 ))}
               </Pie>
               <Tooltip {...tooltipStyle} />
               <Legend
                 formatter={(value) => (
-                  <span style={{ color: tick, fontSize: 12 }}>
-                    {value.charAt(0).toUpperCase() + value.slice(1)}
-                  </span>
+                  <span style={{ color: tick, fontSize: 12 }}>{membershipLabel(value)}</span>
                 )}
               />
             </PieChart>
@@ -173,13 +186,13 @@ export default function AnalyticsPage() {
       <div className={cardCls}>
         <h2 className={titleCls}>Top Cities</h2>
         <div className="space-y-3">
-          {(analytics?.topCities || []).map((city: { _id: string; count: number }, i: number) => {
+          {(analytics?.topCities || []).map((city: { _id: string | null; count: number }, i: number) => {
             const max = analytics.topCities[0]?.count || 1;
             const pct = Math.round((city.count / max) * 100);
             return (
-              <div key={city._id} className="flex items-center gap-4">
+              <div key={city._id ?? `unknown-${i}`} className="flex items-center gap-4">
                 <span className="w-6 text-sm font-bold text-gray-400">{i + 1}</span>
-                <span className="w-32 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{city._id}</span>
+                <span className="w-32 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{city._id || 'Unknown'}</span>
                 <div className="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-2">
                   <div className="bg-brand-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
                 </div>

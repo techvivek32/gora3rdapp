@@ -73,6 +73,23 @@ class CustomerRepository {
   }
 
   // ── Driver / vendor side ──
+  /// One page of the driver-facing feed. Returns the rows plus whether another
+  /// page exists, so the caller can keep loading as the user scrolls — the feed
+  /// used to be a flat server-side cap of 100 with no way to reach the rest.
+  Future<({List<Map<String, dynamic>> items, bool hasMore})> availablePage({
+    String? serviceType,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    final res = await _api.get('/customer-bookings/available', params: {
+      if (serviceType != null) 'serviceType': serviceType,
+      'page': '$page',
+      'limit': '$limit',
+    });
+    final meta = res.data['meta'] as Map?;
+    return (items: _list(res.data['data']), hasMore: meta?['hasNextPage'] == true);
+  }
+
   Future<List<Map<String, dynamic>>> available({String? serviceType}) async {
     final res = await _api.get('/customer-bookings/available',
         params: {if (serviceType != null) 'serviceType': serviceType});

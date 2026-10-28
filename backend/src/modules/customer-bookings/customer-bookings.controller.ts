@@ -77,8 +77,12 @@ export class CustomerBookingsController {
 
   @Get('available')
   @ApiOperation({ summary: 'Driver/Vendor: open bookings I can apply to' })
-  listAvailable(@CurrentUser('sub') userId: string, @Query('serviceType') serviceType?: string) {
-    return this.service.listAvailable(userId, serviceType);
+  listAvailable(
+    @CurrentUser('sub') userId: string,
+    @Query('serviceType') serviceType?: string,
+    @Query() query?: any,
+  ) {
+    return this.service.listAvailable(userId, serviceType, query);
   }
 
   @Get('my-applications')

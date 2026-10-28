@@ -7,6 +7,8 @@ export interface ApiResponse<T> {
   statusCode: number;
   message: string;
   data: T;
+  /** Present only for paginated handlers — see the note in `intercept`. */
+  meta?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -27,11 +29,23 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>
           return data;
         }
 
+        // Unwrapping `data` drops every sibling the handler returned, which
+        // silently swallowed the pagination `meta` of anything that returns
+        // buildPaginatedResult() directly — the requirements and
+        // available-vehicles feeds. The app reads `hasNextPage` off that meta,
+        // so with it missing the flag defaulted to false and the feed stopped
+        // after the first page no matter how far you scrolled.
+        //
+        // Carried as a sibling rather than folded into `data`, because `data`
+        // is the list itself for every existing caller.
+        const meta = data && typeof data === 'object' ? (data as any).meta : undefined;
+
         return {
           success: true,
           statusCode: response.statusCode || 200,
           message: data?.message || 'Success',
           data: data?.data !== undefined ? data.data : data,
+          ...(meta !== undefined ? { meta } : {}),
           timestamp: new Date().toISOString(),
         };
       }),

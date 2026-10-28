@@ -37,6 +37,11 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
   // Customer-mode cab bookings shown in this feed so drivers can accept them
   // (accepting only registers interest — an admin assigns the driver).
   List<Map<String, dynamic>> _customerBookings = [];
+  // Customer bookings page alongside the requirements feed; both grow as the
+  // user scrolls, so the list is never silently truncated.
+  int _cbPage = 1;
+  bool _cbHasMore = true;
+  bool _cbLoading = false;
   List<Map<String, dynamic>> _banners = [];
 
   // Silent auto-refresh (no spinner, keeps scroll position).
@@ -70,13 +75,44 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
     _loadCustomerBookings();
   }
 
+  /// First page — also used by every refresh, so it resets the paging state.
   Future<void> _loadCustomerBookings() async {
+    _cbPage = 1;
+    _cbHasMore = true;
     try {
       // Only cab bookings belong in this feed. Hire-a-Driver has its own
       // requests list (driver grid) and Car Pooling has its own screen.
-      final d = await getIt<CustomerRepository>().available(serviceType: 'cab');
-      if (mounted) setState(() => _customerBookings = d);
+      final r = await getIt<CustomerRepository>().availablePage(serviceType: 'cab');
+      if (mounted) {
+        setState(() {
+          _customerBookings = r.items;
+          _cbHasMore = r.hasMore;
+        });
+      }
     } catch (_) {}
+  }
+
+  /// Next page, triggered from the scroll listener.
+  Future<void> _loadMoreCustomerBookings() async {
+    if (_cbLoading || !_cbHasMore) return;
+    _cbLoading = true;
+    try {
+      final r = await getIt<CustomerRepository>()
+          .availablePage(serviceType: 'cab', page: _cbPage + 1);
+      if (mounted && r.items.isNotEmpty) {
+        setState(() {
+          _cbPage += 1;
+          _customerBookings = [..._customerBookings, ...r.items];
+          _cbHasMore = r.hasMore;
+        });
+      } else {
+        _cbHasMore = false;
+      }
+    } catch (_) {
+      // Keep what is on screen; the next scroll will try again.
+    } finally {
+      _cbLoading = false;
+    }
   }
 
   void _reloadAll() {
@@ -177,7 +213,9 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      // Two independent lists feed this page, so both need nudging.
       context.read<RequirementsBloc>().add(LoadMoreRequirementsEvent());
+      _loadMoreCustomerBookings();
     }
   }
 
