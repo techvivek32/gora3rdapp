@@ -25,6 +25,9 @@ import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garag
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import { AvailableVehiclesService } from '../available-vehicles/available-vehicles.service';
+import { GarageService } from '../garage/garage.service';
+import { CreateGarageVehicleDto } from '../garage/dto/garage-vehicle.dto';
+import { CreateGarageDriverDto } from '../garage/dto/garage-driver.dto';
 import { MembershipType, UserRole, VerificationStatus } from '../../common/enums/user-role.enum';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
 import { getPaginationParams, buildPaginatedResult, dateRangeFilter } from '../../common/utils/pagination.util';
@@ -56,6 +59,7 @@ export class AdminService {
     private notificationsService: NotificationsService,
     private requirementsService: RequirementsService,
     private availableVehiclesService: AvailableVehiclesService,
+    private garageService: GarageService,
   ) {}
 
   // ─── Franchise scoping helpers ──────────────────────────────────────────────
@@ -1208,6 +1212,58 @@ export class AdminService {
       this.garageDriverModel.find({ userId: uid }).sort({ createdAt: -1 }).lean(),
     ]);
     return { message: 'Garage retrieved', data: { vehicles, drivers } };
+  }
+
+  /**
+   * Add a vehicle to a member's garage from the admin panel.
+   *
+   * Delegates to GarageService so this behaves exactly like the member adding
+   * it themselves — the cross-account duplicate check on the registration
+   * number, the RC name-match rule and the DTO validation all still apply.
+   * Reimplementing the insert here would have made the admin a hole in rules
+   * the app enforces.
+   *
+   * Approved straight away: an admin adding it IS the review, and leaving it
+   * `pending` would mean the same person has to go and approve their own entry
+   * before the member can use it.
+   */
+  async addGarageVehicleFor(userId: string, dto: CreateGarageVehicleDto, adminId: string, franchiseCity?: any) {
+    await this.assertUserInCity(userId, franchiseCity);
+    const { data } = await this.garageService.create(userId, dto);
+    const v = await this.garageVehicleModel.findById((data as any)._id);
+    if (v) {
+      v.approvalStatus = 'approved';
+      v.reviewedAt = new Date();
+      v.reviewedBy = new Types.ObjectId(adminId);
+      await v.save();
+    }
+    await this.auditLogModel.create({
+      userId: new Types.ObjectId(adminId),
+      action: 'ADMIN_ADD_GARAGE_VEHICLE',
+      resource: 'garageVehicle',
+      resourceId: `${(data as any)._id}`,
+    });
+    return { message: 'Vehicle added', data: v ?? data };
+  }
+
+  /** Same as addGarageVehicleFor, for a driver. */
+  async addGarageDriverFor(userId: string, dto: CreateGarageDriverDto, adminId: string, franchiseCity?: any) {
+    await this.assertUserInCity(userId, franchiseCity);
+    const { data } = await this.garageService.createDriver(userId, dto);
+    const d = await this.garageDriverModel.findById((data as any)._id);
+    if (d) {
+      d.approvalStatus = 'approved';
+      d.reviewedAt = new Date();
+      d.reviewedBy = new Types.ObjectId(adminId);
+      await d.save();
+    }
+    await this.auditLogModel.create({
+      userId: new Types.ObjectId(adminId),
+      action: 'ADMIN_ADD_GARAGE_DRIVER',
+      resource: 'garageDriver',
+      resourceId: `${(data as any)._id}`,
+    });
+    return { message: 'Driver added', data: d ?? data };
   }
 
   async approveGarageDriver(id: string, adminId: string, franchiseCity?: any) {

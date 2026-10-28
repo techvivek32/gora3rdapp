@@ -190,6 +190,11 @@ export const adminApi = {
 
   // ─── One member's garage (vehicles + drivers) ────────────────────────────────
   getUserGarage: (userId: string) => apiClient.get(`/admin/users/${userId}/garage`),
+  // Adding on a member's behalf goes through the same service the app uses, so
+  // duplicate registration numbers / phones / Aadhaar / licence numbers are
+  // refused here exactly as they are in the app.
+  addUserGarageVehicle: (userId: string, data: any) => apiClient.post(`/admin/users/${userId}/garage/vehicles`, data),
+  addUserGarageDriver: (userId: string, data: any) => apiClient.post(`/admin/users/${userId}/garage/drivers`, data),
   // Blacklist is a BAN, not a rejection — value:false lifts it back to pending.
   blacklistGarageVehicle: (id: string, reason: string, value = true) =>
     apiClient.post(`/admin/garage/vehicles/${id}/blacklist`, { reason, value }),

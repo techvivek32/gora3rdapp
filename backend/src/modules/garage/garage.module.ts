@@ -20,5 +20,8 @@ import { SettingsModule } from '../settings/settings.module';
   ],
   controllers: [GarageController],
   providers: [GarageService],
+  // The admin panel adds vehicles/drivers on a member's behalf through this
+  // same service, so the duplicate and validation rules stay in one place.
+  exports: [GarageService],
 })
 export class GarageModule {}

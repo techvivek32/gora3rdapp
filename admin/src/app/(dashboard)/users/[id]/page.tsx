@@ -21,6 +21,7 @@ import { RequirementEditModal } from '@/components/requirements/RequirementEditM
 import { AdjustWalletModal } from '@/components/wallets/AdjustWalletModal';
 import { EditUserModal } from '@/components/users/EditUserModal';
 import { UploadDocumentsModal } from '@/components/users/UploadDocumentsModal';
+import { AddGarageEntryModal } from '@/components/users/AddGarageEntryModal';
 import { VehicleEditModal } from '@/components/vehicles/VehicleEditModal';
 import { useRole } from '@/hooks/useRole';
 
@@ -344,6 +345,8 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
     (duplicatesData as any)?.data ?? [];
 
   const refreshGarage = () => queryClient.invalidateQueries({ queryKey: ['user-garage', id] });
+  // Which "Add" form is open on the Vehicles & Drivers tab, if any.
+  const [addGarage, setAddGarage] = useState<'vehicle' | 'driver' | null>(null);
 
   // Vehicles + drivers this member has saved, shown on the tab itself.
   const garageCount =
@@ -1055,7 +1058,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             return (
               <div className="space-y-8">
                 <div>
-                  <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Vehicles ({vehicles.length})</h3>
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Vehicles ({vehicles.length})</h3>
+                    <Button size="sm" onClick={() => setAddGarage('vehicle')}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Vehicle
+                    </Button>
+                  </div>
                   <p className="text-xs text-gray-500 mb-3">
                     Blacklisting bans the vehicle: it cannot accept bookings, disappears from the member&apos;s
                     public profile, and its registration number stays reserved so it cannot be re-added
@@ -1072,7 +1080,12 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
 
                 <div>
-                  <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Drivers ({drivers.length})</h3>
+                  <div className="flex items-start justify-between gap-4">
+                    <h3 className="font-semibold mb-1 text-gray-900 dark:text-white">Drivers ({drivers.length})</h3>
+                    <Button size="sm" onClick={() => setAddGarage('driver')}>
+                      <Plus className="w-4 h-4 mr-1" /> Add Driver
+                    </Button>
+                  </div>
                   <p className="text-xs text-gray-500 mb-3">
                     A blacklisted driver cannot be assigned to any booking, and their number stays reserved.
                   </p>
@@ -1225,6 +1238,18 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
             queryClient.invalidateQueries({ queryKey: ['user', id] });
             queryClient.invalidateQueries({ queryKey: ['verification-requests'] });
             setUploadDocsOpen(false);
+          }}
+        />
+      )}
+
+      {addGarage && (
+        <AddGarageEntryModal
+          userId={id}
+          kind={addGarage}
+          onClose={() => setAddGarage(null)}
+          onSaved={() => {
+            refreshGarage();
+            setAddGarage(null);
           }}
         />
       )}

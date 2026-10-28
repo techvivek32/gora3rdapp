@@ -10,6 +10,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { BlockImpersonationGuard } from '../../common/guards/block-impersonation.guard';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
+import { CreateGarageVehicleDto } from '../garage/dto/garage-vehicle.dto';
+import { CreateGarageDriverDto } from '../garage/dto/garage-driver.dto';
 
 // Class default: admin-only. Endpoints a franchise may use are individually marked
 // with @Roles(...FRANCHISE_ROLES) — method-level @Roles fully overrides the class
@@ -283,6 +285,32 @@ export class AdminController {
   @ApiOperation({ summary: "One member's garage vehicles + drivers" })
   getGarageForUser(@Param('id') id: string, @CurrentUser('franchiseCity') city?: string) {
     return this.adminService.getGarageForUser(id, city);
+  }
+
+  // Add straight into a member's garage from their admin page — same rules as
+  // the member adding it in the app (see AdminService.addGarageVehicleFor).
+  @Post('users/:id/garage/vehicles')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: "Add a vehicle to a member's garage" })
+  addGarageVehicleFor(
+    @Param('id') id: string,
+    @Body() dto: CreateGarageVehicleDto,
+    @CurrentUser('sub') adminId: string,
+    @CurrentUser('franchiseCity') city?: string,
+  ) {
+    return this.adminService.addGarageVehicleFor(id, dto, adminId, city);
+  }
+
+  @Post('users/:id/garage/drivers')
+  @Roles(...FRANCHISE_ROLES)
+  @ApiOperation({ summary: "Add a driver to a member's garage" })
+  addGarageDriverFor(
+    @Param('id') id: string,
+    @Body() dto: CreateGarageDriverDto,
+    @CurrentUser('sub') adminId: string,
+    @CurrentUser('franchiseCity') city?: string,
+  ) {
+    return this.adminService.addGarageDriverFor(id, dto, adminId, city);
   }
 
   @Post('garage/drivers/:id/approve')

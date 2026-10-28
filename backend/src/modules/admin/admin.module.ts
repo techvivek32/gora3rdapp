@@ -24,6 +24,7 @@ import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RequirementsModule } from '../requirements/requirements.module';
 import { AvailableVehiclesModule } from '../available-vehicles/available-vehicles.module';
+import { GarageModule } from '../garage/garage.module';
 
 @Module({
   imports: [
@@ -54,6 +55,10 @@ import { AvailableVehiclesModule } from '../available-vehicles/available-vehicle
     // the app rather than being reimplemented here.
     RequirementsModule,
     AvailableVehiclesModule,
+    // Same reason: adding a garage vehicle/driver from the admin goes through
+    // GarageService, so duplicate registration numbers, duplicate phones and
+    // duplicate Aadhaar/licence numbers are refused there too.
+    GarageModule,
   ],
   controllers: [AdminController],
   providers: [AdminService],
