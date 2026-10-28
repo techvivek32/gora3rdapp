@@ -206,6 +206,15 @@ export class RequirementsService {
     if (dto?.travelDate != null) filter.travelDate = new Date(dto.travelDate);
     // Two different WhatsApp customers can share a route/date — keep them apart.
     if (dto?.contactMobile) filter.contactMobile = dto.contactMobile;
+    // The privacy switches are part of what makes a post "the same" post.
+    //
+    // Without them, a member who posted a booking with "hide my profile" on and
+    // then posted the same route again with it OFF was handed the FIRST booking
+    // back, still hidden, under a "Booking posted successfully" message — which
+    // reads exactly like the setting refusing to turn off. A real double-tap
+    // sends identical switches, so it is still collapsed.
+    filter.secureBooking = dto?.secureBooking === true;
+    filter.hideProfile = dto?.hideProfile === true;
 
     return this.requirementModel.findOne(filter).sort({ createdAt: -1 });
   }

@@ -112,6 +112,8 @@ class _VehiclesFeedPageState extends State<VehiclesFeedPage> {
   }
 
   void _onScroll() {
+    // Nothing left to fetch — don't dispatch on every frame near the bottom.
+    if (!_lastHasMore) return;
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
       context.read<VehiclesBloc>().add(LoadMoreVehiclesEvent());
     }

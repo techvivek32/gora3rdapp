@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Chat, ChatDocument, Message, MessageDocument, MessageType } from '../../database/schemas/chat.schema';
@@ -9,6 +9,8 @@ import { getPaginationParams } from '../../common/utils/pagination.util';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
+
   constructor(
     @InjectModel(Chat.name) private chatModel: Model<ChatDocument>,
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
@@ -269,7 +271,13 @@ export class ChatService {
     const isParticipant = chat.participants.some((p) => p.toString() === userId);
     if (!isParticipant) throw new ForbiddenException('Not a participant in this chat');
 
-    const { skip } = getPaginationParams({ page, limit });
+    // Take the SANITISED page, not the raw argument. The global ValidationPipe
+    // runs with `enableImplicitConversion`, so an absent `?page=` arrives as
+    // NaN rather than undefined — the `page = 1` default never kicks in, and
+    // `NaN <= 1` is false. The app asks for messages with no page param at all,
+    // so reading the raw value meant the badge was only ever cleared for a
+    // caller that happened to send `?page=1`.
+    const { page: pageNo, skip } = getPaginationParams({ page, limit });
 
     const messages = await this.messageModel
       .find({ chatId: new Types.ObjectId(chatId), isDeleted: false })
@@ -288,8 +296,13 @@ export class ChatService {
     //
     // Only on the first page: paging back through history is not "reading" new
     // messages, and it must not race a message that arrived meanwhile.
-    if (page <= 1) {
-      await this.markMessagesRead(chatId, userId).catch(() => {});
+    if (pageNo <= 1) {
+      // Clearing the badge must never stop the messages coming back, but it
+      // must not fail quietly either — a silent catch here is what hid the
+      // NaN bug above.
+      await this.markMessagesRead(chatId, userId).catch((e) =>
+        this.logger.error(`Failed to clear unread for ${userId} on chat ${chatId}: ${e?.message}`),
+      );
     }
 
     // Flag the caller's own messages so the app can right-align them.
@@ -321,7 +334,9 @@ export class ChatService {
   async sendMessage(
     userId: string,
     chatId: string,
-    data: { content: string; type: MessageType; mediaUrl?: string },
+    // All three are optional on the wire: a photo carries no text, and the
+    // type is whitelisted below rather than trusted.
+    data: { content?: string; type?: MessageType; mediaUrl?: string },
   ) {
     const chat = await this.chatModel.findById(chatId);
     if (!chat) throw new NotFoundException('Chat not found');
@@ -330,7 +345,15 @@ export class ChatService {
       throw new ForbiddenException('Not a participant in this chat');
     }
 
-    const type = data.type || MessageType.TEXT;
+    // Whitelist here, not at the call sites: `system` and `driver_details`
+    // render as trusted, app-generated cards, and the app-generated ones are
+    // written straight to the model (see postDriverDetails), never through
+    // here. Keeping the rule in one place means a future caller cannot forget
+    // it — it used to be duplicated in the controller AND the gateway.
+    const type =
+      data.type === MessageType.IMAGE || data.type === MessageType.AUDIO
+        ? data.type
+        : MessageType.TEXT;
     // An image is uploaded to storage first and only its URL is sent, so a
     // picture-only message has no text of its own. `content` is required by the
     // schema, so the URL goes there too — that keeps every existing reader

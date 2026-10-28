@@ -15,7 +15,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ChatService } from './chat.service';
 import { User, UserDocument } from '../../database/schemas/user.schema';
-import { MessageType } from '../../database/schemas/chat.schema';
 
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -91,15 +90,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     const userId = client.data.userId;
     if (!userId) return;
 
-    // Same whitelist as the HTTP route: a client may send text or media, never
-    // a system / driver-details card.
-    const type =
-      data.type === MessageType.IMAGE || data.type === MessageType.AUDIO
-        ? (data.type as MessageType)
-        : MessageType.TEXT;
     const message = await this.chatService.sendMessage(userId, data.chatId, {
       content: data.content,
-      type,
+      type: data.type as any,
       mediaUrl: data.mediaUrl,
     });
 

@@ -178,9 +178,39 @@ class _BookingThreadsPage extends StatefulWidget {
 }
 
 class _BookingThreadsPageState extends State<_BookingThreadsPage> {
+  late List<Map<String, dynamic>> _chats = widget.chats;
+
+  /// Re-read this booking's threads after the user comes back from a room.
+  ///
+  /// The rows were handed over as a snapshot taken when the group was opened,
+  /// so anything sent in the room — a reply, a photo — left the preview and
+  /// time showing the previous message until the whole Messages list was
+  /// rebuilt. Only the unread badge was patched locally, which made the row
+  /// look half-updated.
+  Future<void> _refresh() async {
+    try {
+      final res = await getIt<ApiClient>().get('/chats/grouped');
+      final groups = (res.data['data'] as List?) ?? [];
+      for (final g in groups) {
+        if (g is! Map) continue;
+        final booking = g['booking'] is Map ? g['booking'] as Map : null;
+        final matches = widget.bookingId.isEmpty
+            ? booking == null
+            : (booking?['bookingId'] ?? '').toString() == widget.bookingId;
+        if (!matches) continue;
+        final rows = (g['chats'] as List?) ?? [];
+        if (!mounted) return;
+        setState(() => _chats = rows.map((e) => Map<String, dynamic>.from(e as Map)).toList());
+        return;
+      }
+    } catch (_) {
+      // Keep showing what we have — a failed refresh must not empty the list.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final chats = widget.chats;
+    final chats = _chats;
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
@@ -250,9 +280,13 @@ class _BookingThreadsPageState extends State<_BookingThreadsPage> {
             ),
             onTap: () async {
               await context.push('/chats/${c['_id']}');
-              // Reading a thread clears its badge; repaint so this page agrees.
-              // The Messages list behind reloads when this page is popped.
-              if (mounted) setState(() => c['unreadCount'] = 0);
+              // Clear the badge straight away so the row never looks unread
+              // after you just read it, then pull the real rows so the preview
+              // and time catch up too. The Messages list behind reloads when
+              // this page is popped.
+              if (!mounted) return;
+              setState(() => c['unreadCount'] = 0);
+              await _refresh();
             },
           ),
         );
