@@ -65,9 +65,9 @@ export class AvailableVehiclesService {
       status: { $in: [AvailabilityStatus.AVAILABLE, AvailabilityStatus.ON_HOLD, AvailabilityStatus.BOOKED, AvailabilityStatus.CANCELLED] },
     };
 
-    if (user?.businessCities?.length > 0 && !query.currentCity) {
-      filter.currentCity = { $in: user.businessCities };
-    }
+    // Same as the requirements feed: the "my cities" preference no longer has a
+    // screen behind it, so it must not keep narrowing what people see. An
+    // explicit ?currentCity= filter still works, just below.
 
     // Coerce to strings so a nested query object (e.g. ?vehicleType[$ne]=x) can't
     // inject a Mongo operator into the filter, and escape the regex input (ReDoS).

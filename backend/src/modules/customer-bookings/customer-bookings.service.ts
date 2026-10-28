@@ -1175,13 +1175,12 @@ export class CustomerBookingsService {
   async listAvailable(driverId: string, serviceType?: string, query: any = {}) {
     const driver = await this.userModel
       .findById(driverId)
-      .select('businessCities isGolden membershipType membershipExpiresAt')
+      .select('isGolden membershipType membershipExpiresAt')
       .lean();
     // Everyone can SEE customer-app bookings; only Golden members can ACCEPT them.
     // `canAccept` drives whether the app shows the Accept button or a
     // "Golden membership required" note in its place.
     const canAccept = this.isGoldenActive(driver);
-    const cities = ((driver as any)?.businessCities ?? []).filter(Boolean);
     // A booking that is no longer open stays in the feed (with its stamp) for 7
     // days, whatever ended it — booked, finished, cancelled or expired.
     //
@@ -1217,14 +1216,9 @@ export class CustomerBookingsService {
       $and: [statusCond],
     };
     if (serviceType) filter.serviceType = serviceType;
-    if (cities.length) {
-      filter.$and.push({
-        $or: [
-          { pickupCity: { $in: cities } },
-          { dropCity: { $in: cities } },
-        ],
-      });
-    }
+    // No "my cities" narrowing — same reason as the requirements and
+    // available-vehicles feeds: the screen that set those cities is gone, so
+    // the stored value must not keep hiding bookings from people.
     // Paged, not a flat limit(100). The cap meant booking 101 onwards simply
     // never reached the driver — no error, no "load more", it just was not
     // there. The feed now pages like the requirements feed beside it, so

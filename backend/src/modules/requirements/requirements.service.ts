@@ -250,23 +250,11 @@ export class RequirementsService {
       },
     };
 
-    // Filter by user's business cities if they have set them. Match leniently:
-    // a requirement counts if any business city appears in its clean city name or
-    // its detailed pickup/drop address (case-insensitive).
-    // WhatsApp bookings are a separate channel (any city) — never city-filter them,
-    // otherwise a forwarded booking outside the user's cities silently disappears.
-    if (user?.businessCities?.length > 0 && !query.pickupCity && query.source !== 'whatsapp') {
-      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const cityRegexes = user.businessCities
-        .filter((c) => c && c.trim())
-        .map((c) => new RegExp(escape(c.trim()), 'i'));
-      filter.$or = cityRegexes.flatMap((rx) => [
-        { pickupCityName: rx },
-        { dropCityName: rx },
-        { pickupCity: rx },
-        { dropCity: rx },
-      ]);
-    }
+    // No "my cities" narrowing any more. The feed used to be silently limited
+    // to the cities on the user's profile, but the screen that let them pick
+    // those cities is gone — so anyone who had set them was stuck seeing a
+    // fraction of the board with no way to widen it. A city filter the user
+    // applies by hand (query.pickupCity / dropCity) still works, just below.
 
     // Escape user input before building a regex (prevents ReDoS / regex injection).
     const rx = (s: string) => new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
