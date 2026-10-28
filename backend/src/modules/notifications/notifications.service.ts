@@ -30,6 +30,17 @@ const titleCase = (s: any) =>
   `${s ?? ''}`.replace(/_/g, ' ').split(' ').filter(Boolean)
     .map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
 
+/**
+ * Alert push titles are shouted — "GORA TAXI BOOKING ONE WAY TRIP". They land
+ * in a crowded notification tray next to every other app, and all-caps is what
+ * makes ours findable at a glance. Only the TITLE: the body keeps its normal
+ * casing so the route and car type stay readable.
+ *
+ * `titleCase` still runs first on the interpolated parts, because it is what
+ * turns `one_way` into `One Way` — without it the title would read ONE_WAY.
+ */
+const shout = (s: string) => s.toUpperCase();
+
 const fmtDate = (d: any) => {
   if (!d) return '';
   const dt = new Date(d);
@@ -184,11 +195,11 @@ export class NotificationsService {
       .lean();
 
     // Push format:
-    //   Gora Taxi booking One Way trip
+    //   GORA TAXI BOOKING ONE WAY TRIP
     //   Jodhpur → Surat
     //   Car type - Innova Crysta
     //   Date time - 4 July 2026 | 5:00am
-    const title = `Gora Taxi booking ${titleCase(requirement.tripType)} trip`;
+    const title = shout(`Gora Taxi booking ${titleCase(requirement.tripType)} trip`);
     const body = `${requirement.pickupCity} → ${requirement.dropCity}\nCar type - ${titleCase(requirement.vehicleType)}\nDate time - ${fmtDate(requirement.travelDate)} | ${fmtTime(requirement.travelTime)}`;
 
     // No in-app notification rows for new requirements: they're delivered as a push
@@ -269,7 +280,7 @@ export class NotificationsService {
 
       const label = SERVICE_LABEL[booking.serviceType] || 'ride';
       const route = [booking.pickupCity, booking.dropCity].filter(Boolean).join(' \→ ');
-      const title = `Gora Taxi customer ${label} booking`;
+      const title = shout(`Gora Taxi customer ${label} booking`);
       const bodyLines = [
         route || 'New customer booking',
         booking.vehicleType ? `Car type - ${titleCase(booking.vehicleType)}` : '',
@@ -333,7 +344,7 @@ export class NotificationsService {
         .lean();
 
       const route = [vehicle.currentCity, vehicle.destinationCity].filter(Boolean).join(' \→ ');
-      const title = `Car available \— ${titleCase(vehicle.tripType)}`;
+      const title = shout(`Car available \— ${titleCase(vehicle.tripType)}`);
       const body = [
         route || 'New car available',
         `Car type - ${titleCase(vehicle.vehicleType)}`,
