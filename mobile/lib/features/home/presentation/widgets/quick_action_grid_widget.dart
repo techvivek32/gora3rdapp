@@ -15,7 +15,18 @@ class QuickActionGridWidget extends StatelessWidget {
       _QuickAction(icon: Icons.badge_rounded, label: 'Hire a Driver'.tr, onTap: () => context.push('/customer-requests?serviceType=hire_driver')),
       _QuickAction(icon: Icons.groups_rounded, label: 'Car Pooling'.tr, onTap: () => context.push('/car-pool/my-rides')),
       _QuickAction(icon: Icons.account_balance_wallet_rounded, label: 'Recharge Plans'.tr, onTap: () => context.push('/subscriptions')),
-      _QuickAction(icon: Icons.notifications_rounded, label: 'Notifications'.tr, onTap: () => context.push('/notifications')),
+      // Trip OTPs arrive as notifications (the booking owner gets the code and
+      // passes it to the driver), so the tile says so — people were opening it
+      // looking for alerts and not realising the OTP lives here too.
+      //
+      // Composed rather than a new translation key: 'Notifications' is already
+      // translated into twelve languages, and a new key would fall back to
+      // English in all of them. "OTP" is written as-is in every one.
+      _QuickAction(
+        icon: Icons.notifications_rounded,
+        label: "${'Notifications'.tr} & OTP",
+        onTap: () => context.push('/notifications'),
+      ),
     ];
 
     // Alternate the two brand tones by position so the grid works at any length.
