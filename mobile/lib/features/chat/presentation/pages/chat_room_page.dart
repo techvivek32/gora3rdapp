@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -7,6 +8,7 @@ import '../../../../core/config/env.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_source_picker.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../bloc/chat_bloc.dart';
 
@@ -23,6 +25,7 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
   final _scrollCtrl = ScrollController();
   io.Socket? _socket;
   bool _isTyping = false;
+  bool _sendingImage = false;
   Map<String, dynamic>? _header; // { relatedRequirement, otherUser }
 
   @override
@@ -60,13 +63,26 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
           .build(),
     );
 
-    _socket!.onConnect((_) => _socket!.emit('chat:join', widget.chatId));
+    // The gateway reads `data.chatId`, so it must be a map — sending the bare
+    // id meant chatId arrived undefined, the join was refused, and live
+    // messages never reached this screen. Mark-read goes out on the same
+    // connect so the other side sees the ticks too.
+    _socket!.onConnect((_) {
+      _socket!.emit('chat:join', {'chatId': widget.chatId});
+      _socket!.emit('chat:mark-read', {'chatId': widget.chatId});
+    });
     _socket!.on('chat:new-message', (data) {
       if (mounted) context.read<ChatBloc>().add(MessageReceivedEvent(Map<String, dynamic>.from(data as Map)));
       _scrollToBottom();
     });
-    _socket!.on('chat:typing', (_) => setState(() => _isTyping = true));
-    _socket!.on('chat:stop-typing', (_) => setState(() => _isTyping = false));
+    // The gateway only ever broadcasts 'chat:typing', carrying the flag — so
+    // read the flag. Listening for a 'chat:stop-typing' it never sends left
+    // the indicator stuck on once it appeared.
+    _socket!.on('chat:typing', (data) {
+      if (!mounted) return;
+      final on = data is Map ? data['isTyping'] == true : true;
+      setState(() => _isTyping = on);
+    });
   }
 
   /// App-bar title: the linked booking's From → To on top, booking id + date/time
@@ -278,6 +294,59 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
     context.read<ChatBloc>().add(SendMessageEvent(chatId: widget.chatId, content: text));
   }
 
+  /// Pick a photo (camera or gallery), upload it, then send it as a message.
+  ///
+  /// The image goes to storage first and only the URL travels in the message,
+  /// so the chat payload stays small and the picture is cached like any other
+  /// image in the app. Capped at 1600px — a phone photo is several MB at full
+  /// size, which is a slow send on a patchy connection and far more detail than
+  /// a chat bubble shows.
+  Future<void> _sendImage() async {
+    if (_sendingImage) return;
+    final picked = await pickImageFromCameraOrGallery(
+      context,
+      maxWidth: 1600,
+      imageQuality: 80,
+      title: 'Send photo',
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _sendingImage = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final name = picked.name.isNotEmpty ? picked.name : 'photo.jpg';
+      // FormData streams are consumed on first use, so build a fresh one per
+      // attempt — otherwise the auth interceptor's token-refresh retry fails.
+      FormData form() => FormData.fromMap({
+            'file': MultipartFile.fromBytes(bytes, filename: name),
+            'folder': 'chat',
+          });
+      final api = getIt<ApiClient>();
+      Response res;
+      try {
+        res = await api.dio.post('/storage/upload', data: form());
+      } catch (_) {
+        res = await api.dio.post('/storage/upload', data: form());
+      }
+      final url = (res.data is Map ? res.data['data'] : null)?.toString();
+      if (url == null || url.isEmpty) throw Exception('upload returned no url');
+      if (!mounted) return;
+      context.read<ChatBloc>().add(SendMessageEvent(
+            chatId: widget.chatId,
+            content: url,
+            type: 'image',
+            mediaUrl: url,
+          ));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not send the photo. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _sendingImage = false);
+    }
+  }
+
   @override
   void dispose() {
     _socket?.disconnect();
@@ -332,6 +401,20 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
             child: SafeArea(
               child: Row(
                 children: [
+                  // Attach a photo. Disabled while one is uploading so a second
+                  // tap can't start a parallel send.
+                  IconButton(
+                    onPressed: _sendingImage ? null : _sendImage,
+                    icon: _sendingImage
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.attach_file_rounded, size: 22),
+                    color: AppColors.primary,
+                    tooltip: 'Send a photo',
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _msgCtrl,
@@ -343,7 +426,11 @@ class _ChatRoomPageState extends State<ChatRoomPage> {
                       ),
                       maxLines: null,
                       textCapitalization: TextCapitalization.sentences,
-                      onChanged: (v) => _socket?.emit(v.isEmpty ? 'chat:stop-typing' : 'chat:typing', widget.chatId),
+                      // One event with a flag, matching the gateway — it has
+                      // no 'chat:stop-typing' handler, and it reads chatId off
+                      // the payload, so a bare id never reached it.
+                      onChanged: (v) => _socket?.emit(
+                          'chat:typing', {'chatId': widget.chatId, 'isTyping': v.isNotEmpty}),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -372,10 +459,72 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMe = message['isMe'] as bool? ?? false;
     final content = message['content'] as String? ?? '';
+    final type = (message['type'] ?? '').toString();
+
+    // A photo. `mediaUrl` is where it belongs, but a picture-only message also
+    // carries the URL in `content` (the schema requires content), so fall back
+    // to that rather than showing an empty bubble.
+    if (type == 'image') {
+      final url = (message['mediaUrl']?.toString().isNotEmpty ?? false)
+          ? message['mediaUrl'].toString()
+          : content;
+      final caption = content == url ? '' : content;
+      return Align(
+        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.66),
+          decoration: BoxDecoration(
+            color: isMe ? Theme.of(context).primaryColor : Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2, offset: const Offset(0, 1))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(caption.isEmpty ? 16 : 0).copyWith(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                ),
+                child: GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => _PhotoViewPage(url: url)),
+                  ),
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (_, child, progress) => progress == null
+                        ? child
+                        : const SizedBox(
+                            height: 170,
+                            width: 220,
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 170,
+                      width: 220,
+                      alignment: Alignment.center,
+                      color: Colors.black12,
+                      child: const Icon(Icons.broken_image_outlined, color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
+              if (caption.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: Text(caption, style: TextStyle(color: isMe ? Colors.white : null, fontSize: 14.5)),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Driver + vehicle details auto-posted on assignment — a highlighted card
     // with a Share button, regardless of who it reads as being from.
-    if ((message['type'] ?? '').toString() == 'driver_details') {
+    if (type == 'driver_details') {
       return Align(
         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
@@ -437,6 +586,52 @@ class _MessageBubble extends StatelessWidget {
         child: Text(
           content,
           style: TextStyle(color: isMe ? Colors.white : null, fontSize: 15),
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-screen view of a chat photo, pinch-to-zoom.
+class _PhotoViewPage extends StatelessWidget {
+  const _PhotoViewPage({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => Share.share(url),
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Share',
+          ),
+        ],
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 4,
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            loadingBuilder: (_, child, progress) => progress == null
+                ? child
+                : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            errorBuilder: (_, __, ___) => const Padding(
+              padding: EdgeInsets.all(32),
+              child: Text(
+                'Could not load this photo.',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+          ),
         ),
       ),
     );

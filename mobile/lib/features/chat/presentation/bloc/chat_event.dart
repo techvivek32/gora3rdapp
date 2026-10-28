@@ -18,9 +18,20 @@ class LoadMessagesEvent extends ChatEvent {
 class SendMessageEvent extends ChatEvent {
   final String chatId;
   final String content;
-  const SendMessageEvent({required this.chatId, required this.content});
+
+  /// 'text' or 'image'. An image carries its storage URL in [mediaUrl]; the
+  /// upload has already happened by the time this is dispatched.
+  final String type;
+  final String? mediaUrl;
+
+  const SendMessageEvent({
+    required this.chatId,
+    required this.content,
+    this.type = 'text',
+    this.mediaUrl,
+  });
   @override
-  List<Object?> get props => [chatId, content];
+  List<Object?> get props => [chatId, content, type, mediaUrl];
 }
 
 class MessageReceivedEvent extends ChatEvent {

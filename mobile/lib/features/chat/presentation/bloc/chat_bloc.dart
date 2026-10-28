@@ -43,7 +43,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     // _onReceived de-dupes by id). Keeps the input snappy and avoids a reload.
     final current = state;
     try {
-      final res = await apiClient.post('/chats/${event.chatId}/messages', data: {'content': event.content, 'type': 'text'});
+      final res = await apiClient.post('/chats/${event.chatId}/messages', data: {
+        'content': event.content,
+        'type': event.type,
+        if (event.mediaUrl != null) 'mediaUrl': event.mediaUrl,
+      });
       final msg = res.data is Map ? (res.data['data'] ?? res.data) : null;
       if (msg is Map && current is MessagesLoaded && current.chatId == event.chatId) {
         _appendUnique(emit, current, Map<String, dynamic>.from(msg));

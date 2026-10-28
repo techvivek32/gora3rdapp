@@ -235,7 +235,10 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
   /// SharedPreferences read.
   Future<void> _runPendingAlertAction() async {
     final pending = await consumePendingAlertAction();
-    if (pending == null || !mounted) return;
+    if (pending == null) return;
+    // Read the root navigator's context fresh, after the await — so there is
+    // nothing stale to guard against, and null simply means the app is going
+    // away. (A `mounted` check here would be about the wrong widget.)
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx == null) return;
     switch (pending.kind) {

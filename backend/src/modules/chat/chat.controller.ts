@@ -4,6 +4,19 @@ import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { MessageType } from '../../database/schemas/chat.schema';
+
+/**
+ * The message types a client may actually send.
+ *
+ * `system` and `driver_details` render as trusted, app-generated cards, so a
+ * client must not be able to ask for them — anything else falls back to text.
+ */
+function clientMessageType(type?: string): MessageType {
+  return type === MessageType.IMAGE || type === MessageType.AUDIO
+    ? (type as MessageType)
+    : MessageType.TEXT;
+}
 
 @ApiTags('Chat')
 @ApiBearerAuth('access-token')
@@ -58,15 +71,16 @@ export class ChatController {
   }
 
   @Post(':chatId/messages')
-  @ApiOperation({ summary: 'Send a message (HTTP; also broadcast over the socket)' })
+  @ApiOperation({ summary: 'Send a message, optionally an image (HTTP; also broadcast over the socket)' })
   async sendMessage(
     @Param('chatId') chatId: string,
     @CurrentUser('sub') userId: string,
-    @Body() body: { content: string; type?: string },
+    @Body() body: { content?: string; type?: string; mediaUrl?: string },
   ) {
     const message: any = await this.chatService.sendMessage(userId, chatId, {
       content: body.content,
-      type: (body.type as any) || 'text',
+      type: clientMessageType(body.type),
+      mediaUrl: body.mediaUrl,
     });
     // Real-time deliver to the room (the other participant) + push to offline.
     this.chatGateway.broadcastNewMessage(chatId, message);

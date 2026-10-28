@@ -329,7 +329,9 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     if (_loadingA) return const Center(child: CircularProgressIndicator());
     if (_errA != null) return _retry(_errA!, _loadAvailable);
     final items = _available ?? [];
-    if (items.isEmpty) return _empty('No customer requests in your city right now');
+    // Not "in your city" any more — the feed stopped being narrowed by the
+    // member's business cities, so promising a city filter here would be a lie.
+    if (items.isEmpty) return _empty('No customer requests right now');
     return RefreshIndicator(
       onRefresh: _loadAvailable,
       child: ListView.separated(

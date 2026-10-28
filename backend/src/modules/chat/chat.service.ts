@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Chat, ChatDocument, Message, MessageDocument, MessageType } from '../../database/schemas/chat.schema';
@@ -279,6 +279,19 @@ export class ChatService {
       .limit(limit)
       .lean();
 
+    // Opening a chat IS reading it, so clear the badge here.
+    //
+    // There is a `chat:mark-read` socket event for this, but nothing ever
+    // emitted it — so the count only ever went up and the list showed unread
+    // badges on conversations the user had already read. Doing it on the fetch
+    // means it works whether or not the socket connected.
+    //
+    // Only on the first page: paging back through history is not "reading" new
+    // messages, and it must not race a message that arrived meanwhile.
+    if (page <= 1) {
+      await this.markMessagesRead(chatId, userId).catch(() => {});
+    }
+
     // Flag the caller's own messages so the app can right-align them.
     const withMine = messages.reverse().map((m: any) => ({
       ...m,
@@ -294,7 +307,22 @@ export class ChatService {
     return !!chat && (chat.participants as any[]).some((p) => p.toString() === userId);
   }
 
-  async sendMessage(userId: string, chatId: string, data: { content: string; type: MessageType }) {
+  /**
+   * One-line stand-in for a message, for the chat list and the push body.
+   *
+   * A media message's content is a URL, which reads as noise in both places.
+   */
+  private previewText(type: MessageType, content: string): string {
+    if (type === MessageType.IMAGE) return '📷 Photo';
+    if (type === MessageType.AUDIO) return '🎤 Voice message';
+    return content.substring(0, 100);
+  }
+
+  async sendMessage(
+    userId: string,
+    chatId: string,
+    data: { content: string; type: MessageType; mediaUrl?: string },
+  ) {
     const chat = await this.chatModel.findById(chatId);
     if (!chat) throw new NotFoundException('Chat not found');
     // Only a participant may post — stops injecting messages into other people's chats.
@@ -302,11 +330,21 @@ export class ChatService {
       throw new ForbiddenException('Not a participant in this chat');
     }
 
+    const type = data.type || MessageType.TEXT;
+    // An image is uploaded to storage first and only its URL is sent, so a
+    // picture-only message has no text of its own. `content` is required by the
+    // schema, so the URL goes there too — that keeps every existing reader
+    // working, and the bubble prefers `mediaUrl` when it is set.
+    const mediaUrl = data.mediaUrl?.trim() || undefined;
+    const content = (data.content || '').trim() || mediaUrl || '';
+    if (!content) throw new BadRequestException('Message cannot be empty');
+
     const message = await this.messageModel.create({
       chatId: new Types.ObjectId(chatId),
       senderId: new Types.ObjectId(userId),
-      content: data.content,
-      type: data.type || MessageType.TEXT,
+      content,
+      type,
+      ...(mediaUrl ? { mediaUrl } : {}),
     });
 
     // Update chat's last message
@@ -319,7 +357,7 @@ export class ChatService {
 
     await this.chatModel.findByIdAndUpdate(chatId, {
       lastMessage: message._id,
-      lastMessageText: data.content.substring(0, 100),
+      lastMessageText: this.previewText(type, content),
       lastMessageAt: new Date(),
       ...unreadUpdate,
     });
@@ -376,7 +414,7 @@ export class ChatService {
       if (participant._id.toString() !== senderId && participant.fcmTokens?.length) {
         await this.firebaseService.sendPushNotification(participant.fcmTokens, {
           title: `💬 ${sender?.fullName || 'New Message'}`,
-          body: message.content,
+          body: this.previewText(message.type, message.content || ''),
           data: { chatId, type: 'new_message' },
         }).catch(() => {});
       }

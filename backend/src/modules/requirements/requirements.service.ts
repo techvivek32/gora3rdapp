@@ -308,15 +308,23 @@ export class RequirementsService {
       // The owner can always see their own number; premium tiers see everyone's.
       const isOwner = postedBy && postedBy._id?.toString() === userId;
       if (!isPremium && !isOwner) {
+        // Mask on a COPY, never on the populated object — Mongoose shares one
+        // object between every row that references the same user, so an
+        // in-place edit reaches rows this gate does not apply to. See
+        // applyHideProfile below for the full story.
         if (postedBy) {
           // Only the phone number is gated for non-premium users; the profile
           // picture and agency name are public display info shown on the card.
-          postedBy.mobile = undefined;
+          req.postedBy = { ...postedBy, mobile: undefined };
         }
         // Same gate for the assigned driver's number — don't let the "Assigned
-        // Driver" block hand a free contact to a non-premium viewer.
+        // Driver" block hand a free contact to a non-premium viewer. This one
+        // was leaking the other way: the gate turns on the POSTER's identity,
+        // so clearing it here on a booking of someone else's also blanked the
+        // driver's number on the viewer's OWN booking whenever the same driver
+        // was on both.
         const driver = req.assignedDriver as any;
-        if (driver) driver.mobile = undefined;
+        if (driver) req.assignedDriver = { ...driver, mobile: undefined };
       }
       this.applyHideProfile(req, userId, isOwner);
       return req;
@@ -329,6 +337,16 @@ export class RequirementsService {
    * "Hide my profile" (secure bookings): mask the poster's name/agency/photo for
    * everyone except the owner and the assigned driver. The identity is revealed
    * to the driver only once the booking is assigned to them.
+   *
+   * The masked profile is written to a COPY, never to the populated object.
+   * Mongoose hands every document that references the same user ONE shared
+   * `postedBy` object (`populate`'s `clone` option is off by default), so
+   * masking it in place leaked across rows: a member who posted one booking
+   * with the profile hidden and a second one without saw BOTH show up as
+   * "Hidden until assigned" whenever the two landed on the same feed page —
+   * and the hidden one also un-hid the other for its assigned driver, because
+   * that exemption is per booking. Copying is cheap here: it only happens for
+   * a row that is actually being masked.
    */
   private applyHideProfile(req: any, viewerId: string, isOwner?: boolean) {
     if (!req?.hideProfile || !req?.secureBooking) return;
@@ -337,9 +355,12 @@ export class RequirementsService {
     const owner = isOwner ?? postedBy._id?.toString() === viewerId;
     const assignedId = (req.assignedDriver as any)?._id?.toString() ?? req.assignedDriver?.toString();
     if (owner || assignedId === viewerId) return; // owner + assigned driver see the real profile
-    postedBy.fullName = 'Hidden until assigned';
-    postedBy.agencyName = undefined;
-    postedBy.profileImage = undefined;
+    req.postedBy = {
+      ...postedBy,
+      fullName: 'Hidden until assigned',
+      agencyName: undefined,
+      profileImage: undefined,
+    };
   }
 
   async findOne(id: string, userId: string) {
