@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
@@ -90,16 +90,20 @@ const DOCS = [
   { key: 'vehicleRc', label: 'Vehicle RC' },
 ];
 
+// `partnerOnly` tabs are about running a cab business — a membership plan, KYC
+// documents, the requirements/vehicles they posted, and their garage. Someone
+// who only ever books rides has none of that, so showing them four permanently
+// empty tabs is just noise. Anyone who is also a driver or vendor sees them.
 const TABS = [
   { id: 'profile', label: 'User Profile', icon: User },
-  { id: 'subscription', label: 'Subscription', icon: CheckSquare },
+  { id: 'subscription', label: 'Subscription', icon: CheckSquare, partnerOnly: true },
   { id: 'payments', label: 'Payment History', icon: CreditCard },
   { id: 'withdrawals', label: 'Withdrawal History', icon: ArrowUpRight },
   { id: 'wallet', label: 'Wallet', icon: Wallet },
   { id: 'reviews', label: 'Review History', icon: Star },
-  { id: 'documents', label: 'Documents', icon: FileCheck },
-  { id: 'requests', label: 'Request List', icon: ClipboardList },
-  { id: 'garage', label: 'Vehicles & Drivers', icon: Car },
+  { id: 'documents', label: 'Documents', icon: FileCheck, partnerOnly: true },
+  { id: 'requests', label: 'Request List', icon: ClipboardList, partnerOnly: true },
+  { id: 'garage', label: 'Vehicles & Drivers', icon: Car, partnerOnly: true },
 ];
 
 function verificationBadge(status?: string) {
@@ -406,6 +410,19 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
   const user = (data as any)?.data;
   if (!user) return <div className="text-center py-12 text-gray-500">User not found</div>;
 
+  // Customer-only means exactly that: currently a customer AND never set up as
+  // a driver. Someone who switched back to Customer still has a garage, a plan
+  // and KYC behind them, so `driverOnboarded` is what decides it — not the role
+  // they happen to be in right now.
+  const isCustomerOnly = user.role === 'customer' && user.driverOnboarded !== true;
+  const visibleTabs = isCustomerOnly ? TABS.filter((t) => !t.partnerOnly) : TABS;
+  // Opening a customer-only member while sitting on a partner tab (say the
+  // admin came from a driver's garage) would otherwise render a hidden panel
+  // with no tab highlighted. Fall back to the profile instead of changing
+  // state mid-render.
+  const tabExists = visibleTabs.some((t) => t.id === activeTab);
+  const currentTab = tabExists ? activeTab : 'profile';
+
   const providedDocs = DOCS
     .map((d) => ({ ...d, doc: user.documents?.[d.key] }))
     .filter((d) => d.doc && (d.doc.number || d.doc.image || d.doc.backImage));
@@ -503,14 +520,14 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
       <div className={`${cardCls} overflow-hidden`}>
         <div className="border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
           <div className="flex min-w-max">
-            {TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-6 py-4 font-medium text-sm whitespace-nowrap transition-colors relative
-                    ${activeTab === tab.id
+                    ${currentTab === tab.id
                       ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                       : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
                     }`}
@@ -527,7 +544,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
                       </span>
                     )}
                   </div>
-                  {activeTab === tab.id && (
+                  {currentTab === tab.id && (
                     <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500" />
                   )}
                 </button>
@@ -539,7 +556,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
         {/* Tab Content */}
         <div className="p-6">
           {/* User Profile Tab */}
-          {activeTab === 'profile' && (
+          {currentTab === 'profile' && (
             <div className="space-y-6">
               {/* Activity Stats */}
               <div>
@@ -603,7 +620,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Documents Tab */}
-          {activeTab === 'documents' && (
+          {currentTab === 'documents' && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold flex items-center gap-2 text-gray-900 dark:text-white">
@@ -698,7 +715,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Request List Tab */}
-          {activeTab === 'requests' && (
+          {currentTab === 'requests' && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">
@@ -758,7 +775,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Payment History Tab */}
-          {activeTab === 'payments' && (
+          {currentTab === 'payments' && (
             <div>
               <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Payment History</h3>
               {(() => {
@@ -806,7 +823,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Withdrawal History Tab */}
-          {activeTab === 'withdrawals' && (
+          {currentTab === 'withdrawals' && (
             <div>
               <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Withdrawal History</h3>
               {(() => {
@@ -896,7 +913,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Wallet Tab */}
-          {activeTab === 'wallet' && (() => {
+          {currentTab === 'wallet' && (() => {
             const w = (walletData as any)?.data ?? {};
             const balance = w.balance ?? 0;
             const txs = w.transactions ?? [];
@@ -957,7 +974,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           })()}
 
           {/* Vehicles & Drivers Tab — approve, or blacklist outright */}
-          {activeTab === 'garage' && (() => {
+          {currentTab === 'garage' && (() => {
             const g = (garageData as any)?.data ?? {};
             const vehicles: any[] = g.vehicles ?? [];
             const drivers: any[] = g.drivers ?? [];
@@ -1103,7 +1120,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           })()}
 
           {/* Review History Tab */}
-          {activeTab === 'reviews' && (
+          {currentTab === 'reviews' && (
             <div>
               <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Reviews Received</h3>
               {(() => {
@@ -1149,7 +1166,7 @@ export default function UserDetailPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* Subscription Tab */}
-          {activeTab === 'subscription' && (
+          {currentTab === 'subscription' && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-gray-900 dark:text-white">Subscription History</h3>
