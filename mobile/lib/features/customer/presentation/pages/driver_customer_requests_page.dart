@@ -395,9 +395,11 @@ class MyOfferCard extends StatelessWidget {
     // Round-trip context — carried on the booking (subType) + return date in notes.
     // Must stay visible AFTER a driver is selected (the win card is what they work
     // from), so they know to bring the customer back.
-    final subType = (b['subType'] ?? '').toString();
-    final isRound = subType == 'Round Trip';
-    final isLocal = subType == 'Local';
+    // `subType` is free text and arrives as "Round Trip" or "round_trip"
+    // depending on who wrote the booking, so normalise before comparing.
+    final subType = (b['subType'] ?? '').toString().replaceAll('_', ' ');
+    final isRound = subType.toLowerCase() == 'round trip';
+    final isLocal = subType.toLowerCase() == 'local';
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final retM = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
     final returnLabel = retM == null ? '' : '${retM.group(1)}-${retM.group(2)}-${retM.group(3)}';
@@ -519,7 +521,7 @@ class MyOfferCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
+              Expanded(child: routeTimeline(pickup, drop, stops: b['stops'], roundTrip: isRound)),
               SizedBox(width: 10.w),
               Column(
                 mainAxisSize: MainAxisSize.min,

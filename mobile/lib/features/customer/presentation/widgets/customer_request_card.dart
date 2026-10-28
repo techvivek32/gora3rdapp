@@ -74,6 +74,9 @@ class CustomerRequestCard extends StatelessWidget {
     final extraKmPrice = (b['extraKmPrice'] as num?)?.toInt() ?? 0;
     // Local (in-city hourly package): show the package hours + extra ₹/hr.
     final isLocal = subType.toLowerCase() == 'local';
+    // Matched on the normalised value above, so "Round Trip" and "round_trip"
+    // both count — `subType` reaches us in either shape.
+    final isRoundTrip = subType.toLowerCase() == 'round trip';
     final packageHours = (b['packageHours'] as num?)?.toInt() ?? (b['durationHours'] as num?)?.toInt() ?? 0;
     final extraHourPrice = (b['extraHourPrice'] as num?)?.toInt() ?? 0;
     // Hire a Driver: the customer picks the gearbox of THEIR car — show it so the
@@ -148,7 +151,7 @@ class CustomerRequestCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(child: routeTimeline(pickup, drop, stops: b['stops'])),
+              Expanded(child: routeTimeline(pickup, drop, stops: b['stops'], roundTrip: isRoundTrip)),
               SizedBox(width: 10.w),
               // Maps shortcut stacked directly above the date box. Straight to
               // Google Maps on this exact route — pickup → stops → drop.

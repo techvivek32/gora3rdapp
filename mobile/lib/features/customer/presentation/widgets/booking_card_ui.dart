@@ -136,10 +136,15 @@ Widget filledChip(String text, Color color) => Container(
     );
 
 /// Vertical FROM → TO route with the connecting line.
-/// FROM → (VIA …) → TO. `stops` is the booking's raw `stops` list; any
-/// intermediate stops the customer added are drawn between the two ends so the
-/// driver sees the route they actually have to take.
-Widget routeTimeline(String from, String to, {dynamic stops}) {
+/// FROM → (VIA …) → TO → (BACK TO). `stops` is the booking's raw `stops` list;
+/// any intermediate stops the customer added are drawn between the two ends so
+/// the driver sees the route they actually have to take.
+///
+/// [roundTrip] adds the return leg back to the pickup. A round trip ends where
+/// it started, and showing only "Rajkot → Jamnagar" made it read like a one-way
+/// — the driver had to spot the ROUND TRIP tag to know they were quoting for
+/// double the distance.
+Widget routeTimeline(String from, String to, {dynamic stops, bool roundTrip = false}) {
   Widget point(IconData icon, Color color, String label, String text, {required bool showLine}) => IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,6 +171,9 @@ Widget routeTimeline(String from, String to, {dynamic stops}) {
         ),
       );
   final via = stopLabels(stops, short: false);
+  // Only worth drawing when we actually know both ends — a booking with no drop
+  // has nothing to come back from.
+  final showReturn = roundTrip && from.isNotEmpty && to.isNotEmpty;
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     mainAxisSize: MainAxisSize.min,
@@ -174,7 +182,11 @@ Widget routeTimeline(String from, String to, {dynamic stops}) {
       for (int i = 0; i < via.length; i++)
         point(Icons.adjust, Colors.orange, via.length == 1 ? 'STOP' : 'STOP ${i + 1}', via[i],
             showLine: to.isNotEmpty || i < via.length - 1),
-      if (to.isNotEmpty) point(Icons.location_on, Colors.red, 'TO', to, showLine: false),
+      if (to.isNotEmpty)
+        point(Icons.location_on, Colors.red, 'TO', to, showLine: showReturn),
+      // The return leg, drawn in the same green as the start because that is
+      // where the trip ends up.
+      if (showReturn) point(Icons.trip_origin, Colors.green, 'BACK TO', from, showLine: false),
     ],
   );
 }
