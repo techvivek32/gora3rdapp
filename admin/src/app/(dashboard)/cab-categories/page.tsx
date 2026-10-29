@@ -8,6 +8,66 @@ import { Badge } from '@/components/ui/Badge';
 import toast from 'react-hot-toast';
 import type { CabCategory } from './CabCategoryForm';
 
+const num = (v: unknown) => (typeof v === 'number' && isFinite(v) ? v : Number(v) || 0);
+
+/**
+ * What this cab can actually be charged at, per km.
+ *
+ * The app resolves the rate as: the PICKUP state's price for the chosen fuel,
+ * else that fuel's own price, else the flat `pricePerKm`. So the flat number
+ * alone is not what a rider pays — a cab priced at ₹50 whose Gujarat row says
+ * ₹100 charges ₹100 for every trip starting in Gujarat. Printing only the flat
+ * rate here is how that goes unnoticed, so show the whole spread that can
+ * apply and flag when the state rows are what decide it.
+ */
+function rateSummary(it: CabCategory): { label: string; stateWise: boolean; detail?: string } {
+  const fuels = [
+    ['Petrol', num(it.pricePerKmPetrol), 'petrol'],
+    ['Diesel', num(it.pricePerKmDiesel), 'diesel'],
+    ['CNG', num(it.pricePerKmCng), 'cng'],
+  ] as const;
+  const offered = fuels.filter(([, base]) => base > 0);
+
+  const rates: number[] = [];
+  const detail: string[] = [];
+  let stateWise = false;
+
+  if (offered.length === 0) {
+    // No per-fuel pricing at all — the flat rate is the only one in play.
+    rates.push(num(it.pricePerKm));
+  } else {
+    for (const [name, base, key] of offered) {
+      const overrides = (it.statePricing ?? [])
+        .map((s) => ({ state: s.state, rate: num(s[key]) }))
+        .filter((s) => s.rate > 0);
+      if (overrides.length > 0) stateWise = true;
+      rates.push(base, ...overrides.map((o) => o.rate));
+      const distinct = [...new Set(overrides.map((o) => o.rate))].sort((a, b) => a - b);
+      detail.push(`${name}: ₹${base} base${distinct.length ? ` · state-wise ₹${distinct.join(', ₹')}` : ''}`);
+    }
+  }
+
+  const uniq = [...new Set(rates.filter((r) => r > 0))].sort((a, b) => a - b);
+  if (uniq.length === 0) return { label: '—', stateWise: false };
+  return {
+    label: uniq.length === 1 ? `₹${uniq[0]}` : `₹${uniq[0]} – ₹${uniq[uniq.length - 1]}`,
+    stateWise,
+    detail: detail.join('\n') || undefined,
+  };
+}
+
+function RateCell({ it }: { it: CabCategory }) {
+  const r = rateSummary(it);
+  return (
+    <div title={r.detail} className="leading-tight">
+      <div className="text-gray-600 dark:text-gray-300">{r.label}</div>
+      {r.stateWise && (
+        <div className="text-[11px] text-amber-600 dark:text-amber-400">state-wise</div>
+      )}
+    </div>
+  );
+}
+
 export default function CabCategoriesPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -362,7 +422,7 @@ export default function CabCategoriesPage() {
                       <div className="font-semibold text-gray-900 dark:text-white">{it.name}</div>
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.vehicleClass || '—'}</td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">₹{it.pricePerKm}</td>
+                    <td className="px-4 py-3"><RateCell it={it} /></td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.dailyKmLimit ? `${it.dailyKmLimit} km/day · ₹${it.extraKmPrice || 0}/extra` : '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.seats ? it.seats : '—'}</td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{it.bags || '—'}</td>

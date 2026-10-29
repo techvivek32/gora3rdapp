@@ -48,6 +48,13 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
   // Original (pre-discount) fare + discount %, for the struck-through price.
   Map<String, dynamic> get _fuelFaresRaw => Map<String, dynamic>.from(widget.data['fuelFaresRaw'] as Map? ?? {});
   double get _discountPct => (widget.data['discountPercent'] as num?)?.toDouble() ?? 0;
+  /// The per-km rate the chosen fuel was priced at — passed through to the
+  /// booking so the invoice prints the admin's rate, not a derived one.
+  double get _ratePerKm {
+    final rates = widget.data['fuelRates'] as Map?;
+    final r = (rates?[_fuel] as num?)?.toDouble() ?? 0;
+    return r > 0 ? r : ((widget.data['noFuelRate'] as num?)?.toDouble() ?? 0);
+  }
   int get _driverAllowance => (widget.data['driverAllowance'] as num?)?.toInt() ?? 0;
   // Global GST %, for the "GST (5%)" label.
   double get _gstPercent => (widget.data['gstPercent'] as num?)?.toDouble() ?? 0;
@@ -139,6 +146,7 @@ class _CabDetailsPageState extends State<CabDetailsPage> {
       'fuel': _fuel.isEmpty ? 'Standard' : _fuel,
       'distanceKm': widget.data['distanceKm'] ?? 0,
       'billedKm': _billedKm,
+      'ratePerKm': _ratePerKm,
       'minKm': widget.data['minKm'] ?? 0,
       'fare': _fare,
       'baseFare': _basePart,

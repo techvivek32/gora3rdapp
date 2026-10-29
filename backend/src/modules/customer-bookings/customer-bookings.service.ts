@@ -541,6 +541,7 @@ export class CustomerBookingsService {
       baseFare: dto.baseFare || 0,
       driverAllowance: dto.driverAllowance || 0,
       gstAmount: dto.gstAmount || 0,
+      ratePerKm: dto.ratePerKm || 0,
       estimatedDistance: dto.estimatedDistance || 0,
       // Round-trip rental snapshot from the chosen cab (0 = no extra-km tracking).
       dailyKmLimit: dto.dailyKmLimit || 0,
@@ -765,7 +766,11 @@ export class CustomerBookingsService {
     let carClass = '';
     let carSeats = 0;
     let carBags = '';
-    let ratePerKm = 0;
+    // The discount is read for ONE purpose: bookings made before the per-km
+    // rate was recorded store only the discounted fare, and the discount is
+    // the single thing standing between that and km x rate. The rate itself
+    // comes off the booking, never off today's price list.
+    let discountPercent = 0;
     try {
       if (booking.vehicleType) {
         const cat: any = await this.cabCategoryModel
@@ -775,11 +780,7 @@ export class CustomerBookingsService {
           carClass = cat.vehicleClass || '';
           carSeats = cat.seats || 0;
           carBags = cat.bags || '';
-          const f = fuel.toLowerCase();
-          ratePerKm =
-            (f === 'diesel' ? cat.pricePerKmDiesel : f === 'cng' ? cat.pricePerKmCng : f === 'petrol' ? cat.pricePerKmPetrol : 0) ||
-            cat.pricePerKm ||
-            0;
+          discountPercent = Number(cat.discountPercent) || 0;
         }
       }
     } catch {
@@ -807,7 +808,8 @@ export class CustomerBookingsService {
       carSeats,
       carBags,
       carFuel: fuel,
-      ratePerKm,
+      ratePerKm: booking.ratePerKm || 0,
+      discountPercent,
       dailyKmLimit: booking.dailyKmLimit || 0,
       pickup: booking.pickup?.address || '',
       drop: booking.drop?.address || '',
@@ -1106,6 +1108,9 @@ export class CustomerBookingsService {
     if (dto.dailyKmLimit !== undefined) booking.dailyKmLimit = dto.dailyKmLimit;
     if (dto.extraKmPrice !== undefined) booking.extraKmPrice = dto.extraKmPrice;
     if (dto.includedKm !== undefined) booking.includedKm = dto.includedKm;
+    // Changing the trip can change the rate it is priced at, and the invoice
+    // prints this, so it has to follow the edit like the other snapshots.
+    if (dto.ratePerKm !== undefined) booking.ratePerKm = dto.ratePerKm;
     if (dto.packageHours !== undefined) booking.packageHours = dto.packageHours;
     if (dto.extraHourPrice !== undefined) booking.extraHourPrice = dto.extraHourPrice;
     if (dto.travelDate !== undefined) {

@@ -101,6 +101,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
   String get _fuel => (widget.data['fuel'] ?? 'Petrol').toString();
   double get _distanceKm => (widget.data['distanceKm'] as num?)?.toDouble() ?? 0;
   double get _billedKm => (widget.data['billedKm'] as num?)?.toDouble() ?? _distanceKm;
+  /// The admin's per-km rate this fare was priced at, carried through from the
+  /// results page so the booking can record it.
+  double get _ratePerKm => (widget.data['ratePerKm'] as num?)?.toDouble() ?? 0;
   int get _fare => (widget.data['fare'] as num?)?.toInt() ?? 0;
   bool get _isRound => widget.data['isRound'] == true;
   // Local hourly package.
@@ -250,6 +253,9 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (_baseFarePart > 0) 'baseFare': _baseFarePart,
       if (_driverAllowance > 0) 'driverAllowance': _driverAllowance,
       if (_gstAmount > 0) 'gstAmount': _gstAmount,
+      // The admin's per-km rate this fare was priced at. The invoice prints
+      // THIS, and shows the gap down to the base fare as the discount it is.
+      if (_ratePerKm > 0) 'ratePerKm': _ratePerKm,
       // For Local, estimatedDistance holds the package's included km (billedKm).
       if (_distanceKm > 0) 'estimatedDistance': _distanceKm.round()
       else if (_isLocal && _billedKm > 0) 'estimatedDistance': _billedKm.round(),

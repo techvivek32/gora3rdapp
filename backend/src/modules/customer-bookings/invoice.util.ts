@@ -21,7 +21,10 @@ export interface InvoiceData {
   carSeats?: number;
   carBags?: string;
   carFuel?: string;
+  /** The per-km rate the booking was priced at, recorded when it was made. */
   ratePerKm?: number;
+  /** The cab category's discount — only used to rebuild older bookings' rate. */
+  discountPercent?: number;
   dailyKmLimit?: number;
   pickup?: string;
   drop?: string;
@@ -78,6 +81,12 @@ function fmtDate(d?: Date | string, withTime = true): string {
 function money(n?: number): string {
   const v = Math.round((n || 0) * 100) / 100;
   return `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Two decimals at most, and none at all on a whole number: 90, not 90.00. */
+function round2(n: number): string {
+  const v = Math.round(n * 100) / 100;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2);
 }
 
 function fmtDuration(start?: Date | string, end?: Date | string): string {
@@ -160,6 +169,15 @@ interface FareLine {
   rate?: string;
   amount: number;
   /**
+   * How many units this line was billed for, of what, and at what price —
+   * 200 km at 100/km. `rateValue` is the rate the booking was actually priced
+   * at, so qty x rateValue equals `amount` and the Rate column explains the
+   * Amount beside it.
+   */
+  qty?: number;
+  unit?: string;
+  rateValue?: number;
+  /**
    * False for money the driver laid out and is simply being paid back — toll,
    * parking, and whatever they entered as "other". Those are reimbursements,
    * not our service, so no tax is charged on them and the figure printed must
@@ -216,17 +234,64 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
   // Name the fare on the line, so an All Inclusive bill says why there is no
   // separate toll row — the same thing the driver's trip-end screen shows.
   const svcLabel = data.fareMode ? `${svc} (${data.fareMode})` : svc;
+  // What the ride was actually billed for. On a minimum-km fare that is the
+  // package (200 km) rather than the distance driven (91 km), so say which
+  // number the amount beside it was worked out from.
+  const billedKm = Math.max(0, num(data.includedKm)) || Math.max(0, num(data.distanceKm));
+  const svcRoute = route ? `${svcLabel} - ${route}` : svcLabel;
+
+  // The ride is billed at the admin's per-km rate and THEN discounted, so the
+  // invoice shows both: km x rate as the gross, and the reduction as its own
+  // line. Dividing the discounted total by the km instead would print a rate
+  // the admin never set and quietly hide the discount from the rider.
+  const storedRate = Math.max(0, num(data.ratePerKm));
+  let grossBase = base;
+  let baseRate = 0;
+  if (billedKm > 0 && storedRate > 0 && Math.round(billedKm * storedRate) >= base) {
+    // Priced at the admin's rate, then discounted down to `base`.
+    grossBase = Math.round(billedKm * storedRate);
+    baseRate = storedRate;
+  } else if (num(data.includedKm) > 0) {
+    // Booked before the rate was recorded. The discount the cab category
+    // carried is the only thing that moved km x rate and the charged fare
+    // apart, so it can be rebuilt — but ONLY for a booking that carries a real
+    // billing basis (`includedKm`, written by the fare engine). Without one
+    // there is nothing to say the fare was ever priced per km, and assuming a
+    // discount would invent one the rider never got.
+    const pct = Math.min(99, Math.max(0, num(data.discountPercent)));
+    const g = pct > 0 ? Math.round(base / (1 - pct / 100)) : base;
+    if (g >= base) {
+      grossBase = g;
+      baseRate = g / billedKm;
+    }
+  }
+  // Whatever route got us here, the three cells must agree before any of them
+  // is printed: a rate that does not multiply up to the amount is worse than
+  // no rate at all.
+  if (!(billedKm > 0) || Math.abs(billedKm * baseRate - grossBase) > 1) {
+    grossBase = base;
+    baseRate = 0;
+  }
+  const discount = grossBase > base ? grossBase - base : 0;
+
   lines.push({
-    label: route ? `${svcLabel} - ${route}` : svcLabel,
-    rate: data.ratePerKm ? `Rs. ${data.ratePerKm}/km` : undefined,
-    amount: base,
+    label: billedKm > 0 ? `${svcRoute} (${round2(billedKm)} km)` : svcRoute,
+    qty: billedKm,
+    unit: 'km',
+    rateValue: baseRate,
+    amount: grossBase,
   });
+  if (discount > 0) {
+    const pct = Math.round((discount / grossBase) * 100);
+    lines.push({ label: pct > 0 ? `Discount (${pct}%)` : 'Discount', amount: -discount });
+  }
   if (allowance > 0) lines.push({ label: 'Driver allowance', amount: allowance });
   if (extraKmCharge > 0) {
-    lines.push({ label: `Extra ${data.extraKm} km`, rate: data.extraKmPrice ? `Rs. ${data.extraKmPrice}/km` : undefined, amount: extraKmCharge });
+    // Extra km is billed at trip end at the snapshot rate and is not discounted.
+    lines.push({ label: `Extra ${data.extraKm} km`, qty: num(data.extraKm), unit: 'km', rateValue: num(data.extraKmPrice), amount: extraKmCharge });
   }
   if (extraHrCharge > 0) {
-    lines.push({ label: `Extra ${data.extraHours} hr`, rate: data.extraHourPrice ? `Rs. ${data.extraHourPrice}/hr` : undefined, amount: extraHrCharge });
+    lines.push({ label: `Extra ${data.extraHours} hr`, qty: num(data.extraHours), unit: 'hr', rateValue: num(data.extraHourPrice), amount: extraHrCharge });
   }
   if (toll > 0) lines.push({ label: 'Toll', amount: toll, taxable: false });
   if (parking > 0) lines.push({ label: 'Parking', amount: parking, taxable: false });
@@ -239,11 +304,13 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
   // How much tax this invoice states — on the service only.
   let taxTotal: number;
   let taxable: number;
+  let rescaled = false;
   if (storedGst > 0) {
     // The booking recorded the tax actually charged; an invoice must state that.
     taxTotal = storedGst;
     taxable = serviceTotal;
   } else if (totalPct > 0 && tax.fareIncludesTax) {
+    rescaled = true;
     // The fare already has tax inside it — pull it back out so the taxable
     // value plus the tax add up to what was charged. Only the service lines
     // are scaled; a reimbursement is printed at the amount actually paid.
@@ -258,6 +325,16 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
   } else {
     taxable = serviceTotal;
     taxTotal = 0;
+  }
+
+  // Print the rate the ride was priced at. `rescaled` is the one case where it
+  // cannot be shown: the fare had no GST recorded, so the tax was pulled back
+  // out of every line above and the amounts no longer are qty x rate. Leaving
+  // the cell empty there beats printing a rate that does not multiply out.
+  for (const l of lines) {
+    if (rescaled) { l.rate = undefined; continue; }
+    if (!l.qty || l.qty <= 0 || !l.rateValue || l.rateValue <= 0) continue;
+    l.rate = `Rs. ${round2(l.rateValue)}/${l.unit || 'km'}`;
   }
 
   let cgst = 0, sgst = 0, igst = 0;
@@ -667,7 +744,20 @@ export function buildInvoicePdf(data: InvoiceData, template?: InvoiceTemplateLik
 }
 
 /** A realistic booking used by the admin's "Download sample" button. */
-export function sampleInvoiceData(): InvoiceData {
+/**
+ * A stand-in booking for the Invoice Design preview.
+ *
+ * The GST is passed in rather than fixed so the preview answers the question
+ * the admin is actually asking — "what does MY tax setting look like?" — and
+ * so it goes down the same path a real booking does, which records the tax it
+ * was charged instead of having it pulled back out of the total.
+ */
+// 200 km at Rs 100/km, less the cab's 10% discount, plus the driver allowance.
+const SAMPLE_ALLOWANCE = 300;
+const SAMPLE_NET = 18000 + SAMPLE_ALLOWANCE;
+
+export function sampleInvoiceData(gstPercent = 0): InvoiceData {
+  const sampleGst = Math.round((SAMPLE_NET * Math.max(0, gstPercent)) / 100);
   const now = new Date();
   const started = new Date(now.getTime() - 3 * 3600000);
   return {
@@ -684,7 +774,6 @@ export function sampleInvoiceData(): InvoiceData {
     vehicleNumber: 'GJ03AB1234',
     carName: 'Innova Crysta',
     carClass: 'A/C Sedan',
-    ratePerKm: 22,
     pickup: 'Rajkot Railway Station, Rajkot',
     drop: 'Jamnagar Airport, Jamnagar',
     pickupCity: 'Rajkot',
@@ -693,12 +782,17 @@ export function sampleInvoiceData(): InvoiceData {
     travelTime: '09:30',
     startedAt: started,
     completedAt: now,
+    // A realistic fare so the preview shows what a real invoice shows: a
+    // 92 km trip billed on the 200 km minimum at Rs 100/km, less the cab's
+    // 10% discount, plus the allowance, taxed at whatever the admin has set.
     distanceKm: 92,
+    includedKm: 200,
+    ratePerKm: 100,
     passengers: 3,
-    fare: 25037,
+    fare: SAMPLE_NET + sampleGst,
     tollAmount: 0,
-    driverAllowance: 300,
-    gstAmount: 0,
+    driverAllowance: SAMPLE_ALLOWANCE,
+    gstAmount: sampleGst,
     paymentMode: 'Cash — paid to the driver',
   };
 }

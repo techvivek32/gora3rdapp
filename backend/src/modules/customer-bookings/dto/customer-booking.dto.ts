@@ -44,6 +44,8 @@ export class CreateCustomerBookingDto {
   @IsOptional() @IsNumber() baseFare?: number;
   @IsOptional() @IsNumber() driverAllowance?: number;
   @IsOptional() @IsNumber() gstAmount?: number;
+  // The admin's per-km rate the fare was priced at; the invoice prints it.
+  @IsOptional() @IsNumber() ratePerKm?: number;
   @IsOptional() @IsNumber() estimatedDistance?: number;
   // Round-trip GPS rental snapshot (from the chosen cab category).
   @IsOptional() @IsNumber() dailyKmLimit?: number;
@@ -101,6 +103,8 @@ export class UpdateCustomerBookingDto {
   @IsOptional() @IsNumber() baseFare?: number;
   @IsOptional() @IsNumber() driverAllowance?: number;
   @IsOptional() @IsNumber() gstAmount?: number;
+  // The admin's per-km rate the fare was priced at; the invoice prints it.
+  @IsOptional() @IsNumber() ratePerKm?: number;
   @IsOptional() @IsNumber() estimatedDistance?: number;
   // Round-trip GPS rental snapshot (from the chosen cab category).
   @IsOptional() @IsNumber() dailyKmLimit?: number;

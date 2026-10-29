@@ -404,6 +404,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
       'fuelFaresRaw': fuelFaresRaw,
       'noFuelFareRaw': _rawFareFor(cat),
       'discountPercent': _discountPct(cat),
+      // The per-km rate this fare was actually priced at (pickup state's rate
+      // first, then the fuel rate, then the flat one). Carried all the way to
+      // the booking so the invoice can print the admin's real rate instead of
+      // guessing one back out of the total.
+      'fuelRates': {for (final f in fuels) f: _rateForFuel(cat, f)},
+      'noFuelRate': _rate(cat),
       'driverAllowance': _allowanceFor(cat),
       'gstPercent': _gstPercent,
       // Fare-breakdown parts (base+toll and GST), per fuel + no-fuel fallback.

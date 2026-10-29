@@ -62,7 +62,9 @@ export class AdminController {
     const posted = body && body.blocks ? body : await this.invoiceTemplates.getSafe();
     // Rates always come from Pricing Config, never from whatever the page sent.
     const template = await this.invoiceTemplates.applyTaxRates(posted);
-    const buffer = await buildInvoicePdf(sampleInvoiceData(), template);
+    // Tax the sample at the rate the admin has actually configured, so the
+    // preview answers "what will MY invoice look like" rather than a fixed one.
+    const buffer = await buildInvoicePdf(sampleInvoiceData(Number(template?.tax?.gstPercent) || 0), template);
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="invoice-preview.pdf"',

@@ -461,7 +461,14 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-4 space-y-3">
                     <div>
                       <label className={labelCls}>State-wise price/km (₹)</label>
-                      <p className="text-xs text-gray-500">The app uses the pickup state&apos;s rate. Pick a fuel, then set each state (or use &quot;Apply to all&quot;).</p>
+                      <p className="text-xs text-gray-500">
+                        Pick a fuel, then set each state (or use &quot;Apply to all&quot;).
+                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        A state&apos;s rate <b>overrides the fuel price above</b> for every trip that
+                        <b> starts</b> in that state — the drop state never decides the rate. Leave a
+                        state blank to fall back to the fuel price.
+                      </p>
                     </div>
                     {/* Fuel sub-tabs (only active fuels) */}
                     <div className="flex flex-wrap gap-2">

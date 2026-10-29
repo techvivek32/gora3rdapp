@@ -97,7 +97,6 @@ export const SAMPLE = {
   vehicle: 'Toyota Innova Crysta',
   vehicleNumber: 'GJ03AB1234',
   cabType: 'Innova Crysta A/C Sedan',
-  ratePerKm: 22,
   pickup: 'Rajkot Railway Station, Rajkot',
   drop: 'Jamnagar Airport, Jamnagar',
   pickupCity: 'Rajkot',
@@ -106,8 +105,13 @@ export const SAMPLE = {
   travelTime: '09:30',
   duration: '3h 0m',
   distanceKm: 92,
+  // Billed on the 200 km minimum at Rs 100/km, less the cab's 10% discount.
+  includedKm: 200,
+  ratePerKm: 100,
   passengers: 3,
-  fare: 25037,
+  // The GST — and so the total — follow the tax setting being previewed; see
+  // previewFare. These are the net figures everything else is built from.
+  netBeforeTax: 18300,
   driverAllowance: 300,
   paymentMode: 'Cash',
 };
@@ -120,21 +124,53 @@ export function previewFare(tax: Record<string, any>) {
   const totalPct = mode === 'igst' ? ig : mode === 'none' ? 0 : cg + sg;
 
   const allowance = SAMPLE.driverAllowance;
-  const base = SAMPLE.fare - allowance;
-  const lines = [
-    { label: `${SAMPLE.serviceCategory} - ${SAMPLE.pickupCity} to ${SAMPLE.dropCity}`, rate: `Rs. ${SAMPLE.ratePerKm}/km`, amount: base },
-    { label: 'Driver allowance', rate: '', amount: allowance },
+  // The sample is taxed at the rate being previewed, exactly as the server
+  // does it, so a real booking and this preview take the same code path.
+  const storedGst = Math.round((n(SAMPLE.netBeforeTax) * Math.max(0, totalPct)) / 100);
+  const base = n(SAMPLE.netBeforeTax) - allowance;
+  // Mirror the PDF: the ride is billed at the admin's per-km rate and THEN
+  // discounted, so the gross (km x rate) and the discount are separate lines.
+  const billedKm = n(SAMPLE.includedKm) || n(SAMPLE.distanceKm);
+  const rate = n(SAMPLE.ratePerKm);
+  const gross = billedKm > 0 && rate > 0 && Math.round(billedKm * rate) >= base
+    ? Math.round(billedKm * rate) : base;
+  const discount = gross > base ? gross - base : 0;
+
+  const lines: { label: string; rate: string; amount: number; qty?: number; unit?: string; rateValue?: number }[] = [
+    {
+      label: `${SAMPLE.serviceCategory} - ${SAMPLE.pickupCity} to ${SAMPLE.dropCity}${billedKm > 0 ? ` (${billedKm} km)` : ''}`,
+      rate: '', qty: billedKm, unit: 'km', rateValue: discount > 0 || gross === base ? rate : 0, amount: gross,
+    },
   ];
+  if (discount > 0) {
+    lines.push({ label: `Discount (${Math.round((discount / gross) * 100)}%)`, rate: '', amount: -discount });
+  }
+  lines.push({ label: 'Driver allowance', rate: '', amount: allowance });
   const itemTotal = lines.reduce((s, l) => s + l.amount, 0);
 
   let taxable = itemTotal, taxTotal = 0;
-  if (totalPct > 0 && tax?.fareIncludesTax !== false) {
+  let rescaled = false;
+  if (storedGst > 0) {
+    taxTotal = storedGst;
+  } else if (totalPct > 0 && tax?.fareIncludesTax !== false) {
+    rescaled = true;
     taxable = itemTotal / (1 + totalPct / 100);
     taxTotal = itemTotal - taxable;
     lines.forEach((l) => { l.amount = l.amount / (1 + totalPct / 100); });
   } else if (totalPct > 0) {
     taxTotal = (itemTotal * totalPct) / 100;
   }
+
+  // Same rule as the PDF: print the rate the ride was priced at, and nothing
+  // at all once the tax has been pulled back out of the line amounts.
+  const round2 = (v: number) => {
+    const r = Math.round(v * 100) / 100;
+    return Number.isInteger(r) ? String(r) : r.toFixed(2);
+  };
+  lines.forEach((l) => {
+    if (rescaled || !l.qty || l.qty <= 0 || !l.rateValue || l.rateValue <= 0) return;
+    l.rate = `Rs. ${round2(l.rateValue)}/${l.unit || 'km'}`;
+  });
 
   let cgst = 0, sgst = 0, igst = 0;
   if (mode === 'igst') igst = taxTotal;

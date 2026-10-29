@@ -118,6 +118,12 @@ export class CustomerBooking {
   @Prop({ default: 0 }) driverAllowance: number;
   @Prop({ default: 0 }) gstAmount: number;
   @Prop({ default: 0 }) estimatedDistance: number;
+  // The admin's per-km rate this fare was priced at — the pickup state's rate
+  // for the chosen fuel, else the fuel rate, else the cab's flat one. Recorded
+  // at booking time because a later price change must not rewrite an issued
+  // invoice, and because the invoice has to print the real rate rather than
+  // divide the discounted total by the km.
+  @Prop({ default: 0 }) ratePerKm: number;
 
   // ── Round-trip GPS km tracking + extra-km billing ──────────────────────────
   // Snapshot of the cab's rental limits at accept time (so later admin edits
