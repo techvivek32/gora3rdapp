@@ -114,11 +114,13 @@ export const DEFAULT_INVOICE_TEMPLATE = {
     logoUrl: '',
   },
   tax: {
-    // 5% GST on cab service, split half CGST / half SGST for an intra-state ride.
+    // The RATES are not configured here — they are read from Pricing Config's
+    // GST % on every load and split (12% -> CGST 6% + SGST 6%), so there is one
+    // place to change GST. These are only the fallbacks used if that read fails.
     mode: 'cgst_sgst',
-    cgstPercent: 2.5,
-    sgstPercent: 2.5,
-    igstPercent: 5,
+    cgstPercent: 0,
+    sgstPercent: 0,
+    igstPercent: 0,
     showRoundOff: true,
     // The stored fare already includes GST, so the invoice shows the tax it
     // contains rather than adding more on top.

@@ -230,6 +230,10 @@ class _CabConfirmPageState extends State<CabConfirmPage> {
       if (!_isEdit) 'serviceType': 'cab',
       if (t['subType'] != null) 'subType': t['subType'],
       'vehicleType': (_cat['name'] ?? 'Cab').toString(),
+      // Which fare was booked. The server uses it to decide whether the driver
+      // may add a toll at trip end — on All Inclusive the toll is already in
+      // this fare, so charging it again would bill the rider twice.
+      'fareMode': _isLocal ? 'local' : (_isBestPrice ? 'best_price' : 'all_inclusive'),
       'pickup': t['pickup'],
       'pickupCity': t['pickupCity'],
       // Local has no destination.

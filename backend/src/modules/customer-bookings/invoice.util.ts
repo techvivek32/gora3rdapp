@@ -155,7 +155,18 @@ function amountInWords(amount: number): string {
 
 // ─── fare + tax maths ────────────────────────────────────────────────────────
 
-interface FareLine { label: string; rate?: string; amount: number }
+interface FareLine {
+  label: string;
+  rate?: string;
+  amount: number;
+  /**
+   * False for money the driver laid out and is simply being paid back — toll,
+   * parking, and whatever they entered as "other". Those are reimbursements,
+   * not our service, so no tax is charged on them and the figure printed must
+   * be the exact amount the rider handed over.
+   */
+  taxable?: boolean;
+}
 
 interface FareBreakdown {
   lines: FareLine[];
@@ -202,8 +213,11 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
   const lines: FareLine[] = [];
   const svc = prettyService(data.serviceType);
   const route = [data.pickupCity || data.pickup, data.dropCity || data.drop].filter(Boolean).join(' to ');
+  // Name the fare on the line, so an All Inclusive bill says why there is no
+  // separate toll row — the same thing the driver's trip-end screen shows.
+  const svcLabel = data.fareMode ? `${svc} (${data.fareMode})` : svc;
   lines.push({
-    label: route ? `${svc} - ${route}` : svc,
+    label: route ? `${svcLabel} - ${route}` : svcLabel,
     rate: data.ratePerKm ? `Rs. ${data.ratePerKm}/km` : undefined,
     amount: base,
   });
@@ -214,29 +228,35 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
   if (extraHrCharge > 0) {
     lines.push({ label: `Extra ${data.extraHours} hr`, rate: data.extraHourPrice ? `Rs. ${data.extraHourPrice}/hr` : undefined, amount: extraHrCharge });
   }
-  if (toll > 0) lines.push({ label: 'Toll', amount: toll });
-  if (parking > 0) lines.push({ label: 'Parking', amount: parking });
-  if (other > 0) lines.push({ label: 'Other charges', amount: other });
+  if (toll > 0) lines.push({ label: 'Toll', amount: toll, taxable: false });
+  if (parking > 0) lines.push({ label: 'Parking', amount: parking, taxable: false });
+  if (other > 0) lines.push({ label: 'Other charges', amount: other, taxable: false });
 
-  const itemTotal = lines.reduce((s, l) => s + l.amount, 0);
+  // What the rider pays back at cost, and what they pay us for the service.
+  const passThrough = lines.filter((l) => l.taxable === false).reduce((s, l) => s + l.amount, 0);
+  const serviceTotal = lines.filter((l) => l.taxable !== false).reduce((s, l) => s + l.amount, 0);
 
-  // How much tax this invoice states.
+  // How much tax this invoice states — on the service only.
   let taxTotal: number;
   let taxable: number;
   if (storedGst > 0) {
+    // The booking recorded the tax actually charged; an invoice must state that.
     taxTotal = storedGst;
-    taxable = itemTotal;
+    taxable = serviceTotal;
   } else if (totalPct > 0 && tax.fareIncludesTax) {
-    // The stored fare already has tax inside it — pull it back out so the
-    // invoice shows a taxable value plus tax that add up to what was charged.
-    taxable = itemTotal / (1 + totalPct / 100);
-    taxTotal = itemTotal - taxable;
-    lines.forEach((l) => { l.amount = l.amount / (1 + totalPct / 100); });
+    // The fare already has tax inside it — pull it back out so the taxable
+    // value plus the tax add up to what was charged. Only the service lines
+    // are scaled; a reimbursement is printed at the amount actually paid.
+    taxable = serviceTotal / (1 + totalPct / 100);
+    taxTotal = serviceTotal - taxable;
+    lines.forEach((l) => {
+      if (l.taxable !== false) l.amount = l.amount / (1 + totalPct / 100);
+    });
   } else if (totalPct > 0) {
-    taxable = itemTotal;
-    taxTotal = (itemTotal * totalPct) / 100;
+    taxable = serviceTotal;
+    taxTotal = (serviceTotal * totalPct) / 100;
   } else {
-    taxable = itemTotal;
+    taxable = serviceTotal;
     taxTotal = 0;
   }
 
@@ -248,7 +268,8 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
     sgst = taxTotal - cgst;
   }
 
-  const total = taxable + taxTotal;
+  // The reimbursements sit outside the tax but inside what the rider pays.
+  const total = taxable + taxTotal + passThrough;
   const rounded = Math.round(total);
   const roundOff = tax.showRoundOff ? rounded - total : 0;
   const finalAmount = tax.showRoundOff ? rounded : total;

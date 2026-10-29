@@ -518,6 +518,11 @@ export class CustomerBookingsService {
       customerId: new Types.ObjectId(customerId),
       serviceType: dto.serviceType,
       subType: dto.subType || '',
+      // Record which fare was booked rather than inferring it later from the
+      // free text in `notes`. An older app build sends nothing, so fall back to
+      // the same wording it writes — that keeps old and new clients in step.
+      fareMode: (dto as any).fareMode
+        || CustomerBookingsService.resolveFareMode({ subType: dto.subType, notes: dto.notes }),
       pickup: dto.pickup || {},
       drop: dto.drop || {},
       stops: dto.stops || [],
@@ -730,14 +735,25 @@ export class CustomerBookingsService {
     // assigned, so there is nothing for them to settle with us afterwards.
     // Both copies of the invoice therefore show the same total.
     const fare = rawFare;
-    // Toll: prefer the structured charge the driver entered on the bill screen;
-    // fall back to the legacy value concatenated into `notes` for old bookings.
-    let tollAmount = Math.max(0, Math.round(booking.tollCharge || 0));
-    if (!tollAmount) {
-      const m = /toll[^0-9]{0,12}(\d+)/i.exec(booking.notes || '');
-      if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
+    const mode = CustomerBookingsService.resolveFareMode(booking);
+    // Toll is only ever a SEPARATE line when the rider pays it on top of the
+    // fare — that is Best Price. On All Inclusive it is priced inside the fare,
+    // and the driver's trip-end screen shows it inside the base too, so pulling
+    // it back out here would make the two bills disagree.
+    //
+    // The notes fallback is for old Best Price bookings, which recorded the
+    // driver's toll as text before `tollCharge` existed. It must not run on an
+    // All Inclusive booking: its notes say "Toll included (auto): Rs.500", which
+    // is the opposite claim.
+    let tollAmount = 0;
+    if (mode === 'best_price') {
+      tollAmount = Math.max(0, Math.round(booking.tollCharge || 0));
+      if (!tollAmount) {
+        const m = /toll[^0-9]{0,12}(\d+)/i.exec(booking.notes || '');
+        if (m) tollAmount = Math.min(Number(m[1]) || 0, fare);
+      }
     }
-    const fareMode = /all\s*inclusive/i.test(booking.notes || '') ? 'All Inclusive' : undefined;
+    const fareMode = mode === 'all_inclusive' ? 'All Inclusive' : mode === 'best_price' ? 'Best Price' : undefined;
 
     // Car details for the invoice: match the booked class (vehicleType is the cab
     // category name) and read its class/seats/bags/per-km rate from the admin panel.
@@ -1063,6 +1079,15 @@ export class CustomerBookingsService {
 
     // Apply the editable fields (serviceType stays fixed).
     if (dto.subType !== undefined) booking.subType = dto.subType;
+    // Editing can switch the fare (Best Price <-> All Inclusive), and that
+    // decides whether the driver may add a toll at the end — so keep it in step.
+    if ((dto as any).fareMode !== undefined) booking.fareMode = (dto as any).fareMode;
+    else if (dto.subType !== undefined || dto.notes !== undefined) {
+      booking.fareMode = CustomerBookingsService.resolveFareMode({
+        subType: dto.subType ?? booking.subType,
+        notes: dto.notes ?? booking.notes,
+      });
+    }
     if (dto.pickup !== undefined) booking.pickup = dto.pickup as any;
     if (dto.drop !== undefined) booking.drop = dto.drop as any;
     if (dto.stops !== undefined) booking.stops = dto.stops as any;
@@ -1990,6 +2015,32 @@ export class CustomerBookingsService {
    * from the agreed base + GPS extras, so re-submitting corrects rather than
    * stacks. Only the selected driver, only on a completed trip.
    */
+  /**
+   * Which fare this booking was made on.
+   *
+   * New bookings store it. Older ones only ever recorded it as wording the app
+   * put into `notes` ("Best Price — toll/tax/parking paid directly by rider" /
+   * "All Inclusive: …"), so those are read back here rather than being treated
+   * as Best Price by default — guessing wrong would let a driver charge a toll
+   * that the rider has already paid inside the fare.
+   */
+  static resolveFareMode(booking: any): 'best_price' | 'all_inclusive' | 'local' {
+    const stored = booking?.fareMode;
+    if (stored === 'best_price' || stored === 'all_inclusive' || stored === 'local') return stored;
+    if ((booking?.subType || '') === 'Local') return 'local';
+    const notes = `${booking?.notes || ''}`;
+    if (/best\s*price/i.test(notes)) return 'best_price';
+    if (/all\s*inclusive|toll\s*included/i.test(notes)) return 'all_inclusive';
+    // Nothing to go on. All Inclusive is the app's own default fare, and it is
+    // the safe guess: it blocks a second toll rather than inviting one.
+    return 'all_inclusive';
+  }
+
+  /** True when the toll is already inside the fare the rider agreed to. */
+  static tollAlreadyInFare(booking: any): boolean {
+    return CustomerBookingsService.resolveFareMode(booking) !== 'best_price';
+  }
+
   async updateTripCharges(
     driverId: string,
     id: string,
@@ -2006,7 +2057,15 @@ export class CustomerBookingsService {
       throw new BadRequestException('Charges were already saved for this trip and cannot be changed.');
     }
     const clean = (v: any) => Math.max(0, Math.round(Number(v) || 0));
-    booking.tollCharge = clean(charges.toll);
+    // On an All Inclusive (or Local) fare the toll is already paid inside the
+    // fare, so accepting one here would bill the rider for it twice. The app
+    // hides the field, but the rule has to hold on the server too.
+    if (clean(charges.toll) > 0 && CustomerBookingsService.tollAlreadyInFare(booking)) {
+      throw new BadRequestException(
+        'Toll is already included in this fare, so it cannot be added again. You can still add parking and other charges.',
+      );
+    }
+    booking.tollCharge = CustomerBookingsService.tollAlreadyInFare(booking) ? 0 : clean(charges.toll);
     booking.parkingCharge = clean(charges.parking);
     booking.otherCharge = clean(charges.other);
     booking.tripChargesSavedAt = new Date();

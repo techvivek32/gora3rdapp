@@ -8,6 +8,7 @@ import {
   INVOICE_BLOCK_TYPES,
   InvoiceBlock,
 } from '../../database/schemas/invoice-template.schema';
+import { SettingsService } from '../settings/settings.service';
 
 const KEY = 'default';
 
@@ -24,13 +25,42 @@ export class InvoiceTemplateService {
 
   constructor(
     @InjectModel(InvoiceTemplate.name) private model: Model<InvoiceTemplateDocument>,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * Fill in the tax rates from the ONE place GST is configured: Pricing Config.
+   *
+   * The invoice must charge what the fare engine charged, so the rate is not a
+   * second thing to keep in step — it is read, and split: 12%% GST becomes
+   * CGST 6%% + SGST 6%% within a state, or IGST 12%% across one.
+   */
+  async applyTaxRates(tpl: any): Promise<any> {
+    let gst = 0;
+    try {
+      const s: any = await this.settings.getSettings();
+      gst = Math.max(0, Math.min(100, Number(s?.gstPercent) || 0));
+    } catch {
+      gst = 0;
+    }
+    const half = Math.round((gst / 2) * 100) / 100;
+    return {
+      ...tpl,
+      tax: {
+        ...(tpl?.tax || {}),
+        gstPercent: gst,
+        cgstPercent: half,
+        sgstPercent: gst - half,
+        igstPercent: gst,
+      },
+    };
+  }
 
   /** The saved design, or the built-in default when nothing has been saved. */
   async get(): Promise<any> {
     const doc = await this.model.findOne({ key: KEY }).lean();
-    if (!doc) return { ...DEFAULT_INVOICE_TEMPLATE };
-    return {
+    if (!doc) return this.applyTaxRates({ ...DEFAULT_INVOICE_TEMPLATE });
+    return this.applyTaxRates({
       key: KEY,
       paper: { ...DEFAULT_INVOICE_TEMPLATE.paper, ...(doc.paper || {}) },
       company: { ...DEFAULT_INVOICE_TEMPLATE.company, ...(doc.company || {}) },
@@ -39,7 +69,7 @@ export class InvoiceTemplateService {
       blocks: (doc.blocks && doc.blocks.length ? doc.blocks : DEFAULT_INVOICE_TEMPLATE.blocks) as InvoiceBlock[],
       updatedAt: (doc as any).updatedAt,
       updatedBy: doc.updatedBy,
-    };
+    });
   }
 
   /**
@@ -51,7 +81,7 @@ export class InvoiceTemplateService {
       return await this.get();
     } catch (e: any) {
       this.logger.error(`Could not load the invoice template, using the default: ${e?.message}`);
-      return { ...DEFAULT_INVOICE_TEMPLATE };
+      return this.applyTaxRates({ ...DEFAULT_INVOICE_TEMPLATE });
     }
   }
 
@@ -116,10 +146,11 @@ export class InvoiceTemplateService {
         logoUrl: String(b.company?.logoUrl ?? ''),
       },
       tax: {
+        // The rates are NOT stored: they are read from Pricing Config on every
+        // load (see applyTaxRates), so changing GST in one place changes every
+        // invoice. Only the choices that are genuinely the invoice's own are
+        // kept here.
         mode: ['cgst_sgst', 'igst', 'none'].includes(b.tax?.mode) ? b.tax.mode : d.tax.mode,
-        cgstPercent: Math.min(50, Math.max(0, num(b.tax?.cgstPercent, d.tax.cgstPercent))),
-        sgstPercent: Math.min(50, Math.max(0, num(b.tax?.sgstPercent, d.tax.sgstPercent))),
-        igstPercent: Math.min(50, Math.max(0, num(b.tax?.igstPercent, d.tax.igstPercent))),
         showRoundOff: b.tax?.showRoundOff !== false,
         fareIncludesTax: b.tax?.fareIncludesTax !== false,
       },

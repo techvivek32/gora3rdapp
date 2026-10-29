@@ -59,7 +59,9 @@ export class AdminController {
   async previewInvoiceTemplate(@Body() body: any, @Res() res: Response) {
     // Render exactly what the renderer would produce for the posted design, so
     // the admin can check an edit before committing to it.
-    const template = body && body.blocks ? body : await this.invoiceTemplates.getSafe();
+    const posted = body && body.blocks ? body : await this.invoiceTemplates.getSafe();
+    // Rates always come from Pricing Config, never from whatever the page sent.
+    const template = await this.invoiceTemplates.applyTaxRates(posted);
     const buffer = await buildInvoicePdf(sampleInvoiceData(), template);
     res.set({
       'Content-Type': 'application/pdf',

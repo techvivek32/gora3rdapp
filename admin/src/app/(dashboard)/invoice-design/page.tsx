@@ -505,15 +505,45 @@ export default function InvoiceDesignPage() {
                   </Select>
                 </div>
                 {tpl.tax?.mode !== 'none' && (
-                  <div className="grid grid-cols-3 gap-3">
-                    {tpl.tax?.mode === 'igst'
-                      ? field('IGST %', tpl.tax?.igstPercent, (v) => patch((d) => { d.tax.igstPercent = Number(v) || 0; }))
-                      : (
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Rate</span>
+                      <span className="text-xs text-gray-500">
+                        GST {tpl.tax?.gstPercent ?? 0}% from{' '}
+                        <a href="/cab-categories" className="underline hover:text-orange-600">Cab Categories</a>
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {tpl.tax?.mode === 'igst' ? (
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-500 mb-1">IGST</label>
+                          <div className="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold">
+                            {tpl.tax?.igstPercent ?? 0}%
+                          </div>
+                        </div>
+                      ) : (
                         <>
-                          {field('CGST %', tpl.tax?.cgstPercent, (v) => patch((d) => { d.tax.cgstPercent = Number(v) || 0; }))}
-                          {field('SGST %', tpl.tax?.sgstPercent, (v) => patch((d) => { d.tax.sgstPercent = Number(v) || 0; }))}
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">CGST</label>
+                            <div className="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold">
+                              {tpl.tax?.cgstPercent ?? 0}%
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">SGST</label>
+                            <div className="px-3 py-2 text-sm rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 font-semibold">
+                              {tpl.tax?.sgstPercent ?? 0}%
+                            </div>
+                          </div>
                         </>
                       )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Set GST once in Cab Categories → Pricing. The invoice splits it:{' '}
+                      {tpl.tax?.gstPercent ?? 0}% becomes {tpl.tax?.mode === 'igst'
+                        ? `IGST ${tpl.tax?.igstPercent ?? 0}%`
+                        : `CGST ${tpl.tax?.cgstPercent ?? 0}% + SGST ${tpl.tax?.sgstPercent ?? 0}%`}.
+                    </p>
                   </div>
                 )}
                 <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -533,8 +563,9 @@ export default function InvoiceDesignPage() {
                   </span>
                 </label>
                 <p className="text-xs text-gray-500 border-t border-gray-100 dark:border-gray-800 pt-3">
-                  A booking that already recorded its own GST keeps that figure on the invoice — these rates apply to
-                  bookings that did not store one.
+                  A booking that already recorded its own GST keeps that figure on the invoice — this rate applies to
+                  bookings that did not store one. Toll, parking and other charges the driver adds at trip end are
+                  reimbursements, so no tax is charged on them.
                 </p>
               </div>
             )}

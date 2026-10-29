@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsInt, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsEmail, IsEnum, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CustomerServiceType } from '../../../database/schemas/customer-booking.schema';
 
@@ -14,6 +14,9 @@ class GeoDto {
 export class CreateCustomerBookingDto {
   @IsEnum(CustomerServiceType) serviceType: CustomerServiceType;
   @IsOptional() @IsString() subType?: string;
+  /** 'best_price' | 'all_inclusive' | 'local' — decides what the driver may
+   *  add at trip end, so it must survive the validation whitelist. */
+  @IsOptional() @IsIn(['best_price', 'all_inclusive', 'local']) fareMode?: string;
 
   @IsOptional() @ValidateNested() @Type(() => GeoDto) pickup?: GeoDto;
   @IsOptional() @ValidateNested() @Type(() => GeoDto) drop?: GeoDto;
@@ -72,6 +75,9 @@ export class CreateGuestBookingDto extends CreateCustomerBookingDto {
 /** Customer edits an OPEN booking. serviceType cannot change (that's a new booking). */
 export class UpdateCustomerBookingDto {
   @IsOptional() @IsString() subType?: string;
+  /** 'best_price' | 'all_inclusive' | 'local' — decides what the driver may
+   *  add at trip end, so it must survive the validation whitelist. */
+  @IsOptional() @IsIn(['best_price', 'all_inclusive', 'local']) fareMode?: string;
   @IsOptional() @ValidateNested() @Type(() => GeoDto) pickup?: GeoDto;
   @IsOptional() @ValidateNested() @Type(() => GeoDto) drop?: GeoDto;
   // Needs the element type: without @Type the global ValidationPipe's

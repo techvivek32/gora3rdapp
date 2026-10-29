@@ -53,6 +53,22 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
   // Charges can be entered only once; locked after the first save.
   bool get _chargesLocked => (_b['tripChargesSavedAt'] ?? '').toString().isNotEmpty;
 
+  /// Which fare the rider booked. Mirrors resolveFareMode() on the server:
+  /// the stored value first, then the wording older bookings left in `notes`.
+  String get _fareMode {
+    final stored = (_b['fareMode'] ?? '').toString();
+    if (stored == 'best_price' || stored == 'all_inclusive' || stored == 'local') return stored;
+    if ((_b['subType'] ?? '').toString() == 'Local') return 'local';
+    final notes = (_b['notes'] ?? '').toString();
+    if (RegExp(r'best\s*price', caseSensitive: false).hasMatch(notes)) return 'best_price';
+    return 'all_inclusive';
+  }
+
+  /// On All Inclusive (and Local) the toll is already inside the fare the rider
+  /// agreed to, so charging it again here would bill them for it twice. The
+  /// server refuses it too — this just keeps the field off the screen.
+  bool get _canChargeToll => _fareMode == 'best_price';
+
   double _num(dynamic v) => v is num ? v.toDouble() : (double.tryParse('$v') ?? 0);
 
   /// "2h 15m" trip duration from startedAt→completedAt, or '' if unavailable.
@@ -89,7 +105,7 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
     try {
       final updated = await _repo.updateTripCharges(
         _id,
-        toll: double.tryParse(_tollC.text.trim()) ?? 0,
+        toll: _canChargeToll ? (double.tryParse(_tollC.text.trim()) ?? 0) : 0,
         parking: double.tryParse(_parkingC.text.trim()) ?? 0,
         other: double.tryParse(_otherC.text.trim()) ?? 0,
       );
@@ -311,13 +327,15 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
           SizedBox(height: 2.h),
           Text(
               _chargesLocked
-                  ? 'Toll / parking / other charges were saved for this trip. They can be added only once and cannot be edited.'
-                  : 'Add any toll, parking or other approved charges — these are added to the cash the customer pays. You can save them only ONCE.',
+                  ? 'These charges were saved for this trip. They can be added only once and cannot be edited.'
+                  : _canChargeToll
+                      ? 'Add any toll, parking or other approved charges — these are added to the cash the customer pays. You can save them only ONCE.'
+                      : 'Toll is already included in this fare, so it cannot be charged again. Add parking or other approved charges — these are added to the cash the customer pays. You can save them only ONCE.',
               style: TextStyle(fontSize: 10.5.sp, color: AppColors.textSecondary, fontFamily: 'Poppins')),
           SizedBox(height: 12.h),
           if (_chargesLocked) ...[
             // Read-only once saved.
-            _row('Toll', '₹${_num(_b['tollCharge']).toStringAsFixed(0)}'),
+            if (_canChargeToll) _row('Toll', '₹${_num(_b['tollCharge']).toStringAsFixed(0)}'),
             _row('Parking', '₹${_num(_b['parkingCharge']).toStringAsFixed(0)}'),
             _row('Other charges', '₹${_num(_b['otherCharge']).toStringAsFixed(0)}'),
             SizedBox(height: 10.h),
@@ -333,8 +351,10 @@ class _DriverTripSummaryPageState extends State<DriverTripSummaryPage> {
               ]),
             ),
           ] else ...[
-            _chargeField('Toll', _tollC),
-            SizedBox(height: 10.h),
+            if (_canChargeToll) ...[
+              _chargeField('Toll', _tollC),
+              SizedBox(height: 10.h),
+            ],
             _chargeField('Parking', _parkingC),
             SizedBox(height: 10.h),
             _chargeField('Other charges', _otherC),

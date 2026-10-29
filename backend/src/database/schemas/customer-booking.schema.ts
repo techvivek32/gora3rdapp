@@ -146,6 +146,17 @@ export class CustomerBooking {
   @Prop({ default: 0 }) extraHours: number;
   @Prop({ default: 0 }) extraHourCharge: number;
 
+  // Which fare the rider booked:
+  //   best_price    — distance only; toll, state tax and parking are collected
+  //                   from the rider by the driver at the end of the trip.
+  //   all_inclusive — the toll is already priced into the fare, so the driver
+  //                   must NOT add it again at trip end.
+  //   local         — in-city hourly package (never carries a route toll).
+  // Older bookings have no value here; resolveFareMode() falls back to reading
+  // the wording the app wrote into `notes`.
+  @Prop({ type: String, enum: ['best_price', 'all_inclusive', 'local'] })
+  fareMode: string;
+
   // ── Driver-entered trip-end charges (cab bookings) ─────────────────────────
   // Entered by the driver on the final-bill screen after the drop OTP; each is
   // added to the balance the customer pays in cash. No tax line.
