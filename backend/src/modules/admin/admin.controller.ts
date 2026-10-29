@@ -1,6 +1,7 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,6 +13,8 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { MembershipType } from '../../common/enums/user-role.enum';
 import { CreateGarageVehicleDto } from '../garage/dto/garage-vehicle.dto';
 import { CreateGarageDriverDto } from '../garage/dto/garage-driver.dto';
+import { InvoiceTemplateService } from '../invoice-template/invoice-template.service';
+import { buildInvoicePdf, sampleInvoiceData } from '../customer-bookings/invoice.util';
 
 // Class default: admin-only. Endpoints a franchise may use are individually marked
 // with @Roles(...FRANCHISE_ROLES) — method-level @Roles fully overrides the class
@@ -26,7 +29,46 @@ const FRANCHISE_ROLES = [UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.FRANCHIS
 @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly invoiceTemplates: InvoiceTemplateService,
+  ) {}
+
+  // ─── Invoice design ────────────────────────────────────────────────
+
+  @Get('invoice-template')
+  @ApiOperation({ summary: 'The saved invoice design (falls back to the default)' })
+  getInvoiceTemplate() {
+    return this.invoiceTemplates.get();
+  }
+
+  @Put('invoice-template')
+  @ApiOperation({ summary: 'Save the invoice design built in the admin panel' })
+  saveInvoiceTemplate(@Body() body: any, @CurrentUser('sub') userId: string) {
+    return this.invoiceTemplates.update(body, userId);
+  }
+
+  @Post('invoice-template/reset')
+  @ApiOperation({ summary: 'Restore the built-in default invoice design' })
+  resetInvoiceTemplate() {
+    return this.invoiceTemplates.reset();
+  }
+
+  @Post('invoice-template/preview')
+  @ApiOperation({ summary: 'Render a sample PDF of a design WITHOUT saving it' })
+  async previewInvoiceTemplate(@Body() body: any, @Res() res: Response) {
+    // Render exactly what the renderer would produce for the posted design, so
+    // the admin can check an edit before committing to it.
+    const template = body && body.blocks ? body : await this.invoiceTemplates.getSafe();
+    const buffer = await buildInvoicePdf(sampleInvoiceData(), template);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="invoice-preview.pdf"',
+      'Content-Length': String(buffer.length),
+      'Cache-Control': 'private, no-store',
+    });
+    res.end(buffer);
+  }
 
   // ─── Dashboard ─────────────────────────────────────────────────────────────
   @Get('dashboard')

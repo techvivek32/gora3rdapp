@@ -20,6 +20,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { buildInvoicePdf } from './invoice.util';
+import { InvoiceTemplateService } from '../invoice-template/invoice-template.service';
 import { resolveGuestUser } from '../../common/utils/guest-user.util';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 import {
@@ -55,6 +56,7 @@ export class CustomerBookingsService {
     @InjectModel(GarageDriver.name) private garageDriverModel: Model<GarageDriverDocument>,
     private readonly notifications: NotificationsService,
     private readonly settings: SettingsService,
+    private readonly invoiceTemplates: InvoiceTemplateService,
   ) {}
 
   /**
@@ -768,12 +770,18 @@ export class CustomerBookingsService {
       /* best-effort — invoice still renders without car details */
     }
 
+    // The layout, company details, tax rates and wording all come from the
+    // design the admin saved in the Invoice Design page.
+    const template = await this.invoiceTemplates.getSafe();
+
     const buffer = await buildInvoicePdf({
       bookingId: booking.bookingId,
       serviceType: booking.serviceType,
       subType: booking.subType,
       customerName: customer?.fullName || 'Customer',
       customerMobile: customer?.mobile || '',
+      customerEmail: (customer as any)?.email || '',
+      customerAddress: [(customer as any)?.city, (customer as any)?.state].filter(Boolean).join(', '),
       driverName: booking.driverSnapshot?.name || 'Driver',
       driverPhone: booking.driverSnapshot?.phone || '',
       vehicle: booking.driverSnapshot?.vehicle || booking.vehicleType || '',
@@ -823,7 +831,7 @@ export class CustomerBookingsService {
       // share was already collected from the driver's wallet up front, so the
       // note is the same on both copies.
       paymentMode: `Cash Rs. ${rawFare.toLocaleString('en-IN')} — paid directly to the driver`,
-    });
+    }, template);
 
     return { buffer, filename: `Gora-Invoice-${booking.bookingId}.pdf` };
   }

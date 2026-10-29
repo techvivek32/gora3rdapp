@@ -25,9 +25,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { RequirementsModule } from '../requirements/requirements.module';
 import { AvailableVehiclesModule } from '../available-vehicles/available-vehicles.module';
 import { GarageModule } from '../garage/garage.module';
+import { InvoiceTemplateModule } from '../invoice-template/invoice-template.module';
 
 @Module({
   imports: [
+    InvoiceTemplateModule,
     MongooseModule.forFeature([
       { name: User.name, schema: UserSchema },
       { name: Requirement.name, schema: RequirementSchema },

@@ -42,9 +42,11 @@ import { PopupAdsModule } from './modules/popup-ads/popup-ads.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
 import { ImpersonationModule } from './modules/impersonation/impersonation.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { InvoiceTemplateModule } from './modules/invoice-template/invoice-template.module';
 
 @Module({
   imports: [
+    InvoiceTemplateModule,
     // Configuration
     ConfigModule.forRoot({
       isGlobal: true,

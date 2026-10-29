@@ -11,9 +11,11 @@ import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garag
 import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
+import { InvoiceTemplateModule } from '../invoice-template/invoice-template.module';
 
 @Module({
   imports: [
+    InvoiceTemplateModule,
     MongooseModule.forFeature([
       { name: CustomerBooking.name, schema: CustomerBookingSchema },
       { name: User.name, schema: UserSchema },

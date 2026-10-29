@@ -304,6 +304,23 @@ export const adminApi = {
   getCarPoolRides: (status?: string) => apiClient.get('/car-pool/admin/all', { params: { status: status || undefined } }),
 
   // ─── Platform Settings ─────────────────────────────────────────────────────
+  /** Logo for the invoice design. Stored under uploads/invoice. */
+  uploadInvoiceLogo: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('folder', 'invoice');
+    return apiClient.post('/storage/upload', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  // Invoice design (built in the Invoice Design page).
+  getInvoiceTemplate: () => apiClient.get('/admin/invoice-template'),
+  saveInvoiceTemplate: (data: any) => apiClient.put('/admin/invoice-template', data),
+  resetInvoiceTemplate: () => apiClient.post('/admin/invoice-template/reset', {}),
+  /** Render a design to PDF without saving it — used by the preview pane. */
+  previewInvoiceTemplate: (data: any) =>
+    apiClient.post('/admin/invoice-template/preview', data, { responseType: 'blob' }) as unknown as Promise<Blob>,
+
   getSettings: () => apiClient.get('/settings'),
   getAdminSettings: () => apiClient.get('/settings/admin'),
   updateSettings: (data: {

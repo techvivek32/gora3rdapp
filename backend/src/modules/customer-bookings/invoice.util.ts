@@ -1,4 +1,7 @@
 import PDFDocument from 'pdfkit';
+import * as fs from 'fs';
+import * as path from 'path';
+import { DEFAULT_INVOICE_TEMPLATE, InvoiceBlock } from '../../database/schemas/invoice-template.schema';
 
 export interface InvoiceData {
   bookingId: string;
@@ -6,6 +9,8 @@ export interface InvoiceData {
   subType?: string;
   customerName: string;
   customerMobile?: string;
+  customerEmail?: string;
+  customerAddress?: string;
   driverName: string;
   driverPhone?: string;
   vehicle?: string;
@@ -33,48 +38,48 @@ export interface InvoiceData {
   tollAmount?: number;
   parkingCharge?: number;
   otherCharge?: number;
-  // GST split (new bookings): driver allowance and the GST charged on
-  // (base + allowance). Shown as their own lines in the Fare Summary.
   driverAllowance?: number;
   gstAmount?: number;
   fareMode?: string;
   paymentMode?: string;
-  // Round-trip GPS extra-km billing (optional).
   includedKm?: number;
   trackedKm?: number;
   extraKm?: number;
   extraKmPrice?: number;
   extraCharge?: number;
-  // Local hourly package (optional).
   packageHours?: number;
   extraHourPrice?: number;
   extraHours?: number;
   extraHourCharge?: number;
-  // Advance paid to the platform (online) and the cash balance due to the driver.
   advanceAmount?: number;
 }
 
-const ORANGE = '#F26522';
-const DARK = '#1F2430';
-const GREY = '#6B7280';
-const LIGHT = '#F3F4F6';
+/** The saved design. Shape mirrors DEFAULT_INVOICE_TEMPLATE. */
+export interface InvoiceTemplateLike {
+  paper?: Record<string, any>;
+  company?: Record<string, any>;
+  tax?: Record<string, any>;
+  invoice?: Record<string, any>;
+  blocks?: InvoiceBlock[];
+}
 
-function fmtDate(d?: Date | string): string {
+// ─── formatting helpers ──────────────────────────────────────────────────────
+
+function fmtDate(d?: Date | string, withTime = true): string {
   if (!d) return '-';
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return String(d);
   return dt.toLocaleString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', hour12: true,
+    ...(withTime ? { hour: '2-digit' as const, minute: '2-digit' as const, hour12: true } : {}),
   });
 }
 
 function money(n?: number): string {
-  const v = Math.max(0, Math.round(n || 0));
-  return `Rs. ${v.toLocaleString('en-IN')}`;
+  const v = Math.round((n || 0) * 100) / 100;
+  return `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** "2h 15m" trip duration from start→end, or '' if unavailable. */
 function fmtDuration(start?: Date | string, end?: Date | string): string {
   if (!start || !end) return '';
   const s = new Date(start).getTime();
@@ -86,221 +91,593 @@ function fmtDuration(start?: Date | string, end?: Date | string): string {
 }
 
 /**
- * Build a one-page PDF ride invoice for a completed CustomerBooking and return
- * it as a Buffer. Pure programmatic drawing (pdfkit) — no headless browser.
+ * Fold typographic characters down to what the built-in Helvetica can draw.
+ *
+ * pdfkit's standard fonts are WinAnsi; an em dash or a curly quote that is not
+ * in the subset silently renders as a blank, so an admin typing a dash into the
+ * terms would see a gap on the PDF with nothing to explain it.
  */
-export function buildInvoicePdf(data: InvoiceData): Promise<Buffer> {
-  const doc = new PDFDocument({ size: 'A4', margin: 0 });
-  const chunks: Buffer[] = [];
-  doc.on('data', (c: Buffer) => chunks.push(c));
-  const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
-
-  const pageW = doc.page.width; // 595.28 for A4
-  const M = 50; // content margin
-  const contentW = pageW - M * 2;
-
-  // ── Header band ──────────────────────────────────────────────────────────
-  doc.rect(0, 0, pageW, 110).fill(ORANGE);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(26).text('GORA CABS', M, 34);
-  doc.font('Helvetica').fontSize(10).fillColor('#FFF3EC').text("India Ka Apna App", M, 66);
-  doc.font('Helvetica-Bold').fontSize(20).fillColor('#FFFFFF').text('INVOICE', M, 34, { width: contentW, align: 'right' });
-  doc.font('Helvetica').fontSize(10).fillColor('#FFF3EC')
-    .text(`#${data.bookingId}`, M, 62, { width: contentW, align: 'right' })
-    .text(`Date: ${fmtDate(data.completedAt || data.travelDate)}`, M, 76, { width: contentW, align: 'right' });
-
-  let y = 140;
-
-  // ── Parties (Customer / Driver) ──────────────────────────────────────────
-  const colW = (contentW - 20) / 2;
-  const boxH = 92;
-  doc.roundedRect(M, y, colW, boxH, 6).fill(LIGHT);
-  doc.roundedRect(M + colW + 20, y, colW, boxH, 6).fill(LIGHT);
-
-  doc.fillColor(ORANGE).font('Helvetica-Bold').fontSize(9).text('CUSTOMER', M + 14, y + 12);
-  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(12).text(data.customerName || '-', M + 14, y + 28, { width: colW - 28 });
-  doc.fillColor(GREY).font('Helvetica').fontSize(10).text(data.customerMobile || '-', M + 14, y + 48, { width: colW - 28 });
-
-  const dx = M + colW + 20 + 14;
-  doc.fillColor(ORANGE).font('Helvetica-Bold').fontSize(9).text('DRIVER', dx, y + 12);
-  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(12).text(data.driverName || '-', dx, y + 28, { width: colW - 28 });
-  doc.fillColor(GREY).font('Helvetica').fontSize(10)
-    .text(data.driverPhone || '-', dx, y + 48, { width: colW - 28 });
-  const veh = [data.vehicle, data.vehicleNumber].filter(Boolean).join(' • ');
-  if (veh) doc.text(veh, dx, y + 62, { width: colW - 28 });
-
-  y += boxH + 18;
-
-  // ── Trip details (compact 2-column zebra table — keeps the invoice one page) ─
-  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(13).text('Trip Details', M, y);
-  y += 20;
-  const carLine = [data.carName, data.carClass].filter(Boolean).join(' • ');
-  const carExtra = [
-    data.carSeats ? `${data.carSeats} seats` : '',
-    data.carFuel || '',
-    data.carBags || '',
-  ].filter(Boolean).join(' • ');
-  const isLocalTrip = data.subType === 'Local';
-  type TEntry = { k: string; v: string; full?: boolean };
-  const entries: TEntry[] = [
-    { k: 'Service', v: [prettyService(data.serviceType), data.subType].filter(Boolean).join(' — ') },
-    ...(carLine ? [{ k: 'Cab', v: carLine }] : []),
-    ...((data.ratePerKm && data.ratePerKm > 0) ? [{ k: 'Rate', v: `Rs.${data.ratePerKm}/km` }] : []),
-    ...(carExtra ? [{ k: 'Vehicle', v: carExtra, full: true }] : []),
-    { k: 'Pickup', v: data.pickup || data.pickupCity || '-', full: true },
-    // Local is an in-city package — no drop point, so skip the empty "Drop" row.
-    ...((!isLocalTrip && (data.drop || data.dropCity)) ? [{ k: 'Drop', v: data.drop || data.dropCity || '-', full: true }] : []),
-    { k: 'Trip start', v: fmtDate(data.startedAt) },
-    { k: 'Trip end', v: fmtDate(data.completedAt) },
-    ...(fmtDuration(data.startedAt, data.completedAt) ? [{ k: 'Duration', v: fmtDuration(data.startedAt, data.completedAt) }] : []),
-    ...(data.returnDate ? [{ k: 'Return date', v: data.returnDate }] : []),
-    ...((data.packageHours && data.packageHours > 0)
-      ? [
-          { k: 'Package', v: `${data.packageHours} hrs${data.includedKm ? ` · ${data.includedKm} km` : ''}` },
-          ...((data.extraHourPrice && data.extraHourPrice > 0) ? [{ k: 'Extra hr rate', v: `Rs.${data.extraHourPrice}/hr` }] : []),
-          ...((data.extraHours && data.extraHours > 0) ? [{ k: 'Extra hours', v: `${data.extraHours} hr` }] : []),
-        ]
-      : []),
-    ...((!data.packageHours || data.packageHours <= 0)
-      ? [{ k: 'Distance', v: data.distanceKm ? `${data.distanceKm} km${data.subType === 'Round Trip' ? ' (round)' : ''}` : '-' }]
-      : []),
-    { k: 'Passengers', v: data.passengers ? String(data.passengers) : '-' },
-    ...((data.includedKm && data.includedKm > 0)
-      ? [
-          { k: 'Included KM', v: `${data.includedKm} km` },
-          { k: 'Travelled (GPS)', v: `${(data.trackedKm ?? 0).toFixed(1)} km` },
-          ...((data.extraKm && data.extraKm > 0) ? [{ k: 'Extra KM', v: `${data.extraKm} km` }] : []),
-        ]
-      : []),
-  ];
-
-  const LBL = 88;
-  const half = contentW / 2;
-  const tableTop = y;
-  const drawKV = (k: string, v: string, x: number, w: number, vy: number) => {
-    doc.fillColor(GREY).font('Helvetica').fontSize(7.5).text(k.toUpperCase(), x + 8, vy + 1, { width: LBL - 12 });
-    doc.fillColor(DARK).font('Helvetica-Bold').fontSize(9.5).text(v || '-', x + LBL, vy, { width: w - LBL - 10, lineBreak: false, ellipsis: true });
-  };
-  let rowStripe = false;
-  let ei = 0;
-  while (ei < entries.length) {
-    const e = entries[ei];
-    if (e.full) {
-      const vw = contentW - LBL - 10;
-      doc.font('Helvetica-Bold').fontSize(9.5);
-      const h = Math.max(19, doc.heightOfString(e.v || '-', { width: vw }) + 8);
-      doc.rect(M, y, contentW, h).fill(rowStripe ? LIGHT : '#FFFFFF');
-      doc.fillColor(GREY).font('Helvetica').fontSize(7.5).text(e.k.toUpperCase(), M + 8, y + 5, { width: LBL - 12 });
-      doc.fillColor(DARK).font('Helvetica-Bold').fontSize(9.5).text(e.v || '-', M + LBL, y + 4, { width: vw });
-      y += h; rowStripe = !rowStripe; ei += 1;
-    } else {
-      const e2 = ei + 1 < entries.length && !entries[ei + 1].full ? entries[ei + 1] : null;
-      const h = 19;
-      doc.rect(M, y, contentW, h).fill(rowStripe ? LIGHT : '#FFFFFF');
-      drawKV(e.k, e.v, M, half, y + 4);
-      if (e2) drawKV(e2.k, e2.v, M + half, half, y + 4);
-      y += h; rowStripe = !rowStripe; ei += e2 ? 2 : 1;
-    }
-  }
-  doc.rect(M, tableTop, contentW, y - tableTop).lineWidth(0.5).strokeColor('#E5E7EB').stroke();
-
-  y += 16;
-
-  // ── Fare breakdown table ─────────────────────────────────────────────────
-  const extraCharge = data.extraCharge && data.extraCharge > 0 ? data.extraCharge : 0;
-  const extraHourCharge = data.extraHourCharge && data.extraHourCharge > 0 ? data.extraHourCharge : 0;
-  const parkingCharge = data.parkingCharge && data.parkingCharge > 0 ? data.parkingCharge : 0;
-  const otherCharge = data.otherCharge && data.otherCharge > 0 ? data.otherCharge : 0;
-  const allowance = data.driverAllowance && data.driverAllowance > 0 ? Math.round(data.driverAllowance) : 0;
-  const gst = data.gstAmount && data.gstAmount > 0 ? Math.round(data.gstAmount) : 0;
-  // "Base fare" is whatever is left after every line we itemise below. GST and
-  // driver allowance are only broken out for new bookings that store them; older
-  // bookings have gst/allowance = 0, so the base stays the full pre-tax ride fare.
-  const base = Math.max(0, Math.round(
-    (data.fare || 0) - (data.tollAmount || 0) - extraCharge - extraHourCharge - parkingCharge - otherCharge - allowance - gst,
-  ));
-  const baseLabel = (gst > 0 || allowance > 0) ? 'Base fare' : 'Ride fare';
-  const items: [string, number][] = [[baseLabel + (data.fareMode ? ` (${data.fareMode})` : ''), base]];
-  if (allowance > 0) items.push(['Driver allowance', allowance]);
-  if (extraCharge > 0) items.push([`Extra ${data.extraKm} km @ Rs.${data.extraKmPrice}/km`, extraCharge]);
-  if (extraHourCharge > 0) items.push([`Extra ${data.extraHours} hr @ Rs.${data.extraHourPrice}/hr`, extraHourCharge]);
-  if (data.tollAmount && data.tollAmount > 0) items.push(['Toll', data.tollAmount]);
-  if (parkingCharge > 0) items.push(['Parking', parkingCharge]);
-  if (otherCharge > 0) items.push(['Other charges', otherCharge]);
-  if (gst > 0) {
-    // GST is charged on (base + driver allowance); derive the rate for the label.
-    const pct = (base + allowance) > 0 ? Math.round((gst / (base + allowance)) * 100) : 0;
-    items.push([`GST${pct > 0 ? ` (${pct}%)` : ''}`, gst]);
-  }
-  const advance = Math.max(0, Math.round(data.advanceAmount || 0));
-
-  doc.fillColor(DARK).font('Helvetica-Bold').fontSize(13).text('Fare Summary', M, y);
-  y += 20;
-
-  // header row
-  doc.rect(M, y, contentW, 24).fill(DARK);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(10)
-    .text('DESCRIPTION', M + 12, y + 7)
-    .text('AMOUNT', M, y + 7, { width: contentW - 12, align: 'right' });
-  y += 24;
-
-  doc.font('Helvetica').fontSize(10.5);
-  let stripe = false;
-  for (const [label, amt] of items) {
-    doc.rect(M, y, contentW, 22).fill(stripe ? LIGHT : '#FFFFFF');
-    doc.fillColor(DARK).text(label, M + 12, y + 6, { width: contentW - 120 });
-    doc.text(money(amt), M, y + 6, { width: contentW - 12, align: 'right' });
-    y += 22;
-    stripe = !stripe;
-  }
-
-  // total row
-  doc.rect(M, y, contentW, 30).fill(ORANGE);
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(13)
-    .text('TOTAL', M + 12, y + 8)
-    .text(money(data.fare), M, y + 8, { width: contentW - 12, align: 'right' });
-  y += 30;
-
-  // Advance paid (online) + the cash balance due to the driver.
-  if (advance > 0) {
-    const balance = Math.max(0, Math.round((data.fare || 0) - advance));
-    doc.font('Helvetica').fontSize(10.5);
-    doc.rect(M, y, contentW, 22).fill('#FFFFFF');
-    doc.fillColor(DARK).text('Advance paid (online)', M + 12, y + 6, { width: contentW - 120 });
-    doc.text(`- ${money(advance)}`, M, y + 6, { width: contentW - 12, align: 'right' });
-    y += 22;
-    doc.rect(M, y, contentW, 26).fill(LIGHT);
-    doc.font('Helvetica-Bold').fontSize(12).fillColor(DARK)
-      .text('Balance (cash to driver)', M + 12, y + 7, { width: contentW - 120 })
-      .text(money(balance), M, y + 7, { width: contentW - 12, align: 'right' });
-    y += 30;
-  } else {
-    y += 8;
-  }
-
-  // ── Payment note ─────────────────────────────────────────────────────────
-  doc.roundedRect(M, y, contentW, 40, 6).fill(LIGHT);
-  doc.fillColor(GREY).font('Helvetica-Bold').fontSize(9).text('PAYMENT', M + 14, y + 9);
-  doc.fillColor(DARK).font('Helvetica').fontSize(11)
-    .text(data.paymentMode || 'Cash — paid directly to the driver', M + 14, y + 21, { width: contentW - 28 });
-  y += 60;
-
-  // ── Footer ───────────────────────────────────────────────────────────────
-  const footY = doc.page.height - 70;
-  doc.moveTo(M, footY).lineTo(pageW - M, footY).lineWidth(1).strokeColor('#E5E7EB').stroke();
-  doc.fillColor(GREY).font('Helvetica').fontSize(9)
-    .text('This is a computer-generated invoice and does not require a signature.', M, footY + 10, { width: contentW, align: 'center' })
-    .text('Thank you for riding with Gora Cabs — Har Safar, Gora Ke Saath.', M, footY + 24, { width: contentW, align: 'center' });
-
-  doc.end();
-  return done;
+function txt(v: any): string {
+  return String(v ?? '')
+    .replace(/[‒-―]/g, '-')
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/…/g, '...')
+    .replace(/[   ]/g, ' ')
+    .replace(/₹/g, 'Rs. ');
 }
 
 function prettyService(s?: string): string {
   switch (s) {
-    case 'cab': return 'Cab Booking';
+    case 'cab': return 'Cab Service';
     case 'hire_driver': return 'Hire a Driver';
     case 'luxury': return 'Luxury';
     case 'car_pool': return 'Car Pool';
     default: return s || 'Booking';
   }
+}
+
+const ONES = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+function twoDigits(n: number): string {
+  if (n < 20) return ONES[n];
+  return (TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + ONES[n % 10] : '')).trim();
+}
+
+/** Indian-system words: 1,23,456 → "One Lakh Twenty Three Thousand Four Hundred Fifty Six". */
+function numberToWords(num: number): string {
+  const n = Math.floor(Math.abs(num));
+  if (n === 0) return 'Zero';
+  const parts: string[] = [];
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const hundred = Math.floor((n % 1000) / 100);
+  const rest = n % 100;
+  if (crore) parts.push(twoDigits(crore) + ' Crore');
+  if (lakh) parts.push(twoDigits(lakh) + ' Lakh');
+  if (thousand) parts.push(twoDigits(thousand) + ' Thousand');
+  if (hundred) parts.push(ONES[hundred] + ' Hundred');
+  if (rest) parts.push(twoDigits(rest));
+  return parts.join(' ');
+}
+
+/** "Rupees One Thousand Twenty Five and Fifty Paise Only". */
+function amountInWords(amount: number): string {
+  const rupees = Math.floor(Math.abs(amount));
+  const paise = Math.round((Math.abs(amount) - rupees) * 100);
+  let s = 'Rupees ' + numberToWords(rupees);
+  if (paise > 0) s += ' and ' + numberToWords(paise) + ' Paise';
+  return s + ' Only';
+}
+
+// ─── fare + tax maths ────────────────────────────────────────────────────────
+
+interface FareLine { label: string; rate?: string; amount: number }
+
+interface FareBreakdown {
+  lines: FareLine[];
+  taxable: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  taxTotal: number;
+  total: number;
+  roundOff: number;
+  finalAmount: number;
+  advance: number;
+  balance: number;
+}
+
+/**
+ * Turn the booking's stored amounts into invoice lines plus the tax split.
+ *
+ * The booking's own `gstAmount` wins when it is set — that is the tax actually
+ * charged to the rider, and an invoice must state what was charged, not what a
+ * later settings change would have charged. The template's rates only come into
+ * play for older bookings that never stored one.
+ */
+function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown {
+  const num = (v: any) => (typeof v === 'number' && isFinite(v) ? v : 0);
+  const mode = tax.mode || 'cgst_sgst';
+  const cgstPct = num(tax.cgstPercent);
+  const sgstPct = num(tax.sgstPercent);
+  const igstPct = num(tax.igstPercent);
+  const totalPct = mode === 'igst' ? igstPct : mode === 'none' ? 0 : cgstPct + sgstPct;
+
+  const gross = Math.max(0, num(data.fare));
+  const toll = Math.max(0, num(data.tollAmount));
+  const parking = Math.max(0, num(data.parkingCharge));
+  const other = Math.max(0, num(data.otherCharge));
+  const extraKmCharge = Math.max(0, num(data.extraCharge));
+  const extraHrCharge = Math.max(0, num(data.extraHourCharge));
+  const allowance = Math.max(0, num(data.driverAllowance));
+  const storedGst = Math.max(0, num(data.gstAmount));
+
+  // What the ride itself came to, once every itemised extra is taken out.
+  const base = Math.max(0, gross - toll - parking - other - extraKmCharge - extraHrCharge - allowance - storedGst);
+
+  const lines: FareLine[] = [];
+  const svc = prettyService(data.serviceType);
+  const route = [data.pickupCity || data.pickup, data.dropCity || data.drop].filter(Boolean).join(' to ');
+  lines.push({
+    label: route ? `${svc} - ${route}` : svc,
+    rate: data.ratePerKm ? `Rs. ${data.ratePerKm}/km` : undefined,
+    amount: base,
+  });
+  if (allowance > 0) lines.push({ label: 'Driver allowance', amount: allowance });
+  if (extraKmCharge > 0) {
+    lines.push({ label: `Extra ${data.extraKm} km`, rate: data.extraKmPrice ? `Rs. ${data.extraKmPrice}/km` : undefined, amount: extraKmCharge });
+  }
+  if (extraHrCharge > 0) {
+    lines.push({ label: `Extra ${data.extraHours} hr`, rate: data.extraHourPrice ? `Rs. ${data.extraHourPrice}/hr` : undefined, amount: extraHrCharge });
+  }
+  if (toll > 0) lines.push({ label: 'Toll', amount: toll });
+  if (parking > 0) lines.push({ label: 'Parking', amount: parking });
+  if (other > 0) lines.push({ label: 'Other charges', amount: other });
+
+  const itemTotal = lines.reduce((s, l) => s + l.amount, 0);
+
+  // How much tax this invoice states.
+  let taxTotal: number;
+  let taxable: number;
+  if (storedGst > 0) {
+    taxTotal = storedGst;
+    taxable = itemTotal;
+  } else if (totalPct > 0 && tax.fareIncludesTax) {
+    // The stored fare already has tax inside it — pull it back out so the
+    // invoice shows a taxable value plus tax that add up to what was charged.
+    taxable = itemTotal / (1 + totalPct / 100);
+    taxTotal = itemTotal - taxable;
+    lines.forEach((l) => { l.amount = l.amount / (1 + totalPct / 100); });
+  } else if (totalPct > 0) {
+    taxable = itemTotal;
+    taxTotal = (itemTotal * totalPct) / 100;
+  } else {
+    taxable = itemTotal;
+    taxTotal = 0;
+  }
+
+  let cgst = 0, sgst = 0, igst = 0;
+  if (mode === 'igst') igst = taxTotal;
+  else if (mode === 'cgst_sgst') {
+    const split = cgstPct + sgstPct;
+    cgst = split > 0 ? (taxTotal * cgstPct) / split : taxTotal / 2;
+    sgst = taxTotal - cgst;
+  }
+
+  const total = taxable + taxTotal;
+  const rounded = Math.round(total);
+  const roundOff = tax.showRoundOff ? rounded - total : 0;
+  const finalAmount = tax.showRoundOff ? rounded : total;
+
+  const advance = Math.max(0, Math.round(num(data.advanceAmount)));
+  return {
+    lines, taxable, cgst, sgst, igst, taxTotal, total, roundOff, finalAmount,
+    advance, balance: Math.max(0, finalAmount - advance),
+  };
+}
+
+// ─── field lookups used by the parties / trip blocks ─────────────────────────
+
+function companyFieldValue(key: string, data: InvoiceData, company: Record<string, any>, invoice: Record<string, any>): [string, string] | null {
+  switch (key) {
+    case 'invoiceNo': return ['Invoice No', `${invoice.numberPrefix || 'INV'}-${data.bookingId}`];
+    case 'invoiceDate': return ['Invoice Date', fmtDate(data.completedAt || data.travelDate, false)];
+    case 'companyName': return ['Company Name', company.tradeName || company.legalName || ''];
+    case 'address': return ['Address', company.address || ''];
+    case 'phone': return ['Phone', company.phone || ''];
+    case 'email': return ['Email', company.email || ''];
+    case 'gstin': return ['GSTIN No', company.gstin || ''];
+    case 'placeOfSupply': return ['Place of Supply', company.placeOfSupply || ''];
+    default: return null;
+  }
+}
+
+function customerFieldValue(key: string, data: InvoiceData): [string, string] | null {
+  switch (key) {
+    case 'customerName': return ['Customer Name', data.customerName || ''];
+    case 'phone': return ['Phone', data.customerMobile || ''];
+    case 'email': return ['Email ID', data.customerEmail || ''];
+    case 'address': return ['Address', data.customerAddress || ''];
+    case 'cabType': return ['Cab Type', [data.carName || data.vehicle, data.carClass].filter(Boolean).join(' ')];
+    case 'package': return ['Package', data.subType || '-'];
+    case 'serviceCategory': return ['Service Category', prettyService(data.serviceType)];
+    case 'paymentMode': return ['Payment Mode', data.paymentMode || 'Cash'];
+    default: return null;
+  }
+}
+
+function tripFieldValue(key: string, data: InvoiceData): [string, string] | null {
+  switch (key) {
+    case 'pickup': return ['Pick-Up', data.pickup || data.pickupCity || '-'];
+    case 'drop': return ['Drop', data.drop || data.dropCity || '-'];
+    case 'pickupCity': return ['Pickup City', data.pickupCity || '-'];
+    case 'dropCity': return ['Drop City', data.dropCity || '-'];
+    case 'travelDate': return ['Travel Date', fmtDate(data.travelDate, false)];
+    case 'travelTime': return ['Travel Time', data.travelTime || '-'];
+    case 'returnDate': return ['Return Date', data.returnDate || '-'];
+    case 'tripStart': return ['Trip Start', fmtDate(data.startedAt)];
+    case 'tripEnd': return ['Trip End', fmtDate(data.completedAt)];
+    case 'duration': return ['Duration', fmtDuration(data.startedAt, data.completedAt) || '-'];
+    case 'distance': return ['Distance', data.distanceKm ? `${data.distanceKm} km` : '-'];
+    case 'passengers': return ['Passengers', data.passengers ? String(data.passengers) : '-'];
+    case 'driverName': return ['Driver', data.driverName || '-'];
+    case 'driverPhone': return ['Driver Phone', data.driverPhone || '-'];
+    case 'vehicle': return ['Vehicle', data.vehicle || '-'];
+    case 'vehicleNumber': return ['Vehicle No', data.vehicleNumber || '-'];
+    case 'includedKm': return ['Included KM', data.includedKm ? `${data.includedKm} km` : '-'];
+    case 'trackedKm': return ['Travelled (GPS)', data.trackedKm != null ? `${data.trackedKm.toFixed(1)} km` : '-'];
+    case 'extraKm': return ['Extra KM', data.extraKm ? `${data.extraKm} km` : '-'];
+    case 'packageHours': return ['Package', data.packageHours ? `${data.packageHours} hrs` : '-'];
+    default: return null;
+  }
+}
+
+/** A local logo file for the default template, when no custom logo is uploaded. */
+function builtInLogo(): Buffer | null {
+  for (const p of [
+    path.join(process.cwd(), 'assets', 'invoice-logo.png'),
+    path.join(process.cwd(), 'uploads', 'invoice-logo.png'),
+  ]) {
+    try {
+      if (fs.existsSync(p)) return fs.readFileSync(p);
+    } catch { /* fall through to no logo */ }
+  }
+  return null;
+}
+
+/** Resolve an uploaded logo URL to bytes on disk (local storage only). */
+function logoBytes(logoUrl?: string): Buffer | null {
+  if (!logoUrl) return builtInLogo();
+  try {
+    const m = String(logoUrl).match(/\/uploads\/(.+)$/);
+    if (m) {
+      const p = path.join(process.cwd(), 'uploads', m[1].split('?')[0]);
+      if (fs.existsSync(p)) return fs.readFileSync(p);
+    }
+  } catch { /* ignore — a missing logo must never fail the invoice */ }
+  return builtInLogo();
+}
+
+// ─── the renderer ────────────────────────────────────────────────────────────
+
+/**
+ * Draw the invoice described by `template` for one booking and return the PDF.
+ *
+ * Blocks are drawn in the order the admin arranged them in the Invoice Design
+ * page; a disabled block is skipped. Everything the admin can change lives in
+ * the template, so this function holds layout only, never business wording.
+ */
+export function buildInvoicePdf(data: InvoiceData, template?: InvoiceTemplateLike): Promise<Buffer> {
+  const t = template || (DEFAULT_INVOICE_TEMPLATE as InvoiceTemplateLike);
+  const paper = { ...DEFAULT_INVOICE_TEMPLATE.paper, ...(t.paper || {}) };
+  const company = { ...DEFAULT_INVOICE_TEMPLATE.company, ...(t.company || {}) };
+  const tax = { ...DEFAULT_INVOICE_TEMPLATE.tax, ...(t.tax || {}) };
+  const invoice = { ...DEFAULT_INVOICE_TEMPLATE.invoice, ...(t.invoice || {}) };
+  const blocks = (t.blocks && t.blocks.length ? t.blocks : DEFAULT_INVOICE_TEMPLATE.blocks) as InvoiceBlock[];
+
+  const M = Number(paper.margin) || 36;
+  const FS = Number(paper.fontSize) || 9;
+  const ACCENT = paper.accent || '#F26522';
+  const TEXT = paper.text || '#1F2430';
+  const MUTED = paper.muted || '#6B7280';
+  const BORDER = paper.border || '#D1D5DB';
+  const HEADBG = paper.headerBg || '#F3F4F6';
+
+  const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true });
+  const chunks: Buffer[] = [];
+  doc.on('data', (c: Buffer) => chunks.push(c));
+  const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+  const W = pageW - M * 2;
+  let y = M;
+
+  const fare = computeFare(data, tax);
+
+  /** Start a new page when the next block would not fit. */
+  const ensure = (needed: number) => {
+    if (y + needed <= pageH - M) return;
+    doc.addPage();
+    y = M;
+  };
+
+  const line = (x1: number, yy: number, x2: number) =>
+    doc.moveTo(x1, yy).lineTo(x2, yy).lineWidth(0.7).strokeColor(BORDER).stroke();
+
+  /** label: value, wrapped, returns the height used. */
+  const kv = (label: string, value: string, x: number, w: number, yy: number): number => {
+    const lw = Math.min(92, w * 0.42);
+    doc.fillColor(MUTED).font('Helvetica').fontSize(FS).text(txt(label) + ':', x, yy, { width: lw - 4 });
+    const vh = doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS)
+      .heightOfString(value || '-', { width: w - lw });
+    doc.text(txt(value) || '-', x + lw, yy, { width: w - lw });
+    return Math.max(doc.heightOfString(label + ':', { width: lw - 4 }), vh) + 3;
+  };
+
+  // ── block painters ─────────────────────────────────────────────────────────
+
+  const drawLogo = (b: InvoiceBlock) => {
+    const img = logoBytes(company.logoUrl);
+    const w = Math.min(Number(b.props?.width) || 150, W);
+    if (!img) {
+      // No logo file — fall back to the company name so the top is never blank.
+      ensure(26);
+      doc.fillColor(ACCENT).font('Helvetica-Bold').fontSize(16)
+        .text(company.tradeName || company.legalName || '', M, y, { width: W, align: b.props?.align || 'center' });
+      y += 24;
+      return;
+    }
+    ensure(60);
+    const x = b.props?.align === 'left' ? M : b.props?.align === 'right' ? M + W - w : M + (W - w) / 2;
+    try {
+      doc.image(img, x, y, { width: w });
+      // pdfkit advances y itself for images only when flowing; measure instead.
+      y += (doc as any)._imageHeight || 46;
+    } catch {
+      y += 4;
+    }
+    y += 8;
+  };
+
+  const drawTitle = (b: InvoiceBlock) => {
+    const text = b.props?.text || invoice.title || 'TAX INVOICE';
+    const h = 22;
+    ensure(h + 6);
+    if (b.props?.boxed) {
+      doc.rect(M, y, W, h).fillAndStroke(HEADBG, BORDER);
+    }
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS + 2)
+      .text(txt(text).toUpperCase(), M, y + 6, { width: W, align: b.props?.align || 'center' });
+    y += h + 8;
+  };
+
+  const drawParties = (b: InvoiceBlock) => {
+    const left: Array<[string, string]> = (b.props?.leftFields || [])
+      .map((k: string) => companyFieldValue(k, data, company, invoice))
+      .filter(Boolean) as Array<[string, string]>;
+    const right: Array<[string, string]> = (b.props?.rightFields || [])
+      .map((k: string) => customerFieldValue(k, data))
+      .filter(Boolean) as Array<[string, string]>;
+
+    const colW = (W - 24) / 2;
+    // Measure first so the surrounding box is drawn at the right height.
+    const measure = (rows: Array<[string, string]>) => {
+      let h = 0;
+      const lw = Math.min(92, colW * 0.42);
+      for (const [l, v] of rows) {
+        doc.font('Helvetica-Bold').fontSize(FS);
+        h += Math.max(
+          doc.font('Helvetica').heightOfString(l + ':', { width: lw - 4 }),
+          doc.font('Helvetica-Bold').heightOfString(v || '-', { width: colW - lw }),
+        ) + 3;
+      }
+      return h;
+    };
+    const titleH = 16;
+    const bodyH = Math.max(measure(left), measure(right));
+    const boxH = titleH + bodyH + 14;
+    ensure(boxH + 8);
+
+    doc.rect(M, y, W, boxH).lineWidth(0.7).strokeColor(BORDER).stroke();
+    let ly = y + 8;
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS + 0.5)
+      .text(b.props?.leftTitle || 'Company Details:', M + 10, ly, { width: colW });
+    doc.text(b.props?.rightTitle || 'Customer Details:', M + 14 + colW + 10, ly, { width: colW });
+    ly += titleH;
+    let ry = ly;
+    for (const [l, v] of left) ly += kv(l, v, M + 10, colW - 10, ly);
+    for (const [l, v] of right) ry += kv(l, v, M + 14 + colW + 10, colW - 10, ry);
+    y += boxH + 8;
+  };
+
+  const drawTrip = (b: InvoiceBlock) => {
+    const rows: Array<[string, string]> = (b.props?.fields || [])
+      .map((k: string) => tripFieldValue(k, data))
+      .filter(Boolean) as Array<[string, string]>;
+    if (!rows.length) return;
+    const colW = (W - 24) / 2;
+    const perCol = Math.ceil(rows.length / 2);
+    const colA = rows.slice(0, perCol);
+    const colB = rows.slice(perCol);
+    const measure = (rr: Array<[string, string]>) => {
+      let h = 0;
+      const lw = Math.min(92, colW * 0.42);
+      for (const [l, v] of rr) {
+        h += Math.max(
+          doc.font('Helvetica').fontSize(FS).heightOfString(l + ':', { width: lw - 4 }),
+          doc.font('Helvetica-Bold').fontSize(FS).heightOfString(v || '-', { width: colW - lw }),
+        ) + 3;
+      }
+      return h;
+    };
+    const titleH = 16;
+    const boxH = titleH + Math.max(measure(colA), measure(colB)) + 14;
+    ensure(boxH + 8);
+    doc.rect(M, y, W, boxH).lineWidth(0.7).strokeColor(BORDER).stroke();
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS + 0.5)
+      .text(b.props?.title || 'Trip Details', M + 10, y + 8, { width: W - 20 });
+    let ay = y + 8 + titleH, by = ay;
+    for (const [l, v] of colA) ay += kv(l, v, M + 10, colW - 10, ay);
+    for (const [l, v] of colB) by += kv(l, v, M + 14 + colW + 10, colW - 10, by);
+    y += boxH + 8;
+  };
+
+  const drawFare = (b: InvoiceBlock) => {
+    const amtW = 95, rateW = 80;
+    const descW = W - amtW - rateW;
+    const rowH = 18;
+
+    ensure(60);
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS + 0.5)
+      .text(b.props?.title || 'Fare Details:', M, y);
+    y += 16;
+
+    // header
+    doc.rect(M, y, W, rowH).fillAndStroke(HEADBG, BORDER);
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS)
+      .text(b.props?.descriptionLabel || 'Particulars', M + 6, y + 5, { width: descW - 12 })
+      .text(b.props?.rateLabel || 'Rate', M + descW, y + 5, { width: rateW - 8, align: 'right' })
+      .text(b.props?.amountLabel || 'Amount', M + descW + rateW, y + 5, { width: amtW - 8, align: 'right' });
+    y += rowH;
+
+    const money2 = (n: number) => money(n).replace('Rs. ', '');
+    const row = (label: string, rate: string, amount: string, bold = false, bg?: string) => {
+      const lh = doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS)
+        .heightOfString(label, { width: descW - 12 });
+      const h = Math.max(rowH, lh + 8);
+      ensure(h);
+      if (bg) doc.rect(M, y, W, h).fill(bg);
+      doc.rect(M, y, W, h).lineWidth(0.5).strokeColor(BORDER).stroke();
+      doc.fillColor(TEXT).font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(FS)
+        .text(txt(label), M + 6, y + 5, { width: descW - 12 })
+        .text(rate, M + descW, y + 5, { width: rateW - 8, align: 'right' })
+        .text(amount, M + descW + rateW, y + 5, { width: amtW - 8, align: 'right' });
+      y += h;
+    };
+
+    for (const l of fare.lines) row(l.label, l.rate || '', money2(l.amount));
+
+    if (tax.mode === 'cgst_sgst' && fare.taxTotal > 0) {
+      row('CGST', `${tax.cgstPercent}%`, money2(fare.cgst));
+      row('SGST', `${tax.sgstPercent}%`, money2(fare.sgst));
+    } else if (tax.mode === 'igst' && fare.taxTotal > 0) {
+      row('IGST', `${tax.igstPercent}%`, money2(fare.igst));
+    }
+
+    row('Total', '', money2(fare.total), true);
+    if (tax.showRoundOff && Math.abs(fare.roundOff) >= 0.005) {
+      row('Rounded Off', '', (fare.roundOff < 0 ? '-' : '') + money2(Math.abs(fare.roundOff)));
+    }
+    row('Final Amount', '', money2(fare.finalAmount), true, HEADBG);
+
+    if (fare.advance > 0) {
+      row('Advance paid (online)', '', '-' + money2(fare.advance));
+      row('Balance payable', '', money2(fare.balance), true);
+    }
+    y += 10;
+  };
+
+  const drawWords = (b: InvoiceBlock) => {
+    ensure(26);
+    const label = b.props?.label || 'Amount in words:';
+    doc.fillColor(MUTED).font('Helvetica').fontSize(FS).text(label, M, y, { width: W });
+    y += 12;
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS).text(amountInWords(fare.finalAmount), M, y, { width: W });
+    y += doc.heightOfString(amountInWords(fare.finalAmount), { width: W }) + 10;
+  };
+
+  const drawTerms = (b: InvoiceBlock) => {
+    const items: string[] = (b.props?.items || []).filter((s: string) => String(s || '').trim());
+    if (!items.length) return;
+    ensure(30);
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS + 0.5)
+      .text(b.props?.title || 'Terms & Conditions:', M, y, { width: W });
+    y += 14;
+    doc.font('Helvetica').fontSize(FS - 0.5).fillColor(MUTED);
+    items.forEach((it, i) => {
+      const text = txt(`${i + 1}. ${it}`);
+      const h = doc.heightOfString(text, { width: W - 8 }) + 3;
+      ensure(h);
+      doc.fillColor(MUTED).font('Helvetica').fontSize(FS - 0.5).text(txt(text), M + 4, y, { width: W - 8 });
+      y += h;
+    });
+    y += 8;
+  };
+
+  const drawNote = (b: InvoiceBlock) => {
+    const text = String(b.props?.text || '').trim();
+    if (!text) return;
+    const h = doc.font('Helvetica-Bold').fontSize(FS).heightOfString(text, { width: W - 16 }) + 16;
+    ensure(h + 6);
+    doc.rect(M, y, W, h).lineWidth(0.7).strokeColor(BORDER).stroke();
+    doc.fillColor(TEXT).font('Helvetica-Bold').fontSize(FS)
+      .text(txt(text), M + 8, y + 8, { width: W - 16, align: b.props?.align || 'center' });
+    y += h + 8;
+  };
+
+  const drawText = (b: InvoiceBlock) => {
+    const text = String(b.props?.text || '').trim();
+    if (!text) return;
+    const size = Number(b.props?.size) || FS;
+    const font = b.props?.bold ? 'Helvetica-Bold' : 'Helvetica';
+    const h = doc.font(font).fontSize(size).heightOfString(text, { width: W }) + 6;
+    ensure(h);
+    doc.fillColor(b.props?.color || TEXT).font(font).fontSize(size)
+      .text(txt(text), M, y, { width: W, align: b.props?.align || 'left' });
+    y += h;
+  };
+
+  const drawDivider = () => {
+    ensure(12);
+    line(M, y + 4, M + W);
+    y += 12;
+  };
+
+  const drawSpacer = (b: InvoiceBlock) => {
+    y += Math.max(0, Number(b.props?.height) || 10);
+  };
+
+  // ── walk the design ────────────────────────────────────────────────────────
+  for (const b of blocks) {
+    if (!b || b.enabled === false) continue;
+    switch (b.type) {
+      case 'logo': drawLogo(b); break;
+      case 'title': drawTitle(b); break;
+      case 'parties': drawParties(b); break;
+      case 'trip': drawTrip(b); break;
+      case 'fare': drawFare(b); break;
+      case 'amountInWords': drawWords(b); break;
+      case 'terms': drawTerms(b); break;
+      case 'note': drawNote(b); break;
+      case 'text': drawText(b); break;
+      case 'divider': drawDivider(); break;
+      case 'spacer': drawSpacer(b); break;
+      default: break;
+    }
+  }
+
+  doc.end();
+  return done;
+}
+
+/** A realistic booking used by the admin's "Download sample" button. */
+export function sampleInvoiceData(): InvoiceData {
+  const now = new Date();
+  const started = new Date(now.getTime() - 3 * 3600000);
+  return {
+    bookingId: 'CB2025000123',
+    serviceType: 'cab',
+    subType: 'One Way',
+    customerName: 'Chandan Patel',
+    customerMobile: '9088861449',
+    customerEmail: 'chandanpatel@example.com',
+    customerAddress: 'SLC Homes I, 14, 2nd Cross, Tavarekere, Bengaluru, 560029',
+    driverName: 'Suresh Kumar',
+    driverPhone: '9876543210',
+    vehicle: 'Toyota Innova Crysta',
+    vehicleNumber: 'GJ03AB1234',
+    carName: 'Innova Crysta',
+    carClass: 'A/C Sedan',
+    ratePerKm: 22,
+    pickup: 'Rajkot Railway Station, Rajkot',
+    drop: 'Jamnagar Airport, Jamnagar',
+    pickupCity: 'Rajkot',
+    dropCity: 'Jamnagar',
+    travelDate: now,
+    travelTime: '09:30',
+    startedAt: started,
+    completedAt: now,
+    distanceKm: 92,
+    passengers: 3,
+    fare: 25037,
+    tollAmount: 0,
+    driverAllowance: 300,
+    gstAmount: 0,
+    paymentMode: 'Cash — paid to the driver',
+  };
 }
