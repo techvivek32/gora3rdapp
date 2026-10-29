@@ -131,9 +131,15 @@ export class UsersController {
   }
 
   @Post('fcm-token')
-  @ApiOperation({ summary: 'Add FCM device token' })
-  addFcmToken(@CurrentUser('sub') userId: string, @Body('token') token: string) {
-    return this.usersService.updateFcmToken(userId, token, 'add');
+  @ApiOperation({ summary: 'Register this device FCM token (replaces previousToken when given)' })
+  addFcmToken(
+    @CurrentUser('sub') userId: string,
+    @Body('token') token: string,
+    // The token this one replaces, sent by the app on a refresh. Without it the
+    // old token lingers and the same phone is notified twice.
+    @Body('previousToken') previousToken?: string,
+  ) {
+    return this.usersService.updateFcmToken(userId, token, 'add', previousToken);
   }
 
   @Get('search')

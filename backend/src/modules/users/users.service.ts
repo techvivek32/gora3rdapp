@@ -565,13 +565,61 @@ export class UsersService {
     return { message: 'Deletion request status', data: req ?? null };
   }
 
-  async updateFcmToken(userId: string, fcmToken: string, action: 'add' | 'remove' = 'add') {
-    const update = action === 'add'
-      ? { $addToSet: { fcmTokens: fcmToken } }
-      : { $pull: { fcmTokens: fcmToken } };
+  /**
+   * Register (or drop) this device's push token.
+   *
+   * `fcmTokens` used to be append-only, so every time FCM rotated a token —
+   * a reinstall, cleared data, sometimes just an app update — the new one was
+   * added and the old one stayed. While both were still registered FCM
+   * delivered to both, and the SAME phone showed every notification twice.
+   *
+   * Two things stop that here: the caller passes the token it is replacing
+   * (`previousToken`) so the old row goes out with the new one in, and the
+   * token is pulled off every OTHER account, because one device can only be
+   * one logged-in user — a handed-down phone otherwise kept buzzing for its
+   * previous owner.
+   */
+  async updateFcmToken(
+    userId: string,
+    fcmToken: string,
+    action: 'add' | 'remove' = 'add',
+    previousToken?: string,
+  ) {
+    if (!fcmToken) return { message: 'No token supplied' };
 
-    await this.userModel.findByIdAndUpdate(userId, update);
-    return { message: `FCM token ${action}ed` };
+    if (action === 'remove') {
+      await this.userModel.findByIdAndUpdate(userId, { $pull: { fcmTokens: fcmToken } });
+      return { message: 'FCM token removed' };
+    }
+
+    // The same token can never legitimately belong to two accounts.
+    await this.userModel.updateMany(
+      { _id: { $ne: userId }, fcmTokens: fcmToken },
+      { $pull: { fcmTokens: fcmToken } },
+    );
+
+    // Retire the token this one replaces (a refresh on the same device).
+    const stale = previousToken && previousToken !== fcmToken ? previousToken : undefined;
+    if (stale) {
+      await this.userModel.findByIdAndUpdate(userId, { $pull: { fcmTokens: stale } });
+    }
+
+    await this.userModel.findByIdAndUpdate(userId, { $addToSet: { fcmTokens: fcmToken } });
+    return { message: 'FCM token added' };
+  }
+
+  /**
+   * Drop tokens FCM has told us are dead. Called after a send, so the list
+   * cleans itself up as notifications go out instead of growing forever.
+   */
+  async pruneDeadFcmTokens(tokens: string[]) {
+    const dead = [...new Set((tokens || []).filter(Boolean))];
+    if (dead.length === 0) return 0;
+    const res = await this.userModel.updateMany(
+      { fcmTokens: { $in: dead } },
+      { $pull: { fcmTokens: { $in: dead } } },
+    );
+    return res.modifiedCount ?? 0;
   }
 
   async searchUsers(query: string, page = 1, limit = 20) {

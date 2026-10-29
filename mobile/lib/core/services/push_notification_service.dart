@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../di/injection.dart';
 import '../network/api_client.dart';
 import '../router/app_router.dart';
@@ -109,20 +110,57 @@ class PushNotificationService {
   }
 
   /// Register the device token with the backend (requires the user to be logged in).
+  ///
+  /// FCM rotates a token on reinstall, cleared data and sometimes a plain app
+  /// update. The replaced token is sent along as `previousToken` so the server
+  /// retires it in the same breath — otherwise the account keeps BOTH, FCM
+  /// delivers to both while the old one is still registered, and this phone
+  /// shows every booking alert twice.
   Future<void> registerToken() async {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) {
-        await getIt<ApiClient>().post('/users/fcm-token', data: {'token': token});
+        await _postToken(token);
+        _lastToken = token;
       }
       FirebaseMessaging.instance.onTokenRefresh.listen((t) async {
-        try {
-          await getIt<ApiClient>().post('/users/fcm-token', data: {'token': t});
-        } catch (_) {}
+        await _postToken(t, previous: _lastToken);
+        _lastToken = t;
       });
     } catch (e) {
       debugPrint('FCM token register error: $e');
     }
+  }
+
+  /// The token this device last registered, so a refresh can retire it.
+  static const _lastTokenKey = 'fcm_last_token';
+  String? _lastTokenCache;
+
+  String? get _lastToken => _lastTokenCache;
+  set _lastToken(String? v) {
+    _lastTokenCache = v;
+    if (v != null) {
+      SharedPreferences.getInstance()
+          .then((p) => p.setString(_lastTokenKey, v))
+          .catchError((_) => false);
+    }
+  }
+
+  Future<void> _postToken(String token, {String? previous}) async {
+    try {
+      // On a cold start the in-memory value is empty, so fall back to what was
+      // stored last run — that is the token a refresh is actually replacing.
+      var prev = previous;
+      if (prev == null) {
+        try {
+          prev = (await SharedPreferences.getInstance()).getString(_lastTokenKey);
+        } catch (_) {/* storage unavailable — register without it */}
+      }
+      await getIt<ApiClient>().post('/users/fcm-token', data: {
+        'token': token,
+        if (prev != null && prev.isNotEmpty && prev != token) 'previousToken': prev,
+      });
+    } catch (_) {/* a failed registration retries on the next app start */}
   }
 
   Future<void> _showLocal(RemoteMessage message) async {

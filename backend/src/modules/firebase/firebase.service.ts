@@ -2,6 +2,17 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 
+/**
+ * The errors that mean "this token is gone for good". Everything else — a
+ * network blip, a quota error, an unavailable backend — is transient and must
+ * NOT cost the user their registration.
+ */
+const DEAD_TOKEN_CODES = [
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+  'messaging/invalid-argument',
+];
+
 @Injectable()
 export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
@@ -83,12 +94,42 @@ export class FirebaseService implements OnModuleInit {
     };
 
     try {
-      return await admin.messaging().sendEachForMulticast(message);
+      const res = await admin.messaging().sendEachForMulticast(message);
+      this.reportDeadTokens(message.tokens, res);
+      return res;
     } catch (error) {
       this.logger.error('FCM send failed:', error.message);
       throw error;
     }
   }
+
+  /**
+   * Hand back the tokens FCM has just rejected as no longer registered.
+   *
+   * Nothing used to read the send result, so a token stayed on the account
+   * forever once the app that owned it was gone. That is how accounts built up
+   * a dozen tokens each — and why a phone whose old token was still live got
+   * every notification twice. Whoever registered the callback prunes them.
+   */
+  private reportDeadTokens(tokens: string[], res: admin.messaging.BatchResponse) {
+    if (!FirebaseService.onDeadTokens || res.failureCount === 0) return;
+    const dead = res.responses
+      .map((r, i) => (r.success ? null : { code: r.error?.code, token: tokens[i] }))
+      .filter((x): x is { code: string; token: string } =>
+        !!x && DEAD_TOKEN_CODES.includes(x.code as string));
+    if (dead.length === 0) return;
+    this.logger.log(`FCM: dropping ${dead.length} dead token(s)`);
+    // Fire-and-forget: a failed cleanup must never fail the notification.
+    Promise.resolve(FirebaseService.onDeadTokens(dead.map((d) => d.token))).catch((e) =>
+      this.logger.error(`Dead-token cleanup failed: ${e?.message}`),
+    );
+  }
+
+  /**
+   * Set once at boot by the notifications module. Kept as a hook rather than an
+   * injected service so firebase stays free of a dependency on users.
+   */
+  static onDeadTokens: ((tokens: string[]) => unknown) | null = null;
 
   async sendTopicNotification(topic: string, notification: {
     title: string;

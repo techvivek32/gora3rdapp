@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument, NotificationType } from '../../database/schemas/notification.schema';
@@ -59,7 +59,7 @@ const fmtTime = (t: any) => {
 };
 
 @Injectable()
-export class NotificationsService {
+export class NotificationsService implements OnModuleInit {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
@@ -67,6 +67,27 @@ export class NotificationsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private firebaseService: FirebaseService,
   ) {}
+
+  /**
+   * Let Firebase hand back the tokens it has just rejected, and take them off
+   * the accounts that still carry them.
+   *
+   * Without this `fcmTokens` only ever grew: a device that reinstalled left its
+   * old token behind, and while that token was still registered FCM delivered
+   * to it too — which is exactly how the same phone ended up showing every
+   * booking alert twice.
+   */
+  onModuleInit() {
+    FirebaseService.onDeadTokens = async (tokens: string[]) => {
+      const dead = [...new Set((tokens || []).filter(Boolean))];
+      if (dead.length === 0) return;
+      const res = await this.userModel.updateMany(
+        { fcmTokens: { $in: dead } },
+        { $pull: { fcmTokens: { $in: dead } } },
+      );
+      this.logger.log(`Pruned ${dead.length} dead FCM token(s) from ${res.modifiedCount} user(s)`);
+    };
+  }
 
   /** Generic single-user notification (in-app row + push). Used by the customer
    *  booking flow (offer received, booking confirmed, trip started/completed…). */
