@@ -334,6 +334,15 @@ export class RequirementsService {
         // was on both.
         const driver = req.assignedDriver as any;
         if (driver) req.assignedDriver = { ...driver, mobile: undefined };
+        // `contactMobile` is the END CUSTOMER's own number on WhatsApp-imported
+        // bookings, and the card's Call / WhatsApp buttons prefer it over the
+        // poster's. Masking the poster while shipping this straight through left
+        // the gate wide open on exactly the rows that carry a customer's number
+        // — 1,612 of them — and a scraper was polling `source=whatsapp` as a
+        // separate call to collect precisely those. Same gate, same reason.
+        // The app already greys the buttons out for non-premium viewers
+        // (`canContact` in requirement_card_widget), so nothing visible changes.
+        req.contactMobile = undefined;
       }
       this.applyHideProfile(req, userId, isOwner);
       return req;
@@ -388,6 +397,13 @@ export class RequirementsService {
     const user = await this.userModel.findById(userId);
     const isPremium = this.isPaidMember(user);
 
+    // The owner and the driver actually running the trip must keep the customer's
+    // number whatever they pay — they have to ring them. Everyone else is gated.
+    const ownerId = (requirement.postedBy as any)?._id?.toString();
+    const driverId = (requirement.assignedDriver as any)?._id?.toString()
+      ?? (requirement as any).assignedDriver?.toString();
+    const isParty = ownerId === userId || driverId === userId;
+
     if (!isPremium) {
       // Paid-contact gate: hide BOTH phone AND email from non-premium viewers.
       const postedBy = requirement.postedBy as any;
@@ -395,6 +411,10 @@ export class RequirementsService {
         postedBy.mobile = undefined;
         postedBy.email = undefined;
       }
+      // Same gate for the end customer's own number on WhatsApp bookings — see
+      // the note in findAll. Guarded by isParty so a free owner or the assigned
+      // driver does not lose the number they need.
+      if (!isParty) (requirement as any).contactMobile = undefined;
     } else {
       await this.requirementModel.findByIdAndUpdate(id, { $inc: { contactViewCount: 1 } });
     }

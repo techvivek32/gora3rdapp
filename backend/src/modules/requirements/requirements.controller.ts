@@ -2,6 +2,7 @@ import {
   Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { RequirementsService } from './requirements.service';
 import { CreateRequirementDto } from './dto/create-requirement.dto';
 import { UpdateRequirementDto } from './dto/update-requirement.dto';
@@ -9,6 +10,9 @@ import { FilterRequirementsDto } from './dto/filter-requirements.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { BookingStatus } from '../../common/enums/vehicle-type.enum';
+
+/** Feed pulls allowed per account per hour. Override with FEED_THROTTLE_LIMIT. */
+const FEED_HOURLY_LIMIT = parseInt(process.env.FEED_THROTTLE_LIMIT || '300', 10);
 
 @ApiTags('Requirements')
 @ApiBearerAuth('access-token')
@@ -25,6 +29,10 @@ export class RequirementsController {
   }
 
   @Get()
+  // The whole live lead book, 50 rows a call — the one endpoint a competitor
+  // wants. Two bots pulled it around the clock for weeks on real accounts.
+  // The busiest genuine account manages 29 pulls in an hour.
+  @Throttle({ sustained: { limit: FEED_HOURLY_LIMIT, ttl: 3_600_000 } })
   @ApiOperation({ summary: 'Get all requirements feed (with filters)' })
   findAll(@CurrentUser('sub') userId: string, @Query() query: FilterRequirementsDto) {
     return this.requirementsService.findAll(userId, query);

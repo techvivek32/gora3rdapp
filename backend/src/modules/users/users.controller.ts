@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { SubmitVerificationDto } from './dto/submit-verification.dto';
@@ -11,6 +12,9 @@ import { RateUserDto } from './dto/rate-user.dto';
 import { RequestAccountDeletionDto } from './dto/request-account-deletion.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+
+/** Profile cards allowed per account per hour. Override with CARD_THROTTLE_LIMIT. */
+const CARD_HOURLY_LIMIT = parseInt(process.env.CARD_THROTTLE_LIMIT || '200', 10);
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
@@ -92,6 +96,9 @@ export class UsersController {
   }
 
   @Get('card/:userId')
+  // One card per booking is how a harvester turns the feed into a contact list.
+  // A person opens a handful an hour; the busiest real account managed 16.
+  @Throttle({ sustained: { limit: CARD_HOURLY_LIMIT, ttl: 3_600_000 } })
   @ApiOperation({ summary: 'Get user public profile card' })
   getUserCard(@Param('userId') userId: string, @CurrentUser('sub') viewerId: string) {
     return this.usersService.getUserCard(userId, viewerId);

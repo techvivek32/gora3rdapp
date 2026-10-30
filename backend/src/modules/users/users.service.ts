@@ -418,6 +418,14 @@ export class UsersService {
     if (!viewerPaid) {
       delete targetUser.lastLocationAddress;
       delete targetUser.lastLocationAt;
+      // The phone number belongs behind the same gate as everywhere else. It was
+      // not, and that made this endpoint the way round the feed's masking: one
+      // extra call per booking and a free account had the poster's number. A
+      // scraper on a `new` membership was doing exactly that, card by card, for
+      // every booking posted. The app already hides Call / WhatsApp for
+      // non-premium viewers (`canView` in user_card_sheet, `canContact` in
+      // user_profile_page), so no legitimate screen loses anything.
+      delete targetUser.mobile;
     }
 
     const [withVeh, stats] = await Promise.all([

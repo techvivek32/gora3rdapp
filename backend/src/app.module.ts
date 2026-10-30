@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AccountThrottlerGuard } from './common/guards/account-throttler.guard';
 import { ScheduleModule } from '@nestjs/schedule';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
@@ -78,10 +79,22 @@ import { InvoiceTemplateModule } from './modules/invoice-template/invoice-templa
     // Rate Limiting
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ([{
-        ttl: configService.get<number>('app.throttle.ttl', 60),
-        limit: configService.get<number>('app.throttle.limit', 100),
-      }]),
+      useFactory: (configService: ConfigService) => ([
+        {
+          name: 'default',
+          ttl: configService.get<number>('app.throttle.ttl', 60_000),
+          limit: configService.get<number>('app.throttle.limit', 100),
+        },
+        // Hour-long window, applied everywhere. Routes that need a tighter
+        // ceiling than this — the feed above all — narrow it with
+        // `@Throttle({ sustained: ... })`. See app.config for how the numbers
+        // were measured.
+        {
+          name: 'sustained',
+          ttl: configService.get<number>('app.throttle.sustainedTtl', 3_600_000),
+          limit: configService.get<number>('app.throttle.sustainedLimit', 5000),
+        },
+      ]),
       inject: [ConfigService],
     }),
 
@@ -124,7 +137,8 @@ import { InvoiceTemplateModule } from './modules/invoice-template/invoice-templa
   providers: [
     // Apply rate limiting globally — ThrottlerModule alone is inert without this,
     // so login/OTP/etc. had NO brute-force protection until now.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Keyed on the account rather than the IP; see AccountThrottlerGuard for why.
+    { provide: APP_GUARD, useClass: AccountThrottlerGuard },
   ],
 })
 export class AppModule {}
