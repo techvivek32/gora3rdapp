@@ -102,6 +102,12 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
     } catch (_) {}
     final overlayHeightPx = screenH > 0 ? (screenH * 0.6).round() : 1500;
 
+    // Capped on purpose. When two of these run at once the plugin can leave the
+    // call pending for good — measured: two of four never came back. In the FCM
+    // background isolate that means the handler never returns and Android
+    // eventually kills the process. The window itself is already opening by the
+    // time this resolves, so giving up on the acknowledgement costs nothing but
+    // guarantees the isolate finishes.
     await FlutterOverlayWindow.showOverlay(
       height: overlayHeightPx,
       width: WindowSize.matchParent,
@@ -112,7 +118,7 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
       enableDrag: true,
       overlayTitle: 'New Booking',
       overlayContent: 'Tap to view the ride booking',
-    );
+    ).timeout(const Duration(seconds: 8), onTimeout: () {});
 
     // Live channel: push the data a few times over a wider window to beat the
     // overlay-engine startup race (the prefs read is the reliable fallback).

@@ -19,6 +19,7 @@ import 'core/utils/install_referrer.dart';
 import 'core/utils/membership.dart';
 import 'core/utils/alert_actions.dart';
 import 'core/utils/ring_player.dart';
+import 'core/utils/alert_gate.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/requirements/presentation/widgets/requirement_overlay.dart';
@@ -50,10 +51,24 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // Same gate in the background isolate - going offline has to hold even
       // when the app is not running.
       if (!await isOnline()) return;
-      // Overlay first so it appears immediately, then hold this isolate open for
-      // the ring — it is killed as soon as this handler returns. Uses the user's
-      // chosen NOTIFICATION tone (the tray channel is silent, app plays the sound).
-      await showRequirementOverlay(Map<String, dynamic>.from(data));
+      // Each alert wakes its own isolate, and they all drive ONE native overlay
+      // window. Let a single alert through at a time, and a given booking only
+      // once — four at once left two isolates hung on the overlay call forever,
+      // which is what Android reports as the app "keeps stopping". A repeat
+      // still arrives in the tray; it just does not fight for the window.
+      final key = '${data['requirementId'] ?? data['bookingId'] ?? ''}';
+      if (!await AlertGate.claim(key)) return;
+      try {
+        // Overlay first so it appears immediately, then hold this isolate open
+        // for the ring — it is killed as soon as this handler returns. Uses the
+        // user's chosen NOTIFICATION tone (the tray channel is silent, the app
+        // plays the sound).
+        await showRequirementOverlay(Map<String, dynamic>.from(data));
+      } finally {
+        // Freed as soon as the card is up, so a genuinely new booking seconds
+        // later still rings instead of waiting out the lease.
+        await AlertGate.release();
+      }
       await playRequirementRing(awaitEnd: true, kind: RingKind.notification);
     }
   } catch (e) {
