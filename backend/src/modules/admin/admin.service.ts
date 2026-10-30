@@ -21,6 +21,7 @@ import {
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
 import { FranchiseSettlement, FranchiseSettlementDocument } from '../../database/schemas/franchise-settlement.schema';
 import { GarageVehicle, GarageVehicleDocument } from '../../database/schemas/garage-vehicle.schema';
+import { CustomerBooking, CustomerBookingDocument, CustomerBookingStatus } from '../../database/schemas/customer-booking.schema';
 import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garage-driver.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequirementsService } from '../requirements/requirements.service';
@@ -55,6 +56,7 @@ export class AdminService {
     @InjectModel(Franchise.name) private franchiseModel: Model<FranchiseDocument>,
     @InjectModel(FranchiseSettlement.name) private franchiseSettlementModel: Model<FranchiseSettlementDocument>,
     @InjectModel(GarageVehicle.name) private garageVehicleModel: Model<GarageVehicleDocument>,
+    @InjectModel(CustomerBooking.name) private customerBookingModel: Model<CustomerBookingDocument>,
     @InjectModel(GarageDriver.name) private garageDriverModel: Model<GarageDriverDocument>,
     private notificationsService: NotificationsService,
     private requirementsService: RequirementsService,
@@ -387,6 +389,14 @@ export class AdminService {
     const uCity: any = franchiseCity ? { _id: { $in: ids } } : {};
     const owner: any = ids ? { postedBy: { $in: ids } } : {};
     const reportOwner: any = ids ? { reportedBy: { $in: ids } } : {};
+    // Customer bookings belong to the rider; garage vehicles/drivers to the
+    // member who listed them. Both scope by the owning user, like the rest.
+    const customerOwner: any = ids ? { customerId: { $in: ids } } : {};
+    const garageOwner: any = ids ? { userId: { $in: ids } } : {};
+    // A booking still in play — what the Customer Bookings screen opens on.
+    const liveBooking = {
+      $in: [CustomerBookingStatus.OPEN, CustomerBookingStatus.CONFIRMED, CustomerBookingStatus.ONGOING],
+    };
 
     const [
       totalUsers, activeUsers, verifiedUsers, premiumUsers, goldenUsers,
@@ -396,6 +406,8 @@ export class AdminService {
       pendingReports, totalNotifications,
       todayRegistrations, todayRequirements,
       pendingVerifications,
+      liveBookings, todayBookings,
+      pendingGarageVehicles, pendingGarageDrivers,
     ] = await Promise.all([
       this.userModel.countDocuments({ isActive: true, ...uCity, ...cr }),
       this.userModel.countDocuments({ isActive: true, isBlocked: false, lastActive: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }, ...uCity, ...cr }),
@@ -416,6 +428,12 @@ export class AdminService {
       this.requirementModel.countDocuments({ createdAt: { $gte: todayStart }, ...owner }),
       // Matches the default filter on the Verification Requests page.
       this.userModel.countDocuments({ verificationStatus: VerificationStatus.PENDING, ...uCity, ...cr }),
+      this.customerBookingModel.countDocuments({ status: liveBooking, ...customerOwner, ...cr }),
+      this.customerBookingModel.countDocuments({ createdAt: { $gte: todayStart }, ...customerOwner }),
+      // Both garage queues default to `pending` on their page, so the card
+      // counts exactly what opening it would show.
+      this.garageVehicleModel.countDocuments({ approvalStatus: 'pending', ...garageOwner, ...cr }),
+      this.garageDriverModel.countDocuments({ approvalStatus: 'pending', ...garageOwner, ...cr }),
     ]);
 
     return {
@@ -424,6 +442,14 @@ export class AdminService {
         users: { total: totalUsers, active: activeUsers, verified: verifiedUsers, premium: premiumUsers, golden: goldenUsers },
         requirements: { total: totalRequirements, active: activeRequirements, today: todayRequirements },
         vehicles: { total: totalVehicles, active: activeVehicles },
+        // Cab bookings placed by riders (open / confirmed / ongoing).
+        bookings: { live: liveBookings, today: todayBookings },
+        // Garage listings waiting for an admin to approve them.
+        garage: {
+          pending: pendingGarageVehicles + pendingGarageDrivers,
+          vehicles: pendingGarageVehicles,
+          drivers: pendingGarageDrivers,
+        },
         revenue: {
           total: totalRevenue,
           monthly: monthlyRevenue,

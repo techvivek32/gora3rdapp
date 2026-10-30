@@ -20,6 +20,7 @@ import { AccountDeletionRequest, AccountDeletionRequestSchema } from '../../data
 import { Franchise, FranchiseSchema } from '../../database/schemas/franchise.schema';
 import { FranchiseSettlement, FranchiseSettlementSchema } from '../../database/schemas/franchise-settlement.schema';
 import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garage-vehicle.schema';
+import { CustomerBooking, CustomerBookingSchema } from '../../database/schemas/customer-booking.schema';
 import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { RequirementsModule } from '../requirements/requirements.module';
@@ -49,6 +50,7 @@ import { InvoiceTemplateModule } from '../invoice-template/invoice-template.modu
       { name: Franchise.name, schema: FranchiseSchema },
       { name: FranchiseSettlement.name, schema: FranchiseSettlementSchema },
       { name: GarageVehicle.name, schema: GarageVehicleSchema },
+      { name: CustomerBooking.name, schema: CustomerBookingSchema },
       { name: GarageDriver.name, schema: GarageDriverSchema },
     ]),
     NotificationsModule,

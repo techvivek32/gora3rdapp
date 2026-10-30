@@ -3,7 +3,10 @@
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api';
-import { Users, BadgeCheck, FileText, TrendingUp, Crown, Shield, Star, IndianRupee } from 'lucide-react';
+import {
+  Users, BadgeCheck, FileText, TrendingUp, Crown, Shield, Star, IndianRupee,
+  CalendarCheck, CarFront, Truck, Flag,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface StatCard {
@@ -93,6 +96,44 @@ export function StatsCards({ range }: { range?: { dateFrom?: string; dateTo?: st
       color: 'text-rose-600',
       bgColor: 'bg-rose-100 dark:bg-rose-900/30',
       href: '/payments',
+    },
+    {
+      title: 'Customer Bookings',
+      value: stats?.bookings?.live?.toLocaleString() || '0',
+      change: `+${stats?.bookings?.today || 0} today`,
+      icon: <CalendarCheck className="w-5 h-5" />,
+      color: 'text-teal-600',
+      bgColor: 'bg-teal-100 dark:bg-teal-900/30',
+      href: '/customer-bookings',
+    },
+    {
+      title: 'Vehicle / Driver Requests',
+      value: stats?.garage?.pending?.toLocaleString() || '0',
+      // Say which queue the number is in, so it is clear before opening it.
+      change: `${stats?.garage?.vehicles || 0} vehicles · ${stats?.garage?.drivers || 0} drivers`,
+      icon: <CarFront className="w-5 h-5" />,
+      color: 'text-violet-600',
+      bgColor: 'bg-violet-100 dark:bg-violet-900/30',
+      href: '/vehicle-driver-requests',
+    },
+    {
+      title: 'Available Vehicles',
+      value: stats?.vehicles?.active?.toLocaleString() || '0',
+      change: `${stats?.vehicles?.total || 0} listed`,
+      icon: <Truck className="w-5 h-5" />,
+      color: 'text-sky-600',
+      bgColor: 'bg-sky-100 dark:bg-sky-900/30',
+      // The sidebar calls this page "Available Vehicles"; its route is /vehicles.
+      href: '/vehicles',
+    },
+    {
+      title: 'Pending Reports',
+      value: stats?.reports?.pending?.toLocaleString() || '0',
+      change: 'awaiting review',
+      icon: <Flag className="w-5 h-5" />,
+      color: 'text-red-600',
+      bgColor: 'bg-red-100 dark:bg-red-900/30',
+      href: '/reports',
     },
   ];
 
