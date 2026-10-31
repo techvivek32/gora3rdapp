@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -42,7 +43,25 @@ class _PoolRideDetailPageState extends State<PoolRideDetailPage> {
     }
   }
 
-  bool get _isOwner => _ride?['bookings'] is List;
+  /// The server says so outright. It used to be inferred from `bookings` being
+  /// present — a side effect of the owner getting the passenger list, not an
+  /// answer to "is this my ride". The `is List` fallback keeps this working
+  /// against a backend that has not been updated yet.
+  bool get _isOwner => _ride?['isOwner'] == true || _ride?['bookings'] is List;
+
+  /// The server already explains itself — "You cannot book your own ride",
+  /// "Not enough seats available or ride closed". Showing the raw DioException
+  /// instead buried that under a paragraph about HTTP status codes.
+  String _errMsg(Object e) {
+    if (e is DioException) {
+      final data = e.response?.data;
+      final m = (data is Map ? (data['message'] ?? data['error']) : null);
+      final text = m is List ? m.join(', ') : m?.toString();
+      if (text != null && text.isNotEmpty) return text;
+      return e.message ?? 'Request failed';
+    }
+    return e.toString().replaceFirst('Exception: ', '');
+  }
 
   void _snack(String m, {bool ok = false}) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: ok ? AppColors.success : AppColors.error, behavior: SnackBarBehavior.floating));
 
@@ -53,7 +72,7 @@ class _PoolRideDetailPageState extends State<PoolRideDetailPage> {
       await _load();
       if (mounted) _snack(okMsg, ok: true);
     } catch (e) {
-      if (mounted) _snack('Failed: $e');
+      if (mounted) _snack(_errMsg(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

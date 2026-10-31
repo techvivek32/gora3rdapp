@@ -413,10 +413,20 @@ export class CarPoolService {
     const isOwner = ride.driverId.toString() === userId;
     if (!isOwner) {
       // Passengers see the ride + only their own booking, not other passengers.
+      // `myBooking` is the live one if there is one: a passenger who cancelled and
+      // is free to book again must not be handed their cancelled row, or the app
+      // shows "Cancel Booking" for a booking that no longer exists. Falling back
+      // to the most recent keeps a cancelled/completed ride readable.
       const mine = (ride.bookings || []).filter((b: any) => b.passengerId?.toString() === userId);
-      return { message: 'Ride', data: { ...ride, bookings: undefined, myBooking: mine[mine.length - 1] ?? null } };
+      const live = mine.find((b: any) => b.status === SeatBookingStatus.CONFIRMED || b.status === SeatBookingStatus.PICKED);
+      return {
+        message: 'Ride',
+        data: { ...ride, bookings: undefined, isOwner: false, myBooking: live ?? mine[mine.length - 1] ?? null },
+      };
     }
-    return { message: 'Ride', data: ride };
+    // Explicit, because the app used to infer ownership from the presence of the
+    // `bookings` array — which is a side effect, not an answer.
+    return { message: 'Ride', data: { ...ride, isOwner: true } };
   }
 
   // ─── Admin ──────────────────────────────────────────────────────────────────
