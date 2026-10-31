@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/contact_launcher.dart';
+import '../../../../core/widgets/address_autocomplete_field.dart';
 import '../../data/car_pool_repository.dart';
 import '../widgets/pool_ui.dart';
 
@@ -289,44 +290,59 @@ class _PoolRideDetailPageState extends State<PoolRideDetailPage> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheet) => Padding(
           padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, MediaQuery.of(ctx).viewInsets.bottom + 20.h),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
-              SizedBox(height: 16.h),
-              Text('Book Seats', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
-              SizedBox(height: 16.h),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Seats', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
-                Row(children: [
-                  IconButton(onPressed: seats > 1 ? () => setSheet(() => seats--) : null, icon: const Icon(Icons.remove_circle_outline)),
-                  Text('$seats', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
-                  IconButton(onPressed: seats < avail ? () => setSheet(() => seats++) : null, icon: const Icon(Icons.add_circle_outline)),
+          // Scrollable because the address suggestions open inline under the
+          // field: five of those plus the keyboard is taller than the sheet,
+          // and a bottom sheet overflows rather than scrolls on its own.
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40.w, height: 4.h, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+                SizedBox(height: 16.h),
+                Text('Book Seats', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w700, fontFamily: 'Poppins')),
+                SizedBox(height: 16.h),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('Seats', style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600, fontFamily: 'Poppins')),
+                  Row(children: [
+                    IconButton(onPressed: seats > 1 ? () => setSheet(() => seats--) : null, icon: const Icon(Icons.remove_circle_outline)),
+                    Text('$seats', style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w800, fontFamily: 'Poppins')),
+                    IconButton(onPressed: seats < avail ? () => setSheet(() => seats++) : null, icon: const Icon(Icons.add_circle_outline)),
+                  ]),
                 ]),
-              ]),
-              SizedBox(height: 8.h),
-              TextField(controller: pickupCtrl, decoration: InputDecoration(labelText: 'Pickup point (optional)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)))),
-              SizedBox(height: 16.h),
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12.r)),
-                child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Total (pay driver directly)', style: TextStyle(fontSize: 13.sp, fontFamily: 'Poppins')),
-                  Text('₹${(seats * price).toStringAsFixed(0)}', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Poppins')),
-                ]),
-              ),
-              SizedBox(height: 16.h),
-              SizedBox(
-                width: double.infinity,
-                height: 50.h,
-                child: ElevatedButton(
-                  onPressed: () { Navigator.pop(ctx); _run(() => _repo.book(widget.rideId, seats, pickupPoint: pickupCtrl.text.trim()).then((_) {}), 'Seats booked'); },
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r))),
-                  child: Text('Confirm Booking', style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Poppins', fontSize: 15.sp)),
+                SizedBox(height: 8.h),
+                // Same live Places suggestions as From/To on Post Ride — typing
+                // the pickup by hand was the one address field in Car Pool left
+                // doing it the hard way. Only the text travels: BookSeatsDto
+                // takes `pickupPoint` as a string, so coordinates are not sent.
+                AddressAutocompleteField(
+                  controller: pickupCtrl,
+                  label: 'Pickup point (optional)',
+                  hintText: 'Where should the driver pick you up?',
+                  prefixIcon: Icons.my_location_rounded,
+                  onSelected: (_, __, ___, ____) {},
                 ),
-              ),
-            ],
+                SizedBox(height: 16.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12.r)),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text('Total (pay driver directly)', style: TextStyle(fontSize: 13.sp, fontFamily: 'Poppins')),
+                    Text('₹${(seats * price).toStringAsFixed(0)}', style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w800, color: AppColors.primaryDark, fontFamily: 'Poppins')),
+                  ]),
+                ),
+                SizedBox(height: 16.h),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50.h,
+                  child: ElevatedButton(
+                    onPressed: () { Navigator.pop(ctx); _run(() => _repo.book(widget.rideId, seats, pickupPoint: pickupCtrl.text.trim()).then((_) {}), 'Seats booked'); },
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r))),
+                    child: Text('Confirm Booking', style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Poppins', fontSize: 15.sp)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
