@@ -83,7 +83,6 @@ function Confirm() {
         travelDate: trip.travelDate,
         travelTime: trip.travelTime,
         ...(trip.tripEndDate ? { tripEndDate: trip.tripEndDate, tripEndTime: trip.tripEndTime } : {}),
-        ...(trip.passengers ? { passengers: trip.passengers } : {}),
         vehicleType: cab.cat.name,
         // The fare breakdown is snapshotted onto the booking so a later pricing
         // change can never rewrite what this customer agreed to.
@@ -172,7 +171,6 @@ function Confirm() {
           {cab.isRound && trip.tripEndDate && <Meta label="Return" value={formatDate(trip.tripEndDate)} />}
           {!cab.isLocal && <Meta label="Distance" value={`${Math.round(cab.distanceKm)} km`} />}
           {cab.isLocal && <Meta label="Package" value={`${cab.packageHours} hours · ${cab.includedKm} km`} />}
-          {trip.passengers ? <Meta label="Passengers" value={String(trip.passengers)} /> : null}
         </div>
       </div>
 

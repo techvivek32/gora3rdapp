@@ -13,18 +13,16 @@ import { tripDraft } from '@/lib/trip-draft';
 import type { Booking, Geo, PlatformSettings, ServiceType, TripDraft } from '@/lib/types';
 
 /** Per-service form shape, mirroring `_meta` in the mobile booking form. */
-const META: Record<string, { title: string; subtitle: string; subTypes: string[]; needsPassengers: boolean }> = {
+const META: Record<string, { title: string; subtitle: string; subTypes: string[] }> = {
   cab: {
     title: 'Cab Booking',
     subtitle: 'Book a taxi to your destination',
     subTypes: ['One Way', 'Round Trip', 'Local'],
-    needsPassengers: true,
   },
   hire_driver: {
     title: 'Hire a Driver',
     subtitle: 'A driver for your own car',
     subTypes: ['One Way', 'Round Trip'],
-    needsPassengers: false,
   },
 };
 
@@ -56,7 +54,6 @@ function BookForm() {
   const [time, setTime] = useState('10:00');
   const [endDate, setEndDate] = useState('');
   const [endTime, setEndTime] = useState('18:00');
-  const [passengers, setPassengers] = useState(2);
   const [hours, setHours] = useState(8);
   const [transmission, setTransmission] = useState('Manual');
   const [notes, setNotes] = useState('');
@@ -122,7 +119,6 @@ function BookForm() {
     travelTime: time,
     tripEndDate: isRound || isHire ? endDate : undefined,
     tripEndTime: isRound || isHire ? endTime : undefined,
-    passengers: meta.needsPassengers ? passengers : undefined,
     durationHours: isLocal ? hours : undefined,
     notes: notes.trim() || undefined,
   });
@@ -296,20 +292,6 @@ function BookForm() {
                 </button>
               ))}
             </div>
-          </div>
-        )}
-
-        {meta.needsPassengers && (
-          <div className="max-w-[12rem]">
-            <label className="label">Passengers</label>
-            <input
-              type="number"
-              min={1}
-              max={20}
-              className="field"
-              value={passengers}
-              onChange={(e) => setPassengers(Math.max(1, Number(e.target.value) || 1))}
-            />
           </div>
         )}
 

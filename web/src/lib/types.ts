@@ -78,6 +78,8 @@ export interface Booking {
   travelTime?: string;
   tripEndDate?: string;
   tripEndTime?: string;
+  /** Still sent by the app, and carried by bookings made before the website
+   *  stopped asking. Kept so the shape matches what the API returns. */
   passengers?: number;
   vehicleType?: string;
   durationHours?: number;
@@ -142,7 +144,6 @@ export interface TripDraft {
   travelTime?: string;
   tripEndDate?: string;
   tripEndTime?: string;
-  passengers?: number;
   durationHours?: number;
   notes?: string;
   distanceKm?: number;
