@@ -2,29 +2,131 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Theme tokens
+   ---------------------------------------------------------------------------
+   Channels, not hex (`17 24 39`, not `#111827`), so Tailwind's slash-opacity
+   keeps working: `bg-surface/70` → `rgb(var(--surface) / 0.7)`.
+
+   Three layers decide which theme is on, in this order:
+     1. `:root`                              — light, the default
+     2. `@media (prefers-color-scheme: dark)` — the OS, unless the visitor has
+        explicitly chosen light (`[data-theme='light']` wins over the media
+        query, which is why that selector carries the `:not()`)
+     3. `[data-theme='dark']`                — the visitor's own choice, last
+        word either way
+   layout.tsx sets the attribute before first paint, so the page never flashes
+   the wrong theme.
+   ───────────────────────────────────────────────────────────────────────── */
+
 @layer base {
+  :root {
+    --canvas: 246 247 249;
+    --surface: 255 255 255;
+    --sunken: 243 244 246;
+
+    --ink: 17 24 39;
+    --muted: 107 114 128;
+    --hairline: 229 231 235;
+
+    --tint: 255 247 237;
+    --tintline: 254 215 170;
+    --brandink: 194 65 12;
+
+    --danger-bg: 255 241 242;
+    --danger-fg: 190 18 60;
+
+    --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06), 0 8px 24px rgba(17, 24, 39, 0.06);
+    --shadow-glow: 0 8px 24px rgba(249, 115, 22, 0.35);
+
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --canvas: 11 18 32;
+      --surface: 17 26 43;
+      --sunken: 26 37 58;
+
+      --ink: 237 242 250;
+      --muted: 148 163 184;
+      --hairline: 38 51 74;
+
+      --tint: 36 29 23;
+      --tintline: 92 56 24;
+      --brandink: 253 186 116;
+
+      --danger-bg: 47 23 29;
+      --danger-fg: 253 164 175;
+
+      /* On a dark surface a drop shadow reads as dirt. Depth comes from the
+         hairline above instead, so this is almost nothing. */
+      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
+      --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
+
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --canvas: 11 18 32;
+    --surface: 17 26 43;
+    --sunken: 26 37 58;
+
+    --ink: 237 242 250;
+    --muted: 148 163 184;
+    --hairline: 38 51 74;
+
+    --tint: 36 29 23;
+    --tintline: 92 56 24;
+    --brandink: 253 186 116;
+
+    --danger-bg: 47 23 29;
+    --danger-fg: 253 164 175;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
+    --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
+
+    color-scheme: dark;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
   }
   body {
-    @apply bg-[#F6F7F9] text-ink antialiased;
+    @apply bg-canvas text-ink antialiased;
   }
   /* Date/time inputs are a core part of the booking form, so make their native
-     picker icon visible and clickable rather than the browser's faint default. */
+     picker icon visible and clickable rather than the browser's faint default.
+     `color-scheme` above already flips the picker panel itself to dark; the
+     icon still needs inverting, because it ships as dark artwork. */
   input[type='date']::-webkit-calendar-picker-indicator,
   input[type='time']::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.6;
   }
+  :root[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
+  :root[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.75;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) input[type='date']::-webkit-calendar-picker-indicator,
+    :root:not([data-theme='light']) input[type='time']::-webkit-calendar-picker-indicator {
+      filter: invert(1);
+      opacity: 0.75;
+    }
+  }
 }
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-white shadow-card ring-1 ring-hairline;
+    @apply rounded-2xl bg-surface shadow-card ring-1 ring-hairline;
   }
   .field {
-    @apply w-full rounded-xl border border-hairline bg-white px-3.5 py-2.5 text-[15px] outline-none
-           transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-gray-50;
+    @apply w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none
+           transition placeholder:text-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25
+           disabled:bg-sunken disabled:text-muted;
   }
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
@@ -37,12 +139,385 @@
     @apply btn bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
   }
   .btn-outline {
-    @apply btn border border-brand-500 bg-white text-brand-600 hover:bg-brand-50;
+    @apply btn border border-brand-500 bg-transparent text-brandink hover:bg-tint;
   }
   .btn-ghost {
-    @apply btn border border-hairline bg-white text-ink hover:bg-gray-50;
+    @apply btn border border-hairline bg-surface text-ink hover:bg-sunken;
   }
   .chip {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Motion
+   ---------------------------------------------------------------------------
+   Hand-rolled rather than pulling in an animation library: the whole set below
+   is a few hundred bytes of CSS and runs on the compositor (transform/opacity
+   only), where a JS library would have been ~100 KB on a page a customer opens
+   on a phone, on mobile data, to book a cab.
+
+   Everything is switched off under `prefers-reduced-motion` at the bottom of
+   this block — motion sickness is not a style choice.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes gora-rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes gora-drop-in {
+  from { opacity: 0; transform: translate3d(0, -8px, 0) scaleY(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The two aurora shapes behind a hero. Slow and wide, so it reads as light
+   moving rather than as something demanding attention. */
+@keyframes gora-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  33%      { transform: translate3d(6%, -8%, 0) scale(1.12); }
+  66%      { transform: translate3d(-5%, 5%, 0) scale(0.94); }
+}
+
+/* A light sweep across the primary button. */
+@keyframes gora-sheen {
+  from { transform: translateX(-120%) skewX(-18deg); }
+  to   { transform: translateX(320%) skewX(-18deg); }
+}
+
+@layer components {
+  /* Staggered entrance. `style={{ '--d': '120ms' }}` sets each one's delay;
+     `backwards` keeps the element invisible during that delay instead of
+     flashing at full opacity first. */
+  .reveal {
+    animation: gora-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  /* For a block that appears mid-form (return date, package hours, the Hire
+     price) — it should look like it unfolded, not like the page jumped. */
+  .unfold {
+    animation: gora-drop-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    animation-delay: var(--d, 0ms);
+  }
+
+  .aurora {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(56px);
+    will-change: transform;
+    animation: gora-drift 18s ease-in-out infinite;
+  }
+
+  /* Lifts a touch and deepens its shadow on hover. */
+  .lift {
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(17, 24, 39, 0.08), 0 20px 48px rgba(17, 24, 39, 0.10);
+  }
+  :root[data-theme='dark'] .lift:hover {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 20px 48px rgba(0, 0, 0, 0.4);
+  }
+
+  /* One pill in a segmented control. The selected state is drawn by a sliding
+     indicator behind it, so the pill itself only colours text. */
+  .seg-pill {
+    @apply relative z-10 flex-1 whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold transition-colors duration-300;
+  }
+
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+  .btn-sheen::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  .btn-sheen:hover:not(:disabled)::after {
+    animation: gora-sheen 0.85s ease-out;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .unfold,
+  .aurora,
+  .btn-sheen::after {
+    animation: none !important;
+  }
+  .reveal,
+  .unfold {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .lift {
+    transition: none;
+  }
+  .lift:hover {
+    transform: none;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Intro
+   ---------------------------------------------------------------------------
+   The car drives across and the wordmark is wiped in behind it, so it reads as
+   if the car paints the name on the road. The timings below are tied to each
+   other on purpose — see the note on `--intro-drive` — and the whole thing is
+   over in about two seconds.
+
+   It is held to a strict budget because a splash screen is a tax on someone
+   who came here to book a cab:
+     * once per SESSION, not per page view (IntroLoader writes a flag);
+     * skippable with a tap, a key or a scroll;
+     * a hard timeout removes it even if something above goes wrong;
+     * never shown at all under prefers-reduced-motion;
+     * the page is fully rendered underneath the whole time — this is an
+       overlay, not a gate, so nothing waits on it and a crawler never sees it.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@keyframes intro-drive {
+  from { transform: translateX(-32vw); }
+  to   { transform: translateX(118vw); }
+}
+
+@keyframes intro-wheel {
+  to { transform: rotate(360deg); }
+}
+
+/* Sub-pixel on purpose: enough to feel like a car on a road, not enough to
+   look like it is driving over rubble. */
+@keyframes intro-bounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-0.9px); }
+}
+
+@keyframes intro-streak {
+  from { transform: translateX(0);   opacity: 0; }
+  20%  { opacity: 0.9; }
+  to   { transform: translateX(-90px); opacity: 0; }
+}
+
+/* The reveal that follows the car. */
+@keyframes intro-wipe {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+/* Road markings streaming backwards under the car. */
+@keyframes intro-road {
+  to { background-position-x: -220px; }
+}
+
+@keyframes intro-exit {
+  to { transform: translateY(-101%); }
+}
+
+@keyframes intro-tagline {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@layer components {
+  .intro {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background: radial-gradient(ellipse at 50% 40%, #16294a 0%, #0b1220 60%, #070c16 100%);
+    animation: intro-exit 0.5s cubic-bezier(0.76, 0, 0.24, 1) 1.52s forwards;
+  }
+
+  /* The script in layout.tsx sets this before first paint when the intro has
+     already played this session, or when motion is reduced. `display: none`
+     rather than a React condition, so there is no frame in which it shows. */
+  :root[data-intro='done'] .intro {
+    display: none;
+  }
+
+  .intro-stage {
+    position: relative;
+    width: min(680px, 88vw);
+  }
+
+  .intro-word {
+    display: block;
+    width: 100%;
+    /* Starts at 0.38s and runs 0.52s: that is the window in which the car
+       crosses the span the wordmark occupies, so the two move together. Change
+       the drive duration and these have to move with it. */
+    animation: intro-wipe 0.52s cubic-bezier(0.33, 1, 0.68, 1) 0.38s backwards;
+  }
+
+  .intro-tagline {
+    margin-top: 0.75rem;
+    margin-bottom: 0.5rem;
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #fdba74;
+    animation: intro-tagline 0.4s ease-out 1.02s backwards;
+  }
+
+  .intro-road {
+    position: absolute;
+    /* The stage is only ~680px wide but the car crosses the whole VIEWPORT, so
+       a road tied to the stage left it driving on nothing at both ends. 50vw
+       of overhang each side covers the screen whatever the stage measures. */
+    left: -50vw;
+    right: -50vw;
+    bottom: -30px;
+    height: 2px;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.55) 0 28px, transparent 28px 56px);
+    background-size: 56px 2px;
+    animation: intro-road 0.45s linear infinite;
+    opacity: 0.35;
+  }
+
+  /* Two nested elements because both want `transform`: the outer one drives
+     across, the inner one jiggles on its suspension. One element cannot do
+     both — the second animation would simply overwrite the first. */
+  .intro-car {
+    position: absolute;
+    left: 0;
+    /* Sits ON the road rather than above it: the shadow ellipse is the lowest
+       thing in the drawing and the tyres rest on it. */
+    bottom: -34px;
+    width: 150px;
+    animation: intro-drive 1.3s cubic-bezier(0.37, 0, 0.63, 1) both;
+  }
+  .intro-car-body {
+    display: block;
+    width: 100%;
+    animation: intro-bounce 0.19s ease-in-out infinite;
+    filter: drop-shadow(0 6px 18px rgba(249, 115, 22, 0.4));
+  }
+
+  .intro-wheel {
+    transform-box: fill-box;
+    transform-origin: center;
+    /* NOT the true rolling speed. Rolled correctly this would be about 30
+       revolutions in 1.3s, which is a grey blur — the tyre would look still
+       again, which was the original problem. 0.26s a turn is fast enough to
+       read as speed and slow enough that the spokes are visible. */
+    animation: intro-wheel 0.26s linear infinite;
+  }
+
+  /* Streaks trailing the car, to sell the speed the wheels imply. */
+  .intro-streaks {
+    position: absolute;
+    bottom: -18px;
+    left: 0;
+    width: 150px;
+    height: 26px;
+    animation: intro-drive 1.3s cubic-bezier(0.37, 0, 0.63, 1) both;
+  }
+  .intro-streaks i {
+    position: absolute;
+    right: 100%;
+    height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(90deg, transparent, rgba(253, 186, 116, 0.85));
+    animation: intro-streak 0.5s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Belt and braces: the bootstrap script already marks the intro done, but if
+     JavaScript never runs the overlay must not sit there forever. */
+  .intro {
+    display: none;
+  }
+}
+
+/* ── Home hero ────────────────────────────────────────────────────────────
+   The route card's little car runs the dashed track on a loop. Same nesting
+   reason as the intro: the outer element travels, the inner one bounces,
+   because one element cannot animate `transform` twice.
+   ─────────────────────────────────────────────────────────────────────── */
+
+@keyframes hero-run {
+  0%        { transform: translateX(0); }
+  8%        { transform: translateX(0); }
+  92%       { transform: translateX(calc(100% - 64px)); }
+  100%      { transform: translateX(calc(100% - 64px)); }
+}
+
+@keyframes hero-track {
+  to { background-position-x: -18px; }
+}
+
+/* The two pins at the ends of the route, breathing in turn. */
+@keyframes hero-pulse {
+  0%, 100% { transform: scale(1);   opacity: 1; }
+  50%      { transform: scale(1.5); opacity: 0.35; }
+}
+
+@layer components {
+  .hero-track {
+    position: relative;
+    height: 2px;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.5) 0 9px, transparent 9px 18px);
+    background-size: 18px 2px;
+    animation: hero-track 0.6s linear infinite;
+  }
+
+  /* The travelling box spans the whole track, and the car is a fixed width
+     inside it. That is deliberate: a percentage in `translateX` resolves
+     against the ELEMENT'S OWN width, so with a 64px box `calc(100% - 64px)`
+     came out as exactly 0 and the car sat at the start line spinning its
+     wheels — animation running, nothing moving. Spanning the track makes 100%
+     mean the track, which is what the sum was always meant to say. */
+  .hero-runner {
+    position: absolute;
+    left: 0;
+    /* The drawing has about four viewBox units of clearance under the tyres
+       (the contact shadow), so `bottom: -1px` rests the wheels on the road
+       rather than hanging the car below it. */
+    bottom: -1px;
+    width: 100%;
+    animation: hero-run 3.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  .hero-runner > svg {
+    display: block;
+    width: 64px;
+    animation: intro-bounce 0.22s ease-in-out infinite;
+  }
+
+  .hero-pin {
+    animation: hero-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-track,
+  .hero-runner,
+  .hero-runner > svg,
+  .hero-pin,
+  /* The wheels sit inside the car and were missed by both the intro's
+     reduced-motion block and this one, so they kept spinning for exactly the
+     people who asked for less movement. A looping rotation is the clearest
+     case there is. */
+  .intro-wheel,
+  .intro-car,
+  .intro-car-body,
+  .intro-road,
+  .intro-streaks,
+  .intro-streaks i {
+    animation: none !important;
+  }
+  /* Parked halfway along, so the card still reads as a journey. */
+  .hero-runner {
+    transform: translateX(calc(50% - 32px));
   }
 }

@@ -73,7 +73,7 @@ export default function SupportPage() {
         </p>
       </div>
 
-      <p className="mt-8 rounded-lg bg-rose-50 px-4 py-3 text-xs font-semibold leading-relaxed text-rose-700">
+      <p className="mt-8 rounded-lg bg-dangerbg px-4 py-3 text-xs font-semibold leading-relaxed text-dangerfg">
         Caution: never make advance payments to an unknown person without a reference. Pay only through
         this website or the Gora Cabs app.
       </p>

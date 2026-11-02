@@ -223,7 +223,7 @@ function Confirm() {
               type="button"
               onClick={() => setPercent(p)}
               className={`rounded-xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                percent === p ? 'border-brand-500 bg-brand-50 ring-2 ring-brand-100' : 'border-hairline bg-white hover:bg-gray-50'
+                percent === p ? 'border-brand-500 bg-tint ring-2 ring-tintline' : 'border-hairline bg-surface hover:bg-sunken'
               }`}
             >
               <span className="block text-sm font-extrabold text-ink">

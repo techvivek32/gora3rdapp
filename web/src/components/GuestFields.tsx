@@ -28,7 +28,7 @@ export function GuestFields({
   onChange: (g: GuestInfo) => void;
 }) {
   return (
-    <div className="rounded-xl border border-hairline bg-white p-4">
+    <div className="rounded-xl border border-hairline bg-surface p-4">
       <h3 className="text-sm font-extrabold text-ink">Your details</h3>
       <p className="mt-0.5 text-xs text-muted">No account needed — the driver will call you on this number.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">

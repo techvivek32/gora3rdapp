@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { ArrowRight, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowRight, BadgeIndianRupee, Loader2, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { apiGet, apiPost, errorMessage } from '@/lib/api';
 import { GuestFields, guestReady, type GuestInfo } from '@/components/GuestFields';
 import { PlaceInput } from '@/components/PlaceInput';
@@ -27,6 +27,13 @@ const META: Record<string, { title: string; subtitle: string; subTypes: string[]
 };
 
 const LOCAL_HOURS = [6, 8, 10, 12];
+
+/** The three things a visitor wants to know before they start typing. */
+const TRUST = [
+  { icon: ShieldCheck, text: 'Verified drivers' },
+  { icon: BadgeIndianRupee, text: 'No hidden charges' },
+  { icon: Sparkles, text: 'Instant fare estimate' },
+];
 
 // No sign-in wall: a visitor fills the trip and gives a name + mobile at the
 // point of booking. Signing in is optional and only adds history + online payment.
@@ -171,170 +178,274 @@ function BookForm() {
     }
   };
 
+
+  // Each section fades up a beat after the one above it, so the form assembles
+  // itself instead of arriving all at once. A counter rather than hard-coded
+  // numbers, because sections appear and disappear with the trip type.
+  let step = 0;
+  const rise = () => ({ '--d': `${step++ * 70 + 90}ms` }) as React.CSSProperties;
+  const at = (ms: number) => ({ '--d': `${ms}ms` }) as React.CSSProperties;
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-extrabold text-ink">{meta.title}</h1>
-      <p className="mt-1 text-sm text-muted">{meta.subtitle}</p>
-
-      <div className="card mt-6 space-y-6 p-6">
-        {/* Trip type */}
-        <div>
-          <p className="label">{isHire ? 'Duration' : 'Trip type'}</p>
-          <div className="flex flex-wrap gap-2">
-            {meta.subTypes.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setSubType(t)}
-                className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
-                  subType === t
-                    ? 'bg-brand-500 text-white ring-brand-500'
-                    : 'bg-white text-muted ring-hairline hover:bg-gray-50'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Route */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <PlaceInput label="Pickup" value={pickup} onChange={setPickup} required placeholder="Where from?" />
-          {needsDrop && <PlaceInput label="Drop" value={drop} onChange={setDrop} required placeholder="Where to?" />}
-        </div>
-
-        {/* Stops — only meaningful when there is a route to route THROUGH. */}
-        {needsDrop && (
-          <div>
-            {stops.map((s, i) => (
-              <div key={i} className="mb-3 flex items-end gap-2">
-                <div className="flex-1">
-                  <PlaceInput label={`Stop ${i + 1}`} value={s} onChange={(g) => setStopAt(i, g)} placeholder="Add a via point" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeStop(i)}
-                  className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-hairline text-muted hover:bg-gray-50"
-                  aria-label={`Remove stop ${i + 1}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            {stops.length < 5 && (
-              <button type="button" onClick={addStop} className="btn-ghost px-3 py-2 text-sm">
-                <Plus className="h-4 w-4" /> Add a stop
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* When */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label">Travel date *</label>
-            <input type="date" className="field" value={date} min={toDateInput(new Date())} onChange={(e) => setDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Pickup time *</label>
-            <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
-          </div>
-          {(isRound || isHire) && (
-            <>
-              <div>
-                <label className="label">{isHire ? 'End date *' : 'Return date *'}</label>
-                <input type="date" className="field" value={endDate} min={date} onChange={(e) => setEndDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="label">{isHire ? 'End time' : 'Return time'}</label>
-                <input type="time" className="field" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* Local package hours */}
-        {isLocal && (
-          <div>
-            <p className="label">Package</p>
-            <div className="flex flex-wrap gap-2">
-              {LOCAL_HOURS.map((h) => (
-                <button
-                  key={h}
-                  type="button"
-                  onClick={() => setHours(h)}
-                  className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
-                    hours === h ? 'bg-brand-500 text-white ring-brand-500' : 'bg-white text-muted ring-hairline hover:bg-gray-50'
-                  }`}
-                >
-                  {h} hours
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isHire && (
-          <div>
-            <p className="label">Transmission</p>
-            <div className="flex flex-wrap gap-2">
-              {['Manual', 'Automatic'].map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTransmission(t)}
-                  className={`rounded-full px-4 py-2 text-sm font-bold ring-1 transition ${
-                    transmission === t ? 'bg-brand-500 text-white ring-brand-500' : 'bg-white text-muted ring-hairline hover:bg-gray-50'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Collected here only for Hire, which books straight from this page.
-            Cab asks on the confirm page instead, once the fare is known. */}
-        {isHire && <GuestFields value={guest} onChange={setGuest} />}
-
-        <div>
-          <label className="label">Notes for the driver (optional)</label>
-          <textarea
-            className="field min-h-[88px] resize-y"
-            placeholder="Anything the driver should know"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+    <div className="relative">
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-navy pb-24 pt-12 sm:pb-28">
+        {/* Two slow-drifting colour fields plus a fading grid. `aria-hidden`
+            and non-interactive: this is lighting, not content. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="aurora -left-24 -top-32 h-80 w-80 bg-brand-500/45" />
+          <div className="aurora -right-16 top-10 h-72 w-72 bg-sky-400/25" style={{ animationDelay: '-7s' }} />
+          <div
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
+              backgroundSize: '44px 44px',
+              maskImage: 'radial-gradient(ellipse at 50% 0%, #000 40%, transparent 75%)',
+              WebkitMaskImage: 'radial-gradient(ellipse at 50% 0%, #000 40%, transparent 75%)',
+            }}
           />
         </div>
 
-        {/* Hire shows its price here because there is no cab-picking step. */}
-        {isHire && hirePerDay > 0 && (
-          <div className="rounded-xl bg-brand-50 p-4 ring-1 ring-brand-200">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-ink">
-                {rupees(hirePerDay)} / day × {hireDays} day{hireDays > 1 ? 's' : ''}
-              </span>
-              <span className="text-xl font-black text-brand-600">{rupees(hireTotal)}</span>
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-muted">
-              {hireKmPerDay > 0
-                ? `${Math.round(hireKmPerDay)} km per day included (total ${Math.round(hireKmPerDay * hireDays)} km).`
-                : 'No km limit.'}{' '}
-              The driver drives your own car.
-            </p>
-          </div>
-        )}
+        <div className="relative mx-auto max-w-3xl px-4">
+          <span className="reveal inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-200 ring-1 ring-white/15 backdrop-blur" style={at(40)}>
+            <Sparkles className="h-3 w-3" />
+            {isHire ? 'Your car, our driver' : 'Outstation · Local · Round trip'}
+          </span>
 
-        <button className="btn-primary w-full py-3" onClick={submit} disabled={busy} type="button">
-          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-            <>
-              {isHire ? 'Confirm booking' : 'See cabs & fares'} <ArrowRight className="h-4 w-4" />
-            </>
-          )}
-        </button>
+          <h1 className="reveal mt-4 text-3xl font-black leading-tight text-white sm:text-[40px]" style={at(110)}>
+            {meta.title}
+          </h1>
+          <p className="reveal mt-2 max-w-md text-[15px] leading-relaxed text-white/70" style={at(180)}>
+            {meta.subtitle}
+          </p>
+
+          <div className="reveal mt-6 flex flex-wrap gap-2" style={at(250)}>
+            {TRUST.map(({ icon: Icon, text }) => (
+              <span
+                key={text}
+                className="lift inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85 ring-1 ring-white/15 backdrop-blur"
+              >
+                <Icon className="h-3.5 w-3.5 text-brand-300" />
+                {text}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* ── The form, lifted over the hero ───────────────────────────────── */}
+      {/* `relative z-10` is load-bearing: the hero above is positioned, so
+          without it the hero paints over the 64px the card is pulled up by —
+          which swallowed the "Trip type" label. */}
+      <div className="relative z-10 mx-auto -mt-16 max-w-3xl px-4 pb-16">
+        <div className="reveal lift card space-y-6 p-5 sm:p-7" style={at(300)}>
+          {/* Trip type */}
+          <div className="reveal" style={rise()}>
+            <p className="label">{isHire ? 'Duration' : 'Trip type'}</p>
+            <Segmented options={meta.subTypes} value={subType} onChange={setSubType} />
+          </div>
+
+          {/* Route */}
+          <div className="reveal" style={rise()}>
+            {/* Both stops are themed. `to-white` survived the first pass here
+                and painted a bright slab across the middle of the dark page —
+                a gradient stop is not a background-color, so the sweep for
+                hardcoded surfaces walked straight past it. */}
+            <div className="relative rounded-2xl bg-gradient-to-br from-tint/70 to-surface p-4 ring-1 ring-tintline">
+              <div className="grid gap-4 sm:grid-cols-2 sm:gap-7">
+                <PlaceInput label="Pickup" value={pickup} onChange={setPickup} required placeholder="Where from?" />
+                {needsDrop && <PlaceInput label="Drop" value={drop} onChange={setDrop} required placeholder="Where to?" />}
+              </div>
+              {/* Centred in the panel rather than at a fixed offset, so it stays
+                  put whatever the fields above it do. Desktop only — stacked
+                  fields read fine without it. */}
+              {needsDrop && (
+                <span
+                  aria-hidden
+                  className="absolute left-1/2 top-1/2 hidden h-7 w-7 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-surface text-brand-500 shadow-card ring-1 ring-tintline sm:grid"
+                >
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Stops — only meaningful when there is a route to route THROUGH. */}
+          {needsDrop && (
+            <div className="reveal" style={rise()}>
+              {stops.map((s, i) => (
+                <div key={i} className="unfold mb-3 flex items-end gap-2">
+                  <div className="flex-1">
+                    <PlaceInput label={`Stop ${i + 1}`} value={s} onChange={(g) => setStopAt(i, g)} placeholder="Add a via point" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeStop(i)}
+                    className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-hairline text-muted transition hover:border-bad/40 hover:bg-bad/5 hover:text-bad"
+                    aria-label={`Remove stop ${i + 1}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              {stops.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addStop}
+                  className="btn-ghost group px-3 py-2 text-sm hover:border-brand-300 hover:text-brand-600"
+                >
+                  <Plus className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" /> Add a stop
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* When */}
+          <div className="reveal grid gap-4 sm:grid-cols-2" style={rise()}>
+            <div>
+              <label className="label">Travel date *</label>
+              <input type="date" className="field" value={date} min={toDateInput(new Date())} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Pickup time *</label>
+              <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
+            </div>
+            {(isRound || isHire) && (
+              <>
+                <div className="unfold">
+                  <label className="label">{isHire ? 'End date *' : 'Return date *'}</label>
+                  <input type="date" className="field" value={endDate} min={date} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+                <div className="unfold" style={at(60)}>
+                  <label className="label">{isHire ? 'End time' : 'Return time'}</label>
+                  <input type="time" className="field" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Local package hours */}
+          {isLocal && (
+            <div className="unfold">
+              <p className="label">Package</p>
+              <Segmented
+                options={LOCAL_HOURS.map((h) => `${h} hours`)}
+                value={`${hours} hours`}
+                onChange={(v) => setHours(Number(v.split(' ')[0]))}
+              />
+            </div>
+          )}
+
+          {isHire && (
+            <div className="reveal" style={rise()}>
+              <p className="label">Transmission</p>
+              <Segmented options={['Manual', 'Automatic']} value={transmission} onChange={setTransmission} />
+            </div>
+          )}
+
+          {/* Collected here only for Hire, which books straight from this page.
+              Cab asks on the confirm page instead, once the fare is known. */}
+          {isHire && (
+            <div className="reveal" style={rise()}>
+              <GuestFields value={guest} onChange={setGuest} />
+            </div>
+          )}
+
+          <div className="reveal" style={rise()}>
+            <label className="label">Notes for the driver (optional)</label>
+            <textarea
+              className="field min-h-[88px] resize-y"
+              placeholder="Anything the driver should know"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          {/* Hire shows its price here because there is no cab-picking step. */}
+          {isHire && hirePerDay > 0 && (
+            <div className="unfold overflow-hidden rounded-2xl bg-gradient-to-br from-tint to-brand-100/60 p-4 ring-1 ring-tintline">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-ink">
+                  {rupees(hirePerDay)} / day × {hireDays} day{hireDays > 1 ? 's' : ''}
+                </span>
+                <span className="text-2xl font-black tracking-tight text-brand-600">{rupees(hireTotal)}</span>
+              </div>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                {hireKmPerDay > 0
+                  ? `${Math.round(hireKmPerDay)} km per day included (total ${Math.round(hireKmPerDay * hireDays)} km).`
+                  : 'No km limit.'}{' '}
+                The driver drives your own car.
+              </p>
+            </div>
+          )}
+
+          <button
+            className="btn-sheen group w-full rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 py-3.5 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:shadow-[0_10px_30px_rgba(249,115,22,0.45)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={submit}
+            disabled={busy}
+            type="button"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              {busy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Just a moment…
+                </>
+              ) : (
+                <>
+                  {isHire ? 'Confirm booking' : 'See cabs & fares'}
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </>
+              )}
+            </span>
+          </button>
+        </div>
+
+        <p className="mt-4 text-center text-xs text-muted">
+          No sign-up needed · Pay the driver directly · Free cancellation before pickup
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** A pill group whose selection is drawn as one indicator sliding between the
+ *  options, rather than each pill colouring itself — the movement is what tells
+ *  you the choice changed. An unknown value simply highlights the first. */
+function Segmented({
+  options,
+  value,
+  onChange,
+}: {
+  options: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const index = Math.max(0, options.indexOf(value));
+  return (
+    // No gap between the pills: the indicator is sized at one nth of the inner
+    // width and moved by exactly its own width, so any gap would make it drift
+    // further out of line with every step along.
+    <div className="relative flex rounded-full bg-sunken p-1 ring-1 ring-hairline">
+      <span
+        aria-hidden
+        className="absolute inset-y-1 left-1 rounded-full bg-brand-500 shadow-[0_2px_10px_rgba(249,115,22,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        style={{
+          width: `calc((100% - 0.5rem) / ${options.length})`,
+          transform: `translateX(${index * 100}%)`,
+        }}
+      />
+      {options.map((o) => (
+        <button
+          key={o}
+          type="button"
+          onClick={() => onChange(o)}
+          aria-pressed={o === value}
+          className={`seg-pill ${o === value ? 'text-white' : 'text-muted hover:text-ink'}`}
+        >
+          {o}
+        </button>
+      ))}
     </div>
   );
 }

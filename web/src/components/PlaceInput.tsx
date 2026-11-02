@@ -138,7 +138,7 @@ export function PlaceInput({
           <button
             type="button"
             onClick={clear}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted hover:bg-gray-100"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted hover:bg-sunken"
             aria-label={`Clear ${label}`}
           >
             <X className="h-4 w-4" />
@@ -147,13 +147,13 @@ export function PlaceInput({
       </div>
 
       {open && items.length > 0 && (
-        <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-hairline bg-white py-1 shadow-card">
+        <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-hairline bg-surface py-1 shadow-card">
           {items.map((p) => (
             <li key={p.placeId}>
               <button
                 type="button"
                 onClick={() => pick(p)}
-                className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-brand-50"
+                className="flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-tint"
               >
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
                 <span className="min-w-0">

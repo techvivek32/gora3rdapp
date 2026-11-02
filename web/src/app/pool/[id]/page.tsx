@@ -73,7 +73,7 @@ function PoolRideDetail() {
           {r.distanceKm ? <Meta label="Distance" value={`${Math.round(Number(r.distanceKm))} km`} /> : null}
         </div>
 
-        {r.notes ? <p className="mt-4 rounded-lg bg-gray-50 p-3 text-sm leading-relaxed text-muted">{r.notes}</p> : null}
+        {r.notes ? <p className="mt-4 rounded-lg bg-sunken p-3 text-sm leading-relaxed text-muted">{r.notes}</p> : null}
 
         {r.driver?.fullName ? (
           <div className="mt-4 border-t border-hairline pt-4">
@@ -115,7 +115,7 @@ function PoolRideDetail() {
           <GuestFields value={guest} onChange={setGuest} />
         </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3 ring-1 ring-brand-200">
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-tint px-4 py-3 ring-1 ring-tintline">
           <span className="text-sm font-semibold text-ink">
             {rupees(r.pricePerSeat)} × {seats} seat{seats > 1 ? 's' : ''}
           </span>

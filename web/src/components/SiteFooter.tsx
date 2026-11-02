@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-hairline bg-white">
+    <footer className="mt-16 border-t border-hairline bg-surface">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 md:grid-cols-4">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -33,7 +33,7 @@ export function SiteFooter() {
             <li><Link href="/support" className="hover:text-brand-600">Help &amp; Support</Link></li>
           </ul>
           {/* The same caution the app shows above every booking feed. */}
-          <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-[11px] font-semibold leading-snug text-rose-700">
+          <p className="mt-4 rounded-lg bg-dangerbg px-3 py-2 text-[11px] font-semibold leading-snug text-dangerfg">
             Caution: never make advance payments to an unknown person without a reference.
           </p>
         </div>

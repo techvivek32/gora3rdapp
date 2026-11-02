@@ -163,7 +163,7 @@ function CabResults() {
           </div>
           <div className="flex items-center gap-4">
             {!isLocal && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-bold text-brand-700">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-tint px-3 py-1.5 text-sm font-bold text-brandink">
                 <Route className="h-4 w-4" />
                 {Math.round(ctx.distanceKm)} km
               </span>
@@ -178,7 +178,7 @@ function CabResults() {
       {/* Fare mode. Local packages never carry a separate toll, so the toggle
           would be a lie there — it is hidden instead. */}
       {!isLocal && (
-        <div className="mt-6 inline-flex rounded-xl bg-white p-1 ring-1 ring-hairline">
+        <div className="mt-6 inline-flex rounded-xl bg-surface p-1 ring-1 ring-hairline">
           {(['Best Price', 'All Inclusive'] as IncMode[]).map((m) => (
             <button
               key={m}
@@ -221,7 +221,7 @@ function CabResults() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cat.imageUrl} alt={cat.name ?? ''} className="h-24 w-36 shrink-0 rounded-xl object-cover" />
                   ) : (
-                    <div className="grid h-24 w-36 shrink-0 place-items-center rounded-xl bg-gray-100 text-muted">
+                    <div className="grid h-24 w-36 shrink-0 place-items-center rounded-xl bg-sunken text-muted">
                       <Users className="h-7 w-7" />
                     </div>
                   )}
@@ -255,7 +255,7 @@ function CabResults() {
                             type="button"
                             onClick={() => setFuelByCat((m) => ({ ...m, [key]: f }))}
                             className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 transition ${
-                              fuel === f ? 'bg-brand-500 text-white ring-brand-500' : 'bg-white text-muted ring-hairline'
+                              fuel === f ? 'bg-brand-500 text-white ring-brand-500' : 'bg-surface text-muted ring-hairline'
                             }`}
                           >
                             <Fuel className="h-3 w-3" /> {f}
