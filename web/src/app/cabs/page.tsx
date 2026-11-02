@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, BadgeCheck, Briefcase, Fuel, Loader2, MapPin, Route, Users } from 'lucide-react';
+import { CountUp } from '@/components/CountUp';
 import { apiGet } from '@/lib/api';
 import { formatDate, formatTime12, rupees, shortCity } from '@/lib/format';
 import {
@@ -130,12 +131,43 @@ function CabResults() {
     router.push('/confirm');
   };
 
+  // Before the loading state, not after: with no draft this page is on its
+  // way to /book/cab, and a skeleton captioned "Pricing your trip…" would be
+  // claiming to price a trip that was never given.
+  if (!trip) return null;
+
   if (loading) {
+    // The shape of what is coming, rather than a spinner in the middle of an
+    // empty screen. Pricing needs a route lookup and the cab list, so this is
+    // a second or two on a good connection — long enough that a blank page
+    // reads as broken.
     return (
-      <div className="grid min-h-[50vh] place-items-center">
-        <div className="text-center">
-          <Loader2 className="mx-auto h-6 w-6 animate-spin text-brand-500" />
-          <p className="mt-3 text-sm text-muted">Pricing your trip…</p>
+      <div className="mx-auto max-w-5xl px-4 py-10">
+        <div className="card p-5">
+          <div className="skel h-4 w-56" />
+          <div className="skel mt-3 h-3 w-36" />
+        </div>
+        <div className="skel mt-6 h-9 w-52 rounded-xl" />
+        <p className="mt-6 text-sm font-semibold text-muted" role="status">
+          Pricing your trip…
+        </p>
+        <div className="mt-3 space-y-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="card p-5">
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <div className="skel h-24 w-36 shrink-0 rounded-xl" />
+                <div className="flex-1">
+                  <div className="skel h-4 w-40" />
+                  <div className="skel mt-2 h-3 w-24" />
+                  <div className="skel mt-4 h-3 w-56" />
+                </div>
+                <div className="sm:w-40">
+                  <div className="skel ml-auto h-7 w-28" />
+                  <div className="skel ml-auto mt-3 h-9 w-24 rounded-xl" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
@@ -209,13 +241,18 @@ function CabResults() {
         </div>
       ) : (
         <div className="mt-4 space-y-4">
-          {cats.map((cat) => {
+          {cats.map((cat, idx) => {
             const key = String(cat._id ?? cat.name);
             const fuels = availableFuels(cat);
             const fuel = resolveFuel(cat, fuelByCat[key]);
             const b = fareFor(cat, fuel, ctx);
             return (
-              <div key={key} className="card overflow-hidden p-5">
+              <div
+                key={key}
+                data-reveal
+                style={{ '--d': `${Math.min(idx, 6) * 70}ms` } as React.CSSProperties}
+                className="card group overflow-hidden p-5 transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(17,24,39,0.10)]"
+              >
                 <div className="flex flex-col gap-4 sm:flex-row">
                   {cat.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -275,7 +312,12 @@ function CabResults() {
                     {b.originalTotal > 0 && (
                       <p className="text-xs text-muted line-through">{rupees(b.originalTotal)}</p>
                     )}
-                    <p className="text-2xl font-black text-ink">{rupees(b.total)}</p>
+                    {/* Counts up the first time it scrolls into view, then
+                        snaps on any later change — rolling between two REAL
+                        prices would look like the price moving by itself. */}
+                    <p className="text-2xl font-black text-ink">
+                      ₹<CountUp value={Math.round(b.total)} />
+                    </p>
                     <p className="text-[11px] text-muted">
                       {incMode === 'Best Price' && !isLocal ? 'Best price' : 'All inclusive'}
                     </p>

@@ -5,6 +5,7 @@ import { Providers } from './providers';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
 import { IntroLoader } from '@/components/IntroLoader';
+import { ScrollFx } from '@/components/ScrollFx';
 
 // Poppins is the mobile app's font, so the two surfaces read as one product.
 const poppins = Poppins({
@@ -44,6 +45,18 @@ document.documentElement.dataset.theme=d?'dark':'light';
 }catch(e){document.documentElement.dataset.theme='light';}})();`;
 
 /**
+ * Records that scripting is on, which the reveal-on-scroll styles key off.
+ *
+ * Those styles park an element at `opacity: 0` until ScrollFx says otherwise.
+ * With no JavaScript, ScrollFx never says otherwise, and the measured result
+ * was nine invisible sections — the entire page below the fold, gone, for a
+ * crawler or anyone with scripts blocked. Scoping the hidden state to this
+ * attribute means the default is a plain, visible page and the animation is
+ * the enhancement, which is the right way round.
+ */
+const JS_FLAG = `document.documentElement.dataset.js='on';`;
+
+/**
  * Runs the opening sequence — all of it, here, not in React.
  *
  * It decides whether to play before first paint, so neither answer flashes the
@@ -81,11 +94,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // it finds will not match the server's. That difference is the point.
     <html lang="en" className={poppins.variable} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP + INTRO_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: JS_FLAG + THEME_BOOTSTRAP + INTRO_BOOTSTRAP }} />
       </head>
       <body className="min-h-screen font-sans">
         <Providers>
           <IntroLoader />
+          <ScrollFx />
           <div className="flex min-h-screen flex-col">
             <SiteHeader />
             <main className="flex-1">{children}</main>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, BadgeCheck, CarFront, Clock, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { ArrowRight, BadgeCheck, CarFront, Clock, MapPin, Route, ShieldCheck, Sparkles, Tag, Users } from 'lucide-react';
 import { CarSide } from '@/components/CarSide';
 import { apiGet } from '@/lib/api';
 
@@ -213,19 +213,38 @@ export default function HomePage() {
       </section>
 
       {/* ── Services ─────────────────────────────────────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 py-14">
-        <h2 className="text-xl font-extrabold text-ink">What would you like to book?</h2>
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {SERVICES.map((s) => (
-            <Link key={s.href} href={s.href} className="card group p-6 transition hover:-translate-y-0.5 hover:shadow-lg">
-              <span className={`grid h-12 w-12 place-items-center rounded-2xl ${s.tint}`}>
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div data-reveal>
+          <p className="section-eyebrow">
+            <Sparkles className="h-3 w-3" /> Three ways to travel
+          </p>
+          <h2 className="section-title">What would you like to book?</h2>
+          <div className="section-rule" />
+        </div>
+        <div className="mt-8 grid gap-4 md:grid-cols-3">
+          {SERVICES.map((s, i) => (
+            <Link
+              key={s.href}
+              href={s.href}
+              data-reveal
+              style={at(i * 90)}
+              className="card group relative overflow-hidden p-6 transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)]"
+            >
+              {/* A wash growing out of the corner, so the whole card answers a
+                  hover rather than only the arrow. */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 scale-0 rounded-full bg-brand-500/10 transition-transform duration-500 group-hover:scale-100"
+              />
+              <span className={`relative grid h-12 w-12 place-items-center rounded-2xl ${s.tint} transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110`}>
                 <s.icon className="h-6 w-6 text-brand-600" />
               </span>
-              <h3 className="mt-4 text-lg font-extrabold text-ink">{s.title}</h3>
-              <p className="text-xs font-bold uppercase tracking-wide text-brand-600">{s.blurb}</p>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{s.desc}</p>
-              <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brand-600">
-                Continue <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              <h3 className="relative mt-4 text-lg font-extrabold text-ink">{s.title}</h3>
+              <p className="relative text-xs font-bold uppercase tracking-wide text-brandink">{s.blurb}</p>
+              <p className="relative mt-2 text-sm leading-relaxed text-muted">{s.desc}</p>
+              <span className="relative mt-4 inline-flex items-center gap-1.5 text-sm font-bold text-brandink">
+                Continue
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
               </span>
             </Link>
           ))}
@@ -234,22 +253,34 @@ export default function HomePage() {
 
       {/* ── Admin-managed showcases (hidden when the admin has added none) ── */}
       {explore.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pb-14">
-          <h2 className="text-xl font-extrabold text-ink">Explore India</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mx-auto max-w-6xl px-4 pb-16">
+          <div data-reveal>
+            <p className="section-eyebrow">
+              <MapPin className="h-3 w-3" /> Where to next
+            </p>
+            <h2 className="section-title">Explore India</h2>
+            <div className="section-rule" />
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {explore.map((item, i) => (
-              <ShowcaseCard key={item._id ?? i} item={item} />
+              <ShowcaseCard key={item._id ?? i} item={item} delay={i * 80} />
             ))}
           </div>
         </section>
       )}
 
       {offers.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pb-14">
-          <h2 className="text-xl font-extrabold text-ink">Special offers</h2>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mx-auto max-w-6xl px-4 pb-16">
+          <div data-reveal>
+            <p className="section-eyebrow">
+              <Tag className="h-3 w-3" /> Worth a look
+            </p>
+            <h2 className="section-title">Special offers</h2>
+            <div className="section-rule" />
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {offers.map((item, i) => (
-              <ShowcaseCard key={item._id ?? i} item={item} />
+              <ShowcaseCard key={item._id ?? i} item={item} delay={i * 80} />
             ))}
           </div>
         </section>
@@ -257,21 +288,36 @@ export default function HomePage() {
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
       <section className="border-t border-hairline bg-surface">
-        <div className="mx-auto max-w-6xl px-4 py-14">
-          <h2 className="text-xl font-extrabold text-ink">How it works</h2>
-          <ol className="mt-6 grid gap-6 md:grid-cols-4">
+        <div className="mx-auto max-w-6xl px-4 py-16">
+          <div data-reveal>
+            <p className="section-eyebrow">
+              <Route className="h-3 w-3" /> Four steps
+            </p>
+            <h2 className="section-title">How it works</h2>
+            <div className="section-rule" />
+          </div>
+          <ol className="mt-10 grid gap-8 md:grid-cols-4">
             {[
               ['Tell us the trip', 'Pickup, drop, date and time — add stops if you need them.'],
               ['Pick your cab', 'Compare classes and see the exact fare breakup before you commit.'],
               ['Confirm & pay', 'Book with ₹0 advance, or pay 10% / 100% online to lock it in.'],
               ['Ride', 'Our team assigns a verified driver and shares their details with you.'],
-            ].map(([title, body], i) => (
-              <li key={title} className="relative">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-brand-500 text-sm font-extrabold text-white">
+            ].map(([title, body], i, all) => (
+              <li key={title} className="relative" data-reveal style={at(i * 110)}>
+                {/* The rail joining one step to the next. Not on the last one,
+                    and not below md, where the steps stack and a horizontal
+                    line between them would point at nothing. */}
+                {i < all.length - 1 && (
+                  <span
+                    aria-hidden
+                    className="absolute left-11 top-[18px] hidden h-px w-[calc(100%-1rem)] bg-gradient-to-r from-brand-400/60 to-transparent md:block"
+                  />
+                )}
+                <span className="relative grid h-9 w-9 place-items-center rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-sm font-extrabold text-white shadow-glow">
                   {i + 1}
                 </span>
-                <h3 className="mt-3 text-base font-bold text-ink">{title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted">{body}</p>
+                <h3 className="mt-4 text-base font-bold text-ink">{title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">{body}</p>
               </li>
             ))}
           </ol>
@@ -281,16 +327,29 @@ export default function HomePage() {
   );
 }
 
-function ShowcaseCard({ item }: { item: Showcase }) {
+function ShowcaseCard({ item, delay = 0 }: { item: Showcase; delay?: number }) {
   const body = (
-    <div className="card overflow-hidden transition hover:-translate-y-0.5 hover:shadow-lg">
+    <div
+      data-reveal
+      style={at(delay)}
+      className="zoom-card card group overflow-hidden transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(17,24,39,0.12)]"
+    >
       {item.imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.imageUrl} alt={item.title ?? ''} className="h-40 w-full object-cover" />
+        <div className="relative h-44 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={item.imageUrl} alt={item.title ?? ''} className="h-full w-full object-cover" />
+          {/* Admin-supplied artwork is whatever it is: often bright, often
+              with its own text baked in. The scrim keeps this card's own
+              typography legible over any of it. */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+          <p className="absolute inset-x-4 bottom-3 text-base font-extrabold text-white drop-shadow">
+            {item.title}
+          </p>
+        </div>
       )}
       <div className="p-4">
-        <p className="text-base font-bold text-ink">{item.title}</p>
-        {item.subtitle && <p className="mt-1 text-sm text-muted">{item.subtitle}</p>}
+        {!item.imageUrl && <p className="text-base font-bold text-ink">{item.title}</p>}
+        {item.subtitle && <p className="text-sm text-muted">{item.subtitle}</p>}
       </div>
     </div>
   );

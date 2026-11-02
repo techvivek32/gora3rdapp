@@ -20,7 +20,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-hairline bg-surface/85 backdrop-blur-xl">
+    <header className="relative sticky top-0 z-40 border-b border-hairline bg-surface/85 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
         <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
           {/* The real brand mark, shared with the app (gora_logo_white.png). */}
@@ -70,6 +70,11 @@ export function SiteHeader() {
           </button>
         </div>
       </div>
+
+      {/* Reading progress. Inside the header so it rides along with it, and
+          driven by ScrollFx rather than React state — a scroll handler that
+          called setState would re-render the whole header on every frame. */}
+      <span id="gora-progress" className="progress" aria-hidden />
 
       {open && (
         <div className="border-t border-hairline bg-surface md:hidden">

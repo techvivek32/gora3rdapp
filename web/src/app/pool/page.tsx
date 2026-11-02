@@ -76,10 +76,10 @@ function PoolSearch() {
         </div>
       ) : (
         <div className="mt-6 space-y-4">
-          {rides.map((r) => {
+          {rides.map((r, i) => {
             const left = Math.max(0, Number(r.totalSeats ?? 0) - Number(r.seatsBooked ?? 0));
             return (
-              <Link key={r._id} href={`/pool/${r._id}`} className="card block p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
+              <Link key={r._id} href={`/pool/${r._id}`} data-reveal style={{ '--d': `${Math.min(i, 6) * 70}ms` } as React.CSSProperties} className="card block p-5 transition duration-300 hover:-translate-y-1 hover:shadow-[0_14px_36px_rgba(17,24,39,0.10)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-bold text-ink">
                     <span className="truncate">{shortCity(r.fromCity || r.from?.address)}</span>
