@@ -15,8 +15,9 @@ const poppins = Poppins({
   display: 'swap',
 });
 
+
 export const metadata: Metadata = {
-  title: 'Gora Cabs — Book a cab, hire a driver, share a ride',
+  title: 'Gora Taxi — Book a cab, hire a driver, share a ride',
   description:
     'Book outstation and local cabs, hire a driver for your own car, or share a ride across India. India Ka Apna App.',
 };

@@ -21,7 +21,7 @@
 
 @layer base {
   :root {
-    --canvas: 246 247 249;
+    --canvas: 255 251 245;
     --surface: 255 255 255;
     --sunken: 243 244 246;
 
@@ -29,12 +29,40 @@
     --muted: 107 114 128;
     --hairline: 229 231 235;
 
-    --tint: 255 247 237;
+    --tint: 255 237 213;
     --tintline: 254 215 170;
     --brandink: 194 65 12;
 
     --danger-bg: 255 241 242;
     --danger-fg: 190 18 60;
+
+    /* One per service — see tailwind.config.ts. `soft` is the wash the card
+       sits on; the solid is for the rule, the numeral and the icon. */
+    --svc-cab: 29 78 216;
+    --svc-cab-soft: 239 244 255;
+    --svc-drive: 4 120 87;
+    --svc-drive-soft: 236 253 245;
+    --svc-pool: 180 83 9;
+    --svc-pool-soft: 255 247 237;
+
+    /* A fourth accent, and the washes whole sections sit on. The page was
+       technically "colour-accented" and still read as grey — a tinted icon
+       is not colour, a tinted BAND is. */
+    --svc-lux: 109 40 217;
+    --svc-lux-soft: 245 243 255;
+    --band-warm: 255 237 213;
+    --band-cool: 255 247 237;
+    --band-mint: 255 241 224;
+    --band-deep: 18 33 61;
+
+    /* SOLID service colours — the card background itself, with white text on
+       top. The soft tints above are for washes; these are for blocks. Chosen
+       so white clears 4.5:1 on every one of them, which is why the orange is
+       the deep 700 and not the brand 500. */
+    --svc-cab-solid: 15 118 110;
+    --svc-drive-solid: 161 98 7;
+    --svc-pool-solid: 194 65 12;
+    --svc-lux-solid: 51 65 85;
 
     --shadow-card: 0 1px 3px rgba(17, 24, 39, 0.06), 0 8px 24px rgba(17, 24, 39, 0.06);
     --shadow-glow: 0 8px 24px rgba(249, 115, 22, 0.35);
@@ -58,6 +86,27 @@
 
       --danger-bg: 47 23 29;
       --danger-fg: 253 164 175;
+
+      /* Lifted and desaturated: the light values are near-black on a dark
+         canvas, and the soft washes glare. */
+      --svc-cab: 147 197 253;
+      --svc-cab-soft: 23 33 56;
+      --svc-drive: 110 231 183;
+      --svc-drive-soft: 18 40 35;
+      --svc-pool: 253 186 116;
+      --svc-pool-soft: 44 32 20;
+
+      --svc-lux: 196 181 253;
+      --svc-lux-soft: 33 27 51;
+      --band-warm: 28 22 17;
+      --band-cool: 24 19 15;
+      --band-mint: 32 24 18;
+      --band-deep: 9 15 28;
+
+      --svc-cab-solid: 13 148 136;
+      --svc-drive-solid: 161 98 7;
+      --svc-pool-solid: 194 65 12;
+      --svc-lux-solid: 100 116 139;
 
       /* On a dark surface a drop shadow reads as dirt. Depth comes from the
          hairline above instead, so this is almost nothing. */
@@ -83,6 +132,25 @@
 
     --danger-bg: 47 23 29;
     --danger-fg: 253 164 175;
+
+    --svc-cab: 147 197 253;
+    --svc-cab-soft: 23 33 56;
+    --svc-drive: 110 231 183;
+    --svc-drive-soft: 18 40 35;
+    --svc-pool: 253 186 116;
+    --svc-pool-soft: 44 32 20;
+
+    --svc-lux: 196 181 253;
+    --svc-lux-soft: 33 27 51;
+    --band-warm: 28 22 17;
+    --band-cool: 24 19 15;
+    --band-mint: 32 24 18;
+    --band-deep: 9 15 28;
+
+    --svc-cab-solid: 13 148 136;
+    --svc-drive-solid: 161 98 7;
+    --svc-pool-solid: 194 65 12;
+    --svc-lux-solid: 100 116 139;
 
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
     --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
@@ -131,8 +199,11 @@
   .label {
     @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
   }
+  /* `min-h-11` is 44px. Without it the base button was 42px, and any caller
+     trimming the padding — `btn-ghost px-3 py-2 text-sm` on "Add a stop" —
+     came out at 38px. */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-semibold
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-semibold
            transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
@@ -223,8 +294,11 @@
 
   /* One pill in a segmented control. The selected state is drawn by a sliding
      indicator behind it, so the pill itself only colours text. */
+  /* At `py-2` these were 36px, which on a phone is the difference between
+     hitting "Round Trip" and hitting "Local". */
   .seg-pill {
     @apply relative z-10 flex-1 whitespace-nowrap rounded-full px-4 py-2 text-sm font-bold transition-colors duration-300;
+    @apply inline-flex min-h-11 items-center justify-center;
   }
 
   .btn-sheen {
@@ -621,5 +695,95 @@
   .zoom-card:hover img {
     transition: none;
     transform: none;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Editorial
+   ---------------------------------------------------------------------------
+   The "classic" half of the design: a serif display face, generous measure,
+   hairline rules and numbered entries instead of a wall of identical cards.
+   The colour comes from the per-service tokens, used sparingly and always to
+   mean something — never as decoration.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* Headlines. `text-balance` stops a two-word orphan on the last line, which
+     is the single thing that makes a large serif heading look amateur. */
+  /* A heavy sans, not a serif.
+   *
+   * The serif was the "classic" reading of the brief and it was the wrong
+   * one: the reference the client gave is a modern taxi brand — bold sans,
+   * orange and white, photography. Poppins Black at display sizes is what
+   * that looks like, and it is already the app's font. */
+  .display {
+    @apply font-sans font-black tracking-[-0.03em] text-ink;
+    text-wrap: balance;
+  }
+  .display-xl {
+    @apply display text-[2.5rem] leading-[1.05] sm:text-6xl lg:text-7xl;
+  }
+  .display-lg {
+    @apply display text-[2rem] leading-[1.1] sm:text-5xl;
+  }
+  .display-md {
+    @apply display text-2xl leading-snug sm:text-[2rem];
+  }
+
+  /* The label above a section title. Letterspaced caps, the oldest trick in
+     editorial design for marking a new chapter without shouting. */
+  .eyebrow {
+    @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-muted;
+  }
+
+  /* A hairline that carries the section's colour. */
+  .rule {
+    @apply h-px w-full bg-hairline;
+  }
+  .rule-accent {
+    @apply h-[3px] w-12 rounded-full bg-ink;
+  }
+
+  /* A numbered entry — "01 / CAB BOOKING". The numeral is the colour. */
+  .numeral {
+    @apply font-display text-sm font-semibold tabular-nums;
+  }
+
+  /* Body copy set to a comfortable measure. 68 characters is the top of the
+     range typographers recommend; past it the eye loses the line return. */
+  .prose-measure {
+    @apply max-w-[68ch] leading-relaxed text-muted;
+  }
+
+  /* A quiet card: no shadow, just a rule and space. The shadowed `.card` is
+     still there for things that genuinely float (the booking form). */
+  .card-flat {
+    @apply rounded-2xl bg-surface ring-1 ring-hairline;
+  }
+
+  /* An entry in the services list. The left rule is the service's colour and
+     thickens on hover — the whole row answers, not just a link. */
+  .entry {
+    @apply relative grid gap-5 border-t border-hairline py-8 transition-colors sm:grid-cols-[auto_1fr_auto] sm:items-baseline sm:gap-8;
+  }
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: -1px;
+    height: 3px;
+    width: 0;
+    background: currentColor;
+    transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .entry:hover::before,
+  .entry:focus-visible::before {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry::before {
+    transition: none;
   }
 }

@@ -40,6 +40,41 @@ const config: Config = {
         },
         navy: '#12213D',
 
+        /**
+         * One colour per service.
+         *
+         * The brand stays orange — it is the logo, the buttons and the app —
+         * but a page that offers three different things in three identical
+         * orange cards makes the reader do the sorting. Giving Cab, Hire a
+         * Driver and Car Pool a colour each lets someone find their service
+         * before they have read a word, and it is what makes an otherwise
+         * restrained, typographic layout feel colourful.
+         *
+         * Themed, because a tint that sits well on paper-white glares on a
+         * dark canvas.
+         */
+        cab: themed('--svc-cab'),
+        cabsoft: themed('--svc-cab-soft'),
+        drive: themed('--svc-drive'),
+        drivesoft: themed('--svc-drive-soft'),
+        pool: themed('--svc-pool'),
+        poolsoft: themed('--svc-pool-soft'),
+        lux: themed('--svc-lux'),
+        luxsoft: themed('--svc-lux-soft'),
+
+        /** The same four as a BLOCK colour, with white text on top. */
+        cabsolid: themed('--svc-cab-solid'),
+        drivesolid: themed('--svc-drive-solid'),
+        poolsolid: themed('--svc-pool-solid'),
+        luxsolid: themed('--svc-lux-solid'),
+
+        /** Full-width section washes. A page of grey bands is not colourful
+         *  however colourful its icons are. */
+        bandwarm: themed('--band-warm'),
+        bandcool: themed('--band-cool'),
+        bandmint: themed('--band-mint'),
+        banddeep: themed('--band-deep'),
+
         /** Page background. */
         canvas: themed('--canvas'),
         /** A card, the header, the footer — anything sitting on the canvas. */
@@ -69,6 +104,15 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
+        /**
+         * Display face for headlines only.
+         *
+         * Poppins is the app's font and stays for everything that is read
+         * rather than looked at. A serif at large sizes is what separates an
+         * editorial layout from a dashboard — it carries the "classic" half
+         * of the brief while the colour carries the other half.
+         */
+        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       boxShadow: {
         // Dark surfaces are separated by light, not by shadow, so the card
