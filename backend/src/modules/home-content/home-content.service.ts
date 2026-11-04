@@ -9,6 +9,7 @@ import {
   HomeSectionType,
   HomeShowcase,
   HomeShowcaseDocument,
+  WEBSITE_HERO_KEY,
 } from '../../database/schemas/home-content.schema';
 import {
   CreateCabCategoryDto,
@@ -33,7 +34,10 @@ export class HomeContentService {
   // ─── Customer: fetch the whole home payload for a city ───────────────────────
   async getForCustomer(city?: string): Promise<{ message: string; data: any }> {
     const cityLc = (city ?? '').toLowerCase().trim();
-    const heroImage = cityLc ? await this.resolveCityHero(cityLc) : '';
+    // No city means the website, which has no city to show a picture of
+    // until someone types a pickup. It gets the operator's own hero image,
+    // stored under the reserved key.
+    const heroImage = cityLc ? await this.resolveCityHero(cityLc) : await this.websiteHero();
 
     const items = await this.showcaseModel
       .find({ isActive: true, $or: [{ city: '' }, { city: cityLc }] })
@@ -52,6 +56,14 @@ export class HomeContentService {
     };
   }
 
+  /** The hero image an operator set for the website itself. */
+  private async websiteHero(): Promise<string> {
+    const row = await this.cityImageModel
+      .findOne({ city: WEBSITE_HERO_KEY, isActive: true })
+      .lean();
+    return row?.imageUrl ?? '';
+  }
+
   /**
    * Fully-automatic city hero image. Returns a cached image if it's still fresh,
    * otherwise resolves the city's top attraction photo from Google Places and
@@ -59,6 +71,8 @@ export class HomeContentService {
    */
   private async resolveCityHero(cityLc: string): Promise<string> {
     const cached = await this.cityImageModel.findOne({ city: cityLc }).lean();
+    // Someone chose this one. The TTL does not apply to it.
+    if (cached?.isManual && cached.imageUrl) return cached.imageUrl;
     const fresh =
       !!cached?.imageUrl &&
       !!cached?.fetchedAt &&
@@ -150,9 +164,20 @@ export class HomeContentService {
 
   async upsertCityImage(dto: UpsertCityImageDto) {
     const city = dto.city.toLowerCase().trim();
+    const imageUrl = dto.imageUrl ?? '';
     const item = await this.cityImageModel.findOneAndUpdate(
       { city },
-      { $set: { city, imageUrl: dto.imageUrl ?? '', isActive: dto.isActive ?? true } },
+      {
+        $set: {
+          city,
+          imageUrl,
+          isActive: dto.isActive ?? true,
+          // Picking a picture makes the row the operator's; clearing it hands
+          // the city back to the automatic resolver.
+          isManual: !!imageUrl,
+          fetchedAt: new Date(),
+        },
+      },
       { new: true, upsert: true },
     );
     return { message: 'Saved', data: item };

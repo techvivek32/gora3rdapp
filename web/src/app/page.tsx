@@ -10,8 +10,8 @@ import {
   Wallet, Zap,
 } from 'lucide-react';
 import { apiGet } from '@/lib/api';
-import { CarSide } from '@/components/CarSide';
 import { PlaceInput } from '@/components/PlaceInput';
+import { TaxiHero } from '@/components/TaxiHero';
 import { tripDraft } from '@/lib/trip-draft';
 import { rupees, toDateInput } from '@/lib/format';
 import { COMPANY } from '@/lib/company';
@@ -190,62 +190,27 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* The admin's hero photograph if one is set — and the real fleet
-              if not, because the slot is empty on the live site and what
-              stood here was a white box asking the operator to fill it. */}
+          {/* The admin's own photograph if one is set, and a drawn Gora taxi
+              if not.
+
+              What was here instead was a cut-out of whichever cab class came
+              first in the fleet — a white hatchback on a white stage with its
+              own name under it. The Fleet section immediately below shows the
+              same photograph at the same size, so the first thing on the site
+              was a duplicate of the second, and neither said "Gora". */}
           <div className="relative hidden lg:block">
             {data?.heroImage ? (
               <div className="relative overflow-hidden rounded-[2rem] shadow-card ring-1 ring-white/40">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={data.heroImage} alt="" className="h-[26rem] w-full object-cover" />
               </div>
-            ) : fleet[0]?.imageUrl ? (
-              <div className="overflow-hidden rounded-[2rem] bg-surface shadow-card ring-1 ring-white/50">
-                {/* The fleet photographs are cut-outs on OPAQUE white, so the
-                    stage is white on purpose in both themes: without it the
-                    picture paints its own white rectangle on a dark card and
-                    the card's padding rings it. `data-photo-stage` tells the
-                    theme sweep this slab is meant to be here. */}
-                <div data-photo-stage className="relative h-[20rem] bg-white">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={fleet[0].imageUrl}
-                    alt={fleet[0].name}
-                    className="h-full w-full object-contain p-8"
-                  />
-                  <span className="absolute left-5 top-5 inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1.5 text-xs font-bold text-white shadow-glow">
-                    <BadgeCheck className="h-3.5 w-3.5" />
-                    Verified fleet
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4 border-t border-hairline px-6 py-5">
-                  <span>
-                    <p className="text-lg font-extrabold text-ink">{fleet[0].name}</p>
-                    <p className="mt-0.5 text-xs font-semibold text-muted">
-                      {fleet[0].seats ? `${fleet[0].seats} seats · ` : ''}AC · luggage space
-                    </p>
-                  </span>
-                  <span className="flex shrink-0 -space-x-2">
-                    {fleet.slice(1, 4).map((c) => (
-                      <span
-                        key={c._id}
-                        title={c.name}
-                        className="grid h-9 w-9 place-items-center overflow-hidden rounded-full bg-white text-[10px] font-black uppercase text-ink ring-2 ring-surface"
-                      >
-                        {c.imageUrl ? (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
-                        ) : (
-                          (c.name ?? "").slice(0, 2)
-                        )}
-                      </span>
-                    ))}
-                  </span>
-                </div>
-              </div>
             ) : (
-              <div className="grid h-[26rem] place-items-center overflow-hidden rounded-[2rem] bg-surface shadow-card ring-1 ring-tintline">
-                <CarSide className="w-64" />
+              <div className="relative overflow-hidden rounded-[2rem] shadow-card ring-1 ring-white/40">
+                <TaxiHero className="block h-[26rem] w-full" />
+                <span className="absolute left-5 top-5 inline-flex items-center gap-1.5 rounded-full bg-brand-600 px-3 py-1.5 text-xs font-bold text-white shadow-glow">
+                  <BadgeCheck className="h-3.5 w-3.5" />
+                  Verified fleet
+                </span>
               </div>
             )}
           </div>

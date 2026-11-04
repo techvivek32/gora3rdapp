@@ -6,6 +6,7 @@ import { adminApi } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { MapPin, ClipboardList, UserRound, Users, TrendingUp } from 'lucide-react';
+import { ServiceCities } from '@/components/ServiceCities';
 
 interface CityRow {
   key: string;
@@ -27,7 +28,14 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'agencies', label: 'Agencies' },
 ];
 
+// Two different questions about cities, and they were being confused with
+// each other. "Where is the demand" is an analytics view of what the platform
+// HAS. "Which cities do we serve" is a list the operator DECLARES — it feeds
+// the website's coverage strip and the app's pickers. One nav item, two tabs.
+type Tab = 'insights' | 'manage';
+
 export default function CitiesPage() {
+  const [tab, setTab] = useState<Tab>('insights');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('total');
   const [range, setRange] = useState<PeriodRange>({});
@@ -55,11 +63,34 @@ export default function CitiesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">City Insights</h1>
-          <p className="text-gray-500 mt-1">Where the demand and supply is — cities ranked by requirements, available cabs and agencies.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Cities</h1>
+          <p className="text-gray-500 mt-1">
+            {tab === 'insights'
+              ? 'Where the demand and supply is — cities ranked by requirements, available cabs and agencies.'
+              : 'The cities you serve. This list is what the website’s “Where we run” section and the app’s city pickers show.'}
+          </p>
         </div>
-        <PeriodFilter onChange={setRange} />
+        {tab === 'insights' && <PeriodFilter onChange={setRange} />}
       </div>
+
+      <div className="flex gap-1.5">
+        {([['insights', 'Insights'], ['manage', 'Manage cities']] as [Tab, string][]).map(([k, label]) => (
+          <button
+            key={k}
+            onClick={() => setTab(k)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+              tab === k
+                ? 'bg-orange-500 text-white border-orange-500'
+                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'manage' ? <ServiceCities /> : (
+      <>
 
       {/* KPI summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -142,6 +173,8 @@ export default function CitiesPage() {
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

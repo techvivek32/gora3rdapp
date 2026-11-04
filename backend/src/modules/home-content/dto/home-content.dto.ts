@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsEnum, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Max, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { HomeSectionType } from '../../../database/schemas/home-content.schema';
 
@@ -39,7 +39,8 @@ export class UpdateShowcaseDto {
 }
 
 export class UpsertCityImageDto {
-  @IsString() city: string;
+  /** A city name, or `WEBSITE_HERO_KEY` for the website's own hero image. */
+  @IsString() @IsNotEmpty() city: string;
   @IsOptional() @IsString() imageUrl?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
 }

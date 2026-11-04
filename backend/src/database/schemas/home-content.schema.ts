@@ -41,11 +41,27 @@ HomeShowcaseSchema.index({ section: 1, city: 1, order: 1 });
 export class CityImage {
   @Prop({ required: true, unique: true, lowercase: true, trim: true }) city: string;
   @Prop({ default: '' }) imageUrl: string;
+  /**
+   * Chosen by an operator in the admin panel rather than resolved from
+   * Google. The thirty-day refresh skips these: replacing someone's choice
+   * with whatever Places returns a month later is not a refresh, it is
+   * losing a decision.
+   */
+  @Prop({ default: false }) isManual: boolean;
   @Prop({ default: true }) isActive: boolean;
   // When the image was last auto-resolved from Google Places (cache TTL).
   @Prop({ default: null }) fetchedAt: Date;
 }
 export const CityImageSchema = SchemaFactory.createForClass(CityImage);
+
+/**
+ * The key the WEBSITE's own hero image is stored under, in the same
+ * collection as the per-city ones.
+ *
+ * Not the empty string, tempting as that is: `city` is `required`, and an
+ * empty string is falsy, so that row would never save.
+ */
+export const WEBSITE_HERO_KEY = '__website__';
 
 /// Admin-managed cab class shown on the "Explore Cabs" results screen. The fare
 /// is computed as distanceKm × pricePerKm; everything (name, class, image, seats,

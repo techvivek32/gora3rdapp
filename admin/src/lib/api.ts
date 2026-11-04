@@ -133,6 +133,10 @@ export const adminApi = {
   // ─── Cities ────────────────────────────────────────────────────────────────
   getCities: (params?: any) => apiClient.get('/admin/cities', { params }),
   getCityInsights: (params?: any) => apiClient.get('/admin/city-insights', { params }),
+  // The whole list in one go. The public `/cities` hides switched-off rows,
+  // which is the one thing a management screen must not do.
+  getAdminCities: (search?: string) =>
+    apiClient.get('/admin/cities', { params: { search: search || undefined, limit: 500 } }),
   createCity: (data: any) => apiClient.post('/admin/cities', data),
   updateCity: (id: string, data: any) => apiClient.put(`/admin/cities/${id}`, data),
   deleteCity: (id: string) => apiClient.delete(`/admin/cities/${id}`),

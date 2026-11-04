@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
+import { WebsiteHeroCard } from '@/components/WebsiteHeroCard';
 import toast from 'react-hot-toast';
 
 type Section = 'travel' | 'offers' | 'explore';
@@ -163,7 +164,7 @@ export default function HomeContentPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Home Content</h1>
-          <p className="text-gray-500 mt-1">Manage the showcase sections on the customer app home page</p>
+          <p className="text-gray-500 mt-1">The showcase sections on the customer app home page, and the website&apos;s hero image</p>
         </div>
         <button
           onClick={showForm ? () => { setShowForm(false); setEditingId(null); } : openCreate}
@@ -172,6 +173,12 @@ export default function HomeContentPage() {
           {showForm ? 'Cancel' : '+ Add Item'}
         </button>
       </div>
+
+      {/* The website's own hero image. Separate from the showcase list below:
+          that list is the APP's home page, this one picture is the website's.
+          They were being managed in two different places — one of which did
+          not exist. */}
+      <WebsiteHeroCard />
 
       {/* Form */}
       {showForm && (

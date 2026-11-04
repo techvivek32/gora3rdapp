@@ -1653,8 +1653,27 @@ export class AdminService {
   }
 
   // Cities CRUD
+  /**
+   * One slug per city, derived rather than typed.
+   *
+   * `replace(/\s+/g, '-')` only dealt with spaces, so "Jammu & Kashmir" kept
+   * its ampersand and "New  Delhi" kept its double gap. The slug is what the
+   * app matches a city on, so it has to be the same shape every time.
+   */
+  private static citySlug(name: string): string {
+    return String(name || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
   async createCity(data: Partial<any>) {
-    const slug = data.name.toLowerCase().replace(/\s+/g, '-');
+    const slug = AdminService.citySlug(data.name);
+    if (!slug) throw new BadRequestException('That name has no letters or digits in it');
+    const clash = await this.cityModel.findOne({ slug }).lean();
+    if (clash) throw new BadRequestException(`${(clash as any).name} is already on the list`);
+
     const city = await this.cityModel.create({ ...data, slug });
     return { message: 'City created', data: city };
   }
@@ -1676,7 +1695,17 @@ export class AdminService {
   }
 
   async updateCity(id: string, data: Partial<any>) {
-    const city = await this.cityModel.findByIdAndUpdate(id, data, { new: true });
+    const patch: any = { ...data };
+    // A rename has to carry the slug with it, or the row keeps the slug of
+    // the city it used to be.
+    if (data.name != null) {
+      const slug = AdminService.citySlug(data.name);
+      if (!slug) throw new BadRequestException('That name has no letters or digits in it');
+      const clash = await this.cityModel.findOne({ slug, _id: { $ne: id } }).lean();
+      if (clash) throw new BadRequestException(`${(clash as any).name} is already on the list`);
+      patch.slug = slug;
+    }
+    const city = await this.cityModel.findByIdAndUpdate(id, patch, { new: true });
     if (!city) throw new NotFoundException('City not found');
     return { message: 'City updated', data: city };
   }
