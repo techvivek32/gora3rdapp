@@ -353,7 +353,7 @@ function BookForm() {
                 <span className="text-sm font-semibold text-ink">
                   {rupees(hirePerDay)} / day × {hireDays} day{hireDays > 1 ? 's' : ''}
                 </span>
-                <span className="text-2xl font-black tracking-tight text-brand-600">{rupees(hireTotal)}</span>
+                <span className="text-2xl font-extrabold tracking-tight text-brand-600">{rupees(hireTotal)}</span>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-muted">
                 {hireKmPerDay > 0

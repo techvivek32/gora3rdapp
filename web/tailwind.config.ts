@@ -103,16 +103,14 @@ const config: Config = {
         bad: '#DC2626',
       },
       fontFamily: {
-        sans: ['var(--font-poppins)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
         /**
-         * Display face for headlines only.
-         *
-         * Poppins is the app's font and stays for everything that is read
-         * rather than looked at. A serif at large sizes is what separates an
-         * editorial layout from a dashboard — it carries the "classic" half
-         * of the brief while the colour carries the other half.
+         * Headlines only — see the note in layout.tsx. Its fallback is a
+         * sans, not a serif: if the webfont never arrives, a heading set in
+         * Georgia next to Inter body copy looks like a mistake, where one
+         * set in the system sans just looks plain.
          */
-        display: ['var(--font-display)', 'Georgia', 'serif'],
+        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         // Dark surfaces are separated by light, not by shadow, so the card

@@ -119,7 +119,7 @@ function PoolRideDetail() {
           <span className="text-sm font-semibold text-ink">
             {rupees(r.pricePerSeat)} × {seats} seat{seats > 1 ? 's' : ''}
           </span>
-          <span className="text-xl font-black text-brand-600">{rupees(total)}</span>
+          <span className="text-xl font-extrabold text-brand-600">{rupees(total)}</span>
         </div>
 
         {/* Pool fares are settled with the driver in person — there is no online

@@ -652,7 +652,7 @@
     @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-brandink;
   }
   .section-title {
-    @apply mt-2 text-2xl font-black tracking-tight text-ink sm:text-[28px];
+    @apply mt-2 text-2xl font-extrabold tracking-tight text-ink sm:text-[28px];
   }
   .section-rule {
     @apply mt-4 h-1 w-14 rounded-full bg-gradient-to-r from-brand-500 to-amber-400;
@@ -714,10 +714,17 @@
    *
    * The serif was the "classic" reading of the brief and it was the wrong
    * one: the reference the client gave is a modern taxi brand — bold sans,
-   * orange and white, photography. Poppins Black at display sizes is what
-   * that looks like, and it is already the app's font. */
+   * orange and white, photography. The face is Bricolage Grotesque; see the
+   * note in layout.tsx for why it is not Poppins any more. */
   .display {
-    @apply font-sans font-black tracking-[-0.03em] text-ink;
+    /* Bricolage tops out at 800; `font-extrabold` would ask for a 900 that does
+       not exist and let the browser synthesise one, which smears the very
+       details the face was chosen for. */
+    /* A serif does not want a sans's negative tracking: pulling the letters
+       together closes the thick-to-thin that is the whole point of the
+       face. Melodrama ends at 700, so `font-bold` is the top of the axis
+       and anything heavier would be synthesised. */
+    @apply font-display font-bold tracking-[-0.005em] text-ink;
     text-wrap: balance;
   }
   .display-xl {
@@ -745,8 +752,10 @@
   }
 
   /* A numbered entry — "01 / CAB BOOKING". The numeral is the colour. */
+  /* Numbers — a GSTIN, a phone, a fare. The body face, because Inter's
+     tabular figures line up in a column and Bricolage's do not. */
   .numeral {
-    @apply font-display text-sm font-semibold tabular-nums;
+    @apply font-sans text-sm font-semibold tabular-nums;
   }
 
   /* Body copy set to a comfortable measure. 68 characters is the top of the

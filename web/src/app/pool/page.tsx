@@ -86,7 +86,7 @@ function PoolSearch() {
                     <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
                     <span className="truncate">{shortCity(r.toCity || r.to?.address)}</span>
                   </div>
-                  <p className="text-xl font-black text-ink">
+                  <p className="text-xl font-extrabold text-ink">
                     {rupees(r.pricePerSeat)}
                     <span className="ml-1 text-xs font-semibold text-muted">/ seat</span>
                   </p>

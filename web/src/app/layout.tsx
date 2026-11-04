@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Poppins } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { Providers } from './providers';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -7,12 +7,48 @@ import { SiteFooter } from '@/components/SiteFooter';
 import { IntroLoader } from '@/components/IntroLoader';
 import { ScrollFx } from '@/components/ScrollFx';
 
-// Poppins is the mobile app's font, so the two surfaces read as one product.
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800', '900'],
-  variable: '--font-poppins',
+/**
+ * Headlines. Melodrama, from Fontshare.
+ *
+ * Seventh face, and the first that is not a sans. Six respectable
+ * grotesques were each rejected as "simple", which stopped being a matter
+ * of taste and started being evidence: the category was the problem, not
+ * the pick. Melodrama is a display serif with a dramatic thick-to-thin —
+ * nothing on an orange taxi site looks less like a template.
+ *
+ * Display sizes only. The thin strokes that make it distinctive are the
+ * ones that disappear at 13px, which is why the body is Satoshi.
+ */
+const melodrama = localFont({
+  src: [
+    { path: './fonts/Melodrama-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/Melodrama-600.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/Melodrama-700.woff2', weight: '700', style: 'normal' },
+  ],
+  variable: '--font-display',
   display: 'swap',
+  // Metrics matched to a serif this time, so the swap does not shift.
+  adjustFontFallback: 'Times New Roman',
+});
+
+/**
+ * Everything that is read. Satoshi, from Fontshare.
+ *
+ * Four cuts: 400, 500, 700, 900. The family has no 600 and no 800, so a
+ * `font-semibold` resolves to 700 and a `font-extrabold` to 900 by the
+ * normal CSS matching rules. Both are real cuts — nothing is synthesised,
+ * which is the part that matters.
+ */
+const satoshi = localFont({
+  src: [
+    { path: './fonts/Satoshi-400.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/Satoshi-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/Satoshi-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/Satoshi-900.woff2', weight: '900', style: 'normal' },
+  ],
+  variable: '--font-sans',
+  display: 'swap',
+  adjustFontFallback: 'Arial',
 });
 
 
@@ -93,7 +129,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // `suppressHydrationWarning`: the scripts below set data-theme and
     // data-intro on this very element before React hydrates, so the attributes
     // it finds will not match the server's. That difference is the point.
-    <html lang="en" className={poppins.variable} suppressHydrationWarning>
+    <html lang="en" className={`${satoshi.variable} ${melodrama.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG + THEME_BOOTSTRAP + INTRO_BOOTSTRAP }} />
       </head>

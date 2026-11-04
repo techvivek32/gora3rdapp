@@ -55,14 +55,16 @@ export function IntroLoader() {
             x="340"
             y="78"
             textAnchor="middle"
-            fontFamily="var(--font-poppins), system-ui, sans-serif"
+            fontFamily="var(--font-display), system-ui, sans-serif"
             fontSize="86"
-            fontWeight="900"
+            // Bricolage stops at 800. Asking for 900 gets a synthesised
+            // weight, which on a 86px wordmark is visibly smeared.
+            fontWeight="800"
             letterSpacing="-2"
             fill="#ffffff"
           >
             GORA{' '}
-            <tspan fill="#f97316">CABS</tspan>
+            <tspan fill="#f97316">TAXI</tspan>
           </text>
         </svg>
 

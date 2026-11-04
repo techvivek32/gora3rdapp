@@ -540,7 +540,7 @@ export default function HomePage() {
             ].map(([title, body], i) => (
               <li key={title} className="text-center" data-reveal>
                 <span
-                  className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl text-lg font-black text-white shadow-glow ${
+                  className={`mx-auto grid h-14 w-14 place-items-center rounded-2xl text-lg font-extrabold text-white shadow-glow ${
                     ['bg-cabsolid', 'bg-drivesolid', 'bg-poolsolid', 'bg-luxsolid'][i]
                   }`}
                 >

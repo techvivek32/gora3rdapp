@@ -35,7 +35,7 @@ function BookedInner() {
       {ref && (
         <div className="card mt-6 p-5">
           <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Your booking reference</p>
-          <p className="mt-1 text-xl font-black tracking-wide text-ink">{ref}</p>
+          <p className="mt-1 text-xl font-extrabold tracking-wide text-ink">{ref}</p>
           <p className="mt-2 text-xs text-muted">Keep this handy if you call support.</p>
         </div>
       )}

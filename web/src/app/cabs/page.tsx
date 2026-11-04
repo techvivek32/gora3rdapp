@@ -186,6 +186,14 @@ function CabResults() {
               <span className="truncate">{shortCity(trip.pickup?.address) || '—'}</span>
               <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
               <span className="truncate">{isLocal ? 'Local package' : shortCity(trip.drop?.address) || '—'}</span>
+              {/* And back, on a round trip — the fares below are for both
+                  legs, so the summary has to say so. */}
+              {isRound && !isLocal && (
+                <>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted" />
+                  <span className="truncate">{shortCity(trip.pickup?.address) || '—'}</span>
+                </>
+              )}
             </div>
             <p className="mt-1.5 text-xs text-muted">
               {formatDate(trip.travelDate)} · {formatTime12(trip.travelTime)}
@@ -319,7 +327,7 @@ function CabResults() {
                     {/* Counts up the first time it scrolls into view, then
                         snaps on any later change — rolling between two REAL
                         prices would look like the price moving by itself. */}
-                    <p className="text-2xl font-black text-ink">
+                    <p className="text-2xl font-extrabold text-ink">
                       ₹<CountUp value={Math.round(b.total)} />
                     </p>
                     <p className="text-[11px] text-muted">

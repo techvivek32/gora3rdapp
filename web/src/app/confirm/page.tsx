@@ -164,6 +164,13 @@ function Confirm() {
             <RoutePoint key={i} color="bg-brand-500" label={`STOP ${i + 1}`} text={s.address ?? ''} />
           ))}
           {!cab.isLocal && <RoutePoint color="bg-bad" label="TO" text={trip.drop?.address ?? '—'} />}
+          {/* The way home. A round trip is priced for both legs and carries a
+              return date, so drawing it as a one-way route was the fare and
+              the picture disagreeing with each other. Same shape the app
+              uses: from → stops → to → from. */}
+          {cab.isRound && !cab.isLocal && (
+            <RoutePoint color="bg-ok" label="BACK TO" text={trip.pickup?.address ?? '—'} />
+          )}
         </div>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-hairline pt-4 text-sm">
           <Meta label="Trip type" value={trip.subType} />
@@ -188,7 +195,7 @@ function Confirm() {
               {cab.fuel ? ` · ${cab.fuel}` : ''}
             </p>
           </div>
-          <p className="ml-auto text-2xl font-black text-ink">{rupees(cab.fare)}</p>
+          <p className="ml-auto text-2xl font-extrabold text-ink">{rupees(cab.fare)}</p>
         </div>
 
         <dl className="mt-4 space-y-1.5 border-t border-hairline pt-4 text-sm">
