@@ -22,7 +22,7 @@ function BookedInner() {
       <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-ok">
         <CheckCircle2 className="h-9 w-9" />
       </span>
-      <h1 className="mt-5 text-2xl font-extrabold text-ink">Booking placed</h1>
+      <h1 className="display-md mt-5">Booking placed</h1>
       <p className="mt-2 text-sm leading-relaxed text-muted">
         Our team is assigning a verified driver for your trip. They will call you on the number you gave.
       </p>
@@ -44,7 +44,7 @@ function BookedInner() {
         <h2 className="text-sm font-extrabold text-ink">Want to track it?</h2>
         <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-muted">
           <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-          Open the Gora Cabs app with the same mobile number and this booking will already be there —
+          Open the Gora Taxi app with the same mobile number and this booking will already be there —
           with the driver's details once our team assigns one.
         </p>
       </div>
@@ -58,9 +58,12 @@ function BookedInner() {
         </Link>
       </div>
 
-      <p className="mt-8 inline-flex items-center gap-1.5 text-xs text-muted">
-        <Phone className="h-3.5 w-3.5" />
-        Something wrong? <Link href="/support" className="ml-1 font-semibold text-brand-600 hover:underline">Help &amp; Support</Link>
+      <p className="mt-8 text-xs leading-relaxed text-muted">
+        <Phone className="mr-1 inline h-3.5 w-3.5 align-text-bottom" />
+        Something wrong?{' '}
+        <Link href="/support" className="font-semibold text-brandink hover:underline">
+          Help &amp; Support
+        </Link>
       </p>
     </div>
   );

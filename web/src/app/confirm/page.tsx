@@ -153,7 +153,7 @@ function Confirm() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-extrabold text-ink">Review & confirm</h1>
+      <h1 className="display-lg">Review & confirm</h1>
       <p className="mt-1 text-sm text-muted">Check the trip and fare before you book.</p>
 
       {/* Route */}

@@ -60,7 +60,28 @@ export interface PlatformSettings {
   minDeposit?: number;
   minWithdrawal?: number;
   minTransfer?: number;
+  /** Contact Us, as the operator set it in the admin panel. */
+  supportPhone?: string;
+  supportPhone2?: string;
+  supportWhatsapp?: string;
+  supportEmail?: string;
   [k: string]: unknown;
+}
+
+/** A city the network is set up in. `GET /cities` — public. */
+export interface City {
+  _id?: string;
+  name?: string;
+  state?: string;
+  slug?: string;
+  isFeatured?: boolean;
+}
+
+/** `GET /settings/support-contact` — the franchise's line, else the global one. */
+export interface SupportContact {
+  phone?: string;
+  whatsapp?: string;
+  source?: 'global' | 'franchise';
 }
 
 export interface Booking {

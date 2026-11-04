@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { CarFront, Menu, Phone, X } from 'lucide-react';
+import { CarFront, ChevronRight, Menu, X } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 
 // No account area: the site exists to take a booking, and a visitor never has
@@ -12,6 +12,12 @@ const NAV = [
   { href: '/book/cab', label: 'Book a Cab' },
   { href: '/book/hire_driver', label: 'Hire a Driver' },
   { href: '/pool', label: 'Car Pool' },
+  // Sections of the home page. `secondary` keeps them out of the nav between
+  // md and lg, where six links plus the logo and the Book now button do not
+  // fit — and these are the two a visitor can most afford to lose.
+  { href: '/#about', label: 'About', secondary: true },
+  { href: '/#cities', label: 'Cities', secondary: true },
+  { href: '/#contact', label: 'Contact', secondary: true },
   { href: '/support', label: 'Help' },
 ];
 
@@ -33,14 +39,18 @@ export function SiteHeader() {
 
         <nav className="ml-6 hidden items-center gap-1 md:flex">
           {NAV.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            // An anchor is never "the page you are on", so only real routes
+            // can light up.
+            const active =
+              !item.href.includes('#') &&
+              (pathname === item.href || pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                  active ? 'bg-tint text-brandink' : 'text-muted hover:bg-sunken hover:text-ink'
-                }`}
+                  item.secondary ? 'hidden lg:block' : ''
+                } ${active ? 'bg-tint text-brandink' : 'text-muted hover:bg-sunken hover:text-ink'}`}
               >
                 {item.label}
               </Link>
@@ -86,7 +96,11 @@ export function SiteHeader() {
                 onClick={() => setOpen(false)}
                 className="flex items-center gap-2 rounded-lg px-2 py-3 text-sm font-semibold text-ink hover:bg-sunken"
               >
-                <Phone className="h-4 w-4 text-brand-500" />
+                {item.href.includes('#') ? (
+                  <ChevronRight className="h-4 w-4 text-brand-500" />
+                ) : (
+                  <CarFront className="h-4 w-4 text-brand-500" />
+                )}
                 {item.label}
               </Link>
             ))}

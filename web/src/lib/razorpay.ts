@@ -98,7 +98,7 @@ export async function payBookingAdvance(
       amount: order.amount,
       currency: order.currency ?? 'INR',
       order_id: order.orderId,
-      name: 'Gora Cabs',
+      name: 'Gora Taxi',
       description: `Booking advance (${percent}%)`,
       prefill: { name: guestName, contact: mobile },
       theme: { color: '#F97316' },

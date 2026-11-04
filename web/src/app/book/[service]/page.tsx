@@ -189,44 +189,31 @@ function BookForm() {
   return (
     <div className="relative">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden bg-navy pb-24 pt-12 sm:pb-28">
-        {/* Two slow-drifting colour fields plus a fading grid. `aria-hidden`
-            and non-interactive: this is lighting, not content. */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="aurora -left-24 -top-32 h-80 w-80 bg-brand-500/45" />
-          <div className="aurora -right-16 top-10 h-72 w-72 bg-sky-400/25" style={{ animationDelay: '-7s' }} />
-          <div
-            className="absolute inset-0 opacity-[0.07]"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)',
-              backgroundSize: '44px 44px',
-              maskImage: 'radial-gradient(ellipse at 50% 0%, #000 40%, transparent 75%)',
-              WebkitMaskImage: 'radial-gradient(ellipse at 50% 0%, #000 40%, transparent 75%)',
-            }}
-          />
-        </div>
+      <div className="relative overflow-hidden border-b border-hairline bg-surface pb-12 pt-14">
+        {/* One warm wash, the same device the home hero uses. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-60"
+          style={{ background: 'radial-gradient(55% 100% at 18% 0%, rgb(var(--tint)) 0%, transparent 70%)' }}
+        />
 
         <div className="relative mx-auto max-w-3xl px-4">
-          <span className="reveal inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-brand-200 ring-1 ring-white/15 backdrop-blur" style={at(40)}>
-            <Sparkles className="h-3 w-3" />
+          <p className="eyebrow reveal" style={at(40)}>
+            <Sparkles className="h-3 w-3 text-brand-500" />
             {isHire ? 'Your car, our driver' : 'Outstation · Local · Round trip'}
-          </span>
+          </p>
 
-          <h1 className="reveal mt-4 text-3xl font-black leading-tight text-white sm:text-[40px]" style={at(110)}>
+          <h1 className="display-lg reveal mt-5" style={at(110)}>
             {meta.title}
           </h1>
-          <p className="reveal mt-2 max-w-md text-[15px] leading-relaxed text-white/70" style={at(180)}>
+          <p className="prose-measure reveal mt-4" style={at(180)}>
             {meta.subtitle}
           </p>
 
-          <div className="reveal mt-6 flex flex-wrap gap-2" style={at(250)}>
+          <div className="reveal mt-7 flex flex-wrap gap-x-6 gap-y-2" style={at(250)}>
             {TRUST.map(({ icon: Icon, text }) => (
-              <span
-                key={text}
-                className="lift inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/85 ring-1 ring-white/15 backdrop-blur"
-              >
-                <Icon className="h-3.5 w-3.5 text-brand-300" />
+              <span key={text} className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
+                <Icon className="h-3.5 w-3.5 shrink-0 text-brand-500" />
                 {text}
               </span>
             ))}
@@ -234,11 +221,8 @@ function BookForm() {
         </div>
       </div>
 
-      {/* ── The form, lifted over the hero ───────────────────────────────── */}
-      {/* `relative z-10` is load-bearing: the hero above is positioned, so
-          without it the hero paints over the 64px the card is pulled up by —
-          which swallowed the "Trip type" label. */}
-      <div className="relative z-10 mx-auto -mt-16 max-w-3xl px-4 pb-16">
+      {/* ── The form ─────────────────────────────────────────────────────── */}
+      <div className="relative z-10 mx-auto max-w-3xl px-4 pb-16 pt-8">
         <div className="reveal lift card space-y-6 p-5 sm:p-7" style={at(300)}>
           {/* Trip type */}
           <div className="reveal" style={rise()}>

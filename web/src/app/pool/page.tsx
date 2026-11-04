@@ -41,7 +41,7 @@ function PoolSearch() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold text-ink">Car Pool</h1>
+          <h1 className="display-lg">Car Pool</h1>
           <p className="mt-1 text-sm text-muted">Book a seat on a ride someone is already making.</p>
         </div>
         <Link href="/book/cab" className="btn-ghost px-4 py-2 text-sm">

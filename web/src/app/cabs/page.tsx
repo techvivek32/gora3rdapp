@@ -200,7 +200,11 @@ function CabResults() {
                 {Math.round(ctx.distanceKm)} km
               </span>
             )}
-            <button type="button" onClick={() => router.push('/book/cab')} className="text-sm font-semibold text-brand-600 hover:underline">
+            <button
+              type="button"
+              onClick={() => router.push('/book/cab')}
+              className="-mr-2 inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-brandink transition hover:bg-tint hover:underline"
+            >
               Edit trip
             </button>
           </div>
@@ -216,7 +220,7 @@ function CabResults() {
               key={m}
               type="button"
               onClick={() => setIncMode(m)}
-              className={`rounded-lg px-4 py-2 text-sm font-bold transition ${
+              className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition ${
                 incMode === m ? 'bg-brand-500 text-white' : 'text-muted hover:text-ink'
               }`}
             >
@@ -233,7 +237,7 @@ function CabResults() {
         </p>
       )}
 
-      <h2 className="mt-8 text-lg font-extrabold text-ink">Choose your ride</h2>
+      <h2 className="display-md mt-10">Choose your ride</h2>
 
       {cats.length === 0 ? (
         <div className="card mt-4 p-8 text-center">
@@ -291,7 +295,7 @@ function CabResults() {
                             key={f}
                             type="button"
                             onClick={() => setFuelByCat((m) => ({ ...m, [key]: f }))}
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 transition ${
+                            className={`inline-flex min-h-10 items-center gap-1 rounded-full px-3.5 py-1 text-[11px] font-bold ring-1 transition ${
                               fuel === f ? 'bg-brand-500 text-white ring-brand-500' : 'bg-surface text-muted ring-hairline'
                             }`}
                           >
