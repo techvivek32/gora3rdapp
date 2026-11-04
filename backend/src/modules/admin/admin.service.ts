@@ -1668,7 +1668,24 @@ export class AdminService {
       .replace(/^-+|-+$/g, '');
   }
 
+  /**
+   * The chip colours the website knows how to draw. Anything else would fall
+   * back to soft and leave the operator wondering why their choice did
+   * nothing, so it is refused here instead.
+   */
+  private static readonly CITY_COLOURS = ['auto', 'soft', 'orange', 'teal', 'gold', 'slate'];
+
+  private static assertColour(data: Partial<any>) {
+    if (data.color == null) return;
+    if (!AdminService.CITY_COLOURS.includes(String(data.color))) {
+      throw new BadRequestException(
+        `Colour must be one of: ${AdminService.CITY_COLOURS.join(', ')}`,
+      );
+    }
+  }
+
   async createCity(data: Partial<any>) {
+    AdminService.assertColour(data);
     const slug = AdminService.citySlug(data.name);
     if (!slug) throw new BadRequestException('That name has no letters or digits in it');
     const clash = await this.cityModel.findOne({ slug }).lean();
@@ -1695,6 +1712,7 @@ export class AdminService {
   }
 
   async updateCity(id: string, data: Partial<any>) {
+    AdminService.assertColour(data);
     const patch: any = { ...data };
     // A rename has to carry the slug with it, or the row keeps the slug of
     // the city it used to be.

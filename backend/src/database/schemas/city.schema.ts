@@ -26,6 +26,15 @@ export class City {
   @Prop({ default: false })
   isFeatured: boolean;
 
+  /**
+   * Chip colour on the website's coverage strip: one of auto | soft | orange
+   * | teal | gold | slate. A name, not a hex — every solid it maps to carries
+   * white text and is known to clear 4.5:1 against it, which an arbitrary
+   * colour cannot promise. `auto` keeps the old rotation.
+   */
+  @Prop({ default: 'auto' })
+  color: string;
+
   @Prop({ default: 0 })
   requirementCount: number;
 

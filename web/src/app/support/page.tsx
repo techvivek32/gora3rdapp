@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, Phone, Smartphone } from 'lucide-react';
 import { apiGet } from '@/lib/api';
+import { useSiteText } from '@/lib/site-text';
 
 interface SupportContact {
   phone?: string;
@@ -16,8 +17,14 @@ interface SupportContact {
  * Raising a tracked complaint belongs to a real customer record, so that stays
  * in the app. Here we show the ways to reach a human, which is what someone
  * with a problem actually wants.
+ *
+ * Every word on it is the operator's. The numbers already came from their
+ * settings; the copy was written into this file, so changing "24×7" meant a
+ * developer and a deploy. It now comes from the same place — see
+ * lib/site-text.ts for the defaults this falls back to.
  */
 export default function SupportPage() {
+  const t = useSiteText();
   const { data } = useQuery({
     queryKey: ['support-contact'],
     queryFn: () => apiGet<SupportContact>('/settings/support-contact'),
@@ -29,8 +36,8 @@ export default function SupportPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
-      <h1 className="display-lg">Help &amp; Support</h1>
-      <p className="mt-1 text-sm text-muted">We are here 24×7. Reach us whichever way suits you.</p>
+      <h1 className="display-lg">{t('support.title')}</h1>
+      <p className="mt-1 text-sm text-muted">{t('support.subtitle')}</p>
 
       <div className="mt-6 space-y-3">
         {phone && (
@@ -63,26 +70,36 @@ export default function SupportPage() {
         )}
       </div>
 
-      <div className="card mt-6 p-5">
-        <h2 className="text-sm font-extrabold text-ink">About a booking you made here</h2>
-        <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-muted">
-          <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
-          Keep your booking reference handy when you call. To see the trip, track the driver or raise a
-          complaint, open the Gora Taxi app with the same mobile number you booked with — the booking is
-          already there.
+      {/* Each block disappears if the operator empties it — a caution they
+          no longer want to show should go, not leave a stripe of colour with
+          nothing in it. */}
+      {(t('support.bookingTitle') || t('support.bookingBody')) && (
+        <div className="card mt-6 p-5">
+          {t('support.bookingTitle') && (
+            <h2 className="text-sm font-extrabold text-ink">{t('support.bookingTitle')}</h2>
+          )}
+          {t('support.bookingBody') && (
+            <p className="mt-2 flex items-start gap-2 text-sm leading-relaxed text-muted">
+              <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+              {t('support.bookingBody')}
+            </p>
+          )}
+        </div>
+      )}
+
+      {t('support.caution') && (
+        <p className="mt-8 rounded-lg bg-dangerbg px-4 py-3 text-xs font-semibold leading-relaxed text-dangerfg">
+          {t('support.caution')}
         </p>
-      </div>
+      )}
 
-      <p className="mt-8 rounded-lg bg-dangerbg px-4 py-3 text-xs font-semibold leading-relaxed text-dangerfg">
-        Caution: never make advance payments to an unknown person without a reference. Pay only through
-        this website or the Gora Taxi app.
-      </p>
-
-      <div className="mt-8 text-center">
-        <Link href="/book/cab" className="btn-primary px-6 py-3">
-          Book a cab
-        </Link>
-      </div>
+      {t('support.cta') && (
+        <div className="mt-8 text-center">
+          <Link href="/book/cab" className="btn-primary px-6 py-3">
+            {t('support.cta')}
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

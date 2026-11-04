@@ -141,6 +141,14 @@ export const adminApi = {
   updateCity: (id: string, data: any) => apiClient.put(`/admin/cities/${id}`, data),
   deleteCity: (id: string) => apiClient.delete(`/admin/cities/${id}`),
 
+  // ─── Website text (the wording on the public site) ─────────────────────────
+  // The admin GET returns the field definitions as well as the values, so the
+  // panel never carries its own copy of the labels or the defaults.
+  getSiteText: () => apiClient.get('/site-content/admin'),
+  saveSiteText: (items: { key: string; value: string }[]) =>
+    apiClient.put('/site-content/admin', { items }),
+  resetSiteText: (key: string) => apiClient.delete(`/site-content/admin/${key}`),
+
   // ─── Banners ───────────────────────────────────────────────────────────────
   getBanners: (params?: any) => apiClient.get('/admin/banners', { params }),
   createBanner: (data: any) => apiClient.post('/admin/banners', data),

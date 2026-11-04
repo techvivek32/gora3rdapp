@@ -38,6 +38,7 @@ import { RingtonesModule } from './modules/ringtones/ringtones.module';
 import { CustomerBookingsModule } from './modules/customer-bookings/customer-bookings.module';
 import { CarPoolModule } from './modules/car-pool/car-pool.module';
 import { HomeContentModule } from './modules/home-content/home-content.module';
+import { SiteContentModule } from './modules/site-content/site-content.module';
 import { CustomerComplaintsModule } from './modules/customer-complaints/customer-complaints.module';
 import { PopupAdsModule } from './modules/popup-ads/popup-ads.module';
 import { FranchiseModule } from './modules/franchise/franchise.module';
@@ -128,6 +129,7 @@ import { InvoiceTemplateModule } from './modules/invoice-template/invoice-templa
     CustomerBookingsModule,
     CarPoolModule,
     HomeContentModule,
+    SiteContentModule,
     CustomerComplaintsModule,
     PopupAdsModule,
     FranchiseModule,

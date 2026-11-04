@@ -75,6 +75,8 @@ export interface City {
   state?: string;
   slug?: string;
   isFeatured?: boolean;
+  /** Chip colour on the coverage strip — see lib/city-colour.ts. */
+  color?: string;
 }
 
 /** `GET /settings/support-contact` — the franchise's line, else the global one. */

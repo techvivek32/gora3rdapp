@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Mail, MessageCircle, Phone } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { COMPANY } from '@/lib/company';
+import { useSiteText } from '@/lib/site-text';
 import type { PlatformSettings, SupportContact } from '@/lib/types';
 
 /**
@@ -17,6 +18,7 @@ import type { PlatformSettings, SupportContact } from '@/lib/types';
  * no empty row behind.
  */
 export function SiteFooter() {
+  const t = useSiteText();
   const { data: contact } = useQuery({
     queryKey: ['support-contact'],
     queryFn: () => apiGet<SupportContact>('/settings/support-contact'),
@@ -91,14 +93,16 @@ export function SiteFooter() {
               </a>
             )}
           </div>
-          <p className="mt-3 text-sm leading-relaxed text-muted">
-            Booked here? Open the {COMPANY.brand} app with the same mobile number and your trip is
-            already waiting for you.
-          </p>
-          {/* The same caution the app shows above every booking feed. */}
-          <p className="mt-4 rounded-lg bg-dangerbg px-3 py-2 text-[11px] font-semibold leading-snug text-dangerfg">
-            Caution: never make advance payments to an unknown person without a reference.
-          </p>
+          {t('footer.appNote') && (
+            <p className="mt-3 text-sm leading-relaxed text-muted">{t('footer.appNote')}</p>
+          )}
+          {/* The same caution the app shows above every booking feed. Empty
+              means the operator took it down, so the box goes with it. */}
+          {t('footer.caution') && (
+            <p className="mt-4 rounded-lg bg-dangerbg px-3 py-2 text-[11px] font-semibold leading-snug text-dangerfg">
+              {t('footer.caution')}
+            </p>
+          )}
         </div>
       </div>
 

@@ -15,6 +15,7 @@ import { TaxiHero } from '@/components/TaxiHero';
 import { tripDraft } from '@/lib/trip-draft';
 import { rupees, toDateInput } from '@/lib/format';
 import { COMPANY } from '@/lib/company';
+import { cityChip } from '@/lib/city-colour';
 import type { CabCategory, City, Geo, PlatformSettings, SupportContact } from '@/lib/types';
 
 interface Showcase {
@@ -574,27 +575,23 @@ export default function HomePage() {
             </div>
 
             <div className="mt-10 flex flex-wrap justify-center gap-3">
-              {cities.map((c, i) => (
-                <span
-                  key={c._id ?? c.name}
-                  data-reveal
-                  className={
-                    c.isFeatured
-                      ? `inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-glow ${
-                          ['bg-cabsolid', 'bg-drivesolid', 'bg-poolsolid', 'bg-brand-600'][i % 4]
-                        }`
-                      : 'inline-flex items-center gap-2 rounded-full bg-tint px-5 py-2.5 text-sm font-bold text-brandink ring-1 ring-tintline'
-                  }
-                >
-                  {c.name}
-                  {/* Delhi is its own state, and "Delhi Delhi" reads as a bug. */}
-                  {c.state && c.state.toLowerCase() !== (c.name ?? '').toLowerCase() && (
-                    <span className={`text-[11px] font-semibold ${c.isFeatured ? 'text-white/70' : 'text-muted'}`}>
-                      {c.state}
-                    </span>
-                  )}
-                </span>
-              ))}
+              {cities.map((c, i) => {
+                // The colour comes from the city now. It used to come from
+                // the city's POSITION, so inserting one at the top repainted
+                // every chip under it.
+                const chip = cityChip(c.color, c.isFeatured, i);
+                return (
+                  <span key={c._id ?? c.name} data-reveal className={chip.className}>
+                    {c.name}
+                    {/* Delhi is its own state, and "Delhi Delhi" reads as a bug. */}
+                    {c.state && c.state.toLowerCase() !== (c.name ?? '').toLowerCase() && (
+                      <span className={`text-[11px] font-semibold ${chip.solid ? 'text-white/70' : 'text-muted'}`}>
+                        {c.state}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
             </div>
           </div>
         </section>

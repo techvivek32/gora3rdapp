@@ -27,9 +27,35 @@ interface City {
   isActive?: boolean;
   isFeatured?: boolean;
   sortOrder?: number;
+  color?: string;
 }
 
-const EMPTY = { name: '', state: '', isActive: true, isFeatured: false, sortOrder: 0 };
+/**
+ * The chip colours on the website's coverage strip.
+ *
+ * A fixed set rather than a colour picker: each solid carries white text and
+ * is known to clear 4.5:1 against it, which an arbitrary hex cannot promise —
+ * the first pale yellow anyone picked would make that chip unreadable and
+ * nothing here would stop them.
+ *
+ * `auto` is what the strip did before this existed: featured cities take the
+ * next colour in a rotation, the rest are soft. The swatches below are the
+ * real website values, so what you see here is what the site draws.
+ *
+ * Mirrored in web/src/lib/city-colour.ts. Add a value there too.
+ */
+const COLOURS: { value: string; label: string; swatch: string; ring?: boolean }[] = [
+  { value: 'auto', label: 'Auto', swatch: 'linear-gradient(135deg,#0f766e 0 25%,#a16207 25% 50%,#c2410c 50% 75%,#ea580c 75%)' },
+  { value: 'soft', label: 'Soft', swatch: '#ffedd5', ring: true },
+  { value: 'orange', label: 'Orange', swatch: '#c2410c' },
+  { value: 'teal', label: 'Teal', swatch: '#0f766e' },
+  { value: 'gold', label: 'Gold', swatch: '#a16207' },
+  { value: 'slate', label: 'Slate', swatch: '#64748b' },
+];
+
+const EMPTY = {
+  name: '', state: '', isActive: true, isFeatured: false, sortOrder: 0, color: 'auto',
+};
 
 export function ServiceCities() {
   const queryClient = useQueryClient();
@@ -97,6 +123,7 @@ export function ServiceCities() {
       isActive: c.isActive ?? true,
       isFeatured: c.isFeatured ?? false,
       sortOrder: c.sortOrder ?? 0,
+      color: c.color || 'auto',
     });
     setOpen(true);
   }
@@ -167,6 +194,36 @@ export function ServiceCities() {
               />
               <p className="mt-1 text-xs text-gray-400">Lower numbers come first.</p>
             </div>
+            <div className="sm:col-span-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Chip colour on the website
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {COLOURS.map((c) => (
+                  <button
+                    key={c.value}
+                    type="button"
+                    onClick={() => setForm({ ...form, color: c.value })}
+                    aria-pressed={form.color === c.value}
+                    className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      form.color === c.value
+                        ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/20 dark:text-brand-300'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    <span
+                      className={`h-4 w-4 rounded-full ${c.ring ? 'ring-1 ring-gray-300 dark:ring-gray-600' : ''}`}
+                      style={{ background: c.swatch }}
+                    />
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-gray-400">
+                Auto: featured cities get a colour from the rotation, the rest stay soft.
+              </p>
+            </div>
+
             <div className="flex items-end gap-5 pb-1">
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input
@@ -226,6 +283,16 @@ export function ServiceCities() {
                 i > 0 ? 'border-t border-gray-100 dark:border-gray-800' : ''
               }`}
             >
+              {/* The colour, on the row — otherwise you have to open each
+                  city to find out what the strip looks like. */}
+              <span
+                aria-hidden
+                title={COLOURS.find((x) => x.value === (c.color || 'auto'))?.label}
+                className={`h-6 w-6 shrink-0 rounded-full ${
+                  (c.color || 'auto') === 'soft' ? 'ring-1 ring-gray-300 dark:ring-gray-600' : ''
+                }`}
+                style={{ background: COLOURS.find((x) => x.value === (c.color || 'auto'))?.swatch }}
+              />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                   {c.name}
