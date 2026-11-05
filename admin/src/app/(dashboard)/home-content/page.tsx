@@ -4,7 +4,8 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
-import { WebsiteHeroCard } from '@/components/WebsiteHeroCard';
+import Link from 'next/link';
+import { ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type Section = 'travel' | 'offers' | 'explore';
@@ -174,11 +175,23 @@ export default function HomeContentPage() {
         </button>
       </div>
 
-      {/* The website's own hero image. Separate from the showcase list below:
-          that list is the APP's home page, this one picture is the website's.
-          They were being managed in two different places — one of which did
-          not exist. */}
-      <WebsiteHeroCard />
+      {/* This screen is the APP's home page. The website's hero picture used
+          to sit here too, which put two different products' content in one
+          list; it now lives with the rest of the website's content. */}
+      <Link
+        href="/website?tab=hero"
+        className="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4 transition-colors hover:border-orange-300 dark:border-gray-700 dark:bg-gray-900"
+      >
+        <span>
+          <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+            Looking for the website&apos;s hero image?
+          </span>
+          <span className="mt-0.5 block text-xs text-gray-500">
+            This page is the app&apos;s home screen. The public site is managed under Website.
+          </span>
+        </span>
+        <ArrowRight className="h-4 w-4 shrink-0 text-orange-500" />
+      </Link>
 
       {/* Form */}
       {showForm && (

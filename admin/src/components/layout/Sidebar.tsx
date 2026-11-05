@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, Car, Bell, CreditCard,
   BarChart3, Flag, Image, Settings, LogOut, PlayCircle, Building2,
-  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle, Music, Megaphone, MessageSquareWarning, CarTaxiFront, LayoutGrid, CarFront, ClipboardList, ReceiptText, Type,
+  FileText, Star, Map, BadgeCheck, Wallet, Trophy, MessageSquare, Banknote, DollarSign, UserX, UserCircle, Music, Megaphone, MessageSquareWarning, CarTaxiFront, LayoutGrid, CarFront, ClipboardList, ReceiptText, Globe,
 } from 'lucide-react';
 import { signOut, useSession } from 'next-auth/react';
 
@@ -70,7 +70,7 @@ const navigation = [
       { href: '/notifications', label: 'Notifications', icon: Bell },
       { href: '/pricing', label: 'Pricing Config', icon: DollarSign },
       { href: '/invoice-design', label: 'Invoice Design', icon: ReceiptText },
-      { href: '/website-text', label: 'Website Text', icon: Type },
+      { href: '/website', label: 'Website', icon: Globe },
       { href: '/settings', label: 'Settings', icon: Settings },
       { href: '/profile', label: 'Profile', icon: UserCircle },
     ],

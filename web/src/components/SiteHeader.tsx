@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { CarFront, ChevronRight, Menu, X } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { useSiteText } from '@/lib/site-text';
 
 // No account area: the site exists to take a booking, and a visitor never has
 // to sign in to make one.
@@ -24,6 +25,7 @@ const NAV = [
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useSiteText();
 
   return (
     <header className="relative sticky top-0 z-40 border-b border-hairline bg-surface/85 backdrop-blur-xl">
@@ -31,9 +33,9 @@ export function SiteHeader() {
         <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
           {/* The real brand mark, shared with the app (gora_logo_white.png). */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gora-logo.png" alt="Gora Taxi" className="h-10 w-auto" />
+          <img src="/gora-logo.png" alt={t('company.brand')} className="h-10 w-auto" />
           <span className="hidden leading-tight sm:block">
-            <span className="block text-[10px] font-semibold tracking-wide text-brand-600">India Ka Apna App</span>
+            <span className="block text-[10px] font-semibold tracking-wide text-brand-600">{t('company.tagline')}</span>
           </span>
         </Link>
 

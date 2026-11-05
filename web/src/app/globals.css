@@ -701,7 +701,7 @@
 /* ───────────────────────────────────────────────────────────────────────────
    Editorial
    ---------------------------------------------------------------------------
-   The "classic" half of the design: a serif display face, generous measure,
+   The "classic" half of the design: a heavy display face, generous measure,
    hairline rules and numbered entries instead of a wall of identical cards.
    The colour comes from the per-service tokens, used sparingly and always to
    mean something — never as decoration.
@@ -710,21 +710,14 @@
 @layer components {
   /* Headlines. `text-balance` stops a two-word orphan on the last line, which
      is the single thing that makes a large serif heading look amateur. */
-  /* A heavy sans, not a serif.
+  /* Headlines: Cabinet Grotesk, as heavy as the family goes.
    *
-   * The serif was the "classic" reading of the brief and it was the wrong
-   * one: the reference the client gave is a modern taxi brand — bold sans,
-   * orange and white, photography. The face is Bricolage Grotesque; see the
-   * note in layout.tsx for why it is not Poppins any more. */
+   * 900 is a real cut here, so asking for it costs nothing and gives the
+   * headlines the solidity the serif could not. The slight negative
+   * tracking is what a heavy grotesque wants — at 900 the default spacing
+   * leaves the words looking loose. */
   .display {
-    /* Bricolage tops out at 800; `font-extrabold` would ask for a 900 that does
-       not exist and let the browser synthesise one, which smears the very
-       details the face was chosen for. */
-    /* A serif does not want a sans's negative tracking: pulling the letters
-       together closes the thick-to-thin that is the whole point of the
-       face. Melodrama ends at 700, so `font-bold` is the top of the axis
-       and anything heavier would be synthesised. */
-    @apply font-display font-bold tracking-[-0.005em] text-ink;
+    @apply font-display font-black tracking-[-0.02em] text-ink;
     text-wrap: balance;
   }
   .display-xl {

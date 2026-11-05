@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { adminApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -27,18 +28,38 @@ export default function InvoiceDesignPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const logoInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { void load(); }, []);
+  /**
+   * Wait for the session before asking for anything.
+   *
+   * The bearer token is pushed into the api client by SessionSync once
+   * `useSession()` resolves, which is after the first paint. This page used to
+   * fetch in a `useEffect(..., [])`, so on a cold load the request went out
+   * with no token at all, came back 401, and — because the effect never runs
+   * again — the page sat on its loading skeleton for good. Every other screen
+   * gets away with it because React Query retries once the token lands; this
+   * one does its own fetching, so it has to wait for its own cue.
+   */
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status === 'loading') return;
+    void load();
+  }, [status]);
 
   async function load() {
     setLoading(true);
+    setLoadError(null);
     try {
       const res: any = await adminApi.getInvoiceTemplate();
       setTpl(res.data ?? res);
       setDirty(false);
     } catch (e: any) {
-      toast.error(e?.message || 'Could not load the invoice design');
+      const msg = e?.message || 'Could not load the invoice design';
+      setLoadError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -128,6 +149,23 @@ export default function InvoiceDesignPage() {
     } catch (e: any) {
       toast.error(e?.message || 'Could not upload the logo');
     }
+  }
+
+  // A failed load used to fall through to the same skeleton as a pending one,
+  // so a broken page and a slow page looked identical and neither could be
+  // retried without a refresh. Say what happened, and offer the retry.
+  if (!loading && !tpl) {
+    return (
+      <div className="p-6">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Invoice Design</h1>
+        <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+          {loadError || 'Could not load the invoice design.'}
+        </p>
+        <Button className="mt-4" onClick={() => void load()}>
+          <RotateCcw className="h-4 w-4" /> Try again
+        </Button>
+      </div>
+    );
   }
 
   if (loading || !tpl) {

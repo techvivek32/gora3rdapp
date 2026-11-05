@@ -6,19 +6,21 @@
  * places each belongs: the brand in the writing, the registered name and GSTIN
  * where a visitor is entitled to know who they are dealing with.
  *
- * These values are the same ones the backend prints on a tax invoice —
- * `backend/src/database/schemas/invoice-template.schema.ts`, the `company`
- * block of DEFAULT_TEMPLATE, which is the source of truth. There is no public
- * endpoint for them, so they are repeated here; if the operator edits the
- * invoice template, this file has to follow.
+ * These are DEFAULTS, not the live values. Every one of them is editable in
+ * the admin panel (Website Text → Company details) and the pages read them
+ * through `useSiteText()`; this file is what the site shows on the first
+ * paint, before that request returns, and if it fails. Nothing here needs
+ * editing when the operator changes an address.
  *
- * Phone numbers, WhatsApp and the support email are NOT here. Those are
- * operator settings, read live from `/settings` and `/settings/support-contact`
- * so that changing them in the admin panel changes them on the site.
+ * Phone numbers, WhatsApp and the support email are not here either. Those
+ * are operator settings, read live from `/settings` and
+ * `/settings/support-contact`.
  */
 export const COMPANY = {
   /** The brand. Use this in copy. */
   brand: 'Gora Taxi',
+  /** The small line under the logo, header and footer. */
+  tagline: 'India Ka Apna App',
   /** The registered company. Use this where the law or plain honesty wants it. */
   legalName: 'Gora Cabs & Travels Private Limited',
   address:

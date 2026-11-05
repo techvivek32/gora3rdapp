@@ -131,14 +131,15 @@ export interface PoolRide {
   travelDate?: string;
   departureTime?: string;
   totalSeats?: number;
-  seatsBooked?: number;
+  /** What the API actually sends: seats still free, not seats taken. */
+  seatsAvailable?: number;
   pricePerSeat?: number;
   vehicle?: string;
   vehicleNumber?: string;
   distanceKm?: number;
   notes?: string;
   status?: string;
-  driver?: { fullName?: string; agencyName?: string; mobile?: string; rating?: number; profileImage?: string };
+  driverSnapshot?: { name?: string; phone?: string; rating?: number; vehicle?: string; vehicleNumber?: string };
   [k: string]: unknown;
 }
 

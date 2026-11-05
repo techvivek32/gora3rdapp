@@ -8,27 +8,31 @@ import { IntroLoader } from '@/components/IntroLoader';
 import { ScrollFx } from '@/components/ScrollFx';
 
 /**
- * Headlines. Melodrama, from Fontshare.
+ * Headlines. Cabinet Grotesk, from Fontshare.
  *
- * Seventh face, and the first that is not a sans. Six respectable
- * grotesques were each rejected as "simple", which stopped being a matter
- * of taste and started being evidence: the category was the problem, not
- * the pick. Melodrama is a display serif with a dramatic thick-to-thin —
- * nothing on an orange taxi site looks less like a template.
+ * The serif before this one was dropped for being hard to read, and the
+ * audit said why: every headline on the site sits at 36px or larger, so
+ * size was never the problem — the letterforms were. A display serif's
+ * whole character is its thick-to-thin, and on a screen the thin half
+ * goes pale and fuzzy exactly where a headline needs to be solid.
  *
- * Display sizes only. The thin strokes that make it distinctive are the
- * ones that disappear at 13px, which is why the body is Satoshi.
+ * Cabinet Grotesk keeps the weight even across the stroke, so nothing
+ * fades, while the flat-cut terminals and tight apertures stop it reading
+ * as yet another neutral grotesque. 900 is a real cut, which is what lets
+ * the headlines go properly heavy without the browser faking it.
  */
-const melodrama = localFont({
+const cabinet = localFont({
   src: [
-    { path: './fonts/Melodrama-500.woff2', weight: '500', style: 'normal' },
-    { path: './fonts/Melodrama-600.woff2', weight: '600', style: 'normal' },
-    { path: './fonts/Melodrama-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/CabinetGrotesk-500.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/CabinetGrotesk-700.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/CabinetGrotesk-800.woff2', weight: '800', style: 'normal' },
+    { path: './fonts/CabinetGrotesk-900.woff2', weight: '900', style: 'normal' },
   ],
   variable: '--font-display',
   display: 'swap',
-  // Metrics matched to a serif this time, so the swap does not shift.
-  adjustFontFallback: 'Times New Roman',
+  // Back to sans metrics: the fallback is a sans, and matching it to a serif
+  // made the swap jump.
+  adjustFontFallback: 'Arial',
 });
 
 /**
@@ -56,6 +60,9 @@ export const metadata: Metadata = {
   title: 'Gora Taxi — Book a cab, hire a driver, share a ride',
   description:
     'Book outstation and local cabs, hire a driver for your own car, or share a ride across India. India Ka Apna App.',
+  // Without this the browser asks for /favicon.ico on every page, gets a 404
+  // and shows a blank tab. The mark is the one already in the header.
+  icons: { icon: '/gora-logo.png', apple: '/gora-logo.png' },
 };
 
 export const viewport: Viewport = {
@@ -129,7 +136,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // `suppressHydrationWarning`: the scripts below set data-theme and
     // data-intro on this very element before React hydrates, so the attributes
     // it finds will not match the server's. That difference is the point.
-    <html lang="en" className={`${satoshi.variable} ${melodrama.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${satoshi.variable} ${cabinet.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG + THEME_BOOTSTRAP + INTRO_BOOTSTRAP }} />
       </head>

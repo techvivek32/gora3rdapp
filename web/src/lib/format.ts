@@ -26,14 +26,21 @@ export function formatDayMonth(value?: string | null): string {
 
 /** "14:30" -> "02:30 pm". Returns '' when the input isn't a time. */
 export function formatTime12(value?: string | null): string {
-  const parts = String(value ?? '').split(':');
+  // The stored string is whatever the client sent. The app writes "06:00",
+  // but a pool ride posted with "06:00 AM" came back out as "06:00 AM am":
+  // the old split took "00 AM" as the minutes and then added a meridiem of
+  // its own. Read any marker that is already there instead of assuming none.
+  const raw = String(value ?? '').trim();
+  const marker = /(am|pm)\s*$/i.exec(raw)?.[1]?.toLowerCase();
+  const parts = raw.replace(/\s*(am|pm)\s*$/i, '').split(':');
   if (parts.length < 2) return '';
-  const h = parseInt(parts[0], 10);
-  if (Number.isNaN(h)) return '';
-  const mm = parts[1].padStart(2, '0');
+  let h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (Number.isNaN(h) || Number.isNaN(m)) return '';
+  if (marker && h <= 12) h = marker === 'pm' ? (h % 12) + 12 : h % 12;
   const ampm = h >= 12 ? 'pm' : 'am';
   const h12 = h % 12 === 0 ? 12 : h % 12;
-  return `${String(h12).padStart(2, '0')}:${mm} ${ampm}`;
+  return `${String(h12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 /** yyyy-MM-dd for an <input type="date"> value. */

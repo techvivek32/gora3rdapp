@@ -53,6 +53,26 @@ function BookForm() {
     queryFn: () => apiGet<PlatformSettings>('/settings'),
   });
 
+  /**
+   * Included km per Local package, the same figure the app puts on its
+   * chips: the admin's table in Pricing settings (`localPackageKm`), which
+   * is one table for every cab because the package is sold by the hour.
+   *
+   * No guessing if the table is missing a row — the app used to fall back to
+   * hours x the cab's km/hour and showed "8 hrs — 96 km" while the results
+   * screen priced the table's real 80 km. A chip with no number is better
+   * than a chip with the wrong one.
+   */
+  const localKmByHours = useMemo(() => {
+    const out: Record<number, number> = {};
+    for (const p of settings?.localPackageKm ?? []) {
+      const h = Number(p?.hours ?? 0);
+      const km = Number(p?.km ?? 0);
+      if (h > 0 && km > 0) out[h] = km;
+    }
+    return out;
+  }, [settings]);
+
   const [subType, setSubType] = useState(meta.subTypes[0]);
   const [pickup, setPickup] = useState<Geo | undefined>();
   const [drop, setDrop] = useState<Geo | undefined>();
@@ -102,6 +122,28 @@ function BookForm() {
 
   /** Everything the fare depends on must be a RESOLVED place (lat/lng), not just
    *  typed text — the road distance call needs coordinates. */
+  /**
+   * Pick up a trip handed over from somewhere else — today that is the hero's
+   * pickup/drop widget, which writes the same draft this form writes.
+   *
+   * Only empty fields are filled, and only from a draft for THIS service, so
+   * arriving with something already typed never has it overwritten. It runs
+   * once: after that the form owns its own state.
+   */
+  useEffect(() => {
+    const d = tripDraft.get();
+    if (!d || d.serviceType !== service) return;
+    if (d.subType && meta.subTypes.includes(d.subType)) setSubType(d.subType);
+    if (d.pickup?.address) setPickup((cur) => cur ?? d.pickup);
+    if (d.drop?.address) setDrop((cur) => cur ?? d.drop);
+    if (d.stops?.length) setStops((cur) => (cur.length ? cur : (d.stops as Geo[])));
+    if (d.travelDate) setDate((cur) => d.travelDate ?? cur);
+    if (d.travelTime) setTime((cur) => d.travelTime ?? cur);
+    if (d.notes) setNotes((cur) => cur || (d.notes as string));
+    // Once only: `service` is fixed for the life of the page.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service]);
+
   const validate = (): string | null => {
     if (!pickup?.address) return 'Please select a pickup location';
     if (needsDrop && !drop?.address) return 'Please select a drop location';
@@ -230,6 +272,23 @@ function BookForm() {
             <Segmented options={meta.subTypes} value={subType} onChange={setSubType} />
           </div>
 
+          {/* Local package hours — above the route on purpose: the package is
+              what a Local booking IS (8 hours / 80 km), so it is chosen before
+              the pickup rather than tucked under the date. */}
+          {isLocal && (
+            <div className="unfold">
+              <p className="label">Package</p>
+              <Segmented
+                options={LOCAL_HOURS.map((h) => `${h} hours`)}
+                value={`${hours} hours`}
+                onChange={(v) => setHours(Number(v.split(' ')[0]))}
+                hints={Object.fromEntries(
+                  LOCAL_HOURS.map((h) => [`${h} hours`, localKmByHours[h] ? `${localKmByHours[h]} km` : undefined]),
+                )}
+              />
+            </div>
+          )}
+
           {/* Route */}
           <div className="reveal" style={rise()}>
             {/* Both stops are themed. `to-white` survived the first pass here
@@ -308,18 +367,6 @@ function BookForm() {
               </>
             )}
           </div>
-
-          {/* Local package hours */}
-          {isLocal && (
-            <div className="unfold">
-              <p className="label">Package</p>
-              <Segmented
-                options={LOCAL_HOURS.map((h) => `${h} hours`)}
-                value={`${hours} hours`}
-                onChange={(v) => setHours(Number(v.split(' ')[0]))}
-              />
-            </div>
-          )}
 
           {isHire && (
             <div className="reveal" style={rise()}>
@@ -400,10 +447,13 @@ function Segmented({
   options,
   value,
   onChange,
+  hints,
 }: {
   options: string[];
   value: string;
   onChange: (v: string) => void;
+  /** A smaller second line under an option, keyed by the option itself. */
+  hints?: Record<string, string | undefined>;
 }) {
   const index = Math.max(0, options.indexOf(value));
   return (
@@ -425,9 +475,16 @@ function Segmented({
           type="button"
           onClick={() => onChange(o)}
           aria-pressed={o === value}
-          className={`seg-pill ${o === value ? 'text-white' : 'text-muted hover:text-ink'}`}
+          className={`seg-pill ${hints?.[o] ? 'flex-col gap-0 leading-tight' : ''} ${
+            o === value ? 'text-white' : 'text-muted hover:text-ink'
+          }`}
         >
-          {o}
+          <span>{o}</span>
+          {hints?.[o] ? (
+            <span className={`text-[11px] font-bold ${o === value ? 'text-white/80' : 'text-brand-600'}`}>
+              {hints[o]}
+            </span>
+          ) : null}
         </button>
       ))}
     </div>

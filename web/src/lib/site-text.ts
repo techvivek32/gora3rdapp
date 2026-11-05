@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiGet } from './api';
+import { COMPANY } from './company';
 
 /**
  * Website copy the operator edits in the admin panel.
@@ -15,6 +16,34 @@ import { apiGet } from './api';
  * Adding an editable string is one entry here and one in the backend's list.
  */
 export const SITE_TEXT: Record<string, string> = {
+  // Who the site belongs to. The values live in company.ts so the website has
+  // one place to read them from; the backend carries the same defaults for the
+  // admin form.
+  'company.brand': COMPANY.brand,
+  'company.tagline': COMPANY.tagline,
+  'company.legalName': COMPANY.legalName,
+  'company.address': COMPANY.address,
+  'company.city': COMPANY.city,
+  'company.gstin': COMPANY.gstin,
+  'company.appName': COMPANY.appName,
+  'company.playStoreUrl': COMPANY.playStoreUrl,
+
+  'contact.eyebrow': 'Talk to us',
+  'contact.title': `Contact ${COMPANY.brand}`,
+  'contact.subtitle':
+    'Someone is on the phone 24\u00d77. Call before you book if you want a quote checked, or after you book if anything about the trip changes.',
+  'contact.callNote': '24\u00d77, every day',
+  'contact.whatsappLine': 'Message the team',
+  'contact.whatsappNote': 'Send a trip and get it booked',
+  'contact.emailNote': 'For bills and documents',
+  'contact.appNote': 'Track the trip and keep your history',
+  'contact.officeTitle': 'Registered office',
+  'contact.bookedTitle': 'Already booked?',
+  'contact.bookedBody': 'Keep the booking reference handy when you call.',
+
+  'footer.blurb':
+    'Outstation cabs, local packages, drivers for your own car, and shared rides across India.',
+
   'support.title': 'Help & Support',
   'support.subtitle': 'We are here 24×7. Reach us whichever way suits you.',
   'support.bookingTitle': 'About a booking you made here',

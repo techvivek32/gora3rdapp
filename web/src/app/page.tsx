@@ -14,7 +14,7 @@ import { PlaceInput } from '@/components/PlaceInput';
 import { TaxiHero } from '@/components/TaxiHero';
 import { tripDraft } from '@/lib/trip-draft';
 import { rupees, toDateInput } from '@/lib/format';
-import { COMPANY } from '@/lib/company';
+import { useSiteText } from '@/lib/site-text';
 import { cityChip } from '@/lib/city-colour';
 import type { CabCategory, City, Geo, PlatformSettings, SupportContact } from '@/lib/types';
 
@@ -97,6 +97,11 @@ export default function HomePage() {
   // Contact Us, live from the operator's settings. Nothing about how to reach
   // Gora is written into this page: change it in the admin panel and it
   // changes here.
+  // Company details and the wording around them are the operator's, set in
+  // the admin panel. The defaults ship with the site so nothing is blank on
+  // the first paint.
+  const t = useSiteText();
+
   const { data: contact } = useQuery({
     queryKey: ['support-contact'],
     queryFn: () => apiGet<SupportContact>('/settings/support-contact'),
@@ -359,7 +364,7 @@ export default function HomePage() {
               <span className="text-brand-600">not one more fleet</span>
             </h2>
             <p className="mt-5 text-[15px] leading-relaxed text-muted">
-              {COMPANY.brand} is run by {COMPANY.legalName} from {COMPANY.city}. We do not keep a yard
+              {t('company.brand')} is run by {t('company.legalName')} from {t('company.city')}. We do not keep a yard
               full of cars. We put local travel operators, vendors and owner-drivers from across India
               on one network, and hand each booking to the one who can actually run it.
             </p>
@@ -375,17 +380,21 @@ export default function HomePage() {
                 <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-brandink">
                   Registered name
                 </dt>
-                <dd className="mt-1 text-sm font-bold leading-snug text-ink">{COMPANY.legalName}</dd>
+                <dd className="mt-1 text-sm font-bold leading-snug text-ink">{t('company.legalName')}</dd>
               </div>
-              <div>
-                <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-brandink">GSTIN</dt>
-                <dd className="numeral mt-1 text-sm font-bold text-ink">{COMPANY.gstin}</dd>
-              </div>
+              {/* An operator who clears the GSTIN means it, so the label goes
+                  with the number rather than sitting over an empty line. */}
+              {t('company.gstin') && (
+                <div>
+                  <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-brandink">GSTIN</dt>
+                  <dd className="numeral mt-1 text-sm font-bold text-ink">{t('company.gstin')}</dd>
+                </div>
+              )}
               <div className="sm:col-span-2">
                 <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-brandink">
                   Registered office
                 </dt>
-                <dd className="mt-1 text-sm leading-relaxed text-muted">{COMPANY.address}</dd>
+                <dd className="mt-1 text-sm leading-relaxed text-muted">{t('company.address')}</dd>
               </div>
             </dl>
           </div>
@@ -673,11 +682,10 @@ export default function HomePage() {
       <section id="contact" className="scroll-mt-20 border-b border-hairline bg-surface">
         <div className="mx-auto max-w-6xl px-4 py-16">
           <div className="text-center" data-reveal>
-            <p className="eyebrow justify-center text-brandink">Talk to us</p>
-            <h2 className="display mt-3 text-3xl sm:text-4xl">Contact {COMPANY.brand}</h2>
+            <p className="eyebrow justify-center text-brandink">{t('contact.eyebrow')}</p>
+            <h2 className="display mt-3 text-3xl sm:text-4xl">{t('contact.title')}</h2>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-muted">
-              Someone is on the phone 24×7. Call before you book if you want a quote checked, or after
-              you book if anything about the trip changes.
+              {t('contact.subtitle')}
             </p>
           </div>
 
@@ -690,7 +698,7 @@ export default function HomePage() {
                 bg: 'bg-cabsolid',
                 head: 'Call us',
                 line: phone,
-                note: '24×7, every day',
+                note: t('contact.callNote'),
                 href: `tel:${phone}`,
                 external: false,
               },
@@ -700,8 +708,8 @@ export default function HomePage() {
                 icon: MessageCircle,
                 bg: 'bg-poolsolid',
                 head: 'WhatsApp',
-                line: 'Message the team',
-                note: 'Send a trip and get it booked',
+                line: t('contact.whatsappLine'),
+                note: t('contact.whatsappNote'),
                 href: `https://wa.me/${whatsapp}`,
                 external: true,
               },
@@ -712,7 +720,7 @@ export default function HomePage() {
                 bg: 'bg-drivesolid',
                 head: 'Email',
                 line: email,
-                note: 'For bills and documents',
+                note: t('contact.emailNote'),
                 href: `mailto:${email}`,
                 external: false,
               },
@@ -724,9 +732,9 @@ export default function HomePage() {
                    surface, which is exactly what `luxsolid` is tuned for. */
                 bg: 'bg-luxsolid',
                 head: 'Get the app',
-                line: COMPANY.appName,
-                note: 'Track the trip and keep your history',
-                href: COMPANY.playStoreUrl,
+                line: t('company.appName'),
+                note: t('contact.appNote'),
+                href: t('company.playStoreUrl'),
                 external: true,
               },
             ]
@@ -758,18 +766,23 @@ export default function HomePage() {
                 <Building2 className="h-5 w-5" />
               </span>
               <span>
-                <h3 className="text-base font-extrabold text-ink">Registered office</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">{COMPANY.address}</p>
+                <h3 className="text-base font-extrabold text-ink">{t('contact.officeTitle')}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">{t('company.address')}</p>
                 <p className="mt-2 text-xs font-semibold text-muted">
-                  {COMPANY.legalName} · GSTIN <span className="numeral">{COMPANY.gstin}</span>
+                  {t('company.legalName')}
+                  {t('company.gstin') && (
+                    <>
+                      {' · '}GSTIN <span className="numeral">{t('company.gstin')}</span>
+                    </>
+                  )}
                 </p>
               </span>
             </div>
 
             <div data-reveal className="rounded-3xl bg-bandwarm p-6 ring-1 ring-tintline">
-              <h3 className="text-base font-extrabold text-ink">Already booked?</h3>
+              <h3 className="text-base font-extrabold text-ink">{t('contact.bookedTitle')}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                Keep the booking reference handy when you call.
+                {t('contact.bookedBody')}
                 {phone2 && (
                   <>
                     {' '}
@@ -836,11 +849,13 @@ export default function HomePage() {
 /**
  * Pickup, drop, go — the booking widget the reference carries in its hero.
  *
- * It writes the same trip draft the full booking form writes and hands over
- * to the results page, so this is a real shortcut rather than a decorative
- * panel that drops you on an empty form. Date and time are left at the
- * booking page's own defaults; anyone who needs to change them is one screen
- * away.
+ * It hands over to the booking page with both places already filled in, not
+ * straight to the fare list. Jumping to the fares saved a screen and cost
+ * the customer the answer to "what am I actually booking?": the trip type,
+ * the date and the time were all assumed, none of them were shown, and the
+ * first thing on screen was a price for a trip nobody had described. The
+ * booking page shows the trip, keeps what was typed, and is one click from
+ * the same fares.
  */
 function QuickBook() {
   const router = useRouter();
@@ -867,7 +882,7 @@ function QuickBook() {
       travelDate: toDateInput(new Date()),
       travelTime: '10:00',
     });
-    router.push('/cabs');
+    router.push('/book/cab');
   };
 
   return (

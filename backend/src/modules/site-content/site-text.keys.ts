@@ -23,6 +23,171 @@ export interface SiteTextKey {
 }
 
 export const SITE_TEXT_KEYS: SiteTextKey[] = [
+  // ── Who the site belongs to ───────────────────────────────────────────
+  // These used to be hardcoded in the website (web/src/lib/company.ts) with a
+  // note saying "if the operator edits the invoice template, this file has to
+  // follow" — which meant an address change was a code change. They are the
+  // same details the tax invoice prints, so they belong to the operator.
+  {
+    key: 'company.brand',
+    group: 'Company details',
+    label: 'Brand name',
+    hint: 'The name used in the writing across the site.',
+    fallback: 'Gora Taxi',
+    maxLength: 60,
+  },
+  {
+    key: 'company.tagline',
+    group: 'Company details',
+    label: 'Tagline',
+    hint: 'The small line under the logo, in the header and the footer.',
+    fallback: 'India Ka Apna App',
+    maxLength: 60,
+  },
+  {
+    key: 'company.legalName',
+    group: 'Company details',
+    label: 'Registered company name',
+    hint: 'Shown where a visitor is entitled to know who they are dealing with.',
+    fallback: 'Gora Cabs & Travels Private Limited',
+    maxLength: 120,
+  },
+  {
+    key: 'company.address',
+    group: 'Company details',
+    label: 'Registered office address',
+    fallback:
+      '132, Nayak Bhawan, Haripura Vyas Colony, Tempo Stand Airforce, Jodhpur, Rajasthan 342011',
+    multiline: true,
+    maxLength: 300,
+  },
+  {
+    key: 'company.city',
+    group: 'Company details',
+    label: 'City and state',
+    hint: 'Used in a sentence — "run by … from Jodhpur, Rajasthan".',
+    fallback: 'Jodhpur, Rajasthan',
+    maxLength: 80,
+  },
+  {
+    key: 'company.gstin',
+    group: 'Company details',
+    label: 'GSTIN',
+    hint: 'Leave blank to take it off the site.',
+    fallback: '08AAMCG5008P1Z3',
+    maxLength: 20,
+  },
+  {
+    key: 'company.appName',
+    group: 'Company details',
+    label: 'App name on the store',
+    hint: 'The title someone sees when the Get the app card takes them there.',
+    fallback: 'Gora Taxi Partner',
+    maxLength: 60,
+  },
+  {
+    key: 'company.playStoreUrl',
+    group: 'Company details',
+    label: 'Play Store link',
+    fallback: 'https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner',
+    maxLength: 300,
+  },
+
+  // ── Contact section on the home page ──────────────────────────────────
+  // The phone, WhatsApp and email themselves are operator settings already
+  // (Settings → Support contact); this is the wording around them.
+  {
+    key: 'contact.eyebrow',
+    group: 'Contact section (home page)',
+    label: 'Small label above the heading',
+    fallback: 'Talk to us',
+    maxLength: 40,
+  },
+  {
+    key: 'contact.title',
+    group: 'Contact section (home page)',
+    label: 'Heading',
+    fallback: 'Contact Gora Taxi',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.subtitle',
+    group: 'Contact section (home page)',
+    label: 'Line under the heading',
+    fallback:
+      'Someone is on the phone 24×7. Call before you book if you want a quote checked, or after you book if anything about the trip changes.',
+    multiline: true,
+    maxLength: 300,
+  },
+  {
+    key: 'contact.callNote',
+    group: 'Contact section (home page)',
+    label: 'Call card — note',
+    fallback: '24×7, every day',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.whatsappLine',
+    group: 'Contact section (home page)',
+    label: 'WhatsApp card — main line',
+    fallback: 'Message the team',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.whatsappNote',
+    group: 'Contact section (home page)',
+    label: 'WhatsApp card — note',
+    fallback: 'Send a trip and get it booked',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.emailNote',
+    group: 'Contact section (home page)',
+    label: 'Email card — note',
+    fallback: 'For bills and documents',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.appNote',
+    group: 'Contact section (home page)',
+    label: 'Get the app card — note',
+    fallback: 'Track the trip and keep your history',
+    maxLength: 80,
+  },
+  {
+    key: 'contact.officeTitle',
+    group: 'Contact section (home page)',
+    label: 'Address card — heading',
+    fallback: 'Registered office',
+    maxLength: 60,
+  },
+  {
+    key: 'contact.bookedTitle',
+    group: 'Contact section (home page)',
+    label: 'Already-booked card — heading',
+    fallback: 'Already booked?',
+    maxLength: 60,
+  },
+  {
+    key: 'contact.bookedBody',
+    group: 'Contact section (home page)',
+    label: 'Already-booked card — text',
+    hint: 'The second phone number is added after this automatically when one is set.',
+    fallback: 'Keep the booking reference handy when you call.',
+    multiline: true,
+    maxLength: 300,
+  },
+
+  // ── Footer ────────────────────────────────────────────────────────────
+  {
+    key: 'footer.blurb',
+    group: 'Footer (every page)',
+    label: 'Short description under the logo',
+    fallback:
+      'Outstation cabs, local packages, drivers for your own car, and shared rides across India.',
+    multiline: true,
+    maxLength: 300,
+  },
   {
     key: 'support.title',
     group: 'Help & Support page',

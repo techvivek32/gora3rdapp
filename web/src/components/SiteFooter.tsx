@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Mail, MessageCircle, Phone } from 'lucide-react';
 import { apiGet } from '@/lib/api';
-import { COMPANY } from '@/lib/company';
 import { useSiteText } from '@/lib/site-text';
 import type { PlatformSettings, SupportContact } from '@/lib/types';
 
@@ -44,12 +43,10 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/gora-logo.png" alt={COMPANY.brand} className="h-12 w-auto" />
-          <p className="mt-2 text-xs font-semibold text-brand-600">India Ka Apna App</p>
-          <p className="mt-3 text-sm leading-relaxed text-muted">
-            Outstation cabs, local packages, drivers for your own car, and shared rides across India.
-          </p>
-          <p className="mt-4 text-xs leading-relaxed text-muted">{COMPANY.address}</p>
+          <img src="/gora-logo.png" alt={t('company.brand')} className="h-12 w-auto" />
+          <p className="mt-2 text-xs font-semibold text-brand-600">{t('company.tagline')}</p>
+          <p className="mt-3 text-sm leading-relaxed text-muted">{t('footer.blurb')}</p>
+          <p className="mt-4 text-xs leading-relaxed text-muted">{t('company.address')}</p>
         </div>
 
         <div>
@@ -107,11 +104,15 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-hairline px-4 py-4 text-center text-xs leading-relaxed text-muted">
-        © {new Date().getFullYear()} {COMPANY.legalName}. All rights reserved.
-        <span className="mx-2 hidden sm:inline">·</span>
-        <span className="block sm:inline">
-          GSTIN <span className="numeral">{COMPANY.gstin}</span>
-        </span>
+        © {new Date().getFullYear()} {t('company.legalName')}. All rights reserved.
+        {t('company.gstin') && (
+          <>
+            <span className="mx-2 hidden sm:inline">·</span>
+            <span className="block sm:inline">
+              GSTIN <span className="numeral">{t('company.gstin')}</span>
+            </span>
+          </>
+        )}
       </div>
     </footer>
   );

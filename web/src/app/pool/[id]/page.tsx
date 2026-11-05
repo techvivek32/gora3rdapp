@@ -49,7 +49,8 @@ function PoolRideDetail() {
     );
   }
 
-  const left = Math.max(0, Number(r.totalSeats ?? 0) - Number(r.seatsBooked ?? 0));
+  // Seats still free, as the API reports them.
+  const left = Math.max(0, Number(r.seatsAvailable ?? r.totalSeats ?? 0));
   const total = Math.round(Number(r.pricePerSeat ?? 0) * seats);
   const isFull = left <= 0;
 
@@ -75,10 +76,15 @@ function PoolRideDetail() {
 
         {r.notes ? <p className="mt-4 rounded-lg bg-sunken p-3 text-sm leading-relaxed text-muted">{r.notes}</p> : null}
 
-        {r.driver?.fullName ? (
+        {r.driverSnapshot?.name ? (
           <div className="mt-4 border-t border-hairline pt-4">
             <p className="text-[10px] font-bold uppercase tracking-wide text-muted">Ride offered by</p>
-            <p className="text-sm font-bold text-ink">{r.driver.agencyName || r.driver.fullName}</p>
+            <p className="text-sm font-bold text-ink">{r.driverSnapshot.name}</p>
+            {r.driverSnapshot.vehicle || r.driverSnapshot.vehicleNumber ? (
+              <p className="mt-0.5 text-xs text-muted">
+                {[r.driverSnapshot.vehicle, r.driverSnapshot.vehicleNumber].filter(Boolean).join(' • ')}
+              </p>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -536,6 +536,14 @@ export class CustomerBookingsService {
       vehicleType: dto.vehicleType || '',
       durationHours: dto.durationHours || 0,
       notes: dto.notes || '',
+      // Who the assigned driver calls for THIS trip, which need not be the
+      // account holder — someone books a cab for a parent, a company books for
+      // a guest. The DTO has accepted these since the app started sending them
+      // and the read paths already gate them (blanked in the feed, revealed
+      // only to the selected driver), but the document was never given them,
+      // so every driver got the account number instead.
+      contactName: (dto.contactName ?? '').trim(),
+      contactMobile: (dto.contactMobile ?? '').trim(),
       estimatedFare: dto.estimatedFare || 0,
       // Fare breakdown snapshot — lets the driver side show a GST-exclusive amount.
       baseFare: dto.baseFare || 0,
@@ -1102,6 +1110,11 @@ export class CustomerBookingsService {
     if (dto.vehicleType !== undefined) booking.vehicleType = dto.vehicleType;
     if (dto.durationHours !== undefined) booking.durationHours = dto.durationHours;
     if (dto.notes !== undefined) booking.notes = dto.notes;
+    // Who the driver rings can change with the trip — the same field create()
+    // writes, so an edit is not a second way of losing it. Left alone when the
+    // edit does not mention it, so changing the passenger count cannot wipe it.
+    if (dto.contactName !== undefined) booking.contactName = (dto.contactName ?? '').trim();
+    if (dto.contactMobile !== undefined) booking.contactMobile = (dto.contactMobile ?? '').trim();
     if (dto.estimatedFare !== undefined) booking.estimatedFare = dto.estimatedFare;
     if (dto.estimatedDistance !== undefined) booking.estimatedDistance = dto.estimatedDistance;
     // Pricing snapshots (round-trip km + Local hourly) must follow an edit too.

@@ -6,7 +6,8 @@ import { adminApi } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { PeriodFilter, type PeriodRange } from '@/components/ui/PeriodFilter';
 import { MapPin, ClipboardList, UserRound, Users, TrendingUp } from 'lucide-react';
-import { ServiceCities } from '@/components/ServiceCities';
+import Link from 'next/link';
+import { ArrowRight, Globe } from 'lucide-react';
 
 interface CityRow {
   key: string;
@@ -30,8 +31,10 @@ const SORTS: { key: SortKey; label: string }[] = [
 
 // Two different questions about cities, and they were being confused with
 // each other. "Where is the demand" is an analytics view of what the platform
-// HAS. "Which cities do we serve" is a list the operator DECLARES — it feeds
-// the website's coverage strip and the app's pickers. One nav item, two tabs.
+// HAS — that is this page. "Which cities do we serve" is a list the operator
+// DECLARES, and it now lives in the Website module with the rest of the site's
+// content. The tab stays as a signpost rather than a second place to edit the
+// same list from.
 type Tab = 'insights' | 'manage';
 
 export default function CitiesPage() {
@@ -89,7 +92,7 @@ export default function CitiesPage() {
         ))}
       </div>
 
-      {tab === 'manage' ? <ServiceCities /> : (
+      {tab === 'manage' ? <ServiceCitiesMoved /> : (
       <>
 
       {/* KPI summary */}
@@ -197,6 +200,36 @@ function Metric({ label, value, active, className }: { label: string; value: num
     <div className={`${className} order-3 flex items-center md:justify-center gap-1.5`}>
       <span className="text-xs text-gray-400 md:hidden">{label}:</span>
       <span className={`font-semibold ${active ? 'text-orange-600' : 'text-gray-700 dark:text-gray-200'}`}>{value}</span>
+    </div>
+  );
+}
+
+/**
+ * The service-city list moved into the Website module.
+ *
+ * It is one list and it should have one place to edit it; this is a pointer,
+ * not a copy, so there is no second form that can disagree with the first.
+ */
+function ServiceCitiesMoved() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-900">
+      <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-orange-500/10 text-orange-500">
+        <Globe className="h-6 w-6" />
+      </span>
+      <h2 className="mt-4 font-semibold text-gray-900 dark:text-white">
+        Service cities are managed under Website
+      </h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+        The cities you cover are part of what the public site shows, so they sit with the rest of
+        the website&apos;s content — beside the wording and the hero picture.
+      </p>
+      <Link
+        href="/website?tab=cities"
+        className="mt-5 inline-flex items-center gap-2 rounded-lg bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-orange-600"
+      >
+        Open Website → Service cities
+        <ArrowRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }
