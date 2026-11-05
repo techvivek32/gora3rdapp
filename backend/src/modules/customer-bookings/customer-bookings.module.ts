@@ -11,6 +11,7 @@ import { GarageVehicle, GarageVehicleSchema } from '../../database/schemas/garag
 import { GarageDriver, GarageDriverSchema } from '../../database/schemas/garage-driver.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SettingsModule } from '../settings/settings.module';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { InvoiceTemplateModule } from '../invoice-template/invoice-template.module';
 
 @Module({
@@ -27,6 +28,8 @@ import { InvoiceTemplateModule } from '../invoice-template/invoice-template.modu
     ]),
     NotificationsModule,
     SettingsModule,
+    // The trip start/end code goes out over WhatsApp for website bookings.
+    WhatsappModule,
   ],
   controllers: [CustomerBookingsController],
   providers: [CustomerBookingsService],

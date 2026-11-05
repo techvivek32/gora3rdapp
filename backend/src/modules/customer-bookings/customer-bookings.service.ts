@@ -17,6 +17,7 @@ import { GarageDriver, GarageDriverDocument } from '../../database/schemas/garag
 import { generatePaymentOrderId } from '../../common/utils/booking-id.util';
 import Razorpay from 'razorpay';
 import { NotificationsService } from '../notifications/notifications.service';
+import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { SettingsService } from '../settings/settings.service';
 import { UserRole } from '../../common/enums/user-role.enum';
 import { buildInvoicePdf } from './invoice.util';
@@ -55,6 +56,7 @@ export class CustomerBookingsService {
     @InjectModel(GarageVehicle.name) private garageVehicleModel: Model<GarageVehicleDocument>,
     @InjectModel(GarageDriver.name) private garageDriverModel: Model<GarageDriverDocument>,
     private readonly notifications: NotificationsService,
+    private readonly whatsapp: WhatsappService,
     private readonly settings: SettingsService,
     private readonly invoiceTemplates: InvoiceTemplateService,
   ) {}
@@ -495,7 +497,10 @@ export class CustomerBookingsService {
     // Strip the guest fields before they reach the booking document — they are
     // routing information for this endpoint, not part of a booking.
     const { guestName: _n, guestMobile: _m, guestEmail: _e, ...bookingDto } = dto as any;
-    const result = await this.create(userId, bookingDto);
+    // Mark where it came from. Nothing else calls this endpoint — the app
+    // books with a session — so "guest booking" means "booked on the site",
+    // and that decides how the trip code reaches the customer later.
+    const result = await this.create(userId, { ...bookingDto, source: 'web' });
 
     // Deliberately narrow: the booking only, never the user it was filed against.
     const booking: any = (result as any)?.data ?? {};
@@ -536,6 +541,7 @@ export class CustomerBookingsService {
       vehicleType: dto.vehicleType || '',
       durationHours: dto.durationHours || 0,
       notes: dto.notes || '',
+      source: (dto as any).source === 'web' ? 'web' : 'app',
       // Who the assigned driver calls for THIS trip, which need not be the
       // account holder — someone books a cab for a parent, a company books for
       // a guest. The DTO has accepted these since the app started sending them
@@ -664,8 +670,14 @@ export class CustomerBookingsService {
     return process.env.JWT_SECRET || process.env.ENCRYPTION_KEY || 'gora-invoice';
   }
 
-  private makeInvoiceToken(id: string, breakdown = true): string {
-    const exp = Date.now() + 15 * 60 * 1000; // valid 15 minutes
+  /**
+   * @param ttlMs how long the link stays valid. Fifteen minutes is right for
+   *   a button the customer just tapped; a link sent to WhatsApp needs to
+   *   outlive the moment, because Meta fetches it on its own schedule and
+   *   the customer may open the chat later.
+   */
+  private makeInvoiceToken(id: string, breakdown = true, ttlMs = 15 * 60 * 1000): string {
+    const exp = Date.now() + ttlMs;
     // `b` = whether the opened PDF shows the GST/allowance breakdown (customer) or
     // the simple driver view; signed so it can't be flipped to peek at the split.
     const payload = `${id}.${exp}.${breakdown ? '1' : '0'}`;
@@ -952,6 +964,68 @@ export class CustomerBookingsService {
     return s?.contactRevealHoursBeforePickup ?? 1;
   }
 
+  /**
+   * The story of one booking, in the order it happened.
+   *
+   * Every step here is a timestamp the booking already carried — nothing new
+   * is written, it was simply never shown. A rider looking at an old trip
+   * could see THAT it was confirmed but not when, by whom, or how long the
+   * driver took to accept.
+   *
+   * Steps with no timestamp are left out rather than listed as pending, so
+   * the list is a record of what happened, not a checklist.
+   */
+  private static buildTimeline(b: any): Array<{ key: string; label: string; at: Date; note?: string }> {
+    const steps: Array<{ key: string; label: string; at?: Date | null; note?: string }> = [];
+
+    steps.push({ key: 'booked', label: 'Booking placed', at: b.createdAt });
+
+    // The first driver to apply — offers carry their own createdAt.
+    const applied = (b.offers ?? [])
+      .map((o: any) => o.createdAt)
+      .filter(Boolean)
+      .sort((x: any, y: any) => new Date(x).getTime() - new Date(y).getTime())[0];
+    if (applied) {
+      const n = (b.offers ?? []).length;
+      steps.push({
+        key: 'accepted',
+        label: 'Driver accepted',
+        at: applied,
+        note: n > 1 ? `${n} drivers accepted` : undefined,
+      });
+    }
+
+    if (b.confirmedAt) {
+      const who = b.confirmedBy === 'customer'
+        ? 'You chose this driver'
+        : b.confirmedBy === 'admin_phone'
+          ? 'Assigned by Gora to a driver directly'
+          : 'Assigned by the Gora team';
+      steps.push({
+        key: 'confirmed',
+        label: 'Driver confirmed',
+        at: b.confirmedAt,
+        note: `${who}${b.driverSnapshot?.name ? ' — ' + b.driverSnapshot.name : ''}`,
+      });
+    }
+
+    if (b.driverArrivedAt) steps.push({ key: 'arrived', label: 'Driver reached the pickup', at: b.driverArrivedAt });
+    if (b.startedAt) steps.push({ key: 'started', label: 'Trip started', at: b.startedAt, note: 'Your OTP was verified' });
+    if (b.completedAt) steps.push({ key: 'completed', label: 'Trip completed', at: b.completedAt, note: 'Your OTP was verified' });
+    if (b.cancelledAt) {
+      steps.push({
+        key: 'cancelled',
+        label: 'Booking cancelled',
+        at: b.cancelledAt,
+        note: [b.cancelledBy ? `by the ${b.cancelledBy}` : '', b.cancelReason].filter(Boolean).join(' — ') || undefined,
+      });
+    }
+
+    return steps
+      .filter((s): s is { key: string; label: string; at: Date; note?: string } => !!s.at)
+      .sort((x, y) => new Date(x.at).getTime() - new Date(y.at).getTime());
+  }
+
   private async withOfferProfiles(booking: any) {
     const cancellationPolicy = CustomerBookingsService.CANCELLATION_POLICY;
     // Surface an active trip OTP to the customer only; strip the raw stored fields.
@@ -959,7 +1033,7 @@ export class CustomerBookingsService {
     const tripOtp = otpActive ? booking.tripOtp : '';
     const tripOtpAction = otpActive ? booking.tripOtpAction : '';
     delete booking.tripOtp; delete booking.tripOtpExpiresAt;
-    booking = { ...booking, tripOtp, tripOtpAction };
+    booking = { ...booking, tripOtp, tripOtpAction, timeline: CustomerBookingsService.buildTimeline(booking) };
     // Hide the assigned driver's phone from the customer until the reveal window
     // (admin: contactRevealHoursBeforePickup). The driver's name/vehicle still show.
     const revealHours = await this.getContactRevealHours();
@@ -1044,6 +1118,7 @@ export class CustomerBookingsService {
     booking.finalFare = chosen.quotedFare || booking.estimatedFare;
     booking.status = CustomerBookingStatus.CONFIRMED;
     booking.confirmedAt = new Date();
+    booking.confirmedBy = 'customer';
     booking.driverSnapshot = {
       name: (driver as any)?.agencyName || (driver as any)?.fullName || 'Driver',
       phone: (driver as any)?.mobile || '',
@@ -1481,6 +1556,7 @@ export class CustomerBookingsService {
             status: CustomerBookingStatus.CONFIRMED,
             selectedDriverId: dId,
             confirmedAt: new Date(),
+            confirmedBy: 'admin',
             finalFare: fare,
             driverSnapshot: snapshot,
             assignedDriverPhone: this.phoneLast10(snapshot.phone),
@@ -1717,6 +1793,7 @@ export class CustomerBookingsService {
 
     booking.status = CustomerBookingStatus.CONFIRMED;
     booking.confirmedAt = booking.confirmedAt || new Date();
+    booking.confirmedBy = booking.confirmedBy || 'admin_phone';
     booking.assignedDriverPhone = this.phoneLast10(booking.driverSnapshot.phone);
     await booking.save();
 
@@ -1907,7 +1984,54 @@ export class CustomerBookingsService {
       `Share OTP ${otp} with your driver to ${verb} trip ${booking.bookingId}. Do not share it with anyone else.`,
       { type: 'customer_trip_otp', bookingId: booking.bookingId, action, otp }).catch(() => {});
 
+    // A website booking needs no sign-up, so that customer usually has no
+    // app: the push above reaches no device and the in-app OTP card is on a
+    // screen they cannot open. WhatsApp is the one channel they are likely
+    // to already have, and it costs nothing per message.
+    //
+    // App bookings are left alone on purpose — they already get a rotating
+    // code in the app, which is better than anything we could send.
+    if (booking.source === 'web') {
+      const to = (booking.contactMobile || '').trim() || (await this.userModel
+        .findById(booking.customerId).select('mobile').lean() as any)?.mobile || '';
+      if (to) {
+        this.whatsapp.sendTripOtp(to, otp, action, booking.bookingId).catch(() => {});
+      } else {
+        this.logger.warn(`No number to send the trip code to for ${booking.bookingId}`);
+      }
+    }
+
     return { message: 'OTP sent to the customer', data: { action } };
+  }
+
+  /**
+   * WhatsApp the finished trip's invoice to a website customer.
+   *
+   * Never throws and never blocks the trip: a bill that failed to send is a
+   * message in the log, not a driver stuck on a completed trip he cannot
+   * close. The customer can still get the PDF from support.
+   */
+  private async sendInvoiceOnWhatsapp(booking: any): Promise<void> {
+    try {
+      const to = (booking.contactMobile || '').trim() || (await this.userModel
+        .findById(booking.customerId).select('mobile').lean() as any)?.mobile || '';
+      if (!to) {
+        this.logger.warn(`No number to send the invoice to for ${booking.bookingId}`);
+        return;
+      }
+      const base = (process.env.SERVER_BASE_URL || '').replace(/\/+$/, '');
+      if (!base) {
+        this.logger.warn('SERVER_BASE_URL is not set — cannot build an invoice link');
+        return;
+      }
+      const prefix = (process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
+      // A week, not the usual fifteen minutes: this link lives in a chat.
+      const token = this.makeInvoiceToken(String(booking._id), true, 7 * 24 * 60 * 60 * 1000);
+      const url = `${base}/${prefix}/customer-bookings/invoice-file/${token}`;
+      await this.whatsapp.sendInvoice(to, booking.bookingId, url, Math.round(booking.finalFare || 0));
+    } catch (e: any) {
+      this.logger.warn(`Invoice WhatsApp failed for ${booking.bookingId}: ${e?.message ?? e}`);
+    }
   }
 
   /** Driver enters the OTP the customer read out. Starts / completes the trip. */
@@ -1944,6 +2068,9 @@ export class CustomerBookingsService {
     booking.tripOtp = undefined as any;
     booking.tripOtpAction = undefined as any;
     booking.tripOtpExpiresAt = undefined as any;
+    // Set when the trip finishes; acted on after the save so the invoice is
+    // built from a booking that is actually written as completed.
+    let sendInvoiceAfterSave = false;
     if (action === 'start') {
       booking.status = CustomerBookingStatus.ONGOING;
       booking.startedAt = new Date();
@@ -1953,6 +2080,7 @@ export class CustomerBookingsService {
     } else {
       booking.status = CustomerBookingStatus.COMPLETED;
       booking.completedAt = new Date();
+      sendInvoiceAfterSave = booking.source === 'web';
       // Finalise the fare: base + any extra-km (round trip) + any extra-hours (Local).
       const baseFare = booking.finalFare || booking.estimatedFare || 0;
       // Remember the agreed base so re-submitting trip-end charges later recomputes
@@ -2001,6 +2129,14 @@ export class CustomerBookingsService {
       this.notifications.notifyUser(booking.customerId, '✅ Trip Completed',
         `Trip ${booking.bookingId} is complete. Please rate your driver.`,
         { type: 'customer_trip_completed', bookingId: booking.bookingId }).catch(() => {});
+
+      // Website customers have no app to tap "Download Invoice" in, so the
+      // bill goes to the chat the trip codes already went to. The link is
+      // signed and given a week, because Meta fetches it on its own schedule
+      // and the customer may open the chat long after.
+      if (sendInvoiceAfterSave) {
+        void this.sendInvoiceOnWhatsapp(booking);
+      }
     }
     return { message: action === 'start' ? 'Trip started' : 'Trip completed', data: booking };
   }

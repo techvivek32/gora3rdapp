@@ -208,6 +208,10 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
         const SizedBox(height: 16),
         _paymentBreakdownCard(b),
 
+        // What happened and when. Useful on a live trip, and the only way to
+        // answer "who approved this, and when" on an old one.
+        _timelineCard(b),
+
         // Cancellation terms — configurable by admin, shown before selecting.
         if ((b['cancellationPolicy'] ?? '').toString().isNotEmpty && (status == 'open' || status == 'confirmed')) ...[
           const SizedBox(height: 16),
@@ -602,6 +606,99 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
                     ? 'Pay ₹$driverCash to the driver in cash. GST ₹$gst is billed by Gora separately — not paid to the driver.'
                     : 'Pay ₹$driverCash directly to the driver.'),
             style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// The booking's own history: placed → accepted → confirmed → started → done.
+  ///
+  /// The server sends only the steps that actually happened, in order, so
+  /// this draws what it is given rather than deciding what "should" be next.
+  Widget _timelineCard(Map<String, dynamic> b) {
+    final steps = (b['timeline'] as List?) ?? const [];
+    if (steps.isEmpty) return const SizedBox.shrink();
+
+    final fmt = DateFormat('dd MMM, hh:mm a');
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Trip history', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          for (var i = 0; i < steps.length; i++)
+            _timelineRow(
+              step: steps[i] as Map,
+              isLast: i == steps.length - 1,
+              fmt: fmt,
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timelineRow({required Map step, required bool isLast, required DateFormat fmt}) {
+    final cancelled = step['key'] == 'cancelled';
+    final colour = cancelled ? AppColors.error : AppColors.success;
+    final at = DateTime.tryParse('${step['at'] ?? ''}')?.toLocal();
+    final note = '${step['note'] ?? ''}';
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Dot and the rail down to the next step.
+          Column(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                margin: const EdgeInsets.only(top: 4),
+                decoration: BoxDecoration(color: colour, shape: BoxShape.circle),
+              ),
+              if (!isLast)
+                Expanded(child: Container(width: 2, color: AppColors.border)),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${step['label'] ?? ''}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  if (at != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: Text(
+                        fmt.format(at),
+                        style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                      ),
+                    ),
+                  if (note.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        note,
+                        style: TextStyle(fontSize: 11.5, color: colour, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

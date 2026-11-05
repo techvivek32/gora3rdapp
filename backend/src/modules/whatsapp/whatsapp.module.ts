@@ -21,5 +21,7 @@ import { SettingsModule } from '../settings/settings.module';
   ],
   controllers: [WhatsappController],
   providers: [WhatsappService, WhatsappAiService],
+  // Customer bookings sends the trip start/end code through this.
+  exports: [WhatsappService],
 })
 export class WhatsappModule {}

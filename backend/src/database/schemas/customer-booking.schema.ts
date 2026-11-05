@@ -214,7 +214,26 @@ export class CustomerBooking {
   @Prop({ select: false }) tripOtpAction: string; // 'start' | 'end'
   @Prop({ select: false }) tripOtpExpiresAt: Date;
 
+  /**
+   * Where the booking was made.
+   *
+   * 'web' means the website's guest flow — no sign-up, so that customer
+   * usually has no app, and the trip code has to reach them another way.
+   */
+  @Prop({ type: String, enum: ['web', 'app'], default: 'app' }) source: string;
+
   @Prop() confirmedAt: Date;
+  /**
+   * Who turned the accepted offer into a confirmed trip.
+   *
+   * 'customer'    — the rider picked a driver themselves.
+   * 'admin'       — the office assigned one of the drivers who accepted.
+   * 'admin_phone' — the office handed the trip to a phone number directly.
+   *
+   * Recorded so the rider's own history can answer "who approved this, and
+   * when" instead of only showing that it happened.
+   */
+  @Prop({ default: '' }) confirmedBy: string;
   @Prop() driverArrivedAt: Date; // set when the driver marks "arriving"
   @Prop() startedAt: Date;
   @Prop() completedAt: Date;

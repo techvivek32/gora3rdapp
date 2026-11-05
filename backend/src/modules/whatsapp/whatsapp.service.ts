@@ -589,29 +589,136 @@ export class WhatsappService {
     return this.userModel.findOne({ mobile: new RegExp(`${local10}$`) });
   }
 
+  /**
+   * The trip start/end code, for a booking made on the WEBSITE.
+   *
+   * A website booking needs no sign-up, so that customer usually has no app
+   * — which means the in-app OTP card and the push both land nowhere and the
+   * driver can never be told the code. WhatsApp is the one channel they are
+   * likely to already have and it costs nothing per message.
+   *
+   * App bookings are deliberately NOT sent here: those customers get the
+   * rotating OTP in the app, which is better.
+   *
+   * On a free-form text, Meta only delivers inside the 24-hour window that
+   * opens when the customer last messaged the business. For a trip booked
+   * days earlier that window is shut, so set WHATSAPP_OTP_TEMPLATE to an
+   * approved AUTHENTICATION template and it is sent as a template instead.
+   */
+  async sendTripOtp(mobile: string, otp: string, action: 'start' | 'end', bookingId: string): Promise<void> {
+    const to = `91${String(mobile).replace(/\D/g, '').slice(-10)}`;
+    const template = process.env.WHATSAPP_OTP_TEMPLATE
+      || this.config.get<string>('whatsapp.otpTemplate');
+
+    if (template) {
+      await this.sendTemplate(to, template, otp);
+      return;
+    }
+
+    const verb = action === 'start' ? 'start' : 'end';
+    await this.sendText(
+      to,
+      `🔐 Gora Taxi\n\nYour code to ${verb} trip ${bookingId} is *${otp}*.\n`
+      + `Give it to your driver only. It is valid for 15 minutes.\n\n`
+      + `Never share this code with anyone else.`,
+    );
+  }
+
+  /**
+   * The tax invoice for a finished trip, as a PDF in the chat.
+   *
+   * Sent as a document rather than a link so the customer keeps the file in
+   * WhatsApp — once Meta has fetched it and delivered it, it no longer
+   * matters that the signed URL eventually expires.
+   *
+   * Meta fetches the URL from its own servers, so this only works when the
+   * backend is reachable from the internet. On a localhost backend the fetch
+   * fails and the error is logged; nothing else breaks.
+   */
+  async sendInvoice(mobile: string, bookingId: string, url: string, amount: number): Promise<void> {
+    const to = `91${String(mobile).replace(/\D/g, '').slice(-10)}`;
+    const template = process.env.WHATSAPP_INVOICE_TEMPLATE
+      || this.config.get<string>('whatsapp.invoiceTemplate');
+
+    if (template) {
+      const lang = process.env.WHATSAPP_OTP_TEMPLATE_LANG || 'en';
+      await this.send(to, {
+        type: 'template',
+        template: {
+          name: template,
+          language: { code: lang },
+          components: [
+            { type: 'header', parameters: [{ type: 'document', document: { link: url, filename: `Invoice-${bookingId}.pdf` } }] },
+            { type: 'body', parameters: [{ type: 'text', text: bookingId }, { type: 'text', text: String(amount) }] },
+          ],
+        },
+      });
+      return;
+    }
+
+    await this.send(to, {
+      type: 'document',
+      document: {
+        link: url,
+        filename: `Invoice-${bookingId}.pdf`,
+        caption: `🧾 Gora Taxi — invoice for trip ${bookingId}.\nAmount paid: ₹${amount}.\nThank you for riding with us.`,
+      },
+    });
+  }
+
+  /** An approved template, which Meta delivers outside the 24-hour window. */
+  private async sendTemplate(to: string, name: string, otp: string): Promise<void> {
+    const lang = process.env.WHATSAPP_OTP_TEMPLATE_LANG || 'en';
+    // Meta's AUTHENTICATION templates carry the code twice: once in the body
+    // and once on the copy-code button. A UTILITY template has the body only.
+    const components: any[] = [
+      { type: 'body', parameters: [{ type: 'text', text: otp }] },
+    ];
+    if (process.env.WHATSAPP_OTP_TEMPLATE_BUTTON === 'true') {
+      components.push({
+        type: 'button', sub_type: 'url', index: '0',
+        parameters: [{ type: 'text', text: otp }],
+      });
+    }
+    await this.send(to, {
+      type: 'template',
+      template: { name, language: { code: lang }, components },
+    });
+  }
+
   // ─── Outbound reply (WhatsApp Cloud API) ─────────────────────────────────────
-  private async sendReply(to: string, message: string): Promise<void> {
+  private sendReply(to: string, message: string): Promise<void> {
+    return this.sendText(to, message);
+  }
+
+  private sendText(to: string, message: string): Promise<void> {
+    return this.send(to, { type: 'text', text: { body: message.slice(0, 4000) } });
+  }
+
+  /**
+   * One place that talks to the Graph API, so a text and a template take the
+   * same path, the same credentials and the same error handling.
+   *
+   * Never throws: a message that does not go out must not take a booking or
+   * a trip down with it.
+   */
+  private async send(to: string, payload: Record<string, any>): Promise<void> {
     const token = this.config.get<string>('whatsapp.accessToken') || process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneId = this.config.get<string>('whatsapp.phoneNumberId') || process.env.WHATSAPP_PHONE_NUMBER_ID;
     const version = this.config.get<string>('whatsapp.graphVersion') || process.env.WHATSAPP_GRAPH_VERSION || 'v21.0';
     if (!token || !phoneId) {
-      this.logger.warn(`[WhatsApp reply skipped — token/phoneId not set] to +${to}: ${message}`);
+      this.logger.warn(`[WhatsApp skipped — token/phoneId not set] to +${to}: ${JSON.stringify(payload).slice(0, 200)}`);
       return;
     }
     try {
       const res = await fetch(`https://graph.facebook.com/${version}/${phoneId}/messages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to,
-          type: 'text',
-          text: { body: message.slice(0, 4000) },
-        }),
+        body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload }),
       });
-      if (!res.ok) this.logger.error(`WhatsApp reply failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+      if (!res.ok) this.logger.error(`WhatsApp send failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
     } catch (e: any) {
-      this.logger.error(`WhatsApp reply error: ${e?.message ?? e}`);
+      this.logger.error(`WhatsApp send error: ${e?.message ?? e}`);
     }
   }
 }
