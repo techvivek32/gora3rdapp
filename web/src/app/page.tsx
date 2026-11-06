@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -373,16 +373,13 @@ export default function HomePage() {
             lead="Pick the one that matches the trip. Every one of them prices the whole journey before you commit to it."
           />
 
-          {/* No top margin, and the first row drops its own top border: the
-              chapter rule above IS this list's first divider. With both, two
-              hairlines sat forty pixels apart and read as a mistake. */}
-          <div>
+          <div className="mt-12">
             {SERVICES.map((s, i) => (
               <Link
                 key={s.href}
                 href={s.href}
                 data-reveal
-                className={`roadrow group ${s.tone} first:border-t-0 last:border-b last:border-hairline`}
+                className={`roadrow group ${s.tone} last:border-b last:border-hairline`}
               >
                 <span className="flex items-center gap-3 sm:block">
                   <span className="ghost-num text-[2.5rem] sm:text-[3rem]">{`0${i + 1}`}</span>
@@ -1052,41 +1049,22 @@ export default function HomePage() {
           </div>
 
           <div data-reveal>
-            {/* Each rule is an element so it can be drawn, and each is a
-                step later than the one above, so the stack cascades as it
-                comes into view instead of all of them snapping at once. */}
             {FAQ.map(([q, a], i) => (
-              <Fragment key={q}>
-                <span
-                  aria-hidden
-                  data-reveal
-                  className="hairline hairline-draw"
-                  style={{ ['--d' as string]: `${i * 70}ms` }}
-                />
-                {/* <details> rather than React state: it works before
-                    hydration, and the browser handles the open/close and the
-                    keyboard. */}
-                <details className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-start gap-4 text-[15px] font-bold text-ink marker:hidden">
-                    <span className="numeral shrink-0 pt-0.5 text-xs text-muted">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <span className="flex-1">{q}</span>
-                    <span className="mt-0.5 shrink-0 text-xl font-normal leading-none text-brand-500 transition-transform duration-300 group-open:rotate-45">
-                      +
-                    </span>
-                  </summary>
-                  <p className="mt-3 max-w-[68ch] pl-8 text-sm leading-relaxed text-muted">{a}</p>
-                </details>
-              </Fragment>
+              // <details> rather than React state: it works before hydration,
+              // and the browser handles the open/close and the keyboard.
+              <details key={q} className="group border-b border-hairline py-5 first:border-t">
+                <summary className="flex cursor-pointer list-none items-start gap-4 text-[15px] font-bold text-ink marker:hidden">
+                  <span className="numeral shrink-0 pt-0.5 text-xs text-muted">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="flex-1">{q}</span>
+                  <span className="mt-0.5 shrink-0 text-xl font-normal leading-none text-brand-500 transition-transform duration-300 group-open:rotate-45">
+                    +
+                  </span>
+                </summary>
+                <p className="mt-3 max-w-[68ch] pl-8 text-sm leading-relaxed text-muted">{a}</p>
+              </details>
             ))}
-            {/* The rule that closes the list. */}
-            <span
-              aria-hidden
-              data-reveal
-              className="hairline hairline-draw"
-              style={{ ['--d' as string]: `${FAQ.length * 70}ms` }}
-            />
           </div>
         </div>
       </section>
@@ -1319,26 +1297,13 @@ function SectionHead({
   lead?: string;
 }) {
   return (
-    <div>
-      <div className="flex items-start gap-4 sm:gap-6" data-reveal>
-        <span className="stone">{n}</span>
-        <div className="min-w-0 flex-1">
-          <p className="eyebrow text-brandink">{eyebrow}</p>
-          <h2 className="display-section mt-2.5">{title}</h2>
-          {lead && <p className="mt-4 max-w-[62ch] text-[15px] leading-relaxed text-muted">{lead}</p>}
-        </div>
+    <div className="flex items-start gap-4 sm:gap-6" data-reveal>
+      <span className="stone">{n}</span>
+      <div className="min-w-0 flex-1">
+        <p className="eyebrow text-brandink">{eyebrow}</p>
+        <h2 className="display-section mt-2.5">{title}</h2>
+        {lead && <p className="mt-4 max-w-[62ch] text-[15px] leading-relaxed text-muted">{lead}</p>}
       </div>
-      {/* The chapter rule, drawn left to right as the section arrives, with
-          one glint running its length afterwards. Its own element rather
-          than a border on the block above: a border cannot be drawn, and a
-          1px line is the one thing on a page whose entire shape is a
-          direction. */}
-      <span
-        aria-hidden
-        data-reveal
-        className="hairline hairline-draw hairline-glint mt-8"
-        style={{ ['--d' as string]: '140ms' }}
-      />
     </div>
   );
 }
