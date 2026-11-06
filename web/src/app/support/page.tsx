@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, Phone, Smartphone } from 'lucide-react';
-import { PageHero } from '@/components/PageHero';
 import { apiGet } from '@/lib/api';
 import { useSiteText } from '@/lib/site-text';
 
@@ -36,16 +35,11 @@ export default function SupportPage() {
   const whatsapp = data?.whatsapp?.trim().replace(/\D/g, '');
 
   return (
-    <>
-      <PageHero
-        width="2xl"
-        eyebrow="We are on the phone"
-        title={t('support.title')}
-        lead={t('support.subtitle')}
-      />
+    <div className="mx-auto max-w-2xl px-4 py-12">
+      <h1 className="display-lg">{t('support.title')}</h1>
+      <p className="mt-1 text-sm text-muted">{t('support.subtitle')}</p>
 
-      <div className="mx-auto max-w-2xl px-4 py-12">
-      <div className="space-y-3">
+      <div className="mt-6 space-y-3">
         {phone && (
           <a href={`tel:${phone}`} className="card flex items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:shadow-lg">
             <span className="grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-ok">
@@ -106,7 +100,6 @@ export default function SupportPage() {
           </Link>
         </div>
       )}
-      </div>
-    </>
+    </div>
   );
 }

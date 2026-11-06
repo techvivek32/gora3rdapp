@@ -22,16 +22,6 @@ const config: Config = {
   content: [
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-    /*
-     * `src/lib` builds class strings too — `cityChip` picks a chip's colour
-     * and `statusPill` picks a booking status's — and Tailwind only emits a
-     * utility it has SEEN in a scanned file. Leaving this folder out meant
-     * those classes existed only while some page happened to spell the same
-     * name out; the moment the home page stopped using `bg-cabsolid`, every
-     * teal city chip rendered as a white pill with white text on it. A class
-     * name decided in a helper is still a class name.
-     */
-    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {

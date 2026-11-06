@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CalendarDays, Loader2, Search, Users } from 'lucide-react';
 import { apiGet } from '@/lib/api';
-import { PageHero } from '@/components/PageHero';
 import { PlaceInput } from '@/components/PlaceInput';
 import { formatDate, formatTime12, rupees, shortCity, toDateInput } from '@/lib/format';
 import type { Geo, PoolRide } from '@/lib/types';
@@ -39,21 +38,18 @@ function PoolSearch() {
   const rides = data ?? [];
 
   return (
-    <>
-      <PageHero
-        width="4xl"
-        eyebrow="Share & save"
-        title="Car Pool"
-        lead="Book a seat on a ride someone is already making. Cheaper than a cab of your own, and one less car on the road."
-        aside={
-          <Link href="/book/cab" className="btn-ghost px-4 py-2 text-sm">
-            Book a cab instead
-          </Link>
-        }
-      />
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="display-lg">Car Pool</h1>
+          <p className="mt-1 text-sm text-muted">Book a seat on a ride someone is already making.</p>
+        </div>
+        <Link href="/book/cab" className="btn-ghost px-4 py-2 text-sm">
+          Book a cab instead
+        </Link>
+      </div>
 
-      <div className="mx-auto max-w-4xl px-4 py-10">
-        <div className="card p-5">
+      <div className="card mt-6 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <PlaceInput label="From" value={from} onChange={setFrom} cityOnly placeholder="Leaving from" />
           <PlaceInput label="To" value={to} onChange={setTo} cityOnly placeholder="Going to" />
@@ -116,7 +112,6 @@ function PoolSearch() {
           })}
         </div>
       )}
-      </div>
-    </>
+    </div>
   );
 }

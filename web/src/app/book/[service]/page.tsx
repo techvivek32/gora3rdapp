@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import { ArrowRight, BadgeIndianRupee, Loader2, Plus, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { apiGet, apiPost, errorMessage } from '@/lib/api';
 import { GuestFields, guestReady, type GuestInfo } from '@/components/GuestFields';
-import { PageHero } from '@/components/PageHero';
 import { PlaceInput } from '@/components/PlaceInput';
 import { rupees, toDateInput } from '@/lib/format';
 import { tripDraft } from '@/lib/trip-draft';
@@ -232,29 +231,37 @@ function BookForm() {
   return (
     <div className="relative">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      {/* The landing page's band, not a wash of its own: this page is one
-          click from the home hero and used to open in a different language
-          from it. */}
-      <PageHero
-        width="3xl"
-        eyebrow={
-          <>
+      <div className="relative overflow-hidden border-b border-hairline bg-surface pb-12 pt-14">
+        {/* One warm wash, the same device the home hero uses. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-56 opacity-60"
+          style={{ background: 'radial-gradient(55% 100% at 18% 0%, rgb(var(--tint)) 0%, transparent 70%)' }}
+        />
+
+        <div className="relative mx-auto max-w-3xl px-4">
+          <p className="eyebrow reveal" style={at(40)}>
             <Sparkles className="h-3 w-3 text-brand-500" />
             {isHire ? 'Your car, our driver' : 'Outstation · Local · Round trip'}
-          </>
-        }
-        title={meta.title}
-        lead={meta.subtitle}
-      >
-        <ul className="grid gap-x-5 gap-y-3 sm:grid-cols-3">
-          {TRUST.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-center gap-2.5 border-l-2 border-brand-500/50 pl-3">
-              <Icon className="h-4 w-4 shrink-0 text-brand-500" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-ink">{text}</span>
-            </li>
-          ))}
-        </ul>
-      </PageHero>
+          </p>
+
+          <h1 className="display-lg reveal mt-5" style={at(110)}>
+            {meta.title}
+          </h1>
+          <p className="prose-measure reveal mt-4" style={at(180)}>
+            {meta.subtitle}
+          </p>
+
+          <div className="reveal mt-7 flex flex-wrap gap-x-6 gap-y-2" style={at(250)}>
+            {TRUST.map(({ icon: Icon, text }) => (
+              <span key={text} className="inline-flex items-center gap-2 text-xs font-semibold text-muted">
+                <Icon className="h-3.5 w-3.5 shrink-0 text-brand-500" />
+                {text}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── The form ─────────────────────────────────────────────────────── */}
       <div className="relative z-10 mx-auto max-w-3xl px-4 pb-16 pt-8">
