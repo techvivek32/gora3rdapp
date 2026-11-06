@@ -21,50 +21,72 @@
 
 @layer base {
   :root {
-    --canvas: 250 246 239;
+    --canvas: 248 250 253;
     --surface: 255 255 255;
-    --sunken: 243 238 230;
+    --sunken: 240 245 250;
 
-    --ink: 23 20 16;
-    --muted: 115 108 98;
-    --hairline: 228 221 210;
+    --ink: 15 27 51;
+    --muted: 90 106 130;
+    --hairline: 221 229 239;
 
     --tint: 255 237 213;
-    --tintline: 254 215 170;
+    --tintline: 253 203 150;
     --brandink: 194 65 12;
+
+    /* The structural blue. `blueink` is blue text on a page surface; the
+       700 is dark enough to clear 4.5:1 on white, which #3B82F6 does not. */
+    /* The reference's blue is #0094EB — a sky blue, not a royal one. The
+       `ink` shade is the only one dark enough to clear 4.5:1 on white, so
+       text uses that and fills use the bright one. */
+    --blue: 14 165 233;
+    --blueink: 3 105 161;
+    --blue-soft: 240 249 255;
+    --blue-line: 186 230 253;
 
     --danger-bg: 255 241 242;
     --danger-fg: 190 18 60;
 
     /* One per service — see tailwind.config.ts. `soft` is the wash the card
        sits on; the solid is for the rule, the numeral and the icon. */
-    --svc-cab: 15 110 92;
-    --svc-cab-soft: 235 245 241;
-    --svc-drive: 140 97 19;
-    --svc-drive-soft: 250 244 230;
-    --svc-pool: 178 58 28;
-    --svc-pool-soft: 253 240 234;
+    --svc-cab: 3 105 161;
+    --svc-cab-soft: 240 249 255;
+    --svc-drive: 15 110 92;
+    --svc-drive-soft: 235 245 241;
+    --svc-pool: 180 60 16;
+    --svc-pool-soft: 255 241 230;
 
     /* A fourth accent, and the washes whole sections sit on. The page was
        technically "colour-accented" and still read as grey — a tinted icon
        is not colour, a tinted BAND is. */
-    --svc-lux: 90 63 120;
-    --svc-lux-soft: 245 241 248;
-    --band-warm: 246 240 230;
-    --band-cool: 250 246 239;
-    --band-mint: 244 237 226;
-    --band-deep: 23 20 16;
+    --svc-lux: 71 85 105;
+    --svc-lux-soft: 241 245 251;
+    /* The bands are what the client meant by "the background". They were
+       three shades of the same beige; now they alternate white, a pale blue
+       wash and a warm one, so a long page has a rhythm instead of a tint. */
+    --band-warm: 255 249 242;
+    --band-cool: 245 249 253;
+    --band-mint: 249 251 254;
+    --band-deep: 11 30 63;
+    /* One band of real, unmissable blue. The reference has a blue bar
+       across the top of every page; this is ours. */
+    /* A FILL, so it is chosen for white text sitting on it rather than
+       for how bright it looks. #0284C7 only reaches 4.0:1 against
+       white, which is under AA for the 10-11px labels that sit on this
+       colour; this one is 5.7:1 and still unmistakably a sky blue. */
+    --band-blue: 3 105 161;
 
     /* SOLID service colours — the card background itself, with white text on
        top. The soft tints above are for washes; these are for blocks. Chosen
        so white clears 4.5:1 on every one of them, which is why the orange is
        the deep 700 and not the brand 500. */
-    --svc-cab-solid: 15 110 92;
-    --svc-drive-solid: 154 107 21;
-    --svc-pool-solid: 178 58 28;
-    --svc-lux-solid: 63 58 51;
+    --svc-cab-solid: 2 132 199;
+    --svc-drive-solid: 13 136 116;
+    --svc-pool-solid: 217 74 16;
+    --svc-lux-solid: 51 65 85;
 
-    --shadow-card: 0 1px 3px rgba(23, 20, 16, 0.07), 0 10px 30px rgba(23, 20, 16, 0.08);
+    /* A blue-tinted shadow rather than a grey one: a neutral shadow on a
+       blue-white page reads as dirt. */
+    --shadow-card: 0 1px 3px rgba(15, 27, 51, 0.06), 0 12px 32px rgba(15, 27, 51, 0.09);
     --shadow-glow: 0 8px 24px rgba(249, 115, 22, 0.35);
 
     color-scheme: light;
@@ -72,41 +94,47 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) {
-      --canvas: 16 14 12;
-      --surface: 25 22 19;
-      --sunken: 36 32 27;
+      --canvas: 9 23 45;
+      --surface: 16 34 62;
+      --sunken: 24 47 82;
 
-      --ink: 245 241 234;
-      --muted: 163 154 142;
-      --hairline: 58 52 45;
+      --ink: 232 238 248;
+      --muted: 150 170 198;
+      --hairline: 41 66 104;
 
       --tint: 36 29 23;
       --tintline: 92 56 24;
       --brandink: 253 186 116;
+
+      --blue: 56 189 248;
+      --blueink: 125 211 252;
+      --blue-soft: 12 38 60;
+      --blue-line: 30 72 110;
 
       --danger-bg: 47 23 29;
       --danger-fg: 253 164 175;
 
       /* Lifted and desaturated: the light values are near-black on a dark
          canvas, and the soft washes glare. */
-      --svc-cab: 125 214 190;
-      --svc-cab-soft: 20 35 31;
-      --svc-drive: 232 192 112;
-      --svc-drive-soft: 40 32 18;
+      --svc-cab: 125 211 252;
+      --svc-cab-soft: 12 38 60;
+      --svc-drive: 125 214 190;
+      --svc-drive-soft: 16 36 32;
       --svc-pool: 253 186 116;
-      --svc-pool-soft: 44 32 20;
+      --svc-pool-soft: 46 31 18;
 
-      --svc-lux: 208 190 230;
-      --svc-lux-soft: 34 28 38;
-      --band-warm: 28 24 19;
-      --band-cool: 23 20 16;
-      --band-mint: 32 27 21;
-      --band-deep: 12 10 9;
+      --svc-lux: 165 182 208;
+      --svc-lux-soft: 24 34 50;
+      --band-warm: 38 27 17;
+      --band-cool: 11 28 54;
+      --band-mint: 13 32 60;
+      --band-deep: 6 17 35;
+      --band-blue: 7 108 163;
 
-      --svc-cab-solid: 17 125 104;
-      --svc-drive-solid: 154 107 21;
-      --svc-pool-solid: 185 62 30;
-      --svc-lux-solid: 104 95 83;
+      --svc-cab-solid: 2 145 216;
+      --svc-drive-solid: 15 140 118;
+      --svc-pool-solid: 214 76 20;
+      --svc-lux-solid: 71 85 105;
 
       /* On a dark surface a drop shadow reads as dirt. Depth comes from the
          hairline above instead, so this is almost nothing. */
@@ -118,39 +146,45 @@
   }
 
   :root[data-theme='dark'] {
-    --canvas: 16 14 12;
-    --surface: 25 22 19;
-    --sunken: 36 32 27;
+    --canvas: 9 23 45;
+    --surface: 16 34 62;
+    --sunken: 24 47 82;
 
-    --ink: 245 241 234;
-    --muted: 163 154 142;
-    --hairline: 58 52 45;
+    --ink: 232 238 248;
+    --muted: 150 170 198;
+    --hairline: 41 66 104;
 
     --tint: 36 29 23;
     --tintline: 92 56 24;
     --brandink: 253 186 116;
 
+    --blue: 56 189 248;
+    --blueink: 125 211 252;
+    --blue-soft: 12 38 60;
+    --blue-line: 30 72 110;
+
     --danger-bg: 47 23 29;
     --danger-fg: 253 164 175;
 
-    --svc-cab: 125 214 190;
-    --svc-cab-soft: 20 35 31;
-    --svc-drive: 232 192 112;
-    --svc-drive-soft: 40 32 18;
+    --svc-cab: 125 211 252;
+    --svc-cab-soft: 12 38 60;
+    --svc-drive: 125 214 190;
+    --svc-drive-soft: 16 36 32;
     --svc-pool: 253 186 116;
-    --svc-pool-soft: 44 32 20;
+    --svc-pool-soft: 46 31 18;
 
-    --svc-lux: 208 190 230;
-    --svc-lux-soft: 34 28 38;
-    --band-warm: 28 24 19;
-    --band-cool: 23 20 16;
-    --band-mint: 32 27 21;
-    --band-deep: 12 10 9;
+    --svc-lux: 165 182 208;
+    --svc-lux-soft: 24 34 50;
+    --band-warm: 38 27 17;
+    --band-cool: 11 28 54;
+    --band-mint: 13 32 60;
+    --band-deep: 6 17 35;
+    --band-blue: 7 108 163;
 
-    --svc-cab-solid: 17 125 104;
-    --svc-drive-solid: 154 107 21;
-    --svc-pool-solid: 185 62 30;
-    --svc-lux-solid: 104 95 83;
+    --svc-cab-solid: 2 145 216;
+    --svc-drive-solid: 15 140 118;
+    --svc-pool-solid: 214 76 20;
+    --svc-lux-solid: 71 85 105;
 
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
     --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
@@ -406,7 +440,7 @@
     z-index: 100;
     display: grid;
     place-items: center;
-    background: radial-gradient(ellipse at 50% 40%, #2a2219 0%, #15120e 60%, #0b0908 100%);
+    background: radial-gradient(ellipse at 50% 40%, #16305c 0%, #0a1830 60%, #050d1c 100%);
     animation: intro-exit 0.5s cubic-bezier(0.76, 0, 0.24, 1) 1.52s forwards;
   }
 
@@ -813,27 +847,29 @@
        washes; in dark mode that token is a brown-black, and brown under an
        orange glow is mud. Separating it lets the hero be cream on paper and
        deep navy at night, with the same ember in the corner. */
-    --hero-base: 252 248 241;
-    --hero-glow: 253 186 116;
-    --hero-deep: 250 236 218;
+    /* Pale blue with a warm corner — the two brand colours meeting in the
+       background rather than sitting on it. */
+    --hero-base: 252 253 255;
+    --hero-glow: 254 223 190;
+    --hero-deep: 223 238 252;
     /* The ink of the road: lane markings, rails, stones. */
-    --road: 23 20 16;
+    --road: 15 27 51;
   }
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme='light']) {
-      --hero-base: 14 12 10;
-      --hero-glow: 124 45 18;
-      --hero-deep: 36 27 18;
-      --road: 245 241 234;
+      --hero-base: 8 22 44;
+      --hero-glow: 146 56 18;
+      --hero-deep: 23 60 118;
+      --road: 232 238 248;
     }
   }
 
   :root[data-theme='dark'] {
-    --hero-base: 14 12 10;
-    --hero-glow: 124 45 18;
-    --hero-deep: 36 27 18;
-    --road: 245 241 234;
+    --hero-base: 8 22 44;
+    --hero-glow: 146 56 18;
+    --hero-deep: 23 60 118;
+    --road: 232 238 248;
   }
 }
 
@@ -952,10 +988,19 @@
   /* ── Hero backdrop ────────────────────────────────────────────────────
      An ember out of the top-right corner and a cooler pool at bottom-left,
      over a base that is cream by day and navy at night. */
+  /*
+   * Blue is the band; orange is a corner of it.
+   *
+   * It used to be the other way round — the ember was the first layer at
+   * 85% across 115% of the width, so it covered most of the hero and the
+   * whole thing sampled as brown. In the CSS shorthand the FIRST layer sits
+   * on top, so the small warm corner is listed first and the large blue
+   * wash underneath it.
+   */
   .hero-band {
     background:
-      radial-gradient(115% 85% at 88% -12%, rgb(var(--hero-glow) / 0.85) 0%, transparent 56%),
-      radial-gradient(85% 70% at -8% 112%, rgb(var(--hero-deep) / 0.9) 0%, transparent 62%),
+      radial-gradient(46% 44% at 94% -8%, rgb(var(--hero-glow) / 0.55) 0%, transparent 62%),
+      radial-gradient(95% 80% at 10% 0%, rgb(var(--hero-deep) / 0.7) 0%, transparent 68%),
       rgb(var(--hero-base));
   }
 
@@ -1088,9 +1133,9 @@
    * also keeps them legible if the gradient never paints. */
   .poster {
     position: relative;
-    background-color: #191511;
+    background-color: #0f1e38;
     background-image:
-      linear-gradient(140deg, hsl(var(--h, 24) 58% 38%) 0%, hsl(calc(var(--h, 24) + 18) 64% 20%) 52%, #100d0b 100%);
+      linear-gradient(140deg, hsl(var(--h, 24) 58% 38%) 0%, hsl(calc(var(--h, 24) + 18) 64% 20%) 52%, #061127 100%);
   }
   .poster::after {
     content: '';
@@ -1107,7 +1152,7 @@
      without this every photograph on the site showed through a 50% diagonal
      hatch — which looked like a rendering fault, not a texture. */
   .poster.has-photo {
-    background-color: #100d0b;
+    background-color: #061127;
     background-image: none;
   }
   .poster.has-photo::after {
@@ -1155,7 +1200,7 @@
      dashed line: the band has to be twice the cell. */
   .chequer {
     height: 1.25rem;
-    background-color: var(--chequer-bg, rgb(var(--ink)));
+    background-color: var(--chequer-bg, rgb(var(--band-blue)));
     background-image:
       linear-gradient(45deg, var(--chequer-fg, #fff) 25%, transparent 25%, transparent 75%, var(--chequer-fg, #fff) 75%),
       linear-gradient(45deg, var(--chequer-fg, #fff) 25%, transparent 25%, transparent 75%, var(--chequer-fg, #fff) 75%);

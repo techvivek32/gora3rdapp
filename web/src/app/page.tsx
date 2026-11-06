@@ -12,6 +12,7 @@ import {
 import { apiGet } from '@/lib/api';
 import { PlaceInput } from '@/components/PlaceInput';
 import { AppMock } from '@/components/AppMock';
+import { HeroDecor } from '@/components/HeroDecor';
 import { CarSide } from '@/components/CarSide';
 import { TaxiHero } from '@/components/TaxiHero';
 import { Poster } from '@/components/Poster';
@@ -185,6 +186,9 @@ export default function HomePage() {
        */}
       <section className="hero-band relative isolate overflow-hidden">
         <div aria-hidden className="noise pointer-events-none absolute inset-0" />
+        {/* Blue, as shapes. A wash of it measured at 4% colourfulness and
+            vanished; an outline reads as the colour it is drawn in. */}
+        <HeroDecor />
         {/* The ember, behind the device, so the column has a centre of
             gravity without a box drawn round it. */}
         <div
@@ -200,7 +204,7 @@ export default function HomePage() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-x-10 gap-y-12 px-4 pb-16 pt-12 lg:grid-cols-[1.08fr_0.92fr] lg:pb-20 lg:pt-16">
           <div>
             <span className="inline-flex items-center gap-2.5 rounded-full bg-surface px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-ink shadow-card ring-1 ring-hairline">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+              <span className="h-1.5 w-1.5 rounded-full bg-blue" />
               Fast <span className="text-muted">/</span> Safe <span className="text-muted">/</span> Affordable
             </span>
 
@@ -219,8 +223,8 @@ export default function HomePage() {
 
             <ul className="mt-7 grid max-w-xl gap-x-5 gap-y-3 sm:grid-cols-3">
               {['Instant booking', 'Verified drivers', 'No hidden charges'].map((label) => (
-                <li key={label} className="flex items-center gap-2.5 border-l-2 border-brand-500/60 pl-3">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-brand-500" />
+                <li key={label} className="flex items-center gap-2.5 border-l-2 border-blue/70 pl-3">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-blueink" />
                   {/* 11px, not 12: at 12 the longest of the three needed two
                       lines inside its column and the row came out ragged. */}
                   <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-ink">{label}</span>
@@ -303,7 +307,9 @@ export default function HomePage() {
             data — the city list, the states in it, the services the site
             actually offers — so none of it is a number somebody decided a
             landing page ought to show. */}
-        <div className="relative border-t border-hairline bg-midnight">
+        {/* The counters sit on the blue, not on near-black: this is the
+            one band that has to say "blue and orange" at a glance. */}
+        <div className="relative border-t border-hairline bg-bandblue">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-4 lg:grid-cols-4">
             {[
               { figure: String(cities.length || '—'), label: 'Cities on the network' },
@@ -322,7 +328,7 @@ export default function HomePage() {
                 <p className="font-display text-4xl font-black leading-none tracking-[-0.04em] text-white sm:text-5xl">
                   {figure}
                 </p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/60">
+                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/85">
                   {label}
                 </p>
               </div>
@@ -383,7 +389,15 @@ export default function HomePage() {
               >
                 <span className="flex items-center gap-3 sm:block">
                   <span className="ghost-num text-[2.5rem] sm:text-[3rem]">{`0${i + 1}`}</span>
-                  <span className="grid h-10 w-10 place-items-center rounded-xl ring-1 ring-current sm:mt-3">
+                  {/* Filled, not outlined. The reference's icons are solid
+                      squares of colour and that is most of what makes its
+                      page read as blue; a 1px ring of the same hue reads as
+                      grey from two feet away. */}
+                  <span
+                    className={`grid h-11 w-11 place-items-center rounded-xl text-white shadow-sm sm:mt-3 ${
+                      ['bg-cabsolid', 'bg-drivesolid', 'bg-poolsolid'][i]
+                    }`}
+                  >
                     <s.icon className="h-5 w-5" />
                   </span>
                 </span>
@@ -1353,8 +1367,16 @@ function QuickBook() {
   // right and could not be used. The strip gets its own rounded top corners.
   return (
     <div className="glass rounded-3xl shadow-2xl ring-1 ring-white/25">
-      <p className="flex items-center gap-2 rounded-t-3xl border-b border-hairline px-5 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
-        <Route className="h-3.5 w-3.5 text-brand-500" />
+      {/* A solid blue bar across the top of the booking card. The
+          reference does exactly this with its selected trip-type tab, and
+          it is most of why that page reads as blue.
+
+          `bandblue` is the FILL blue, not `blueink`. `blueink` is a TEXT
+          colour, and in the dark theme it is a pale sky blue — white on it
+          came out at about 1.4:1, which is to say invisible. A colour meant
+          to be written on has to be picked for what sits on it. */}
+      <p className="flex items-center gap-2 rounded-t-3xl bg-bandblue px-5 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white">
+        <Route className="h-3.5 w-3.5" />
         Where to?
       </p>
       <div className="grid gap-3 p-4 sm:grid-cols-1 lg:grid-cols-1">

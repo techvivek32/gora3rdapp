@@ -53,8 +53,21 @@ const config: Config = {
           800: '#9a3412',
           900: '#7c2d12',
         },
-        /** The dark end of the page: a warm black, not a blue one. */
-        midnight: '#17140F',
+        /** The dark end of the page. Blue-black, because the logo is blue
+         *  and orange and the dark bands are the only place the blue gets
+         *  to be the surface rather than an accent. */
+        midnight: '#0B1E3F',
+
+        /** The structural blue, straight off the logo's own #0020A0 family.
+         *  Orange stays the action colour; this one carries everything that
+         *  is not asking to be clicked. */
+        blue: themed('--blue'),
+        blueink: themed('--blueink'),
+        bluesoft: themed('--blue-soft'),
+        blueline: themed('--blue-line'),
+        /** A whole band of blue — the one area of the page that is
+         *  unmistakably the brand colour rather than a tint of it. */
+        bandblue: themed('--band-blue'),
 
         /**
          * One colour per service.
