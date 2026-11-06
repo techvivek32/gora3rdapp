@@ -2,8 +2,13 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Brand palette mirrors the mobile app's AppColors so a booking looks the same
- * whether the customer is on the phone or the website: primary #F97316 (orange)
- * with the deep navy #12213D used on the customer home hero.
+ * whether the customer is on the phone or the website: primary #F97316
+ * (orange), carried on a warm near-black rather than the old navy.
+ *
+ * The navy went because navy-and-orange was the half of the palette that
+ * could go: the orange is the logo, the buttons and the app, and a brand that
+ * changes colour between the phone and the website is not a brand. Black and
+ * bone is a far more expensive pairing with it than blue ever was.
  *
  * Everything that changes between light and dark is a CSS variable rather than
  * a fixed hex, defined in globals.css under `:root` and `[data-theme='dark']`.
@@ -22,6 +27,16 @@ const config: Config = {
   content: [
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    /*
+     * `src/lib` builds class strings too — `cityChip` picks a chip's colour
+     * and `statusPill` picks a booking status's — and Tailwind only emits a
+     * utility it has SEEN in a scanned file. Leaving this folder out meant
+     * those classes existed only while some page happened to spell the same
+     * name out; the moment the home page stopped using `bg-cabsolid`, every
+     * teal city chip rendered as a white pill with white text on it. A class
+     * name decided in a helper is still a class name.
+     */
+    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -38,7 +53,8 @@ const config: Config = {
           800: '#9a3412',
           900: '#7c2d12',
         },
-        navy: '#12213D',
+        /** The dark end of the page: a warm black, not a blue one. */
+        midnight: '#17140F',
 
         /**
          * One colour per service.

@@ -39,7 +39,8 @@ export function SiteFooter() {
   const row = 'flex items-center gap-2 py-1.5 text-sm text-muted transition hover:text-brand-600';
 
   return (
-    <footer className="border-t border-hairline bg-surface">
+    <footer className="bg-surface">
+      <span aria-hidden className="lane-x block w-full" />
       <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -50,8 +51,8 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <p className="text-sm font-bold text-ink">Book</p>
-          <ul className="mt-2 space-y-1 text-sm text-muted">
+          <p className="eyebrow text-brandink">Book</p>
+          <ul className="mt-3 space-y-1 text-sm text-muted">
             <li><Link href="/book/cab" className="inline-block py-1.5 hover:text-brand-600">Cab Booking</Link></li>
             <li><Link href="/book/hire_driver" className="inline-block py-1.5 hover:text-brand-600">Hire a Driver</Link></li>
             <li><Link href="/pool" className="inline-block py-1.5 hover:text-brand-600">Car Pool</Link></li>
@@ -59,8 +60,8 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <p className="text-sm font-bold text-ink">Company</p>
-          <ul className="mt-2 space-y-1 text-sm text-muted">
+          <p className="eyebrow text-brandink">Company</p>
+          <ul className="mt-3 space-y-1 text-sm text-muted">
             <li><Link href="/#about" className="inline-block py-1.5 hover:text-brand-600">About us</Link></li>
             <li><Link href="/#cities" className="inline-block py-1.5 hover:text-brand-600">Where we run</Link></li>
             <li><Link href="/#contact" className="inline-block py-1.5 hover:text-brand-600">Contact</Link></li>
@@ -69,8 +70,8 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <p className="text-sm font-bold text-ink">Reach us</p>
-          <div className="mt-2">
+          <p className="eyebrow text-brandink">Reach us</p>
+          <div className="mt-3">
             {phone && (
               <a href={`tel:${phone}`} className={row}>
                 <Phone className="h-4 w-4 shrink-0 text-brand-500" />
