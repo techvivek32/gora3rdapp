@@ -77,9 +77,6 @@ export interface City {
   isFeatured?: boolean;
   /** Chip colour on the coverage strip — see lib/city-colour.ts. */
   color?: string;
-  /** The operator's photograph of the city. It has been on the schema and
-   *  on `GET /cities` from the beginning; the website never asked for it. */
-  imageUrl?: string;
 }
 
 /** `GET /settings/support-contact` — the franchise's line, else the global one. */

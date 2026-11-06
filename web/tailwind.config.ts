@@ -2,13 +2,8 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Brand palette mirrors the mobile app's AppColors so a booking looks the same
- * whether the customer is on the phone or the website: primary #F97316
- * (orange), carried on a warm near-black rather than the old navy.
- *
- * The navy went because navy-and-orange was the half of the palette that
- * could go: the orange is the logo, the buttons and the app, and a brand that
- * changes colour between the phone and the website is not a brand. Black and
- * bone is a far more expensive pairing with it than blue ever was.
+ * whether the customer is on the phone or the website: primary #F97316 (orange)
+ * with the deep navy #12213D used on the customer home hero.
  *
  * Everything that changes between light and dark is a CSS variable rather than
  * a fixed hex, defined in globals.css under `:root` and `[data-theme='dark']`.
@@ -53,8 +48,7 @@ const config: Config = {
           800: '#9a3412',
           900: '#7c2d12',
         },
-        /** The dark end of the page: a warm black, not a blue one. */
-        midnight: '#17140F',
+        navy: '#12213D',
 
         /**
          * One colour per service.
