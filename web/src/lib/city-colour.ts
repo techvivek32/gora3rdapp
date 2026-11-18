@@ -29,13 +29,18 @@ const SOLID: Record<string, string> = {
   // and a dark one in the other, and the token is tuned per-surface — on the
   // dark theme it came out as slate on slate.
   slate: 'bg-slate-500',
-  brand: 'bg-brand-600',
+  // 700, not 600: white on #EA580C is 3.56:1, and a chip is a small
+  // label on a colour, so it takes the strict 4.5 bar. This one is 5.18.
+  brand: 'bg-brand-700',
 };
 
 const SOFT =
   'inline-flex items-center gap-2 rounded-full bg-tint px-5 py-2.5 text-sm font-bold text-brandink ring-1 ring-tintline';
+// A neutral shadow, not `shadow-glow`. That token is tinted orange, so a blue
+// or a teal chip came out with an orange halo round it — the one colour it is
+// not. A chip this small needs almost nothing anyway.
 const SOLID_BASE =
-  'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-glow';
+  'inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-[0_2px_8px_rgba(16,24,40,0.14)]';
 
 /**
  * The classes for one chip, and whether it ended up solid — the state label

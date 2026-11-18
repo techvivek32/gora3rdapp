@@ -42,6 +42,7 @@ function PoolSearch() {
     <>
       <PageHero
         width="4xl"
+        tone="accent"
         eyebrow="Share & save"
         title="Car Pool"
         lead="Book a seat on a ride someone is already making. Cheaper than a cab of your own, and one less car on the road."

@@ -8,188 +8,104 @@
    Channels, not hex (`17 24 39`, not `#111827`), so Tailwind's slash-opacity
    keeps working: `bg-surface/70` → `rgb(var(--surface) / 0.7)`.
 
-   Three layers decide which theme is on, in this order:
-     1. `:root`                              — light, the default
-     2. `@media (prefers-color-scheme: dark)` — the OS, unless the visitor has
-        explicitly chosen light (`[data-theme='light']` wins over the media
-        query, which is why that selector carries the `:not()`)
-     3. `[data-theme='dark']`                — the visitor's own choice, last
-        word either way
-   layout.tsx sets the attribute before first paint, so the page never flashes
-   the wrong theme.
+   The site is light only. There is one set of values, on `:root`, and
+   `color-scheme: light` tells the browser to render its own widgets — form
+   controls, scrollbars, the date picker panel — to match, so a visitor whose
+   OS is set to dark does not get a dark picker on a white page.
+
+   The tokens stay variables even so. Every surface, band and service colour
+   is named in one place rather than spelled as a hex on two hundred
+   elements, which is what makes a palette change a palette change.
    ───────────────────────────────────────────────────────────────────────── */
 
 @layer base {
   :root {
-    --canvas: 248 250 253;
+    /* Surfaces. The reference is a white page: white is 3.3M of the painted
+       pixels on it, and every tint is a section wash rather than a page
+       colour. So canvas is white and the rhythm comes from the bands below. */
+    --canvas: 255 255 255;
     --surface: 255 255 255;
-    --sunken: 240 245 250;
+    /* 248, not 243. Grey body text on the darker well measured 4.46:1 —
+       four hundredths under AA, on the segmented control's unselected
+       labels. Lifting the well clears it without moving --muted, which
+       every paragraph on the site is set in. */
+    --sunken: 248 250 252;
 
-    --ink: 15 27 51;
-    --muted: 90 106 130;
-    --hairline: 221 229 239;
+    /* Ink. Measured off the reference: gray-800 for headings, gray-500 for
+       body, which is a neutral scale, not the blue-black this site used.
+       The blue-black made every paragraph look like part of the brand; a
+       neutral grey lets the blue and the orange be the only colour. */
+    --ink: 31 41 55;
+    --muted: 107 114 128;
+    --hairline: 229 233 240;
 
-    --tint: 255 237 213;
+    --tint: 255 243 230;
     --tintline: 253 203 150;
     --brandink: 194 65 12;
 
-    /* The structural blue. `blueink` is blue text on a page surface; the
-       700 is dark enough to clear 4.5:1 on white, which #3B82F6 does not. */
-    /* The reference's blue is #0094EB — a sky blue, not a royal one. The
-       `ink` shade is the only one dark enough to clear 4.5:1 on white, so
-       text uses that and fills use the bright one. */
-    --blue: 14 165 233;
-    --blueink: 3 105 161;
-    --blue-soft: 240 249 255;
-    --blue-line: 186 230 253;
+    /* Two blues, because one cannot do both jobs.
+
+       The reference uses #009AF4 for everything, including 14px white labels
+       on it — which measures 3.03:1 and fails AA. '--blue' here is a shade
+       down from it at 3.9:1: bright enough to read as the same sky blue, and
+       used only where it carries an icon or 24px+ type. Anything with small
+       white text on it uses '--band-blue' (4.93:1), and blue TEXT on a white
+       card uses '--blueink' (the same 4.93:1). */
+    --blue: 0 134 214;
+    --blueink: 11 116 190;
+    --blue-soft: 239 246 255;
+    --blue-line: 191 219 254;
 
     --danger-bg: 255 241 242;
     --danger-fg: 190 18 60;
 
-    /* One per service — see tailwind.config.ts. `soft` is the wash the card
-       sits on; the solid is for the rule, the numeral and the icon. */
-    --svc-cab: 3 105 161;
-    --svc-cab-soft: 240 249 255;
+    /* One per service. Kept, because three identical cards make the reader do
+       the sorting, but pulled towards the new palette. */
+    --svc-cab: 11 116 190;
+    --svc-cab-soft: 239 246 255;
     --svc-drive: 15 110 92;
-    --svc-drive-soft: 235 245 241;
+    --svc-drive-soft: 236 246 243;
     --svc-pool: 180 60 16;
-    --svc-pool-soft: 255 241 230;
+    --svc-pool-soft: 255 243 235;
 
-    /* A fourth accent, and the washes whole sections sit on. The page was
-       technically "colour-accented" and still read as grey — a tinted icon
-       is not colour, a tinted BAND is. */
     --svc-lux: 71 85 105;
-    --svc-lux-soft: 241 245 251;
-    /* The bands are what the client meant by "the background". They were
-       three shades of the same beige; now they alternate white, a pale blue
-       wash and a warm one, so a long page has a rhythm instead of a tint. */
-    --band-warm: 255 249 242;
-    --band-cool: 245 249 253;
-    --band-mint: 249 251 254;
-    --band-deep: 11 30 63;
-    /* One band of real, unmissable blue. The reference has a blue bar
-       across the top of every page; this is ours. */
-    /* A FILL, so it is chosen for white text sitting on it rather than
-       for how bright it looks. #0284C7 only reaches 4.0:1 against
-       white, which is under AA for the 10-11px labels that sit on this
-       colour; this one is 5.7:1 and still unmistakably a sky blue. */
-    --band-blue: 3 105 161;
+    --svc-lux-soft: 243 246 250;
 
-    /* SOLID service colours — the card background itself, with white text on
-       top. The soft tints above are for washes; these are for blocks. Chosen
-       so white clears 4.5:1 on every one of them, which is why the orange is
-       the deep 700 and not the brand 500. */
-    --svc-cab-solid: 2 132 199;
-    --svc-drive-solid: 13 136 116;
-    --svc-pool-solid: 217 74 16;
+    /* Section washes. Very slight — a few points off white — because on the
+       reference they are barely-there gradients, not panels. */
+    --band-warm: 255 251 244;
+    --band-cool: 242 248 253;
+    --band-mint: 247 250 253;
+    --band-deep: 16 26 46;
+    /* The blue that carries white text: the active tab, the primary button,
+       the app band, the stat pill. 4.93:1 against white. */
+    --band-blue: 11 116 190;
+
+    /* The accent, in the role the reference gives yellow: the Book button,
+       the section eyebrows, the second colour in the icon tiles.
+
+       It is the brand orange and it takes DARK text, not white. White on
+       #F97316 is 2.80:1 — it has always failed here — while gray-800 on it is
+       5.24:1. The reference reaches the same answer with its yellow, and it
+       is why that button reads as a button rather than as a warning. */
+    --accent: 249 115 22;
+    --accent-hover: 234 88 12;
+    --accent-ink: 31 41 55;
+    --accent-soft: 255 243 230;
+
+    --svc-cab-solid: 11 116 190;
+    --svc-drive-solid: 14 122 102;
+    --svc-pool-solid: 194 65 12;
     --svc-lux-solid: 51 65 85;
 
-    /* A blue-tinted shadow rather than a grey one: a neutral shadow on a
-       blue-white page reads as dirt. */
-    --shadow-card: 0 1px 3px rgba(15, 27, 51, 0.06), 0 12px 32px rgba(15, 27, 51, 0.09);
-    --shadow-glow: 0 8px 24px rgba(249, 115, 22, 0.35);
+    /* Soft and neutral. The reference's cards are separated by a wide, faint
+       shadow rather than a border, which is what stops a page of white cards
+       on white looking like a spreadsheet. */
+    --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 28px rgba(16, 24, 40, 0.07);
+    --shadow-lift: 0 2px 6px rgba(16, 24, 40, 0.06), 0 18px 44px rgba(16, 24, 40, 0.11);
+    --shadow-glow: 0 10px 26px rgba(249, 115, 22, 0.32);
 
     color-scheme: light;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) {
-      --canvas: 9 23 45;
-      --surface: 16 34 62;
-      --sunken: 24 47 82;
-
-      --ink: 232 238 248;
-      --muted: 150 170 198;
-      --hairline: 41 66 104;
-
-      --tint: 36 29 23;
-      --tintline: 92 56 24;
-      --brandink: 253 186 116;
-
-      --blue: 56 189 248;
-      --blueink: 125 211 252;
-      --blue-soft: 12 38 60;
-      --blue-line: 30 72 110;
-
-      --danger-bg: 47 23 29;
-      --danger-fg: 253 164 175;
-
-      /* Lifted and desaturated: the light values are near-black on a dark
-         canvas, and the soft washes glare. */
-      --svc-cab: 125 211 252;
-      --svc-cab-soft: 12 38 60;
-      --svc-drive: 125 214 190;
-      --svc-drive-soft: 16 36 32;
-      --svc-pool: 253 186 116;
-      --svc-pool-soft: 46 31 18;
-
-      --svc-lux: 165 182 208;
-      --svc-lux-soft: 24 34 50;
-      --band-warm: 38 27 17;
-      --band-cool: 11 28 54;
-      --band-mint: 13 32 60;
-      --band-deep: 6 17 35;
-      --band-blue: 7 108 163;
-
-      --svc-cab-solid: 2 145 216;
-      --svc-drive-solid: 15 140 118;
-      --svc-pool-solid: 214 76 20;
-      --svc-lux-solid: 71 85 105;
-
-      /* On a dark surface a drop shadow reads as dirt. Depth comes from the
-         hairline above instead, so this is almost nothing. */
-      --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
-      --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
-
-      color-scheme: dark;
-    }
-  }
-
-  :root[data-theme='dark'] {
-    --canvas: 9 23 45;
-    --surface: 16 34 62;
-    --sunken: 24 47 82;
-
-    --ink: 232 238 248;
-    --muted: 150 170 198;
-    --hairline: 41 66 104;
-
-    --tint: 36 29 23;
-    --tintline: 92 56 24;
-    --brandink: 253 186 116;
-
-    --blue: 56 189 248;
-    --blueink: 125 211 252;
-    --blue-soft: 12 38 60;
-    --blue-line: 30 72 110;
-
-    --danger-bg: 47 23 29;
-    --danger-fg: 253 164 175;
-
-    --svc-cab: 125 211 252;
-    --svc-cab-soft: 12 38 60;
-    --svc-drive: 125 214 190;
-    --svc-drive-soft: 16 36 32;
-    --svc-pool: 253 186 116;
-    --svc-pool-soft: 46 31 18;
-
-    --svc-lux: 165 182 208;
-    --svc-lux-soft: 24 34 50;
-    --band-warm: 38 27 17;
-    --band-cool: 11 28 54;
-    --band-mint: 13 32 60;
-    --band-deep: 6 17 35;
-    --band-blue: 7 108 163;
-
-    --svc-cab-solid: 2 145 216;
-    --svc-drive-solid: 15 140 118;
-    --svc-pool-solid: 214 76 20;
-    --svc-lux-solid: 71 85 105;
-
-    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 30px rgba(0, 0, 0, 0.35);
-    --shadow-glow: 0 8px 28px rgba(249, 115, 22, 0.28);
-
-    color-scheme: dark;
   }
 
   html {
@@ -200,57 +116,107 @@
   }
   /* Date/time inputs are a core part of the booking form, so make their native
      picker icon visible and clickable rather than the browser's faint default.
-     `color-scheme` above already flips the picker panel itself to dark; the
-     icon still needs inverting, because it ships as dark artwork. */
+     The artwork ships dark, which is what this page wants — it only needs to
+     be opaque enough to look like a control. */
   input[type='date']::-webkit-calendar-picker-indicator,
   input[type='time']::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.6;
   }
-  :root[data-theme='dark'] input[type='date']::-webkit-calendar-picker-indicator,
-  :root[data-theme='dark'] input[type='time']::-webkit-calendar-picker-indicator {
-    filter: invert(1);
-    opacity: 0.75;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) input[type='date']::-webkit-calendar-picker-indicator,
-    :root:not([data-theme='light']) input[type='time']::-webkit-calendar-picker-indicator {
-      filter: invert(1);
-      opacity: 0.75;
-    }
-  }
 }
 
 @layer components {
+  /* A card. 24px, because that is the radius the whole reference is built on
+     and a 16px card next to a 24px one looks like a mistake rather than a
+     variation. The ring is nearly invisible on purpose — the separation is
+     meant to come from the shadow, which is what keeps white cards on a white
+     page from reading as a table. */
   .card {
-    @apply rounded-2xl bg-surface shadow-card ring-1 ring-hairline;
+    @apply rounded-card bg-surface shadow-card ring-1 ring-hairline/70;
   }
   .field {
-    @apply w-full rounded-xl border border-hairline bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none
-           transition placeholder:text-muted/70 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25
+    @apply w-full rounded-xl border border-hairline bg-surface px-3.5 py-3 text-[15px] text-ink outline-none
+           transition placeholder:text-muted/70 focus:border-blue focus:ring-2 focus:ring-blue/20
            disabled:bg-sunken disabled:text-muted;
   }
+  /* PICKUP / DROP. Small, bold, uppercase — and only mildly tracked. The
+     reference tracks nothing at all; this site used to track everything at
+     0.2em, which is what made it read as a design portfolio. */
   .label {
-    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted;
+    @apply mb-2 block text-[11px] font-bold uppercase tracking-[0.06em] text-muted;
   }
   /* `min-h-11` is 44px. Without it the base button was 42px, and any caller
      trimming the padding — `btn-ghost px-3 py-2 text-sm` on "Add a stop" —
      came out at 38px. */
   .btn {
-    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[15px] font-semibold
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-3 text-[15px] font-semibold
            transition disabled:cursor-not-allowed disabled:opacity-50;
   }
+  /* The action colour, with DARK text on it. See the note on `--accent`:
+     white on this orange is 2.80:1 and always has been. */
   .btn-primary {
-    @apply btn bg-brand-500 text-white hover:bg-brand-600 active:bg-brand-700;
+    @apply btn bg-accent text-accentink shadow-[0_6px_16px_rgba(249,115,22,0.28)]
+           hover:bg-accenthover hover:shadow-[0_8px_22px_rgba(249,115,22,0.34)] active:translate-y-px;
+  }
+  /* The structural blue, for the second action in a pair. */
+  .btn-blue {
+    @apply btn bg-bandblue text-white hover:brightness-110 active:translate-y-px;
   }
   .btn-outline {
-    @apply btn border border-brand-500 bg-transparent text-brandink hover:bg-tint;
+    @apply btn border border-blue/60 bg-transparent text-blueink hover:bg-bluesoft;
   }
   .btn-ghost {
     @apply btn border border-hairline bg-surface text-ink hover:bg-sunken;
   }
   .chip {
     @apply inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1;
+  }
+
+  /* ── The reference's section furniture ──────────────────────────────────
+     Every section on oneway.cab opens the same way: a small coloured pill,
+     one very large centred heading, one muted line under it. Repeating that
+     shape is most of what makes a long page feel like one page, so it is
+     three classes here rather than the same twelve utilities twelve times. */
+
+  /* The pill above a heading. Orange and blue alternate down the page so no
+     two neighbouring sections open on the same colour. */
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-bold;
+  }
+  .eyebrow-accent {
+    @apply eyebrow bg-accent text-accentink shadow-[0_4px_12px_rgba(249,115,22,0.25)];
+  }
+  .eyebrow-blue {
+    @apply eyebrow bg-bandblue text-white shadow-[0_4px_12px_rgba(11,116,190,0.25)];
+  }
+
+  /* 48px/48px at desktop, measured off the reference, stepping down to 30px
+     on a phone. Tight leading is what lets a two-line heading stay one
+     object instead of two. */
+  .section-title {
+    @apply font-display text-[30px] font-bold leading-[1.12] tracking-[-0.015em] text-ink
+           sm:text-[38px] lg:text-[48px];
+  }
+  .section-sub {
+    @apply mx-auto max-w-readable text-[16px] leading-relaxed text-muted sm:text-[18px];
+  }
+
+  /* The rounded-square icon tile that sits on top of a feature card. 56px on
+     a phone, 64px above it; the glyph inside is always 24-28px. */
+  .tile {
+    @apply inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-tile sm:h-16 sm:w-16;
+  }
+  .tile-blue {
+    @apply tile bg-blue text-white;
+  }
+  .tile-accent {
+    @apply tile bg-accent text-accentink;
+  }
+
+  /* One row of the FAQ: a separated card rather than a divided list, which is
+     how the reference draws it. */
+  .faq-item {
+    @apply overflow-hidden rounded-tile bg-surface shadow-card ring-1 ring-hairline/70;
   }
 }
 
@@ -322,10 +288,6 @@
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(17, 24, 39, 0.08), 0 20px 48px rgba(17, 24, 39, 0.10);
   }
-  :root[data-theme='dark'] .lift:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), 0 20px 48px rgba(0, 0, 0, 0.4);
-  }
-
   /* One pill in a segmented control. The selected state is drawn by a sliding
      indicator behind it, so the pill itself only colours text. */
   /* At `py-2` these were 36px, which on a phone is the difference between
@@ -764,10 +726,15 @@
     @apply display text-2xl leading-snug sm:text-[2rem];
   }
 
-  /* The label above a section title. Letterspaced caps, the oldest trick in
-     editorial design for marking a new chapter without shouting. */
-  .eyebrow {
-    @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-muted;
+  /* The old eyebrow — letterspaced grey caps — lived here and is gone. It is
+     now the coloured pill defined with the rest of the section furniture
+     further up this file. Two rules with the same name meant the later one
+     silently won, which is a bug waiting to happen; there is one now.
+
+     The caps-and-tracking version is kept under its own name for the two
+     places that still want a quiet label rather than a pill. */
+  .label-caps {
+    @apply inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-muted;
   }
 
   /* A hairline that carries the section's colour. */
@@ -843,33 +810,15 @@
 
 @layer base {
   :root {
-    /* The hero's own backdrop. It used to be `--band-warm` plus three radial
-       washes; in dark mode that token is a brown-black, and brown under an
-       orange glow is mud. Separating it lets the hero be cream on paper and
-       deep navy at night, with the same ember in the corner. */
-    /* Pale blue with a warm corner — the two brand colours meeting in the
+    /* The hero's own backdrop, kept separate from `--band-warm` so the top of
+       the page can be tuned without moving every warm section below it.
+       Pale blue with a warm corner — the two brand colours meeting in the
        background rather than sitting on it. */
     --hero-base: 252 253 255;
     --hero-glow: 254 223 190;
     --hero-deep: 223 238 252;
     /* The ink of the road: lane markings, rails, stones. */
     --road: 15 27 51;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) {
-      --hero-base: 8 22 44;
-      --hero-glow: 146 56 18;
-      --hero-deep: 23 60 118;
-      --road: 232 238 248;
-    }
-  }
-
-  :root[data-theme='dark'] {
-    --hero-base: 8 22 44;
-    --hero-glow: 146 56 18;
-    --hero-deep: 23 60 118;
-    --road: 232 238 248;
   }
 }
 
@@ -939,19 +888,28 @@
   }
 
   /* ── Display type ─────────────────────────────────────────────────────
-     Every heading on the old page was text-3xl/4xl, so the hero and the FAQ
-     carried the same weight and the eye had nowhere to land. These fluid
-     steps put real distance between them. */
+     Both of these came down a long way.
+
+     The hero used to top out at 5.2rem (83px) with -0.035em tracking and
+     0.95 leading — a poster headline. The reference's h1 is 48px and its
+     section h2 is also 48px: the hierarchy there comes from WHERE a heading
+     sits, not from how big it is, and the booking card is allowed to be the
+     loudest thing on the screen instead. That is the right order for a page
+     whose job is to take a pickup and a drop.
+
+     Montserrat is also a wider face than Cabinet Grotesk at the same size, so
+     the old negative tracking closed it up into a solid block. -0.02em is
+     enough to stop a large line looking loose without touching the fit. */
   .display-hero {
-    @apply font-display font-black tracking-[-0.035em] text-ink;
-    font-size: clamp(2.6rem, 6.3vw, 5.2rem);
-    line-height: 0.95;
+    @apply font-display font-extrabold tracking-[-0.02em] text-ink;
+    font-size: clamp(2rem, 4.2vw, 3.4rem);
+    line-height: 1.1;
     text-wrap: balance;
   }
   .display-section {
-    @apply font-display font-black tracking-[-0.028em] text-ink;
-    font-size: clamp(1.9rem, 3.5vw, 2.9rem);
-    line-height: 1.03;
+    @apply font-display font-bold tracking-[-0.015em] text-ink;
+    font-size: clamp(1.75rem, 3.2vw, 2.6rem);
+    line-height: 1.14;
     text-wrap: balance;
   }
 
@@ -1170,10 +1128,13 @@
   }
 
   /* A bar across the corner of an offer. */
+  /* Dark on orange, like every other accent surface here. White on this
+     gradient measured 2.80:1 at its light end — unreadable, on a label whose
+     whole job is to be read at a glance. */
   .ribbon {
-    @apply absolute left-0 top-5 z-10 inline-flex items-center gap-1.5 rounded-r-full py-1.5 pl-4 pr-4 text-[11px] font-black uppercase tracking-[0.16em] text-white;
-    background: linear-gradient(90deg, #ea580c, #f97316);
-    box-shadow: 0 10px 24px -10px rgba(249, 115, 22, 0.9);
+    @apply absolute left-0 top-5 z-10 inline-flex items-center gap-1.5 rounded-r-full py-1.5 pl-4 pr-4 text-[11px] font-black uppercase tracking-[0.1em] text-accentink;
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+    box-shadow: 0 10px 24px -12px rgba(249, 115, 22, 0.8);
   }
 }
 

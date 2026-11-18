@@ -239,7 +239,7 @@ function BookForm() {
         width="3xl"
         eyebrow={
           <>
-            <Sparkles className="h-3 w-3 text-brand-500" />
+            <Sparkles className="h-3.5 w-3.5" />
             {isHire ? 'Your car, our driver' : 'Outstation · Local · Round trip'}
           </>
         }
@@ -405,7 +405,10 @@ function BookForm() {
           )}
 
           <button
-            className="btn-sheen group w-full rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 py-3.5 text-[15px] font-bold text-white shadow-[0_8px_24px_rgba(249,115,22,0.35)] transition hover:shadow-[0_10px_30px_rgba(249,115,22,0.45)] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            // The site-wide primary, rather than a gradient of its own. White on
+            // that gradient was 2.80:1 at the light end — the least readable
+            // button on the site was the one that submits the booking.
+            className="btn-primary btn-sheen group w-full py-3.5 text-[15px]"
             onClick={submit}
             disabled={busy}
             type="button"
@@ -456,7 +459,12 @@ function Segmented({
     <div className="relative flex rounded-full bg-sunken p-1 ring-1 ring-hairline">
       <span
         aria-hidden
-        className="absolute inset-y-1 left-1 rounded-full bg-brand-500 shadow-[0_2px_10px_rgba(249,115,22,0.4)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+        /* Blue, not orange. White on the brand orange is 2.80:1 and the hint
+           under it was white/80, which is worse still — this control has
+           carried unreadable labels since it was built. Blue is also what the
+           hero's trip-type tabs use, and this is the same control doing the
+           same job one screen later. */
+        className="absolute inset-y-1 left-1 rounded-full bg-bandblue shadow-[0_2px_10px_rgba(11,116,190,0.35)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
           width: `calc((100% - 0.5rem) / ${options.length})`,
           transform: `translateX(${index * 100}%)`,

@@ -15,6 +15,11 @@ import type { PlatformSettings, SupportContact } from '@/lib/types';
  *
  * Every line is conditional. A number the operator has not configured leaves
  * no empty row behind.
+ *
+ * Dark, with warm headings over cool grey links — the reference's footer, and
+ * the one place a long white page needs a full stop. It is deliberately NOT
+ * themed: a footer that goes white in light mode stops being a full stop.
+ * Measured on this ground: the links are 11.8:1 and the headings 10.3:1.
  */
 export function SiteFooter() {
   const t = useSiteText();
@@ -36,75 +41,76 @@ export function SiteFooter() {
   const waDigits = (contact?.whatsapp || settings?.supportWhatsapp || '').replace(/\D/g, '');
   const whatsapp = waDigits ? (waDigits.length === 10 ? `91${waDigits}` : waDigits) : '';
 
-  const row = 'flex items-center gap-2 py-1.5 text-sm text-muted transition hover:text-brand-600';
+  const head = 'font-display text-[17px] font-bold text-[#FDBA74]';
+  const link = 'inline-block py-1.5 text-[15px] text-[#D1D5DB] transition hover:text-white';
+  const row = 'flex items-center gap-2.5 py-1.5 text-[15px] text-[#D1D5DB] transition hover:text-white';
 
   return (
-    <footer className="bg-surface">
-      <span aria-hidden className="lane-x block w-full" />
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 pb-10 pt-14 sm:grid-cols-2 lg:grid-cols-4">
+    <footer className="bg-banddeep">
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 pb-12 pt-16 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/gora-logo.png" alt={t('company.brand')} className="h-12 w-auto" />
-          <p className="mt-2 text-xs font-semibold text-brand-600">{t('company.tagline')}</p>
-          <p className="mt-3 text-sm leading-relaxed text-muted">{t('footer.blurb')}</p>
-          <p className="mt-4 text-xs leading-relaxed text-muted">{t('company.address')}</p>
+          <p className="mt-3 text-[13px] font-semibold text-[#FDBA74]">{t('company.tagline')}</p>
+          <p className="mt-4 text-[15px] leading-relaxed text-[#D1D5DB]">{t('footer.blurb')}</p>
+          <p className="mt-4 text-[13px] leading-relaxed text-[#9CA3AF]">{t('company.address')}</p>
         </div>
 
         <div>
-          <p className="eyebrow text-brandink">Book</p>
-          <ul className="mt-3 space-y-1 text-sm text-muted">
-            <li><Link href="/book/cab" className="inline-block py-1.5 hover:text-brand-600">Cab Booking</Link></li>
-            <li><Link href="/book/hire_driver" className="inline-block py-1.5 hover:text-brand-600">Hire a Driver</Link></li>
-            <li><Link href="/pool" className="inline-block py-1.5 hover:text-brand-600">Car Pool</Link></li>
+          <p className={head}>Book</p>
+          <ul className="mt-3 space-y-0.5">
+            <li><Link href="/book/cab" className={link}>Cab Booking</Link></li>
+            <li><Link href="/book/hire_driver" className={link}>Hire a Driver</Link></li>
+            <li><Link href="/pool" className={link}>Car Pool</Link></li>
           </ul>
         </div>
 
         <div>
-          <p className="eyebrow text-brandink">Company</p>
-          <ul className="mt-3 space-y-1 text-sm text-muted">
-            <li><Link href="/#about" className="inline-block py-1.5 hover:text-brand-600">About us</Link></li>
-            <li><Link href="/#cities" className="inline-block py-1.5 hover:text-brand-600">Where we run</Link></li>
-            <li><Link href="/#contact" className="inline-block py-1.5 hover:text-brand-600">Contact</Link></li>
-            <li><Link href="/support" className="inline-block py-1.5 hover:text-brand-600">Help &amp; Support</Link></li>
+          <p className={head}>Company</p>
+          <ul className="mt-3 space-y-0.5">
+            <li><Link href="/#about" className={link}>About us</Link></li>
+            <li><Link href="/#cities" className={link}>Where we run</Link></li>
+            <li><Link href="/#faq" className={link}>FAQ</Link></li>
+            <li><Link href="/support" className={link}>Help &amp; Support</Link></li>
           </ul>
         </div>
 
         <div>
-          <p className="eyebrow text-brandink">Reach us</p>
+          <p className={head}>Reach us</p>
           <div className="mt-3">
             {phone && (
               <a href={`tel:${phone}`} className={row}>
-                <Phone className="h-4 w-4 shrink-0 text-brand-500" />
+                <Phone className="h-4 w-4 shrink-0 text-[#FDBA74]" />
                 <span className="numeral">{phone}</span>
               </a>
             )}
             {whatsapp && (
               <a href={`https://wa.me/${whatsapp}`} target="_blank" rel="noreferrer" className={row}>
-                <MessageCircle className="h-4 w-4 shrink-0 text-brand-500" />
+                <MessageCircle className="h-4 w-4 shrink-0 text-[#FDBA74]" />
                 WhatsApp
               </a>
             )}
             {email && (
               <a href={`mailto:${email}`} className={row}>
-                <Mail className="h-4 w-4 shrink-0 text-brand-500" />
+                <Mail className="h-4 w-4 shrink-0 text-[#FDBA74]" />
                 <span className="break-all">{email}</span>
               </a>
             )}
           </div>
           {t('footer.appNote') && (
-            <p className="mt-3 text-sm leading-relaxed text-muted">{t('footer.appNote')}</p>
+            <p className="mt-3 text-[15px] leading-relaxed text-[#D1D5DB]">{t('footer.appNote')}</p>
           )}
           {/* The same caution the app shows above every booking feed. Empty
               means the operator took it down, so the box goes with it. */}
           {t('footer.caution') && (
-            <p className="mt-4 rounded-lg bg-dangerbg px-3 py-2 text-[11px] font-semibold leading-snug text-dangerfg">
+            <p className="mt-4 rounded-xl bg-white/[0.07] px-3.5 py-2.5 text-[12px] font-semibold leading-snug text-[#FCA5A5]">
               {t('footer.caution')}
             </p>
           )}
         </div>
       </div>
 
-      <div className="border-t border-hairline px-4 py-4 text-center text-xs leading-relaxed text-muted">
+      <div className="border-t border-white/10 px-4 py-5 text-center text-[13px] leading-relaxed text-[#9CA3AF]">
         © {new Date().getFullYear()} {t('company.legalName')}. All rights reserved.
         {t('company.gstin') && (
           <>

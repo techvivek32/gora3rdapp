@@ -229,7 +229,7 @@ function CabResults() {
               type="button"
               onClick={() => setIncMode(m)}
               className={`inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-bold transition ${
-                incMode === m ? 'bg-brand-500 text-white' : 'text-muted hover:text-ink'
+                incMode === m ? 'bg-accent text-accentink' : 'text-muted hover:text-ink'
               }`}
             >
               {m}
@@ -304,7 +304,7 @@ function CabResults() {
                             type="button"
                             onClick={() => setFuelByCat((m) => ({ ...m, [key]: f }))}
                             className={`inline-flex min-h-10 items-center gap-1 rounded-full px-3.5 py-1 text-[11px] font-bold ring-1 transition ${
-                              fuel === f ? 'bg-brand-500 text-white ring-brand-500' : 'bg-surface text-muted ring-hairline'
+                              fuel === f ? 'bg-accent text-accentink ring-accent' : 'bg-surface text-muted ring-hairline'
                             }`}
                           >
                             <Fuel className="h-3 w-3" /> {f}

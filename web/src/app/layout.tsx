@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import localFont from 'next/font/local';
+import { Montserrat, Poppins } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -8,51 +8,41 @@ import { IntroLoader } from '@/components/IntroLoader';
 import { ScrollFx } from '@/components/ScrollFx';
 
 /**
- * Headlines. Cabinet Grotesk, from Fontshare.
+ * Headlines. Montserrat.
  *
- * The serif before this one was dropped for being hard to read, and the
- * audit said why: every headline on the site sits at 36px or larger, so
- * size was never the problem — the letterforms were. A display serif's
- * whole character is its thick-to-thin, and on a screen the thin half
- * goes pale and fuzzy exactly where a headline needs to be solid.
+ * The pairing the whole page is built on, and it is a deliberate swap away
+ * from Cabinet Grotesk. Cabinet is a characterful display face — flat-cut
+ * terminals, tight apertures — and it made the page read as a design studio's
+ * site. This is a cab booking site, and the reference it is modelled on uses
+ * the plainest possible geometric sans at a heavy weight. Plain is the point:
+ * nothing about the lettering competes with the price and the Book button.
  *
- * Cabinet Grotesk keeps the weight even across the stroke, so nothing
- * fades, while the flat-cut terminals and tight apertures stop it reading
- * as yet another neutral grotesque. 900 is a real cut, which is what lets
- * the headlines go properly heavy without the browser faking it.
+ * 600/700/800 only. The headings are set at 700, with 800 reserved for the
+ * one hero line, so the browser never has to synthesise a weight.
  */
-const cabinet = localFont({
-  src: [
-    { path: './fonts/CabinetGrotesk-500.woff2', weight: '500', style: 'normal' },
-    { path: './fonts/CabinetGrotesk-700.woff2', weight: '700', style: 'normal' },
-    { path: './fonts/CabinetGrotesk-800.woff2', weight: '800', style: 'normal' },
-    { path: './fonts/CabinetGrotesk-900.woff2', weight: '900', style: 'normal' },
-  ],
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['600', '700', '800'],
   variable: '--font-display',
   display: 'swap',
-  // Back to sans metrics: the fallback is a sans, and matching it to a serif
-  // made the swap jump.
-  adjustFontFallback: 'Arial',
 });
 
 /**
- * Everything that is read. Satoshi, from Fontshare.
+ * Everything that is read. Poppins.
  *
- * Four cuts: 400, 500, 700, 900. The family has no 600 and no 800, so a
- * `font-semibold` resolves to 700 and a `font-extrabold` to 900 by the
- * normal CSS matching rules. Both are real cuts — nothing is synthesised,
- * which is the part that matters.
+ * Geometric like Montserrat, so the two do not argue, but with a taller
+ * x-height and rounder bowls that keep 14px body copy legible on a phone.
+ *
+ * `latin` only: Poppins also ships Devanagari, and pulling that subset in
+ * would more than double the download for the handful of Hindi words the
+ * site actually uses — those fall back to the system face, which is what
+ * renders them anyway on most Indian phones.
  */
-const satoshi = localFont({
-  src: [
-    { path: './fonts/Satoshi-400.woff2', weight: '400', style: 'normal' },
-    { path: './fonts/Satoshi-500.woff2', weight: '500', style: 'normal' },
-    { path: './fonts/Satoshi-700.woff2', weight: '700', style: 'normal' },
-    { path: './fonts/Satoshi-900.woff2', weight: '900', style: 'normal' },
-  ],
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
   display: 'swap',
-  adjustFontFallback: 'Arial',
 });
 
 
@@ -66,27 +56,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#F97316',
+  // The top strip of the page, which is the blue utility bar — so the phone's
+  // status bar runs into it rather than cutting across it.
+  themeColor: '#0086D6',
   width: 'device-width',
   initialScale: 1,
 };
-
-/**
- * Settles the theme before the browser paints anything.
- *
- * It has to be inline and in `<head>`: an external or deferred script runs
- * after first paint, so the visitor would see a white flash before a dark page
- * — worst at night, which is exactly when dark mode is on.
- *
- * It always writes an explicit `light` or `dark` rather than leaving the
- * attribute off for "follow the system". ThemeToggle leans on that to pick its
- * icon in CSS, which is what keeps the server and client markup identical.
- */
-const THEME_BOOTSTRAP = `(function(){try{
-var s=localStorage.getItem('gora-theme');
-var d=s==='dark'||(!s&&window.matchMedia('(prefers-color-scheme: dark)').matches);
-document.documentElement.dataset.theme=d?'dark':'light';
-}catch(e){document.documentElement.dataset.theme='light';}})();`;
 
 /**
  * Records that scripting is on, which the reveal-on-scroll styles key off.
@@ -133,12 +108,12 @@ setTimeout(done,2100);
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // `suppressHydrationWarning`: the scripts below set data-theme and
-    // data-intro on this very element before React hydrates, so the attributes
-    // it finds will not match the server's. That difference is the point.
-    <html lang="en" className={`${satoshi.variable} ${cabinet.variable}`} suppressHydrationWarning>
+    // `suppressHydrationWarning`: the scripts below set data-js and data-intro
+    // on this very element before React hydrates, so the attributes it finds
+    // will not match the server's. That difference is the point.
+    <html lang="en" className={`${poppins.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: JS_FLAG + THEME_BOOTSTRAP + INTRO_BOOTSTRAP }} />
+        <script dangerouslySetInnerHTML={{ __html: JS_FLAG + INTRO_BOOTSTRAP }} />
       </head>
       <body className="min-h-screen font-sans">
         <Providers>

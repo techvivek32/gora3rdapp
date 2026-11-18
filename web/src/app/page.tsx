@@ -5,16 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Armchair, ArrowRight, Building2, Car, CarTaxiFront, CheckCircle2, Clock,
-  Headphones, Luggage, Mail, MapPin, MessageCircle, Phone, Route, ShieldCheck,
-  Smartphone, Snowflake, Tag, Users, Wallet,
+  ArrowRight, Building2, Car, CarTaxiFront, CheckCircle2, Clock, FileCheck2,
+  Headphones, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck,
+  Smartphone, Star, ThumbsUp, Users, Wallet,
 } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { PlaceInput } from '@/components/PlaceInput';
-import { AppMock } from '@/components/AppMock';
-import { HeroDecor } from '@/components/HeroDecor';
-import { CarSide } from '@/components/CarSide';
-import { TaxiHero } from '@/components/TaxiHero';
 import { Poster } from '@/components/Poster';
 import { tripDraft } from '@/lib/trip-draft';
 import { rupees, toDateInput } from '@/lib/format';
@@ -43,7 +39,6 @@ const SERVICES = [
     title: 'Cab Booking',
     blurb: 'One Way · Round Trip · Local',
     desc: 'Outstation and in-city cabs. The full fare, broken down, before you confirm.',
-    tone: 'text-cabsolid',
   },
   {
     href: '/book/hire_driver',
@@ -51,7 +46,6 @@ const SERVICES = [
     title: 'Hire a Driver',
     blurb: 'Hourly · Full day',
     desc: 'You have the car, we send a verified driver. Priced by the day, not the kilometre.',
-    tone: 'text-drivesolid',
   },
   {
     href: '/pool',
@@ -59,8 +53,33 @@ const SERVICES = [
     title: 'Car Pool',
     blurb: 'Share & save',
     desc: 'Book a seat on a trip someone is already making. Cheaper, and one less car out.',
-    tone: 'text-poolsolid',
   },
+];
+
+/** The four steps, the way the reference lays its own process out. */
+const STEPS = [
+  { icon: Search, title: 'Tell us the trip', body: 'Pickup, drop, date and time. No account needed to get a price.' },
+  { icon: FileCheck2, title: 'Pick your cab', body: 'Compare classes and fare modes side by side, with the whole breakdown shown.' },
+  { icon: CarTaxiFront, title: 'Driver assigned', body: 'We send the driver’s name, vehicle and number before your pickup.' },
+  { icon: ThumbsUp, title: 'Travel and pay', body: 'Pay nothing up front if you like, and settle with the driver at the end.' },
+];
+
+/**
+ * Why book here, numbered.
+ *
+ * Every line is a claim this product can actually keep — the fare modes, the
+ * ₹0 advance, the verified driver, the app handover are all real behaviour
+ * described elsewhere in this repo. Nothing aspirational, because a promise
+ * on a landing page that the booking flow then breaks is worse than no
+ * promise at all.
+ */
+const REASONS: [string, string][] = [
+  ['Fixed, gate-to-gate fare', 'The number you see is the number for the whole route — not a per-kilometre estimate that moves once you are in the car.'],
+  ['You see the breakdown', 'Toll, state tax, driver allowance and GST are itemised before you confirm, on both fare modes.'],
+  ['Book with ₹0 advance', 'Reserve the cab without paying anything, or pay 10% or 100% online if you would rather lock it in.'],
+  ['A verified driver, named', 'Licence and vehicle checked first, and their name, car and number shared with you ahead of pickup.'],
+  ['Free cancellation', 'Change your mind any time before pickup and it costs you nothing.'],
+  ['The app picks it up', 'Book on the website and the trip is already in the Gora Taxi app under the same number.'],
 ];
 
 /** Answered from how the product actually works — nothing aspirational. */
@@ -145,20 +164,8 @@ export default function HomePage() {
     .sort((a, b) => Number(!!b.imageUrl) - Number(!!a.imageUrl)
       || Number(!!b.isFeatured) - Number(!!a.isFeatured))
     .filter((c) => c.imageUrl || c.isFeatured)
-    .slice(0, 6);
+    .slice(0, 8);
   const states = new Set(cities.map((c) => c.state).filter(Boolean)).size;
-
-  /**
-   * The next chapter number.
-   *
-   * Half these sections only exist when the operator has filled them in, so
-   * a hand-written "06" on Explore becomes a lie the moment someone clears
-   * their city list. JSX children evaluate in source order and `&&`
-   * short-circuits before the element is built, so a section that does not
-   * render never takes a number.
-   */
-  let chapter = 0;
-  const step = () => String(++chapter).padStart(2, '0');
 
   const phone = (contact?.phone || settings?.supportPhone || '').trim();
   const phone2 = (settings?.supportPhone2 || '').trim();
@@ -169,252 +176,178 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ── Hero ────────────────────────────────────────────────── */}
-      {/*
-       * Light, and built on the product.
+      {/* ── Hero ──────────────────────────────────────────────────────────
        *
-       * Two things were wrong with the dark photographic version. The
-       * photograph is the operator's upload and the one in the database is a
-       * red sports car at night in a field — nothing a frame can fix. And a
-       * near-black masthead meant the first screen was the heaviest thing on
-       * the page, which is backwards: the heaviest thing should be the
-       * headline.
+       * Centred, with the booking card as the centre of gravity.
        *
-       * So the band is bone, the headline is the largest type on the site,
-       * and the right-hand column is a drawing of the app. That cannot be
-       * uploaded badly, and it shows what is actually being sold.
+       * This replaced a left-aligned poster hero: an 83px headline on the
+       * left, an illustrated cab on the right, and the booking form tucked
+       * underneath the paragraph. It looked good and it buried the one thing
+       * the page exists to do. The reference puts pickup and drop in the
+       * middle of the first screen and lets the headline be a caption, and
+       * that is the right order of importance for a cab site.
+       *
+       * The band behind it is a barely-there wash — warm at one corner, cool
+       * at the other — rather than a picture, because the picture here is the
+       * operator's upload and there is no frame that fixes a bad one.
        */}
-      <section className="hero-band relative isolate overflow-hidden">
-        <div aria-hidden className="noise pointer-events-none absolute inset-0" />
-        {/* Blue, as shapes. A wash of it measured at 4% colourfulness and
-            vanished; an outline reads as the colour it is drawn in. */}
-        <HeroDecor />
-        {/* The ember, behind the device, so the column has a centre of
-            gravity without a box drawn round it. */}
+      <section className="relative isolate overflow-hidden bg-bandcool">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              'radial-gradient(38% 46% at 76% 38%, rgba(249,115,22,0.26) 0%, transparent 70%),' +
-              'radial-gradient(34% 40% at 12% 8%, rgba(249,115,22,0.10) 0%, transparent 70%)',
+              'radial-gradient(46% 50% at 8% 0%, rgba(249,115,22,0.10) 0%, transparent 64%),'
+              + 'radial-gradient(52% 56% at 96% 8%, rgba(0,134,214,0.12) 0%, transparent 64%)',
           }}
         />
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-x-10 gap-y-12 px-4 pb-16 pt-12 lg:grid-cols-[1.08fr_0.92fr] lg:pb-20 lg:pt-16">
-          <div>
-            <span className="inline-flex items-center gap-2.5 rounded-full bg-surface px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-ink shadow-card ring-1 ring-hairline">
-              <span className="h-1.5 w-1.5 rounded-full bg-blue" />
-              Fast <span className="text-muted">/</span> Safe <span className="text-muted">/</span> Affordable
-            </span>
-
-            <h1 className="display-hero mt-6">
-              Book Your Ride
-              <br />
-              <span className="text-brand-600">Anywhere, Anytime</span>
+        <div className="relative mx-auto max-w-5xl px-4 pb-16 pt-12 sm:pt-16 lg:pb-20">
+          <div className="text-center">
+            <h1 className="display-hero">
+              Book a Cab Anywhere in India
             </h1>
-
-            <p className="mt-6 max-w-lg text-[17px] leading-relaxed text-muted">
-              Outstation cabs, local packages and a driver for your own car — across India. See the
-              whole fare before you confirm, and pay the driver directly.
+            <p className="mx-auto mt-3 max-w-2xl text-[17px] font-medium text-muted sm:text-[19px]">
+              Outstation, local and a driver for your own car — {t('company.tagline')}
             </p>
-
-            <QuickBook />
-
-            <ul className="mt-7 grid max-w-xl gap-x-5 gap-y-3 sm:grid-cols-3">
-              {['Instant booking', 'Verified drivers', 'No hidden charges'].map((label) => (
-                <li key={label} className="flex items-center gap-2.5 border-l-2 border-blue/70 pl-3">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-blueink" />
-                  {/* 11px, not 12: at 12 the longest of the three needed two
-                      lines inside its column and the row came out ragged. */}
-                  <span className="text-[11px] font-bold uppercase tracking-[0.06em] text-ink">{label}</span>
-                </li>
-              ))}
-            </ul>
           </div>
 
-          {/*
-           * The operator's photograph is the stage the device stands on.
-           *
-           * It was briefly moved off this band altogether, which was wrong
-           * twice over: the admin field is called "website hero image", so
-           * that is where an operator expects to see it; and the reason for
-           * moving it — that the picture in the database is a dark night
-           * shot — is solved better by putting something in front of it.
-           * Behind the phone, held back and scrimmed, a weak photograph adds
-           * depth and a good one adds a lot. An operator with no upload gets
-           * the drawn panel and the composition is unchanged.
-           */}
-          {/*
-           * A cab. The page had become handsome enough to be selling
-           * anything — the right-hand column was a phone, which is what
-           * every product site puts there.
-           *
-           * The operator's own photograph if there is one, and the drawn
-           * Gora taxi if not: orange, chequer band, roof sign, name on the
-           * door. Over it sits the thing you actually choose when you book,
-           * which is a cab class.
-           */}
-          <div className="relative hidden lg:block">
-            <div className="relative overflow-hidden rounded-[2rem] shadow-card ring-1 ring-ink/10">
-              {data?.heroImage ? (
-                <Poster
-                  src={data.heroImage}
-                  alt=""
-                  seed="gora taxi hero"
-                  hue={22}
-                  className="h-[26rem] w-full"
-                >
-                  <div aria-hidden className="scrim-b absolute inset-x-0 bottom-0 h-2/3" />
-                </Poster>
-              ) : (
-                <TaxiHero className="block h-[26rem] w-full" />
-              )}
-
-              {/* The cab class, drawn, on the floor of the picture. */}
-              <div className="absolute inset-x-5 bottom-5 flex items-center gap-4 rounded-2xl bg-midnight/85 px-4 py-3.5 backdrop-blur">
-                <CarSide className="h-9 w-20 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-extrabold text-white">
-                    {fleet[0]?.name ?? 'Sedan'}
-                    {fleet[0]?.seats ? (
-                      <span className="ml-2 text-xs font-semibold text-white/60">
-                        {fleet[0].seats} seats
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] text-white/70">
-                    Verified driver, assigned before you travel
-                  </span>
-                </span>
-                <CarTaxiFront className="h-5 w-5 shrink-0 text-brand-400" />
-              </div>
-            </div>
-
-            {/* The two moments that matter, beside the picture. */}
-            <div className="absolute -left-6 top-10 hidden w-44 rounded-2xl bg-surface px-3.5 py-3 shadow-card ring-1 ring-hairline xl:block">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brandink">
-                Driver assigned
-              </p>
-              <p className="mt-1 text-[11px] font-bold leading-snug text-ink">
-                Name, car and number before pickup
-              </p>
-            </div>
-          </div>
+          <QuickBook />
         </div>
 
         {/* The counters. Every one of them is read off the operator's own
             data — the city list, the states in it, the services the site
             actually offers — so none of it is a number somebody decided a
             landing page ought to show. */}
-        {/* The counters sit on the blue, not on near-black: this is the
-            one band that has to say "blue and orange" at a glance. */}
-        <div className="relative border-t border-hairline bg-bandblue">
+        <div className="relative border-t border-blue/15 bg-bandblue">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px px-4 lg:grid-cols-4">
             {[
               { figure: String(cities.length || '—'), label: 'Cities on the network' },
               { figure: String(states || '—'), label: 'States covered' },
-              { figure: '4', label: 'Ways to travel' },
+              { figure: '3', label: 'Ways to travel' },
               { figure: '24×7', label: 'Someone on the phone' },
             ].map(({ figure, label }, i) => (
               <div key={label} className="relative py-7 pl-4 pr-3 first:pl-0">
                 {i > 0 && (
                   <span
                     aria-hidden
-                    className="lane-y absolute inset-y-6 left-0 hidden lg:block"
-                    style={{ ['--lane' as string]: 'rgba(255,255,255,0.3)' }}
+                    className="absolute inset-y-6 left-0 hidden w-px bg-white/25 lg:block"
                   />
                 )}
-                <p className="font-display text-4xl font-black leading-none tracking-[-0.04em] text-white sm:text-5xl">
+                <p className="font-display text-[32px] font-extrabold leading-none text-white sm:text-[40px]">
                   {figure}
                 </p>
-                <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-white/85">
-                  {label}
-                </p>
+                <p className="mt-2 text-[13px] font-semibold text-white">{label}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* The one mark only a taxi company gets to use. */}
+      {/* The one mark only a taxi company gets to use. The reference has no
+          equivalent — it has no reason to, it is not called OneWay Taxi — and
+          this is the single place the page is allowed to be a cab company
+          rather than a clone of it. One strip, closing the blue band. */}
       <div aria-hidden className="chequer" />
 
-      {/* ── The promise strip ─────────────────────────────────── */}
-      {/* Four claims on their own line under the counters. They were a
-          floating white panel of rounded icon tiles — the same shape as
-          every card row underneath, which is how a page starts to read as a
-          template. */}
-      <div className="border-b border-hairline bg-surface">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-6 px-4 py-7 lg:grid-cols-4">
-          {[
-            { icon: ShieldCheck, head: 'Safe & secure', sub: 'Licence and vehicle checked first' },
-            { icon: Clock, head: 'On-time pickup', sub: 'Assigned ahead of your trip' },
-            { icon: Wallet, head: 'Affordable fare', sub: 'Broken down before you commit' },
-            { icon: Headphones, head: '24×7 support', sub: 'A person answers, not a form' },
-          ].map(({ icon: Icon, head, sub }) => (
-            <div key={head} className="flex items-start gap-3">
-              <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brandink" />
-              <span className="min-w-0">
-                <p className="text-sm font-extrabold text-ink">{head}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted">{sub}</p>
-              </span>
-            </div>
-          ))}
+      {/* ── Why travel with us ────────────────────────────────────────────
+          Four cards with a rounded icon tile on top, alternating blue and
+          orange. Straight out of the reference, and the one place on the page
+          where the two brand colours sit side by side. */}
+      <section className="bg-surface">
+        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { icon: Wallet, title: 'Pay for one way', body: 'Travelling one way? Pay for one way. No return fare on a journey you are not making.' },
+              { icon: Clock, title: 'On-time pickup', body: 'The driver is assigned ahead of your trip, not scrambled for at the last minute.' },
+              { icon: ShieldCheck, title: 'Verified drivers', body: 'Licence and vehicle checked before anyone is allowed to take a booking.' },
+              { icon: Headphones, title: '24×7 support', body: 'A person answers the phone — a number in the header, not a contact form.' },
+            ].map(({ icon: Icon, title, body }, i) => (
+              <div
+                key={title}
+                data-reveal
+                style={{ ['--d' as string]: `${i * 70}ms` }}
+                className="card lift p-6 text-center"
+              >
+                <span className={`${i % 2 === 0 ? 'tile-blue' : 'tile-accent'} mx-auto`}>
+                  <Icon className="h-7 w-7" />
+                </span>
+                <h3 className="mt-5 font-display text-[19px] font-bold text-ink">{title}</h3>
+                <p className="mt-2.5 text-[15px] leading-relaxed text-muted">{body}</p>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── Services ─────────────────────────────────────────────────────── */}
-      {/* Three editorial rows, not three cards. Each row carries its service's
-          colour in the rule that sweeps across it on hover, so the whole line
-          answers rather than a button inside it. The cards this replaced were
-          identical but for the colour of one icon — and it was the same icon
-          three times. */}
-      <section className="border-b border-hairline bg-canvas">
+      {/* ── How it works ──────────────────────────────────────────────── */}
+      <section className="bg-bandmint">
         <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
           <SectionHead
-            n={step()}
-            eyebrow="What we do"
+            pill="Simple Process"
+            tone="accent"
+            title="How Gora Taxi Works"
+            lead="Four steps from a pickup point to a driver on their way."
+          />
+
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map(({ icon: Icon, title, body }, i) => (
+              <div
+                key={title}
+                data-reveal
+                style={{ ['--d' as string]: `${i * 70}ms` }}
+                className="card lift relative p-6"
+              >
+                {/* The step number, ringed, in the corner the reference puts
+                    it: top-right, out of the way of the icon and the title. */}
+                <span className="absolute right-5 top-5 grid h-8 w-8 place-items-center rounded-full bg-bluesoft text-[13px] font-bold tabular-nums text-blueink ring-1 ring-blueline">
+                  {i + 1}
+                </span>
+                <span className="tile-blue">
+                  <Icon className="h-7 w-7" />
+                </span>
+                <h3 className="mt-5 font-display text-[18px] font-bold text-ink">{title}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-muted">{body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* The one-line promise, in a tinted strip. */}
+          <div className="mx-auto mt-10 max-w-readable rounded-tile bg-bluesoft px-6 py-5 text-center ring-1 ring-blueline">
+            <p className="text-[15px] text-ink/75">Pay only for the distance you travel. No return charges.</p>
+            <p className="mt-1 font-display text-[17px] font-bold text-blueink">One way fare, not one and a half ✓</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── The three services ────────────────────────────────────────── */}
+      <section className="bg-surface">
+        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+          <SectionHead
+            pill="What we do"
+            tone="blue"
             title="Three ways to travel"
             lead="Pick the one that matches the trip. Every one of them prices the whole journey before you commit to it."
           />
 
-          <div className="mt-12">
-            {SERVICES.map((s, i) => (
+          <div className="mt-12 grid gap-5 lg:grid-cols-3">
+            {SERVICES.map(({ href, icon: Icon, title, blurb, desc }, i) => (
               <Link
-                key={s.href}
-                href={s.href}
+                key={href}
+                href={href}
                 data-reveal
-                className={`roadrow group ${s.tone} last:border-b last:border-hairline`}
+                style={{ ['--d' as string]: `${i * 80}ms` }}
+                className="card lift group flex flex-col p-7"
               >
-                <span className="flex items-center gap-3 sm:block">
-                  <span className="ghost-num text-[2.5rem] sm:text-[3rem]">{`0${i + 1}`}</span>
-                  {/* Filled, not outlined. The reference's icons are solid
-                      squares of colour and that is most of what makes its
-                      page read as blue; a 1px ring of the same hue reads as
-                      grey from two feet away. */}
-                  <span
-                    className={`grid h-11 w-11 place-items-center rounded-xl text-white shadow-sm sm:mt-3 ${
-                      ['bg-cabsolid', 'bg-drivesolid', 'bg-poolsolid'][i]
-                    }`}
-                  >
-                    <s.icon className="h-5 w-5" />
-                  </span>
+                <span className={i === 1 ? 'tile-accent' : 'tile-blue'}>
+                  <Icon className="h-7 w-7" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block font-display text-2xl font-black tracking-[-0.02em] text-ink sm:text-[2rem]">
-                    {s.title}
-                  </span>
-                  <span className="mt-1.5 block text-[11px] font-bold uppercase tracking-[0.18em]">
-                    {s.blurb}
-                  </span>
-                  <span className="mt-3 block max-w-xl text-[15px] leading-relaxed text-muted">{s.desc}</span>
-                </span>
-                <span className="inline-flex items-center gap-2 self-center whitespace-nowrap text-sm font-bold">
+                <h3 className="mt-5 font-display text-[21px] font-bold text-ink">{title}</h3>
+                <p className="mt-1 text-[14px] font-semibold text-blueink">{blurb}</p>
+                <p className="mt-3 flex-1 text-[15px] leading-relaxed text-muted">{desc}</p>
+                <span className="mt-5 inline-flex items-center gap-1.5 text-[15px] font-bold text-ink">
                   Book now
-                  <span className="grid h-10 w-10 place-items-center rounded-full ring-1 ring-current transition-transform duration-300 group-hover:translate-x-1">
-                    <ArrowRight className="h-4 w-4" />
-                  </span>
+                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </span>
               </Link>
             ))}
@@ -422,847 +355,347 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Travel categories ────────────────────────────────────────────── */}
-      {/* The operator's own photographs, from a row the admin panel has
-          always carried and the website never showed. Nothing here is
-          stock. */}
+      {/* ── Travel categories (operator's own) ────────────────────────── */}
       {travel.length > 0 && (
-        <section className="border-b border-hairline bg-surface">
+        <section className="bg-bandwarm">
           <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
             <SectionHead
-              n={step()}
-              eyebrow="Where are you going"
-              title="Airport, hotel, temple — or anywhere else"
-              lead="The trips we are asked for most. Every one of them is the same booking: tell us the route, read the fare, confirm."
+              pill="Where are you going"
+              tone="accent"
+              title="Travel made better"
+              lead="The trips people book most often, straight from our own network."
             />
-
-            <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${travel.length >= 3 ? 'lg:grid-cols-3' : ''}`}>
+            <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${gridCols(travel.length)}`}>
               {travel.map((item, i) => (
-                <Link
-                  key={item._id ?? i}
-                  href="/book/cab"
+                <ShowcaseCard key={item._id ?? `${item.title}-${i}`} item={item} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Fleet ─────────────────────────────────────────────────────── */}
+      {fleet.length > 0 && (
+        <section className="bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+            <SectionHead
+              pill="Our fleet"
+              tone="blue"
+              title="The cabs we actually run"
+              lead="Real classes and real per-kilometre rates, kept in the admin panel — not stock photographs of cars we do not have."
+            />
+            <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${fleetCols(fleet.length)}`}>
+              {fleet.map((c, i) => (
+                <div
+                  key={c._id ?? c.name}
                   data-reveal
-                  className="photo-in group relative block overflow-hidden rounded-2xl ring-1 ring-hairline transition duration-300 hover:-translate-y-1 hover:shadow-card"
+                  style={{ ['--d' as string]: `${i * 70}ms` }}
+                  className="card lift overflow-hidden"
                 >
                   <Poster
-                    src={item.imageUrl}
-                    alt={item.title ?? ''}
-                    seed={item.title ?? String(i)}
-                    className="h-72 w-full"
-                  >
-                    <div aria-hidden className="scrim-soft absolute inset-0" />
-                    {/* Inside the panel, not laid over it as a sibling: a
-                        caption positioned beside the picture is not a
-                        descendant of it, so nothing walking the tree can
-                        tell what is behind the words. */}
-                    <div className="absolute inset-x-5 bottom-5">
-                      <p className="font-display text-2xl font-black tracking-[-0.02em] text-white drop-shadow">
-                        {item.title}
+                    src={c.imageUrl}
+                    alt={c.name ?? ''}
+                    seed={c.name ?? 'cab'}
+                    className="h-44 w-full"
+                  />
+                  <div className="p-5">
+                    <h3 className="font-display text-[19px] font-bold text-ink">{c.name}</h3>
+                    <p className="mt-1 text-[14px] text-muted">
+                      {c.seats ? `${c.seats} seats` : 'Sedan'}
+                      {c.acType ? ` · ${c.acType}` : ''}
+                    </p>
+                    {typeof c.perKmRate === 'number' && c.perKmRate > 0 && (
+                      <p className="mt-3 text-[15px] font-bold text-blueink">
+                        from <span className="numeral">{rupees(c.perKmRate)}</span>/km
                       </p>
-                      {item.subtitle && (
-                        <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-white/85">
-                          {item.subtitle}
-                        </p>
-                      )}
-                      <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-brand-300">
-                        Book a cab
-                        <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
-                      </span>
-                    </div>
-                  </Poster>
-                </Link>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ── Fleet ────────────────────────────────────────────────────────── */}
-      {fleet.length > 0 && (
-        <section className="border-b border-hairline bg-surface">
+      {/* ── Why book with us ──────────────────────────────────────────── */}
+      <section id="about" className="scroll-mt-24 bg-bandmint">
+        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+          <SectionHead
+            pill="Why Choose Us"
+            tone="accent"
+            title="Why book your cab with Gora Taxi?"
+            lead="Six things this product actually does, each one of them something you can hold us to."
+          />
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {REASONS.map(([title, body], i) => (
+              <div
+                key={title}
+                data-reveal
+                style={{ ['--d' as string]: `${(i % 3) * 70}ms` }}
+                className="card lift flex gap-4 p-6"
+              >
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-bandblue font-display text-[15px] font-bold tabular-nums text-white">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <span className="min-w-0">
+                  <h3 className="font-display text-[17px] font-bold leading-snug text-ink">{title}</h3>
+                  <p className="mt-2 text-[15px] leading-relaxed text-muted">{body}</p>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Cities ────────────────────────────────────────────────────── */}
+      {cities.length > 0 && (
+        <section id="cities" className="scroll-mt-24 bg-surface">
           <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
             <SectionHead
-              n={step()}
-              eyebrow="Our fleet"
-              title="Travel the way you like"
-              lead="Every class below is one we actually run, with the rate it is billed at."
+              pill="Pan-India coverage"
+              tone="blue"
+              title="Service areas across India"
+              lead={`Outstation and local cabs in ${cities.length} ${cities.length === 1 ? 'city' : 'cities'}${states ? ` across ${states} states` : ''}.`}
             />
 
-            {/*
-             * A lit stage, not a thumbnail.
-             *
-             * These photographs are cut-outs on OPAQUE white, which is why
-             * they cannot simply be dropped on a dark card. Flush to the
-             * card's edge the white read as a mistake; inset, rounded and
-             * standing in a pool of brand light with a contact shadow under
-             * the wheels, the same file reads as a car on a stand — which
-             * is what a fleet page is supposed to look like.
-             */}
-            <div className={`mt-12 grid gap-6 sm:grid-cols-2 ${fleetCols(fleet.length)}`}>
-              {fleet.map((c, i) => (
-                <Link
-                  key={c._id ?? i}
-                  href="/book/cab"
-                  data-reveal
-                  className="group relative overflow-hidden rounded-3xl bg-banddeep p-4 ring-1 ring-hairline transition duration-300 hover:-translate-y-1 hover:shadow-card hover:ring-brand-400/60"
-                >
-                  <div className="studio relative grid h-40 place-items-center overflow-hidden rounded-2xl sm:h-44">
-                    {c.imageUrl ? (
-                      /* Declared as a stage so the theme sweep knows this
-                         white is deliberate and not an unthemed surface. */
-                      <div
-                        data-photo-stage
-                        className="absolute inset-0 m-3 grid place-items-center overflow-hidden rounded-xl bg-white"
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={c.imageUrl}
-                          alt={c.name ?? ''}
-                          className="h-28 w-full object-contain transition-transform duration-700 group-hover:scale-[1.07] sm:h-32"
-                        />
-                      </div>
-                    ) : (
-                      <Users className="h-9 w-9 text-white/40" />
-                    )}
-                    {/* 70%, not 55%: the pill sits on a photograph nobody
-                        here chose, so it has to be its own surface rather
-                        than a tint of whatever is behind it. Under 60% a
-                        contrast reading of this label is a reading of the
-                        car. */}
-                    <span className="absolute left-5 top-5 z-10 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white backdrop-blur">
-                      {c.vehicleClass}
-                    </span>
-                  </div>
-
-                  <div className="flex items-end justify-between gap-4 px-2 pb-1 pt-5">
-                    <div className="min-w-0">
-                      <p className="font-display text-xl font-black tracking-[-0.02em] text-white">
-                        {c.name}
-                      </p>
-                      {/* What you actually get in the car. Only what the
-                          operator has filled in — a row of empty icons says
-                          less than no row at all. */}
-                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-white/60">
-                        {c.seats ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Armchair className="h-3.5 w-3.5" />
-                            {c.seats} seats
-                          </span>
-                        ) : null}
-                        {c.bags ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Luggage className="h-3.5 w-3.5" />
-                            {c.bags}
-                          </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1.5">
-                          <Snowflake className="h-3.5 w-3.5" />
-                          AC
-                        </span>
-                      </div>
-                    </div>
-                    {c.pricePerKm ? (
-                      <p className="shrink-0 text-right font-display text-3xl font-black leading-none tracking-[-0.03em] text-white">
-                        {rupees(c.pricePerKm)}
-                        <span className="ml-1 text-xs font-bold text-white/60">/km</span>
-                      </p>
-                    ) : null}
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── About ────────────────────────────────────────────────────────── */}
-      {/* `scroll-mt-20` on every anchored section: the header is sticky and
-          64px tall, so an un-offset jump lands with the heading underneath
-          it. */}
-      <section id="about" className="scroll-mt-20 border-b border-hairline bg-bandwarm">
-        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
-          <SectionHead n={step()} eyebrow="About us" title="A travel network, not one more fleet" />
-
-          <div className="mt-12 grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-            <div data-reveal>
-              <p className="text-[15px] leading-relaxed text-muted">
-                {t('company.brand')} is run by {t('company.legalName')} from {t('company.city')}. We do not keep a
-                yard full of cars. We put local travel operators, vendors and owner-drivers from across
-                India on one network, and hand each booking to the one who can actually run it.
-              </p>
-              <p className="mt-4 text-[15px] leading-relaxed text-muted">
-                That is why a trip out of a small town is priced the same way as one out of a metro. The
-                operator sets the rate per kilometre, the site adds the tolls, state tax and GST that
-                apply to your route, and you see the whole of it before you confirm. Nothing is added on
-                the way.
-              </p>
-
-              {/* The registered details, set as a record rather than a card:
-                  labels in the margin, values on hairlines. */}
-              <dl className="mt-9 border-t border-hairline">
-                <div className="grid gap-1 border-b border-hairline py-4 sm:grid-cols-[10rem_1fr] sm:gap-6">
-                  <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                    Registered name
-                  </dt>
-                  <dd className="text-sm font-bold leading-snug text-ink">{t('company.legalName')}</dd>
-                </div>
-                {/* An operator who clears the GSTIN means it, so the label goes
-                    with the number rather than sitting over an empty line. */}
-                {t('company.gstin') && (
-                  <div className="grid gap-1 border-b border-hairline py-4 sm:grid-cols-[10rem_1fr] sm:gap-6">
-                    <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">GSTIN</dt>
-                    <dd className="numeral text-sm font-bold text-ink">{t('company.gstin')}</dd>
-                  </div>
-                )}
-                <div className="grid gap-1 border-b border-hairline py-4 sm:grid-cols-[10rem_1fr] sm:gap-6">
-                  <dt className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-                    Registered office
-                  </dt>
-                  <dd className="text-sm leading-relaxed text-muted">{t('company.address')}</dd>
-                </div>
-              </dl>
-            </div>
-
-            {/* A ladder, not three more cards: a big outlined numeral, a rule
-                and the claim. */}
-            <ol className="border-t border-hairline">
-              {[
-                {
-                  icon: Users,
-                  head: 'Partners in each city',
-                  body:
-                    'Local operators and owner-drivers run the trips. You deal with one booking; they deal with the car, the paperwork and the road.',
-                },
-                {
-                  icon: Route,
-                  head: 'Four ways to travel',
-                  body:
-                    'Outstation one way and round trip, local hourly packages, a driver for the car you already own, and a seat in a ride someone else is making.',
-                },
-                {
-                  icon: Wallet,
-                  head: 'Money stays simple',
-                  body:
-                    'Pay the driver at the end, or part of it online if you would rather. Either way the breakup is itemised, with toll, state tax and GST shown on their own lines.',
-                },
-              ].map(({ icon: Icon, head, body }, i) => (
-                <li
-                  key={head}
-                  data-reveal
-                  className="grid grid-cols-[3rem_1fr] gap-4 border-b border-hairline py-6 sm:gap-6"
-                >
-                  <span className="ghost-num pt-0.5 text-[2.25rem]">{`0${i + 1}`}</span>
-                  <span>
-                    <span className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 shrink-0 text-brandink" />
-                      <h3 className="font-display text-lg font-black tracking-[-0.015em] text-ink">{head}</h3>
-                    </span>
-                    <p className="mt-2 text-sm leading-relaxed text-muted">{body}</p>
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Why Gora ─────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-banddeep">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(60% 95% at 88% 0%, rgba(249,115,22,0.30) 0%, transparent 62%),' +
-              'radial-gradient(50% 70% at 10% 100%, rgba(255,255,255,0.07) 0%, transparent 60%)',
-          }}
-        />
-        <div aria-hidden className="noise pointer-events-none absolute inset-0" />
-        {/*
-         * Split, and pinned, rather than a centred paragraph over four equal
-         * tiles. The argument stays on screen while the four answers to it
-         * scroll past, which is the whole point of making the argument.
-         */}
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 py-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
-          <div data-reveal className="lg:sticky lg:top-24 lg:self-start">
-            <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-brand-300 ring-1 ring-white/20">
-              Why choose Gora Taxi?
-            </span>
-            <h2 className="display-section mt-5 text-white">Your trusted travel partner</h2>
-            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-white/75">
-              Most of what goes wrong with a long-distance cab happens before the trip: a fare that
-              grows on the way, a driver nobody can reach, a booking nobody can see. So the fare is
-              shown in full and broken down before you confirm, the driver&apos;s details reach you
-              ahead of pickup, and the same trip waits in the app under your mobile number.
-            </p>
-            <Link
-              href="/book/cab"
-              className="btn-sheen group mt-8 inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand-500 px-7 py-3.5 text-[15px] font-bold text-white shadow-glow transition hover:bg-brand-600"
-            >
-              Book a cab
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-            </Link>
-          </div>
-
-          <ul className="lg:pt-2">
-            {[
-              {
-                icon: Tag,
-                head: 'Transparent pricing',
-                sub: 'Toll, state tax, driver allowance and GST — itemised before you confirm, and the number does not move afterwards.',
-              },
-              {
-                icon: ShieldCheck,
-                head: 'Verified drivers',
-                sub: 'Licence and vehicle checked before any work is assigned, and their details reach you ahead of pickup.',
-              },
-              {
-                icon: Wallet,
-                head: 'Pay the driver',
-                sub: 'Book with ₹0 advance if you would rather not pay online. Pay 10% or all of it if you would.',
-              },
-              {
-                icon: Clock,
-                head: 'Free cancellation',
-                sub: 'Any time before pickup, at no charge. Plans change; that is not something to be fined for.',
-              },
-            ].map(({ icon: Icon, head, sub }, i) => (
-              <li
-                key={head}
-                data-reveal
-                className="grid grid-cols-[2.75rem_1fr] gap-4 border-t border-white/15 py-6 last:border-b sm:grid-cols-[3.5rem_1fr] sm:gap-6"
-              >
-                <span
-                  className="ghost-num pt-1 text-[2rem] sm:text-[2.5rem]"
-                  style={{ WebkitTextStroke: '1.5px rgba(255,255,255,0.35)' }}
-                >
-                  {`0${i + 1}`}
-                </span>
-                <span>
-                  <span className="flex items-center gap-2.5">
-                    <Icon className="h-4 w-4 shrink-0 text-brand-400" />
-                    <h3 className="font-display text-lg font-black tracking-[-0.015em] text-white">{head}</h3>
-                  </span>
-                  <p className="mt-2 text-sm leading-relaxed text-white/70">{sub}</p>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── How it works ─────────────────────────────────────────────────── */}
-      {/* Literally a road: the four steps are stops on a lane, with the pins
-          sitting on it. Before, they were four coloured squares in a row with
-          a number in each — the same furniture as every other section. */}
-      <section className="dotgrid border-y border-hairline bg-canvas">
-        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
-          <SectionHead n={step()} eyebrow="Four steps" title="How it works" />
-
-          <ol className="relative mt-14 grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
-            {/*
-             * One road across the four stops, with a car on it.
-             *
-             * The geometry is exact rather than guessed. In a four-column
-             * grid with a 1.5rem gap each column is (100% - 4.5rem)/4 wide,
-             * so the nth pin's centre is at n·(100% + 1.5rem)/4 + 1.375rem.
-             * The first is 1.375rem from the left edge and the last is
-             * 25% - 2.5rem from the right. A percentage guessed by eye ran
-             * the road out past the final pin.
-             */}
-            {/*
-             * The car travels inside a clipping window.
-             *
-             * `.hero-runner` spans the whole track on purpose — that is what
-             * makes the `translateX(calc(100% - 64px))` in `hero-run` measure
-             * the ROAD rather than the car. The cost is that the travelling
-             * box itself ends up a track-width to the right of where it
-             * started, and on an open page that is two pixels of horizontal
-             * scroll at 1024px. In its original home the track sat inside a
-             * card that clipped it; here it needs its own window.
-             */}
-            <span
-              aria-hidden
-              className="absolute hidden overflow-hidden lg:flex lg:items-end"
-              style={{
-                left: '2.75rem',
-                right: 'calc(25% - 1.125rem)',
-                top: '-0.625rem',
-                height: '2rem',
-              }}
-            >
-              <span className="hero-track w-full">
-                <span className="hero-runner">
-                  <CarSide />
-                </span>
-              </span>
-            </span>
-            {[
-              ['Tell us the trip', 'Pickup, drop, date and time — add stops if you need them.'],
-              ['Pick your cab', 'Compare classes and read the exact fare breakup.'],
-              ['Confirm & pay', 'Book with ₹0 advance, or pay 10% / 100% online.'],
-              ['Ride', 'We assign a verified driver and send you their details.'],
-            ].map(([title, body], i) => (
-              <li key={title} className="relative" data-reveal>
-                <span className="relative grid h-11 w-11 place-items-center rounded-full bg-brand-500 font-display text-base font-black text-white shadow-glow ring-4 ring-canvas">
-                  {i + 1}
-                </span>
-                <h3 className="mt-5 font-display text-lg font-black tracking-[-0.015em] text-ink">{title}</h3>
-                <p className="mt-2 max-w-[24rem] text-sm leading-relaxed text-muted">{body}</p>
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
-
-      {/* ── Coverage ─────────────────────────────────────────────────────── */}
-      {/* Straight from `GET /cities`, so the count is whatever the operator
-          has actually set up. Nothing here is a number someone decided a
-          landing page ought to show. */}
-      {cities.length > 0 && (
-        <section id="cities" className="scroll-mt-20 overflow-hidden border-b border-hairline bg-surface">
-          <div className="mx-auto max-w-6xl px-4 pb-6 pt-16 lg:pt-20">
-            <SectionHead
-              n={step()}
-              eyebrow={
-                <>
-                  <MapPin className="h-3 w-3" /> Where we run
-                </>
-              }
-              title={`${cities.length} cities${states > 1 ? `, ${states} states` : ''}`}
-              lead="These are the cities the network is set up in. Your pickup and drop can be anywhere — most outstation trips end somewhere that is not on this list."
-            />
-          </div>
-
-          {/* The names, running past at reading speed. Full bleed on purpose:
-              a ticker that stops at the container edge reads as a box of
-              words rather than as a network that carries on past the screen.
-              Two copies, scrolled half the track, so the loop has no seam. */}
-          <div className="marquee mt-8 border-y border-hairline bg-bandwarm py-5" aria-hidden>
-            <div className="marquee-track">
-              {[0, 1].map((copy) => (
-                <div key={copy} className="flex shrink-0 items-center">
-                  {cities.map((c) => (
-                    <span key={`${copy}-${c._id ?? c.name}`} className="flex items-center">
-                      <span className="px-5 font-display text-2xl font-black tracking-[-0.02em] text-ink/65 sm:text-3xl">
-                        {c.name}
-                      </span>
-                      <i className="h-1.5 w-1.5 rotate-45 bg-brand-500/70" />
-                    </span>
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* The cities the operator has singled out, as posters.
-              `City.imageUrl` has been on the schema and on this endpoint all
-              along and nobody had ever shown it. Where there is no upload
-              the poster draws itself, so the grid is worth having on day one
-              and only gets better once a photograph is added. */}
-          {featured.length > 0 && (
-            <div className="mx-auto max-w-6xl px-4 pt-12">
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {featured.map((c) => (
-                  <Link
+            {featured.length > 0 && (
+              <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {featured.map((c, i) => (
+                  <div
                     key={c._id ?? c.name}
-                    href="/book/cab"
                     data-reveal
-                    className="photo-in group relative block overflow-hidden rounded-2xl ring-1 ring-hairline transition duration-300 hover:-translate-y-1 hover:shadow-card"
+                    style={{ ['--d' as string]: `${(i % 4) * 70}ms` }}
+                    className="card lift flex items-center gap-3 p-5"
                   >
-                    <Poster
-                      src={c.imageUrl}
-                      alt={c.name ?? ''}
-                      seed={`${c.name ?? ''} ${c.state ?? ''}`}
-                      className="h-56 w-full"
-                    >
-                      <div aria-hidden className="scrim-soft absolute inset-0" />
-                      <div className="absolute inset-x-5 bottom-4">
-                        {c.state && c.state.toLowerCase() !== (c.name ?? '').toLowerCase() && (
-                          <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/80">
-                            {c.state}
-                          </p>
-                        )}
-                        <p className="mt-0.5 font-display text-2xl font-black tracking-[-0.02em] text-white drop-shadow">
-                          {c.name}
-                        </p>
-                      </div>
-                      {/* An <i>, not a <span>. The coverage strip is read by
-                          collecting every `rounded-full` SPAN inside #cities
-                          and treating it as a city chip, so this button was
-                          being counted as six cities with no name. */}
-                      <i className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur transition-transform duration-300 group-hover:translate-x-0.5">
-                        <ArrowRight className="h-4 w-4" />
-                      </i>
-                    </Poster>
-                  </Link>
+                    <MapPin className="h-5 w-5 shrink-0 text-blue" />
+                    <span className="min-w-0">
+                      <p className="truncate font-display text-[17px] font-bold text-ink">{c.name}</p>
+                      {c.state && <p className="truncate text-[14px] text-muted">{c.state}</p>}
+                    </span>
+                  </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="mx-auto max-w-6xl px-4 pb-16 pt-10">
-            <p className="eyebrow mb-4 text-muted">Every city on the network</p>
-            <div className="flex flex-wrap gap-3">
-              {cities.map((c, i) => {
-                // The colour comes from the city now. It used to come from
-                // the city's POSITION, so inserting one at the top repainted
-                // every chip under it.
-                const chip = cityChip(c.color, c.isFeatured, i);
-                return (
-                  <span key={c._id ?? c.name} data-reveal className={chip.className}>
-                    {c.name}
-                    {/* Delhi is its own state, and "Delhi Delhi" reads as a bug. */}
-                    {c.state && c.state.toLowerCase() !== (c.name ?? '').toLowerCase() && (
-                      <span className={`text-[11px] font-semibold ${chip.solid ? 'text-white/70' : 'text-muted'}`}>
-                        {c.state}
-                      </span>
-                    )}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Admin showcases (hidden when the admin has added none) ───────── */}
-      {explore.length > 0 && (
-        <section className="border-b border-hairline bg-canvas">
-          <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
-            <SectionHead
-              n={step()}
-              eyebrow={
-                <>
-                  <MapPin className="h-3 w-3" /> Where to next
-                </>
-              }
-              title="Explore India"
-            />
-            {/* Equal cards, and the row never wider than the number of
-                them. Giving the first the room of two looks better at some
-                counts and ragged at others — three entries left a lone card
-                in a three-column row — and the count belongs to whoever is
-                in the admin panel that day. */}
-            <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${gridCols(explore.length)}`}>
-              {explore.map((item, i) => (
-                <ShowcaseCard key={item._id ?? i} item={item} />
+            {/* The whole list, as chips. The operator picks each chip's
+                colour in the admin panel; `cityChip` is what turns that
+                choice into a class, which is why src/lib is scanned by
+                Tailwind. */}
+            <div className="mt-10 flex flex-wrap justify-center gap-2.5">
+              {cities.map((c, i) => (
+                <span
+                  key={c._id ?? `${c.name}-${i}`}
+                  className={cityChip(c.color, c.isFeatured, i).className}
+                >
+                  {c.name}
+                </span>
               ))}
             </div>
+
+            <div className="mt-10 text-center">
+              <p className="text-[16px] text-muted">Don&rsquo;t see your city? We are adding more.</p>
+              <Link href="#contact" className="btn-primary mt-4">
+                Contact us
+              </Link>
+            </div>
           </div>
         </section>
       )}
 
+      {/* ── Offers ────────────────────────────────────────────────────── */}
       {offers.length > 0 && (
-        <section className="border-b border-hairline bg-surface">
+        <section className="bg-bandwarm">
           <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
             <SectionHead
-              n={step()}
-              eyebrow={
-                <>
-                  <Tag className="h-3 w-3" /> Worth a look
-                </>
-              }
-              title="Special offers"
+              pill="Offers"
+              tone="accent"
+              title="Running right now"
+              lead="Live from the admin panel — when an offer ends it leaves this page with it."
             />
             <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${gridCols(offers.length)}`}>
               {offers.map((item, i) => (
-                <ShowcaseCard key={item._id ?? i} item={item} ribbon="Offer" />
+                <ShowcaseCard key={item._id ?? `${item.title}-${i}`} item={item} ribbon="Offer" />
               ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ── The app ────────────────────────────────────────────── */}
-      {/* Gora has an app and the website mentioned it in one contact row.
-          Everything claimed below is something the product does today — the
-          trip code, the driver's details before pickup, the invoice on a
-          finished trip, the history under a mobile number. */}
-      <section className="relative overflow-hidden bg-midnight">
-        <div aria-hidden className="noise pointer-events-none absolute inset-0" />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              'radial-gradient(44% 64% at 82% 6%, rgba(249,115,22,0.30) 0%, transparent 70%),' +
-              'radial-gradient(40% 50% at 4% 100%, rgba(255,255,255,0.06) 0%, transparent 70%)',
-          }}
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-16 lg:py-20">
-          <div className="grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-14">
-            <div data-reveal>
-              <p className="eyebrow text-brand-400">The app</p>
-              <h2 className="display-section mt-3 text-white">Book here, carry it there</h2>
-              <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-white/75">
-                A trip booked on this site is already in the app under the same mobile number.
-                Nothing to transfer, nothing to sign up for.
-              </p>
+      {/* ── Explore ───────────────────────────────────────────────────── */}
+      {explore.length > 0 && (
+        <section className="bg-surface">
+          <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+            <SectionHead
+              pill="Explore"
+              tone="blue"
+              title="Places worth the drive"
+              lead="Destinations the operator has picked out, with the cab to get you there."
+            />
+            <div className={`mt-12 grid gap-5 sm:grid-cols-2 ${gridCols(explore.length)}`}>
+              {explore.map((item, i) => (
+                <ShowcaseCard key={item._id ?? `${item.title}-${i}`} item={item} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── The app ───────────────────────────────────────────────────────
+          A solid blue section with a white card floated inside it — the
+          reference's download band, and the only full-bleed colour block
+          below the fold. One band of real colour is what stops a long white
+          page going flat. */}
+      <section className="bg-bandblue">
+        <div className="mx-auto max-w-5xl px-4 py-16 lg:py-20">
+          <div className="card p-8 text-center sm:p-12" data-reveal>
+            <span className="eyebrow-accent">Download now</span>
+            <h2 className="section-title mt-5">Book your cab in seconds</h2>
+            <p className="section-sub mt-4">
+              {t('footer.appNote') || 'Track the driver, keep every invoice and rebook a favourite route in two taps.'}
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <a
                 href={t('company.playStoreUrl')}
                 target="_blank"
                 rel="noreferrer"
-                /* `text-midnight`, not `text-ink`: this button is white in
-                   both themes, and in the dark theme `--ink` is near-white,
-                   so the label disappeared into its own background. A fixed
-                   surface needs a fixed foreground. */
-                className="btn-sheen group mt-8 inline-flex min-h-12 items-center gap-2.5 rounded-xl bg-white px-6 py-3.5 text-[15px] font-bold text-midnight shadow-2xl transition hover:bg-white/90"
+                className="btn-primary"
               >
                 <Smartphone className="h-4 w-4" />
-                Get the app
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                Get it on Google Play
               </a>
-              <p className="mt-3 text-xs font-semibold text-white/55">
-                {t('company.appName')} on Google Play
-              </p>
-
-              <ul className="mt-10 grid content-start gap-x-8 gap-y-6 sm:grid-cols-2">
-              {[
-                { icon: Users, head: 'Driver details', sub: 'Name, vehicle and number reach you before pickup.' },
-                { icon: ShieldCheck, head: 'Trip code', sub: 'Read it out at pickup and again at drop. Nobody can start your trip without it.' },
-                { icon: Wallet, head: 'Invoice', sub: 'Download the bill the moment the trip is marked complete.' },
-                { icon: Clock, head: 'Your history', sub: 'Every trip, under your mobile number, on any device you sign in from.' },
-              ].map(({ icon: Icon, head, sub }) => (
-                <li key={head} data-reveal className="border-t border-white/15 pt-5">
-                  <Icon className="h-5 w-5 text-brand-400" />
-                  <h3 className="mt-3 font-display text-base font-black tracking-[-0.01em] text-white">
-                    {head}
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-white/70">{sub}</p>
-                </li>
-              ))}
-              </ul>
+              <Link href="/book/cab" className="btn-ghost">
+                Book on the website
+              </Link>
             </div>
-
-            {/* The phone belongs here, not in the hero: this is the section
-                that is actually about the app, and the hero's job is to show
-                a cab. */}
-            <div className="flex justify-center lg:justify-end">
-              <AppMock />
-            </div>
+            <p className="mt-5 text-[14px] text-muted">
+              Book here and the trip is already in the app under the same number.
+            </p>
           </div>
         </div>
       </section>
 
-
-      {/* ── Questions ────────────────────────────────────────────────────── */}
-      <section className="border-b border-hairline bg-bandwarm">
-        <div className="mx-auto grid max-w-6xl gap-12 px-4 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16 lg:py-20">
-          {/* Pinned: three lines beside six questions is otherwise a tall
-              hole in the page. */}
-          <div data-reveal className="lg:sticky lg:top-24 lg:self-start">
-            <p className="eyebrow text-brandink">Before you book</p>
-            <h2 className="display-section mt-3">Questions, answered</h2>
-            <p className="mt-5 text-sm leading-relaxed text-muted">
-              Anything else, our team is on the phone 24×7.{' '}
-              <Link href="/support" className="font-bold text-brandink hover:underline">
-                Help &amp; Support
-              </Link>
-            </p>
-          </div>
-
-          <div data-reveal>
+      {/* ── FAQ ───────────────────────────────────────────────────────────
+          Separated cards rather than a divided list, and a narrow measure.
+          A question is a thing you scan for, and a gap between rows is what
+          makes a list scannable. */}
+      <section id="faq" className="scroll-mt-24 bg-surface">
+        <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
+          <SectionHead
+            pill="Before you book"
+            tone="blue"
+            title="Questions people ask"
+          />
+          <div className="mx-auto mt-12 max-w-readable space-y-3.5">
             {FAQ.map(([q, a], i) => (
-              // <details> rather than React state: it works before hydration,
-              // and the browser handles the open/close and the keyboard.
-              <details key={q} className="group border-b border-hairline py-5 first:border-t">
-                <summary className="flex cursor-pointer list-none items-start gap-4 text-[15px] font-bold text-ink marker:hidden">
-                  <span className="numeral shrink-0 pt-0.5 text-xs text-muted">
-                    {String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span className="flex-1">{q}</span>
-                  <span className="mt-0.5 shrink-0 text-xl font-normal leading-none text-brand-500 transition-transform duration-300 group-open:rotate-45">
-                    +
+              <details
+                key={q}
+                className="faq-item group"
+                data-reveal
+                style={{ ['--d' as string]: `${i * 50}ms` }}
+              >
+                <summary className="flex cursor-pointer list-none items-center gap-4 px-6 py-5">
+                  <span className="min-w-0 flex-1 font-display text-[17px] font-bold text-ink">{q}</span>
+                  {/* A chevron that turns, drawn in CSS so the closed and open
+                      states cannot disagree with the element's own state. */}
+                  <span
+                    aria-hidden
+                    className="shrink-0 text-blue transition-transform duration-300 group-open:rotate-180"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
                   </span>
                 </summary>
-                <p className="mt-3 max-w-[68ch] pl-8 text-sm leading-relaxed text-muted">{a}</p>
+                <p className="px-6 pb-5 text-[15px] leading-relaxed text-muted">{a}</p>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Contact ──────────────────────────────────────────────────────── */}
-      {/* Every way of reaching Gora comes from the operator's own settings.
-          A card whose number is not configured does not render — better a
-          shorter row than a dead link. */}
-      <section id="contact" className="scroll-mt-20 border-b border-hairline bg-surface">
+      {/* ── Contact ───────────────────────────────────────────────────── */}
+      <section id="contact" className="scroll-mt-24 bg-bandmint">
         <div className="mx-auto max-w-6xl px-4 py-16 lg:py-20">
-          <SectionHead n={step()} eyebrow={t('contact.eyebrow')} title={t('contact.title')} lead={t('contact.subtitle')} />
-
-          <div className="mt-12 grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-14">
-            {/* The number, set as the thing it is. A phone number is the one
-                piece of information on this page somebody might be reading
-                off a screen while holding a handset. */}
-            <div data-reveal>
-              {phone && (
-                <a href={`tel:${phone}`} className="group block">
-                  <p className="eyebrow text-brandink">
-                    <Phone className="h-3 w-3" /> Call us
-                  </p>
-                  <p className="numeral mt-2 font-display text-[clamp(1.75rem,4.5vw,2.75rem)] font-black leading-none tracking-[-0.03em] text-ink group-hover:text-brandink">
-                    {phone}
-                  </p>
-                  <p className="mt-2 text-sm text-muted">{t('contact.callNote')}</p>
-                </a>
-              )}
-              {phone2 && (
-                <p className="mt-4 text-sm text-muted">
-                  If the first line is busy, try{' '}
-                  <a href={`tel:${phone2}`} className="numeral font-bold text-brandink hover:underline">
-                    {phone2}
-                  </a>
-                  .
-                </p>
-              )}
-
-              <div className="mt-8 border-t border-hairline">
-                {[
-                  {
-                    key: 'whatsapp',
-                    show: !!whatsapp,
-                    icon: MessageCircle,
-                    label: 'WhatsApp',
-                    head: t('contact.whatsappLine'),
-                    note: t('contact.whatsappNote'),
-                    href: `https://wa.me/${whatsapp}`,
-                    external: true,
-                  },
-                  {
-                    key: 'email',
-                    show: !!email,
-                    icon: Mail,
-                    label: 'Email',
-                    head: email,
-                    note: t('contact.emailNote'),
-                    href: `mailto:${email}`,
-                    external: false,
-                  },
-                  {
-                    key: 'app',
-                    show: true,
-                    icon: Smartphone,
-                    label: 'Get the app',
-                    head: t('company.appName'),
-                    note: t('contact.appNote'),
-                    href: t('company.playStoreUrl'),
-                    external: true,
-                  },
-                ]
-                  .filter((c) => c.show)
-                  .map(({ key, icon: Icon, label, head, note, href, external }) => (
-                    <a
-                      key={key}
-                      href={href}
-                      {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
-                      className="group flex items-start gap-4 border-b border-hairline py-4 transition-colors hover:bg-tint"
-                    >
-                      <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brandink" />
-                      <span className="min-w-0 flex-1">
-                        {/* The row still has to say what it is for. Dropping
-                            this left an operator who has configured nothing
-                            with a lone row reading "Gora Taxi Partner" and
-                            no clue that it is the app. */}
-                        <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-muted">
-                          {label}
-                        </span>
-                        <span className="numeral mt-0.5 block break-all text-sm font-bold text-ink">{head}</span>
-                        <span className="mt-0.5 block text-xs text-muted">{note}</span>
-                      </span>
-                      <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-muted transition-transform duration-300 group-hover:translate-x-1" />
-                    </a>
-                  ))}
-              </div>
-            </div>
-
-            <div className="grid content-start gap-5">
-              <div data-reveal className="rounded-2xl bg-bandwarm p-6 ring-1 ring-tintline">
-                <span className="flex items-center gap-2.5">
-                  <Building2 className="h-4 w-4 text-brandink" />
-                  <h3 className="font-display text-lg font-black tracking-[-0.015em] text-ink">
-                    {t('contact.officeTitle')}
-                  </h3>
-                </span>
-                <p className="mt-3 text-sm leading-relaxed text-muted">{t('company.address')}</p>
-                <p className="mt-3 border-t border-tintline pt-3 text-xs font-semibold text-muted">
-                  {t('company.legalName')}
-                  {t('company.gstin') && (
-                    <>
-                      {' · '}GSTIN <span className="numeral">{t('company.gstin')}</span>
-                    </>
-                  )}
-                </p>
-              </div>
-
-              <div data-reveal className="rounded-2xl bg-canvas p-6 ring-1 ring-hairline">
-                <h3 className="font-display text-lg font-black tracking-[-0.015em] text-ink">
-                  {t('contact.bookedTitle')}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{t('contact.bookedBody')}</p>
-                {/* A link standing on its own is something a thumb has to hit,
-                    so it gets a tap target rather than a text baseline. */}
-                <Link
-                  href="/support"
-                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 py-2 text-sm font-bold text-brandink hover:underline"
-                >
-                  Help &amp; Support
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* The band again, closing the page the way it opened it. */}
-      <div aria-hidden className="chequer" />
-
-      {/* ── Closing ──────────────────────────────────────────────────────── */}
-      {/* `bg-brand-600` is the real background; the gradient only shades it.
-          With the colour on a child alone, anything measuring this section saw
-          the page canvas behind the button instead of orange. */}
-      <section className="relative overflow-hidden bg-brand-600">
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ background: 'linear-gradient(120deg, #fb923c 0%, #f97316 50%, #ea580c 100%)' }}
-        />
-        <div aria-hidden className="noise pointer-events-none absolute inset-0" />
-        <div className="relative mx-auto max-w-6xl px-4 py-20 lg:py-24">
-          <span
-            aria-hidden
-            className="lane-x mb-10 block w-full"
-            style={{ ['--lane' as string]: 'rgba(255,255,255,0.55)' }}
+          <SectionHead
+            pill={t('contact.eyebrow')}
+            tone="accent"
+            title={t('contact.title')}
+            lead={t('contact.subtitle')}
           />
-          <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
-            <h2 className="display-hero text-white" data-reveal>
-              Where are
-              <br />
-              you headed?
-            </h2>
-            <div data-reveal>
-              <p className="max-w-sm text-[15px] leading-relaxed text-white/90">
-                No sign-up, no advance if you do not want one, and the fare on screen before you
-                confirm.
-              </p>
-              <div className="mt-7 flex flex-wrap gap-3">
-                <Link
-                  href="/book/cab"
-                  className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-[15px] font-bold text-brand-700 shadow-card transition hover:bg-white/90"
-                >
-                  Book a cab
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/pool"
-                  className="inline-flex min-h-11 items-center rounded-xl bg-black/20 px-6 py-3.5 text-[15px] font-bold text-white ring-1 ring-white/40 backdrop-blur transition hover:bg-black/30"
-                >
-                  Find a car pool
-                </Link>
-              </div>
-            </div>
+
+          <div className="mt-12 grid gap-5 lg:grid-cols-3">
+            {phone && (
+              <a href={`tel:${phone}`} className="card lift p-6" data-reveal>
+                <span className="tile-blue">
+                  <Phone className="h-6 w-6" />
+                </span>
+                <h3 className="mt-5 font-display text-[18px] font-bold text-ink">Call us</h3>
+                <p className="mt-2 text-[17px] font-bold text-blueink">
+                  <span className="numeral">{phone}</span>
+                </p>
+                {phone2 && (
+                  <p className="mt-0.5 text-[15px] text-muted">
+                    <span className="numeral">{phone2}</span>
+                  </p>
+                )}
+                {t('contact.callNote') && (
+                  <p className="mt-2 text-[14px] leading-relaxed text-muted">{t('contact.callNote')}</p>
+                )}
+              </a>
+            )}
+
+            {whatsapp && (
+              <a
+                href={`https://wa.me/${whatsapp}`}
+                target="_blank"
+                rel="noreferrer"
+                className="card lift p-6"
+                data-reveal
+                style={{ ['--d' as string]: '70ms' }}
+              >
+                <span className="tile-accent">
+                  <MessageCircle className="h-6 w-6" />
+                </span>
+                <h3 className="mt-5 font-display text-[18px] font-bold text-ink">WhatsApp</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-muted">
+                  {t('contact.whatsappLine') || 'Message us and we will take the booking there.'}
+                </p>
+                {t('contact.whatsappNote') && (
+                  <p className="mt-2 text-[14px] leading-relaxed text-muted">{t('contact.whatsappNote')}</p>
+                )}
+              </a>
+            )}
+
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                className="card lift p-6"
+                data-reveal
+                style={{ ['--d' as string]: '140ms' }}
+              >
+                <span className="tile-blue">
+                  <Mail className="h-6 w-6" />
+                </span>
+                <h3 className="mt-5 font-display text-[18px] font-bold text-ink">Email</h3>
+                <p className="mt-2 break-all text-[15px] font-semibold text-blueink">{email}</p>
+                {t('contact.emailNote') && (
+                  <p className="mt-2 text-[14px] leading-relaxed text-muted">{t('contact.emailNote')}</p>
+                )}
+              </a>
+            )}
           </div>
+
+          {t('company.address') && (
+            <div className="card mt-5 flex gap-4 p-6" data-reveal>
+              <Building2 className="h-5 w-5 shrink-0 text-blue" />
+              <span className="min-w-0">
+                <h3 className="font-display text-[17px] font-bold text-ink">
+                  {t('contact.officeTitle') || 'Our office'}
+                </h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-muted">{t('company.address')}</p>
+              </span>
+            </div>
+          )}
         </div>
       </section>
     </>
@@ -1290,121 +723,175 @@ function gridCols(n: number): string {
 }
 
 /**
- * The heading every section shares: a kilometre stone on the rail, the
- * chapter label, the title.
+ * The heading every section shares: a coloured pill, one large centred
+ * title, one muted line.
  *
- * Left-aligned, and that is the point. The page used to centre seven of
- * these in a row, which is the loudest template tell there is — centred
- * eyebrow, centred title, centred paragraph, repeat. A common marker and a
- * common left edge do the same job of making the page feel like one thing,
- * without making every chapter the same picture.
+ * Centred, and that is a reversal. This used to be a left-aligned block with
+ * a numbered "kilometre stone" beside it, chosen specifically so the page
+ * would not look like a template. The reference centres every one of its
+ * section heads and the result reads as a product, not as a portfolio — the
+ * repetition is what makes a 7,000px page feel like one page rather than
+ * eight stapled together.
+ *
+ * `tone` alternates down the page so no two neighbouring sections open on
+ * the same colour.
  */
 function SectionHead({
-  n,
-  eyebrow,
+  pill,
+  tone = 'blue',
   title,
   lead,
 }: {
-  n: string;
-  eyebrow: React.ReactNode;
+  pill: React.ReactNode;
+  tone?: 'blue' | 'accent';
   title: string;
   lead?: string;
 }) {
   return (
-    <div className="flex items-start gap-4 sm:gap-6" data-reveal>
-      <span className="stone">{n}</span>
-      <div className="min-w-0 flex-1">
-        <p className="eyebrow text-brandink">{eyebrow}</p>
-        <h2 className="display-section mt-2.5">{title}</h2>
-        {lead && <p className="mt-4 max-w-[62ch] text-[15px] leading-relaxed text-muted">{lead}</p>}
-      </div>
+    <div className="text-center" data-reveal>
+      {pill ? <span className={tone === 'accent' ? 'eyebrow-accent' : 'eyebrow-blue'}>{pill}</span> : null}
+      <h2 className="section-title mt-5">{title}</h2>
+      {lead && <p className="section-sub mt-4">{lead}</p>}
     </div>
   );
 }
 
+/** The three things the hero's tabs can switch between. */
+const TABS = [
+  { key: 'cab', label: 'Cab Booking', icon: CarTaxiFront, sub: 'One way · Round · Local' },
+  { key: 'driver', label: 'Hire a Driver', icon: Car, sub: 'Hourly · Full day' },
+  { key: 'pool', label: 'Car Pool', icon: Users, sub: 'Share a ride' },
+] as const;
+
 /**
- * Pickup, drop, go — the booking widget the reference carries in its hero.
+ * Pickup, drop, go — the booking widget, now the centrepiece of the hero
+ * rather than a panel beside the headline.
  *
- * It hands over to the booking page with both places already filled in, not
- * straight to the fare list. Jumping to the fares saved a screen and cost
- * the customer the answer to "what am I actually booking?": the trip type,
- * the date and the time were all assumed, none of them were shown, and the
- * first thing on screen was a price for a trip nobody had described. The
- * booking page shows the trip, keeps what was typed, and is one click from
- * the same fares.
+ * Three changes from the version this replaces, all of them the reference's:
+ * the card is centred and wide instead of a narrow column; the service is
+ * chosen here, on tabs, instead of being assumed to be a cab; and the two
+ * places sit side by side on a desktop, which is how a route reads.
+ *
+ * It still hands over to the booking page with both places already filled in,
+ * not straight to the fare list. Jumping to the fares saved a screen and cost
+ * the customer the answer to "what am I actually booking?": the trip type, the
+ * date and the time were all assumed, none of them were shown, and the first
+ * thing on screen was a price for a trip nobody had described.
  */
 function QuickBook() {
   const router = useRouter();
+  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('cab');
   const [pickup, setPickup] = useState<Geo | undefined>();
   const [drop, setDrop] = useState<Geo | undefined>();
   const [problem, setProblem] = useState('');
 
+  // Hiring a driver happens at one place — there is no drop to price — so
+  // that tab asks for one field and the others ask for two.
+  const needsDrop = tab !== 'driver';
   // The fare is a road distance, so it needs coordinates — typed text that
   // was never resolved to a place cannot be priced.
-  const ready = !!pickup?.lat && !!drop?.lat;
+  const ready = !!pickup?.lat && (!needsDrop || !!drop?.lat);
 
   const go = () => {
     if (!ready) {
-      setProblem('Pick both places from the suggestions so we can price the route.');
+      setProblem(
+        needsDrop
+          ? 'Pick both places from the suggestions so we can price the route.'
+          : 'Pick the location from the suggestions so we can price it.',
+      );
+      return;
+    }
+    if (tab === 'pool') {
+      router.push('/pool');
       return;
     }
     tripDraft.set({
-      serviceType: 'cab',
-      subType: 'One Way',
+      serviceType: tab === 'driver' ? 'hire_driver' : 'cab',
+      subType: tab === 'driver' ? 'Hourly' : 'One Way',
       pickup,
-      drop,
+      drop: needsDrop ? drop : undefined,
       pickupCity: pickup?.city || pickup?.address,
-      dropCity: drop?.city || drop?.address,
+      dropCity: needsDrop ? drop?.city || drop?.address : undefined,
       travelDate: toDateInput(new Date()),
       travelTime: '10:00',
     });
-    router.push('/book/cab');
+    router.push(tab === 'driver' ? '/book/hire_driver' : '/book/cab');
   };
 
-  // Not `overflow-hidden`, however much the header strip wants it: the place
-  // suggestions are an absolutely positioned list that hangs below the input,
-  // and clipping the panel cut the list off inside it — the widget looked
-  // right and could not be used. The strip gets its own rounded top corners.
+  // Not `overflow-hidden`, however much the rounded corners want it: the
+  // place suggestions are an absolutely positioned list that hangs below the
+  // input, and clipping the panel cut the list off inside it — the widget
+  // looked right and could not be used.
   return (
-    <div className="glass rounded-3xl shadow-2xl ring-1 ring-white/25">
-      {/* A solid blue bar across the top of the booking card. The
-          reference does exactly this with its selected trip-type tab, and
-          it is most of why that page reads as blue.
+    <div className="mx-auto mt-10 max-w-4xl rounded-card bg-surface p-5 shadow-lift ring-1 ring-hairline/70 sm:p-7">
+      {/* The trip-type tabs. The selected one is a solid blue block, which is
+          the single loudest element on the first screen and is meant to be:
+          it is the answer to "what are you booking?". */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+        {TABS.map(({ key, label, icon: Icon, sub }) => {
+          const on = tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => { setTab(key); setProblem(''); }}
+              className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-tile px-2 py-3 text-center transition ${
+                on
+                  ? 'bg-bandblue text-white shadow-[0_6px_18px_rgba(11,116,190,0.3)]'
+                  : 'bg-surface text-ink ring-1 ring-hairline hover:bg-sunken'
+              }`}
+            >
+              <Icon className={`h-5 w-5 ${on ? 'text-white' : 'text-blue'}`} />
+              <span className="text-[13px] font-bold leading-tight sm:text-[14px]">{label}</span>
+              {/* Full white, not white/80. On this blue that was 3.74:1 —
+                  an 11px label is exactly the size that cannot afford it. */}
+              <span className={`hidden text-[11px] leading-tight sm:block ${on ? 'text-white' : 'text-muted'}`}>
+                {sub}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-          `bandblue` is the FILL blue, not `blueink`. `blueink` is a TEXT
-          colour, and in the dark theme it is a pale sky blue — white on it
-          came out at about 1.4:1, which is to say invisible. A colour meant
-          to be written on has to be picked for what sits on it. */}
-      <p className="flex items-center gap-2 rounded-t-3xl bg-bandblue px-5 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white">
-        <Route className="h-3.5 w-3.5" />
-        Where to?
-      </p>
-      <div className="grid gap-3 p-4 sm:grid-cols-1 lg:grid-cols-1">
-        <PlaceInput label="Pickup" value={pickup} onChange={setPickup} placeholder="Enter pickup location" />
-        {/* The route between the two fields, so the pair reads as one trip
-            rather than as two unrelated boxes. The panel is one column now
-            that it stands beside the headline instead of under it, so the
-            connector runs down rather than across. */}
-        <span aria-hidden className="-my-1 flex items-center gap-2 pl-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-          <span className="lane-x w-6" />
-          <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted">to</span>
-          <span className="lane-x flex-1" />
-          <MapPin className="h-3.5 w-3.5 text-brand-500" />
-        </span>
-        <PlaceInput label="Drop" value={drop} onChange={setDrop} placeholder="Enter drop location" />
+      <div className={`mt-6 grid gap-4 ${needsDrop ? 'sm:grid-cols-2' : ''}`}>
+        <PlaceInput
+          label={tab === 'driver' ? 'Where is the car' : 'Pickup'}
+          value={pickup}
+          onChange={(v) => { setPickup(v); setProblem(''); }}
+          placeholder={tab === 'driver' ? 'Enter your location' : 'Enter pick-up city'}
+        />
+        {needsDrop && (
+          <PlaceInput
+            label="Drop"
+            value={drop}
+            onChange={(v) => { setDrop(v); setProblem(''); }}
+            placeholder="Enter drop city"
+          />
+        )}
       </div>
-      <div className="px-4 pb-4">
-        <button
-          type="button"
-          onClick={go}
-          className="btn-sheen group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-[15px] font-bold text-white shadow-glow transition hover:bg-brand-600"
-        >
-          Book ride
-          <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-        </button>
-        {problem && <p className="px-1 pt-2 text-xs font-semibold text-dangerfg">{problem}</p>}
-      </div>
+
+      <button
+        type="button"
+        onClick={go}
+        className="btn-primary btn-sheen group mt-5 w-full text-[16px]"
+      >
+        {tab === 'pool' ? 'Find a ride' : 'Check fare'}
+        <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+      </button>
+      {problem && <p className="px-1 pt-2.5 text-[13px] font-semibold text-dangerfg">{problem}</p>}
+
+      {/* The trust line under the button, where the reference puts its
+          rating. Ours says what we can stand behind rather than a star
+          average nobody has collected. */}
+      <ul className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-t border-hairline pt-5">
+        {['No account needed', 'Verified drivers', 'Free cancellation'].map((label) => (
+          <li key={label} className="flex items-center gap-1.5 text-[13px] font-semibold text-muted">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-blue" />
+            {label}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1431,11 +918,11 @@ function ShowcaseCard({
   const body = (
     <div
       data-reveal
-      className="photo-in group relative h-full min-h-[16rem] overflow-hidden rounded-2xl ring-1 ring-hairline transition duration-300 hover:-translate-y-1 hover:shadow-card sm:min-h-[18rem]"
+      className="photo-in group relative h-full min-h-[16rem] overflow-hidden rounded-card shadow-card ring-1 ring-hairline/70 transition duration-300 hover:-translate-y-1 hover:shadow-lift sm:min-h-[18rem]"
     >
       {ribbon && (
         <span className="ribbon">
-          <Tag className="h-3 w-3" />
+          <Star className="h-3 w-3" />
           {ribbon}
         </span>
       )}
@@ -1455,11 +942,11 @@ function ShowcaseCard({
             readable over any of it. */}
         <div aria-hidden className="scrim-soft absolute inset-0" />
         <div className="absolute inset-x-5 bottom-5">
-          <p className="font-display text-xl font-black tracking-[-0.02em] text-white drop-shadow sm:text-2xl">
+          <p className="font-display text-[20px] font-bold text-white drop-shadow sm:text-[22px]">
             {item.title}
           </p>
           {item.subtitle && (
-            <p className="mt-1.5 line-clamp-2 max-w-xl text-[13px] leading-relaxed text-white/85">
+            <p className="mt-1.5 line-clamp-2 max-w-xl text-[14px] leading-relaxed text-white/85">
               {item.subtitle}
             </p>
           )}

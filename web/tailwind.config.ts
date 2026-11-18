@@ -10,20 +10,16 @@ import type { Config } from 'tailwindcss';
  * changes colour between the phone and the website is not a brand. Black and
  * bone is a far more expensive pairing with it than blue ever was.
  *
- * Everything that changes between light and dark is a CSS variable rather than
- * a fixed hex, defined in globals.css under `:root` and `[data-theme='dark']`.
- * Written as bare `R G B` channels so Tailwind's slash-opacity still works:
- * `bg-surface/70` compiles to `rgb(var(--surface) / 0.7)`.
- *
- * The orange scale stays fixed. It is the brand, and a brand that changes
- * colour with the OS setting is not a brand — only the surfaces behind it move.
+ * The site is light only. The surfaces, bands and service colours are still
+ * CSS variables rather than fixed hexes, defined once on `:root` in
+ * globals.css, so a palette change stays a palette change instead of a
+ * find-and-replace across two hundred elements. Written as bare `R G B`
+ * channels so Tailwind's slash-opacity keeps working: `bg-surface/70`
+ * compiles to `rgb(var(--surface) / 0.7)`.
  */
 const themed = (v: string) => `rgb(var(${v}) / <alpha-value>)`;
 
 const config: Config = {
-  // Light is the default; `data-theme="dark"` on <html> switches, which is what
-  // the toggle and the pre-paint script in layout.tsx both set.
-  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
@@ -79,8 +75,6 @@ const config: Config = {
          * before they have read a word, and it is what makes an otherwise
          * restrained, typographic layout feel colourful.
          *
-         * Themed, because a tint that sits well on paper-white glares on a
-         * dark canvas.
          */
         cab: themed('--svc-cab'),
         cabsoft: themed('--svc-cab-soft'),
@@ -115,13 +109,27 @@ const config: Config = {
         muted: themed('--muted'),
         hairline: themed('--hairline'),
 
-        /** A tinted panel in the brand colour — `bg-brand-50` in light, a dim
-         *  wash of orange in dark, where #fff7ed would glare. */
+        /** A tinted panel in the brand colour. */
         tint: themed('--tint'),
         /** The ring that goes with it. */
         tintline: themed('--tintline'),
-        /** Brand text ON a surface: the 700 shade burns out on dark. */
+        /** Brand text ON a surface, at a shade that holds AA on white. */
         brandink: themed('--brandink'),
+
+        /**
+         * The accent, in the role the reference gives its yellow: the Book
+         * button, the section eyebrows, every second icon tile.
+         *
+         * `accentink` is the text that goes ON it, and it is dark on purpose.
+         * White on #F97316 measures 2.80:1 and had been failing on this site
+         * since it was built; gray-800 on it is 5.24:1. The reference reaches
+         * the same answer with its yellow, and dark-on-warm is most of why
+         * that button reads as a button and not as a warning.
+         */
+        accent: themed('--accent'),
+        accenthover: themed('--accent-hover'),
+        accentink: themed('--accent-ink'),
+        accentsoft: themed('--accent-soft'),
 
         /** The caution notice shown above every booking feed. */
         dangerbg: themed('--danger-bg'),
@@ -132,20 +140,45 @@ const config: Config = {
         bad: '#DC2626',
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        /*
+         * The fallback goes INSIDE the var(), not after it.
+         *
+         * `['var(--font-sans)', 'system-ui', 'sans-serif']` compiles to
+         * `font-family: var(--font-sans), system-ui, sans-serif`, and if the
+         * variable is ever undefined that whole declaration is invalid CSS —
+         * the browser drops it and falls all the way back to its default
+         * serif. Measured: every heading and paragraph on the site rendered
+         * in Times New Roman when the font chunk failed to load. Written this
+         * way the missing variable degrades to system-ui, which is the point
+         * of having a fallback at all.
+         */
+        sans: ['var(--font-sans, system-ui)', 'system-ui', 'sans-serif'],
         /**
          * Headlines only — see the note in layout.tsx. Its fallback is a
          * sans, not a serif: if the webfont never arrives, a heading set in
          * Georgia next to Inter body copy looks like a mistake, where one
          * set in the system sans just looks plain.
          */
-        display: ['var(--font-display)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display, system-ui)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        // Dark surfaces are separated by light, not by shadow, so the card
-        // shadow is a variable too — it all but disappears in dark mode.
         card: 'var(--shadow-card)',
+        /** The hover state of a card, and the resting state of the two
+         *  panels that are meant to float: the booking form and the app
+         *  band's inset card. */
+        lift: 'var(--shadow-lift)',
         glow: 'var(--shadow-glow)',
+      },
+      borderRadius: {
+        /** 24px is the radius the reference uses for every card — 51 of them
+         *  measured against 25 at 16px — so it gets a name rather than being
+         *  spelled `rounded-[24px]` on every element. */
+        card: '24px',
+        tile: '16px',
+      },
+      maxWidth: {
+        /** The measure the reference sets its body copy and FAQ to. */
+        readable: '46rem',
       },
     },
   },

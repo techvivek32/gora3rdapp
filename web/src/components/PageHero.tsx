@@ -9,9 +9,14 @@ import type { ReactNode } from 'react';
  * page. Three pages, three openings, which is what makes a site read as a
  * template with the pages filled in separately.
  *
- * The vocabulary is the landing page's: the same backdrop, the same grain,
- * the same chapter label over a heavy heading, and the dashed lane closing
- * the band off. One component, so it stays that way.
+ * It now opens the way the home page's sections do — a coloured pill over a
+ * heavy heading on a pale wash — because that is the one shape repeated down
+ * the whole site, and a page that opens differently from every section on the
+ * landing page is a page that looks like it came from somewhere else.
+ *
+ * Left-aligned rather than centred, and that is deliberate: these pages carry
+ * a form or a list directly underneath, and a centred heading over a
+ * left-aligned form puts two axes on one screen.
  */
 export function PageHero({
   eyebrow,
@@ -20,6 +25,7 @@ export function PageHero({
   aside,
   children,
   width = '6xl',
+  tone = 'blue',
 }: {
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -30,6 +36,8 @@ export function PageHero({
   children?: ReactNode;
   /** Match the page's own container, or the band's content sits off its axis. */
   width?: '2xl' | '3xl' | '4xl' | '6xl';
+  /** Which pill colour opens the page. */
+  tone?: 'blue' | 'accent';
 }) {
   // Spelled out rather than built from a template string: Tailwind only
   // emits a class it has seen, and `max-w-${width}` is not one it can see.
@@ -41,23 +49,34 @@ export function PageHero({
   }[width];
 
   return (
-    <div className="hero-band relative overflow-hidden border-b border-hairline">
-      <div aria-hidden className="noise pointer-events-none absolute inset-0" />
+    <div className="relative overflow-hidden border-b border-hairline bg-bandcool">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(46% 60% at 6% 0%, rgba(249,115,22,0.09) 0%, transparent 62%),'
+            + 'radial-gradient(50% 64% at 97% 10%, rgba(0,134,214,0.11) 0%, transparent 62%)',
+        }}
+      />
 
-      <div className={`relative mx-auto ${MAX} px-4 pb-12 pt-12 sm:pt-14`}>
+      <div className={`relative mx-auto ${MAX} px-4 pb-12 pt-10 sm:pt-12`}>
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0 flex-1">
             {eyebrow && (
-              <p className="eyebrow reveal text-brandink" style={{ '--d': '40ms' } as React.CSSProperties}>
+              <span
+                className={`${tone === 'accent' ? 'eyebrow-accent' : 'eyebrow-blue'} reveal`}
+                style={{ '--d': '40ms' } as React.CSSProperties}
+              >
                 {eyebrow}
-              </p>
+              </span>
             )}
-            <h1 className="display-section reveal mt-3" style={{ '--d': '110ms' } as React.CSSProperties}>
+            <h1 className="display-section reveal mt-4" style={{ '--d': '110ms' } as React.CSSProperties}>
               {title}
             </h1>
             {lead && (
               <p
-                className="reveal mt-4 max-w-xl text-[15px] leading-relaxed text-muted"
+                className="reveal mt-4 max-w-xl text-[16px] leading-relaxed text-muted"
                 style={{ '--d': '180ms' } as React.CSSProperties}
               >
                 {lead}
@@ -76,8 +95,6 @@ export function PageHero({
           </div>
         )}
       </div>
-
-      <span aria-hidden className="lane-x absolute inset-x-0 bottom-0 block" />
     </div>
   );
 }

@@ -115,7 +115,7 @@ export function PlaceInput({
   return (
     <div ref={boxRef} className="relative">
       <label className="label">
-        {label} {required && <span className="text-brand-600">*</span>}
+        {label} {required && <span className="text-brandink">*</span>}
       </label>
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />

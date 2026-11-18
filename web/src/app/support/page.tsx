@@ -39,6 +39,7 @@ export default function SupportPage() {
     <>
       <PageHero
         width="2xl"
+        tone="accent"
         eyebrow="We are on the phone"
         title={t('support.title')}
         lead={t('support.subtitle')}
