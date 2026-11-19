@@ -92,6 +92,14 @@ export const SITE_TEXT_KEYS: SiteTextKey[] = [
     fallback: 'https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner',
     maxLength: 300,
   },
+  {
+    key: 'company.appStoreUrl',
+    group: 'Company details',
+    label: 'App Store link (iOS)',
+    hint: 'Leave empty until the iOS app is published. While it is empty the website shows the Play badge alone instead of a dead Apple badge; fill it in and every Apple badge on the site turns on.',
+    fallback: '',
+    maxLength: 300,
+  },
 
   // ── Contact section on the home page ──────────────────────────────────
   // The phone, WhatsApp and email themselves are operator settings already

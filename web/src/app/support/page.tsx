@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { MessageCircle, Phone, Smartphone } from 'lucide-react';
 import { PageHero } from '@/components/PageHero';
+import { StoreBadges } from '@/components/GetApp';
 import { apiGet } from '@/lib/api';
 import { useSiteText } from '@/lib/site-text';
 
@@ -91,6 +92,7 @@ export default function SupportPage() {
               {t('support.bookingBody')}
             </p>
           )}
+          <StoreBadges size="sm" className="mt-4" />
         </div>
       )}
 

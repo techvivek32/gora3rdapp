@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Mail, MessageCircle, Phone } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { useSiteText } from '@/lib/site-text';
+import { StoreBadges } from '@/components/GetApp';
 import type { PlatformSettings, SupportContact } from '@/lib/types';
 
 /**
@@ -100,6 +101,9 @@ export function SiteFooter() {
           {t('footer.appNote') && (
             <p className="mt-3 text-[15px] leading-relaxed text-[#D1D5DB]">{t('footer.appNote')}</p>
           )}
+          {/* The footer is on every page, so this one badge is what gives the
+              app a link on the pages that have no section of their own. */}
+          <StoreBadges size="sm" className="mt-3" />
           {/* The same caution the app shows above every booking feed. Empty
               means the operator took it down, so the box goes with it. */}
           {t('footer.caution') && (

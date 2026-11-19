@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, BadgeCheck, Briefcase, Fuel, Loader2, MapPin, Route, Users } from 'lucide-react';
 import { CountUp } from '@/components/CountUp';
+import { GetAppRow } from '@/components/GetApp';
 import { apiGet } from '@/lib/api';
 import { formatDate, formatTime12, rupees, shortCity } from '@/lib/format';
 import {
@@ -371,6 +372,12 @@ function CabResults() {
           ))}
         </ul>
       </div>
+
+      {/* After the fares, not before them: someone who has just compared
+          prices is the likeliest person on the site to want the app, and
+          this is the last thing on the page rather than something in the
+          way of choosing a cab. */}
+      <GetAppRow className="mt-8" label="Book this trip in the app instead" />
     </div>
   );
 }

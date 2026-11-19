@@ -7,11 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight, Building2, Car, CarTaxiFront, CheckCircle2, Clock, FileCheck2,
   Headphones, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck,
-  Smartphone, Star, ThumbsUp, Users, Wallet,
+  Star, ThumbsUp, Users, Wallet,
 } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { PlaceInput } from '@/components/PlaceInput';
 import { Poster } from '@/components/Poster';
+import { GetAppRow, StoreBadges } from '@/components/GetApp';
 import { tripDraft } from '@/lib/trip-draft';
 import { rupees, toDateInput } from '@/lib/format';
 import { useSiteText } from '@/lib/site-text';
@@ -213,6 +214,12 @@ export default function HomePage() {
           </div>
 
           <QuickBook />
+
+          {/* The app, directly under the form — where the reference puts it,
+              and the one spot on the page every visitor reaches. It sits
+              OUTSIDE the booking card so it cannot compete with "Check fare":
+              the next step here is still to price a trip. */}
+          <GetAppRow className="mt-8" label="Prefer the app? Book and track on your phone" />
         </div>
 
         {/* The counters. Every one of them is read off the operator's own
@@ -553,16 +560,11 @@ export default function HomePage() {
             <p className="section-sub mt-4">
               {t('footer.appNote') || 'Track the driver, keep every invoice and rebook a favourite route in two taps.'}
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href={t('company.playStoreUrl')}
-                target="_blank"
-                rel="noreferrer"
-                className="btn-primary"
-              >
-                <Smartphone className="h-4 w-4" />
-                Get it on Google Play
-              </a>
+            {/* The store's own badge rather than a button that says the same
+                words: this is the page's main download CTA, and a badge is
+                recognised before it is read. */}
+            <StoreBadges size="lg" className="mt-8 justify-center" />
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link href="/book/cab" className="btn-ghost">
                 Book on the website
               </Link>

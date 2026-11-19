@@ -34,4 +34,14 @@ export const COMPANY = {
    */
   appName: 'Gora Taxi Partner',
   playStoreUrl: 'https://play.google.com/store/apps/details?id=com.taxi.call_taxi_partner',
+  /**
+   * Empty on purpose: there is no App Store listing yet. The only identifier
+   * this product has is an Android package name, and a made-up
+   * `apps.apple.com` URL would be a dead link on a live business's site.
+   *
+   * Every Apple badge on the site is hidden while this is empty, so publishing
+   * the iOS app is one field in the admin panel (Website Text → Company
+   * details) and no code change at all.
+   */
+  appStoreUrl: '',
 } as const;

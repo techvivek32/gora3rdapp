@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Menu, Phone, X } from 'lucide-react';
+import { ChevronRight, Download, Menu, Phone, X } from 'lucide-react';
 import { apiGet } from '@/lib/api';
 import { useSiteText } from '@/lib/site-text';
+import { StoreBadges } from '@/components/GetApp';
 import type { PlatformSettings, SupportContact } from '@/lib/types';
 
 // No account area: the site exists to take a booking, and a visitor never has
@@ -52,6 +53,7 @@ export function SiteHeader() {
     retry: 0,
   });
   const phone = (contact?.phone || settings?.supportPhone || '').trim();
+  const playStore = t('company.playStoreUrl');
 
   return (
     <>
@@ -65,6 +67,20 @@ export function SiteHeader() {
             <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 transition hover:text-white/80">
               <Phone className="h-3.5 w-3.5" />
               <span className="numeral">{phone}</span>
+            </a>
+          ) : null}
+          {/* A text link, not a badge: the strip is 36px tall and a store
+              badge in it would either be illegible or burst the bar. Hidden
+              on the narrowest phones, where the number has to win. */}
+          {playStore ? (
+            <a
+              href={playStore}
+              target="_blank"
+              rel="noreferrer"
+              className="hidden items-center gap-1.5 transition hover:text-white/80 sm:inline-flex"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Get the App
             </a>
           ) : null}
           <Link href="/support" className="inline-flex items-center gap-1.5 transition hover:text-white/80">
@@ -154,6 +170,9 @@ export function SiteHeader() {
               <Link href="/book/cab" onClick={() => setOpen(false)} className="btn-primary mt-2 w-full">
                 Book Cab
               </Link>
+              {/* The strip's "Get the App" link is hidden at this width, so
+                  the phone gets the badge here instead — not nowhere. */}
+              <StoreBadges size="sm" className="mt-4 justify-center pb-1" />
             </div>
           </div>
         )}

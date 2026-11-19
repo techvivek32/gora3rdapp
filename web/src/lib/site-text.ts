@@ -27,6 +27,7 @@ export const SITE_TEXT: Record<string, string> = {
   'company.gstin': COMPANY.gstin,
   'company.appName': COMPANY.appName,
   'company.playStoreUrl': COMPANY.playStoreUrl,
+  'company.appStoreUrl': COMPANY.appStoreUrl,
 
   'contact.eyebrow': 'Talk to us',
   'contact.title': `Contact ${COMPANY.brand}`,

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Loader2, Phone, Smartphone } from 'lucide-react';
+import { StoreBadges } from '@/components/GetApp';
 
 /**
  * Confirmation shown after a booking is placed.
@@ -47,6 +48,7 @@ function BookedInner() {
           Open the Gora Taxi app with the same mobile number and this booking will already be there —
           with the driver's details once our team assigns one.
         </p>
+        <StoreBadges size="sm" className="mt-4" />
       </div>
 
       <div className="mt-6 flex flex-wrap justify-center gap-3">
