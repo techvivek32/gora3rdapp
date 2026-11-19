@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -20,6 +21,7 @@ import 'core/utils/membership.dart';
 import 'core/utils/alert_actions.dart';
 import 'core/utils/ring_player.dart';
 import 'core/utils/alert_gate.dart';
+import 'core/utils/crash_reporter.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/requirements/presentation/widgets/requirement_overlay.dart';
@@ -81,7 +83,69 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 @pragma('vm:entry-point')
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
+  // This engine has no plugins registered, so Crashlytics cannot run here —
+  // but an unhandled async error would still take the process down, and this
+  // process is the one showing the driver a booking. Swallow and log instead:
+  // a broken overlay card is recoverable, a dead app is not.
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('Overlay isolate error: $error');
+    return true;
+  };
+  FlutterError.onError = (details) => debugPrint('Overlay error: ${details.exception}');
   runApp(const RequirementOverlay());
+}
+
+/// Runs one startup step and refuses to let it take the launch down.
+///
+/// Every one of these used to be a bare `await` in [main], before `runApp`.
+/// A throw in any of them — a corrupt prefs file, a plugin that fails to
+/// register, a null from secure storage on a device where the keystore was
+/// reset — killed the process before a single frame was drawn, so the user saw
+/// the app die on launch and Play recorded a user-perceived crash. Worse, the
+/// cause persists: the same user crashes on every launch, which is how a
+/// handful of bad devices drags the crash rate up.
+///
+/// None of these steps is required for the app to show its first screen; each
+/// one degrades on its own (no DI resolves to an error screen, no push means no
+/// alerts, no locale means English, no cached settings means defaults).
+Future<void> _startupStep(String name, Future<void> Function() run) async {
+  try {
+    await run();
+  } catch (e, stack) {
+    debugPrint('Startup step "$name" failed: $e');
+    await CrashReporter.record(e, stack, reason: 'startup/$name');
+  }
+}
+
+/// Portrait is locked on phones only.
+///
+/// Play Console asks us to "remove resizability and orientation restrictions to
+/// support large screen devices". The app was calling
+/// `setPreferredOrientations([portraitUp])` unconditionally, which is a runtime
+/// `setRequestedOrientation` and is exactly what that check looks for.
+///
+/// On Android 16 the lock is void on large screens anyway: for apps targeting
+/// SDK 36 the system ignores orientation and resizability restrictions on any
+/// display at least 600dp wide. So tablets and unfolded foldables already
+/// rotate — this just stops fighting them, and leaves phones exactly as they
+/// were, where 62 portrait-designed screens stay portrait.
+void _applyOrientationPolicy() {
+  final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+  final shortestSide = view == null
+      ? 0.0
+      : (view.physicalSize / view.devicePixelRatio).shortestSide;
+  // 0 means the view is not laid out yet — treat an unknown screen as a phone.
+  final isPhone = shortestSide <= 0 || shortestSide < 600;
+  SystemChrome.setPreferredOrientations(
+    isPhone
+        ? const [DeviceOrientation.portraitUp]
+        : const [
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ],
+  );
 }
 
 void main() async {
@@ -95,31 +159,60 @@ void main() async {
     debugPrint('Firebase initialization skipped: $e');
   }
 
-  // Dependency Injection
-  await configureDependencies();
+  // Crash reporting, as early as possible so the startup steps below are
+  // covered. Installs the two global handlers as well — see CrashReporter.
+  await CrashReporter.init();
 
-  // Push notifications (permission, channel, foreground/tap handlers)
-  await PushNotificationService.instance.init();
+  // Cheap, local, and the first screen genuinely needs them: DI builds the
+  // blocs, and locale and settings are two SharedPreferences reads that decide
+  // what the first frame says.
+  await _startupStep('dependencies', configureDependencies);
+  await _startupStep('locale', LocaleController.instance.load);
+  await _startupStep('settings', AppConfig.initFromPrefs);
 
-  // Restore the saved app language before the first frame.
-  await LocaleController.instance.load();
-
-  // Seed cached platform settings (e.g. App Suggested Fare toggle) from disk so
-  // cards render correctly on first paint; refreshed from the server on load.
-  await AppConfig.initFromPrefs();
+  // Push setup runs AFTER the first frame, and is not awaited.
+  //
+  // It used to be awaited here, and inside it is
+  // `FirebaseMessaging.requestPermission()` — which puts up the Android 13+
+  // notification dialog and waits for an answer. So on a fresh install the
+  // whole of main() stopped on that dialog, and because runApp had not been
+  // reached yet there was nothing behind it: the very first thing a new user
+  // saw was a permission prompt floating on an empty window, for as long as
+  // they took to decide. Verified on an emulator — the UI appeared the instant
+  // the dialog was dismissed, not before.
+  //
+  // Nothing on the first screen needs push to be ready, so it waits its turn.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _startupStep('push', PushNotificationService.instance.init);
+  });
 
   // If this install came from an invite link, grab the referral code Play passed
   // along. Not awaited — it must never delay first paint.
   captureInstallReferrer();
 
-  // Orientation
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  _applyOrientationPolicy();
 
-  // Status bar style
+  // Icon brightness only.
+  //
+  // `statusBarColor: Colors.transparent` used to be set here too, and that is
+  // what Play Console flagged as "your app uses deprecated APIs or parameters
+  // for edge-to-edge". It compiles to Window.setStatusBarColor(), deprecated at
+  // API 35 and a no-op at API 36 — so the line had stopped doing anything on
+  // the devices it was written for, while still being the thing being reported.
+  //
+  // There is deliberately no setEnabledSystemUIMode(edgeToEdge) call to go with
+  // this. The app targets SDK 36, and Flutter already uses edgeToEdge by
+  // default there with no way to opt out, so calling it would be a no-op that
+  // reads like a fix. Under edge-to-edge the bars are transparent by
+  // definition, which is what the removed line was asking for anyway.
+  //
+  // What edge-to-edge actually needs from us is that screens respect the
+  // insets, since the system bars now sit on top of the app rather than beside
+  // it — see the bottom-inset handling in location_picker_page.
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light, // iOS equivalent
     ),
   );
 
@@ -204,12 +297,17 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
     // buttons stay disabled for everyone.
     void onAuthState(AuthState state) {
       if (state is AuthAuthenticated) {
-        saveOverlayContactFlag(Map<String, dynamic>.from(state.user as Map));
+        final user = Map<String, dynamic>.from(state.user as Map);
+        saveOverlayContactFlag(user);
+        // So a crash report can answer "which account?" without carrying a
+        // phone number into Crashlytics.
+        CrashReporter.setUser('${user['_id'] ?? user['id'] ?? ''}');
         // While signed in, re-check the session every 60s so an admin deletion is
         // caught even with no user activity.
         _sessionHeartbeat ??= Timer.periodic(const Duration(seconds: 60), (_) => _checkSession());
       } else if (state is AuthUnauthenticated) {
         clearOverlayContactFlag();
+        CrashReporter.setUser(null);
         _sessionHeartbeat?.cancel();
         _sessionHeartbeat = null;
       }
@@ -217,6 +315,15 @@ class _GoraCabsAppState extends State<GoraCabsApp> with WidgetsBindingObserver {
 
     onAuthState(_authBloc.state); // in case auth already resolved
     _authSub = _authBloc.stream.listen(onAuthState);
+  }
+
+  @override
+  void didChangeMetrics() {
+    // A foldable opening changes the screen from phone-sized to tablet-sized
+    // while the app is running. The policy is decided from the screen width, so
+    // it has to be re-decided here or an unfolded device stays portrait-locked —
+    // which is the restriction Play asked us to drop.
+    _applyOrientationPolicy();
   }
 
   @override

@@ -7,6 +7,7 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 // Release signing config, loaded from android/key.properties (kept out of git).
@@ -61,8 +62,22 @@ android {
                 signingConfigs.getByName("release")
             else
                 signingConfigs.getByName("debug")
-            isMinifyEnabled = false
+            // R8 on. Play Console flagged "DEX code optimization is below our
+            // threshold — Obfuscation (2%)" with a Feb 2027 deadline; it read 2%
+            // because R8 was switched off entirely, so nothing in the DEX was
+            // ever renamed. Keep rules for the plugins that look classes up by
+            // name at runtime are in proguard-rules.pro.
+            isMinifyEnabled = true
+            // Deliberately left off. Play's metric is about DEX, not resources,
+            // so this buys nothing against the warning — and it would strip
+            // res/raw/gora_ring*.* and @mipmap/ic_launcher, which are resolved
+            // by NAME at runtime (the alert ringtones and the notification
+            // icon) and so look unreferenced to the shrinker.
             isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

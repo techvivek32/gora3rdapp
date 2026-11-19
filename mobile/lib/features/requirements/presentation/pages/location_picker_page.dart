@@ -234,6 +234,13 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The app targets SDK 36, where Android draws every app behind the
+    // navigation bar and the opt-out is ignored. This body is a full-bleed map
+    // with its controls hung off the Stack at `bottom:`, so without this the
+    // Confirm Location button sits under the gesture bar — and under three-button
+    // navigation (a ~48dp bar) it is half-covered and hard to press.
+    // The AppBar already handles the status bar, so only the bottom needs it.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title, style: TextStyle(fontFamily: 'Poppins', fontSize: 16.sp, fontWeight: FontWeight.bold)),
@@ -392,7 +399,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           // ── Current location button ─────────────────────────────────────────
           Positioned(
             right: 12.w,
-            bottom: 210.h,
+            bottom: 210.h + bottomInset,
             child: GestureDetector(
               onTap: _locating ? null : _goToCurrentLocation,
               child: Container(
@@ -419,7 +426,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
             right: 0,
             bottom: 0,
             child: Container(
-              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 28.h),
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 28.h + bottomInset),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
