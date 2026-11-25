@@ -1,6 +1,17 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+/**
+ * Blank out the query parameters a log file must not keep: the gateway auth
+ * key, and the message body — which carries the OTP the user is about to type.
+ */
+function redactSecrets(url: string): string {
+  return url.replace(
+    /([?&](?:authkey|apikey|api_key|key|password|pwd|token|message|msg|text)=)[^&]*/gi,
+    '$1***',
+  );
+}
+
 @Injectable()
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
@@ -63,10 +74,11 @@ export class SmsService {
       url = `${sms.apiUrl}${sep}${params.toString()}`;
     }
 
-    // TEMP DEBUG: log the exact outgoing message + URL so we can compare against
-    // a known-working request. Remove once OTP delivery is confirmed.
-    this.logger.log(`SMS OUT -> number=${local10} route=${sms.route} msg="${message}"`);
-    this.logger.log(`SMS URL -> ${url}`);
+    // What went out, minus the two things that must never be written to a log
+    // file: the gateway auth key and the OTP itself. Both were being printed in
+    // full — harmless only because production drops `log` lines, which is not a
+    // safeguard anyone should be relying on.
+    this.logger.log(`SMS OUT -> number=${local10} route=${sms.route} url=${redactSecrets(url)}`);
 
     try {
       const res = await fetch(url, { method: 'GET' });

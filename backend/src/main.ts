@@ -12,6 +12,22 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
+/** Nest's levels, so an unknown word in the env cannot silence the whole log. */
+const LEVELS = ['error', 'warn', 'log', 'debug', 'verbose', 'fatal'] as const;
+type LogLevel = (typeof LEVELS)[number];
+
+/**
+ * `LOG_LEVELS=error,warn,log` → those levels. Unset, empty or entirely unknown
+ * → undefined, and the caller keeps the built-in default.
+ */
+function parseLogLevels(raw?: string): LogLevel[] | undefined {
+  const picked = (raw ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter((s): s is LogLevel => (LEVELS as readonly string[]).includes(s));
+  return picked.length ? [...new Set(picked)] : undefined;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Keep the raw request body so webhook signature checks (Razorpay
@@ -20,10 +36,22 @@ async function bootstrap() {
     // re-serialized body that never matches, and every webhook is rejected —
     // which silently blocked QR-paid membership activations.
     rawBody: true,
-    // In production keep only errors/warnings — 'log'/'debug' floods the CPU & disk.
-    logger: process.env.NODE_ENV === 'production'
+    // Which levels actually reach the log file.
+    //
+    // Production dropped 'log' entirely, and that is how an integration can run
+    // for weeks with no trace of itself: 2,666 bookings have been created from
+    // WhatsApp and `WhatsApp booking created …` appears in the log ZERO times,
+    // because it is a `logger.log`. When a customer says "I messaged and got
+    // nothing back", there was no way to tell whether the message arrived.
+    //
+    // `LOG_LEVELS` makes it a decision rather than a constant — set it to
+    // `error,warn,log` to keep the per-message trail. The default is exactly
+    // what it was before, so nothing changes for anyone who ignores it.
+    // 'debug' stays off in production either way: that one does flood.
+    logger: parseLogLevels(process.env.LOG_LEVELS) ??
+      (process.env.NODE_ENV === 'production'
         ? ['error', 'warn']
-        : ['error', 'warn', 'log', 'debug'],
+        : ['error', 'warn', 'log', 'debug']),
   });
 
   const configService = app.get(ConfigService);

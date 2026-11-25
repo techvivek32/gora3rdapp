@@ -58,11 +58,22 @@ export class WhatsappService {
       // can't create bookings. In dev, stay open for local testing.
       return process.env.NODE_ENV !== 'production';
     }
-    if (!rawBody || !signature) return false;
+    if (!rawBody || !signature) {
+      // Worth a warning, not silence: every rejected call is an inbound message
+      // nobody ever answered, and this is the one path that leaves no other
+      // trace at all.
+      this.logger.warn(
+        `WhatsApp webhook rejected — ${!signature ? 'no x-hub-signature-256 header' : 'no raw body'}`,
+      );
+      return false;
+    }
     const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
     try {
-      return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+      const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+      if (!ok) this.logger.warn('WhatsApp webhook rejected — signature does not match WHATSAPP_APP_SECRET');
+      return ok;
     } catch {
+      this.logger.warn('WhatsApp webhook rejected — malformed signature header');
       return false;
     }
   }
@@ -72,10 +83,28 @@ export class WhatsappService {
     try {
       const value = body?.entry?.[0]?.changes?.[0]?.value;
       const msg = value?.messages?.[0];
-      if (!msg || msg.type !== 'text') return; // status callbacks / non-text → ignore
+      if (!msg) {
+        // Delivery receipts for our own replies — the bulk of the traffic, and
+        // the reason this is not logged at a level that survives production.
+        const st = value?.statuses?.[0];
+        if (st) this.logger.debug(`WhatsApp status "${st.status}" for ${st.id}`);
+        else this.logger.debug('WhatsApp webhook with no message and no status');
+        return;
+      }
+      if (msg.type !== 'text') {
+        // An image, voice note or location gets no answer at all today. The
+        // sender is left waiting, so say so in the log.
+        this.logger.warn(`WhatsApp ${msg.type} from +${msg.from} — not handled, sender got no reply`);
+        return;
+      }
       const from: string = msg.from; // e.g. "919587090620"
       const text: string = (msg.text?.body ?? '').trim();
-      if (!text) return;
+      if (!text) {
+        this.logger.warn(`WhatsApp empty text from +${from} — no reply sent`);
+        return;
+      }
+      // The line that was missing: proof the message reached us at all.
+      this.logger.log(`WhatsApp in  +${from}: "${text.slice(0, 120).replace(/\s+/g, ' ')}"`);
       // When the message omits a date/time we fall back to the moment it was
       // sent (subah/urgent/blank time → the send time; no date → the send date).
       const msgDate = this.messageDate(msg);
@@ -716,9 +745,16 @@ export class WhatsappService {
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ messaging_product: 'whatsapp', to, ...payload }),
       });
-      if (!res.ok) this.logger.error(`WhatsApp send failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
+      if (!res.ok) {
+        this.logger.error(`WhatsApp send failed (${res.status}) to +${to}: ${(await res.text()).slice(0, 300)}`);
+        return;
+      }
+      // Meta accepted it. Without this line a delivered reply and a reply that
+      // was never attempted look exactly the same from the log.
+      const id = (await res.json().catch(() => null))?.messages?.[0]?.id ?? '';
+      this.logger.log(`WhatsApp out +${to} ok${id ? ` (${id.slice(0, 28)}…)` : ''}`);
     } catch (e: any) {
-      this.logger.error(`WhatsApp send error: ${e?.message ?? e}`);
+      this.logger.error(`WhatsApp send error to +${to}: ${e?.message ?? e}`);
     }
   }
 }

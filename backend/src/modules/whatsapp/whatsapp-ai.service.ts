@@ -73,10 +73,27 @@ export class WhatsappAiService {
     return !!process.env.OPENAI_API_KEY;
   }
 
+  /**
+   * How long one model may take before we give up on it.
+   *
+   * The library's default is **ten minutes, retried twice** — thirty minutes
+   * for one message, across three models in the list. Nothing downstream is
+   * waiting on a clock, so a single stalled call simply means the customer who
+   * messaged never gets an answer, and (before this) nothing in the log ever
+   * said so. The fallback list IS the retry, so retries are off here.
+   */
+  private static readonly CALL_TIMEOUT_MS = 15_000;
+
   private get openai(): OpenAI | null {
     const key = process.env.OPENAI_API_KEY;
     if (!key) return null;
-    if (!this.client) this.client = new OpenAI({ apiKey: key });
+    if (!this.client) {
+      this.client = new OpenAI({
+        apiKey: key,
+        timeout: WhatsappAiService.CALL_TIMEOUT_MS,
+        maxRetries: 0,
+      });
+    }
     return this.client;
   }
 
@@ -143,9 +160,15 @@ export class WhatsappAiService {
       : [...WhatsappAiService.MODELS];
 
     const failures: string[] = [];
+    const started = Date.now();
     for (const model of models) {
       try {
         const parsed = await this.callModel(client, model, body);
+        const ms = Date.now() - started;
+        // A parse this slow is a customer watching a silent chat. It is not an
+        // error — the answer did arrive — but it is the early warning that the
+        // model is degrading, which is invisible otherwise.
+        if (ms > 8000) this.logger.warn(`WhatsApp AI parse took ${ms}ms on "${model}"`);
         if (parsed) {
           // Worth knowing: the configured model is dead and a fallback is
           // carrying WhatsApp bookings. Someone should update the list/env.
