@@ -1,5 +1,16 @@
 # WhatsApp replies are not being delivered — 25 Nov 2026
 
+> **RESOLVED the same day, 07:21 UTC (12:51 IST).** ₹100 added to the WhatsApp
+> Business account by UPI; Meta's health check flipped `WABA -> AVAILABLE` and
+> delivery resumed about a minute later. The last failure was 07:20:51; the two
+> real customer confirmations after it (07:21:39, 07:23:13) went through with no
+> failed receipt. Nothing in the app was changed to fix it — the code changes
+> below are what made the cause visible in the first place.
+>
+> Still open: business verification (141010), display name approval (the number
+> is capped at TIER_250), the GST number on the billing account, and the missing
+> OTP / invoice templates.
+
 **The app is not at fault. Meta has the number in a blocked state.**
 
 Three `hii` messages were sent to +91 94620 60407 (10:48, 11:46, 11:48 IST).
@@ -39,12 +50,67 @@ OVERALL can_send_message: BLOCKED
 Also: `messaging_limit_tier: TIER_250`, `is_official_business_account: false`,
 `code_verification_status: EXPIRED`, `quality_rating: GREEN`.
 
-The only entity reading **BLOCKED** is the WABA, and the only error on it is the
-payment method. Meta's note on 141006 says *business-initiated* conversations —
-a reply inside the 24-hour window is user-initiated and should in theory still
-go — but Meta's own rollup for the number is `BLOCKED`, and empirically nothing
-is being delivered. Fix the payment method first, then re-test: the per-message
-reason will now be in the log (see "Code changes" below).
+## Confirmed, per message
+
+With the failed-delivery logging live (`a258e45`), one more `hii` gave Meta's
+own verdict on that exact message — three lines, three seconds apart:
+
+```
+06:29:42  WhatsApp in  +916354348913: "hii"
+06:29:44  WhatsApp out +916354348913 ok (wamid.HBgMOTE2MzU0MzQ4OTEzFQ…)
+06:29:46  WhatsApp delivery FAILED to +916354348913 (wamid.…QjdDQTVFOEYyQjI1OUZDQUQzAA==):
+          131042 Business eligibility payment issue
+          Message failed to send because your WhatsApp Business account currency
+          is not configured.
+```
+
+Meta even supplies the page that fixes it:
+
+```
+https://business.facebook.com/billing_hub/accounts/details/
+  ?business_id=1449843836131229
+  &asset_id=2166534517256689
+  &wizard_name=CHANGE_COUNTRY_CURRENCY
+  &account_type=whatsapp-business-account
+```
+
+So the precise cause is **not a declined card — the WABA has no country/currency
+set at all**, which is what the generic 141006 "payment method" error on the
+health check was standing in for. Nothing can be delivered until that wizard is
+completed.
+
+## It used to work. It stopped on 22 November.
+
+This is not a long-standing fault that nobody noticed — Meta's own analytics for
+the WABA show the number delivering perfectly, every single day, until it simply
+stopped:
+
+```
+date          sent  delivered
+2026-11-15     115        115
+2026-11-16      31         31
+2026-11-17      38         38
+2026-11-18      57         57
+2026-11-19      46         46
+2026-11-20      49         49
+2026-11-21      47         47
+2026-11-22       —          —     no data point at all
+2026-11-23       —          —
+2026-11-24       —          —
+2026-11-25       —          —
+```
+
+Over the 75 days queried: **2,030 sent, 2,030 delivered — a 100% rate, zero
+failures** — and then nothing from 22 November onward. A failed message is not
+counted as "sent", which is why those four days have no row rather than a row of
+zeros.
+
+So the trigger was not a code change on our side (the last backend deploy before
+this was 19 November, and it touched one additive site-text key). What changed is
+that the WABA had **never** had a country/currency set — the billing wizard said
+"cannot be changed once set", which only appears before it has been set — and
+Meta began enforcing that on 22 November. Everything the business sends has been
+dropped since.
 
 ## What else this silently breaks
 
@@ -72,8 +138,9 @@ those two will still not arrive **even after the payment block is cleared**.
 
 ## What has to be done in Meta (cannot be done from the code)
 
-1. **Add a working payment method** on WABA `2166534517256689`. This is the one
-   thing currently marked BLOCKED.
+1. **Set the country and currency** on WABA `2166534517256689`, via the billing
+   hub link Meta returns with error 131042 (above). This is the one thing
+   actually stopping delivery — confirmed on a live message, not inferred.
 2. **Complete business verification** (error 141010) — clears the BUSINESS limit.
 3. **Get the display name approved** — raises the number above TIER_250.
 4. Create and get approved an **AUTHENTICATION** template for the trip OTP and a

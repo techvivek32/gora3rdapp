@@ -179,6 +179,17 @@ export class RequirementsService {
   private static readonly DUP_WINDOW_MS = 90_000;
 
   /**
+   * The same window for WhatsApp forwards, which are not double-taps and arrive
+   * far apart — the same booking has been seen re-posted eight seconds and five
+   * hours later. Eight hours covers a working day's forwarding without merging
+   * a genuine fresh request for the same route the next morning.
+   */
+  private static readonly WA_DUP_WINDOW_MS = 8 * 60 * 60 * 1000;
+
+  /** How long the SAME agent re-sending the same text counts as a mis-send. */
+  private static readonly WA_RESEND_WINDOW_MS = 2 * 60 * 1000;
+
+  /**
    * Finds an already-created booking that this new one would duplicate.
    * WhatsApp messages are de-duplicated SOLELY by their message id (wamid) —
    * idempotent across Meta redeliveries. App posts additionally match on poster
@@ -190,10 +201,59 @@ export class RequirementsService {
       const byMsg = await this.requirementModel.findOne({ whatsappMessageId: dto.whatsappMessageId });
       if (byMsg) return byMsg;
     }
-    // Don't content-match WhatsApp posts: an agent forwarding several different
-    // customer bookings back-to-back (same route/date, no distinct number) would
-    // otherwise be wrongly collapsed into one — the "sometimes not posting" bug.
-    if ((dto?.source ?? 'app') === 'whatsapp') return null;
+    // WhatsApp forwards. The same customer's booking reaches us from several
+    // agents in the same group, each forward carrying its own wamid, so the
+    // idempotency above never catches it: 47 duplicate posts in 30 days, one
+    // ride posted three times. Two drivers then call the same customer.
+    //
+    // Content-matching WhatsApp posts was tried before and reverted, because an
+    // agent forwarding several DIFFERENT customers back-to-back on the same
+    // route and date was collapsed into one — the "sometimes not posting" bug.
+    // The thing that tells those two cases apart is the customer's own number:
+    // when it is present and identical it is the same booking, and when it is
+    // missing we must not guess. So this matches only on a real number, and is
+    // deliberately NOT scoped to the poster — a forward comes from someone else,
+    // which is the whole point.
+    // Measured over 30 days: of 44 rides posted more than once, 8 came from a
+    // DIFFERENT agent (a forward — certainly the same booking) and 36 from the
+    // same agent, at gaps from 8 seconds to 43 hours. Merging that second group
+    // wholesale would eventually drop a customer who genuinely wants two cars,
+    // which is far worse than two drivers ringing one customer. So the two are
+    // treated differently, and anything outside both stays a separate post.
+    if ((dto?.source ?? 'app') === 'whatsapp') {
+      if (!dto?.contactMobile || !dto?.travelDate) return null;
+      const same = {
+        source: 'whatsapp',
+        contactMobile: dto.contactMobile,
+        pickupCity: dto.pickupCity,
+        dropCity: dto.dropCity,
+        travelDate: new Date(dto.travelDate),
+        status: BookingStatus.ACTIVE,
+      };
+      const uid = new Types.ObjectId(userId);
+
+      // Another agent forwarding the same customer's message. Nobody forwards
+      // a booking to ask for a second car, so a whole working day is safe.
+      const forwarded = await this.requirementModel
+        .findOne({
+          ...same,
+          postedBy: { $ne: uid },
+          createdAt: { $gte: new Date(Date.now() - RequirementsService.WA_DUP_WINDOW_MS) },
+        })
+        .sort({ createdAt: -1 });
+      if (forwarded) return forwarded;
+
+      // The same agent sending it twice in a couple of minutes is a mis-send:
+      // a real second car is asked for in one message, not by re-sending the
+      // first one verbatim. Past that the two are left as separate bookings.
+      return this.requirementModel
+        .findOne({
+          ...same,
+          postedBy: uid,
+          createdAt: { $gte: new Date(Date.now() - RequirementsService.WA_RESEND_WINDOW_MS) },
+        })
+        .sort({ createdAt: -1 });
+    }
 
     const filter: any = {
       postedBy: new Types.ObjectId(userId),
