@@ -74,7 +74,7 @@ Fix **30 अक्टूबर** को repo में आ गया था, प
 | 1 | Crash rate 2.27% | Overlay alert deadlock (v44, 22 अक्टूबर) | Fix तैयार, release होना बाकी + startup hardening + Crashlytics |
 | 2 | ANR 0.17% | **समस्या नहीं** — peers से बेहतर | वही deadlock fix इसे भी कवर करता है |
 | 3 | Obfuscation 2% | `isMinifyEnabled = false` — **R8 पूरी तरह बंद था** | R8 चालू + keep rules → **65.7%** (नापा गया) |
-| 4 | Edge-to-edge | `statusBarColor` — API 35 से deprecated, API 36 पर बेअसर | हटाया; साथ में एक असली layout bug भी ठीक |
+| 4 | Edge-to-edge | `statusBarColor` — API 35 से deprecated, API 36 पर बेअसर | हटाया; सभी screens के insets जाँचे गए |
 | 5 | Deprecated APIs | ऊपर वाला ही point | वही fix |
 | 6 | Large screen | `setPreferredOrientations(portrait)` हर device पर | अब portrait सिर्फ़ फ़ोन पर; tablet/foldable घूमते हैं |
 
@@ -113,10 +113,18 @@ runtime पर **नाम से** ढूँढे जाते हैं।
 बनता है — **API 35 से deprecated, API 36 पर बिल्कुल बेअसर**। Play इसी को
 "deprecated APIs for edge-to-edge" बता रहा था। वह line हटा दी।
 
-**साथ में एक असली bug मिला:** location picker (pickup/drop चुनने वाली screen) में
-"Confirm Location" बटन `bottom: 0` पर टँगा था, बिना inset के। यानी Android 15/16 वाले
-users पर वह बटन **अभी भी navigation bar के नीचे दबा है** — three-button navigation पर तो
-आधा ढका रहता है। ठीक कर दिया।
+**Layout की जाँच भी की गई।** Edge-to-edge का असली मतलब यह है कि system bars अब ऐप के
+*ऊपर* बैठते हैं, इसलिए हर screen को insets का ध्यान रखना पड़ता है। सारी screens देखी गईं:
+
+- `main_nav_page` का `BottomAppBar` — Flutter खुद उसमें `SafeArea` लगाता है ✅
+- `customer_nav_page` — पहले से `SafeArea(top: false)` लगा है ✅
+- बाकी किसी reachable screen पर screen-level bottom-anchored element बिना inset के नहीं मिला ✅
+
+`location_picker_page` में एक जगह `bottom: 0` बिना inset के था और वह ठीक किया गया है,
+**लेकिन यह live bug नहीं था** — जाँचने पर पता चला कि वह पूरी screen **dead code** है।
+उसका कोई route नहीं है और कोई screen उसे खोलती नहीं; उस file से सिर्फ़ `haversineDistanceKm`
+helper import होता है। यानी कोई user वहाँ पहुँचता ही नहीं। बदलाव सही है और आगे काम आएगा
+अगर वह screen कभी जोड़ी जाए, पर इसे "ठीक किया गया bug" नहीं गिनना चाहिए।
 
 ### 4.3 Large screen
 
@@ -206,6 +214,67 @@ emulator पर चलाया गया, **production को छुआ नह�
 | फ़ोन (sw411dp) — rotation ज़बरदस्ती | ✅ portrait ही रहा — **कोई बदलाव नहीं** |
 | Tablet (sw1067dp) | ✅ landscape में घूमा, crash नहीं, `SCREEN_ORIENTATION_FULL_USER` |
 
+### दूसरा पूरा sweep (हर screen, R8 build पर)
+
+| जाँच | नतीजा |
+|---|---|
+| Cold start | ✅ कोई startup step fail नहीं, Crashlytics चालू |
+| Session बचती है? (force-stop → restart) | ✅ सीधे logged-in home — secure storage R8 में ठीक |
+| My Bookings | ✅ posted booking दिखी — 395 KM, ₹5921 App Suggested Fare |
+| Chat / Settings | ✅ render, crash नहीं |
+| My Wallet | ✅ balance ₹16924, on-hold ₹520, commission transaction दिखा |
+| My Vehicles & Drivers | ✅ |
+| Membership Plans | ✅ tiers + current plan |
+| Available Car / Hire a Driver / Car Pool | ✅ |
+| Recharge / Notifications & OTP / Booking | ✅ |
+
+**पूरे sweep का हिसाब:** FATAL crash **0**, `E/flutter` errors **0**, ANR **0**,
+R8 वाली class-not-found गड़बड़ी **0**, startup step fail **0**, Crashlytics को भेजा गया
+crash **0**। ऐप अंत तक चलता रहा।
+
+### तीसरा sweep — हर native plugin और Customer mode
+
+R8 सिर्फ़ Android/Java वाले हिस्से (plugins) पर चलता है, Dart पर नहीं। इसलिए हर native
+plugin को अलग से चलाकर देखा गया:
+
+| Plugin | कैसे test हुआ | नतीजा |
+|---|---|---|
+| audioplayers | Alert Sound → tone play | ✅ MediaPlayer→MediaCodec→AudioTrack, 50176 frames, साफ़ stop |
+| share_plus | Invite Friends → Share | ✅ ChooserActivity खुली |
+| image_picker | Profile photo → Gallery | ✅ Android PhotoPicker, 243 items |
+| in_app_update | home पर अपने आप | ✅ `AppUpdateService: requestUpdateInfo` |
+| firebase_crashlytics | startup | ✅ 19.4.4, `collect_anrs: true` |
+| firebase_messaging | startup | ✅ background service started |
+| flutter_secure_storage | force-stop → restart | ✅ session बची रही |
+| google_maps | — | ⚠️ नहीं हुआ (सिर्फ़ live trip screen पर है) |
+| razorpay | — | ⚠️ नहीं हुआ (local में keys नहीं) |
+
+### Customer mode — पूरा booking flow
+
+Driver mode के अलावा Customer mode भी पूरा चलाया गया:
+Switch to Customer → Cab Booking → Jaipur→Udaipur → Explore Cabs (395 km, SUV ₹40350 /
+Sedan ₹20236) → Fare breakdown (Base ₹35523 + Driver allowance ₹504 + GST 12% ₹4323) →
+Select Car → Review → **Confirm** → **Booking ID `CB3952146461` बनी और DB में पहुँची**।
+
+### Edge cases
+
+| जाँच | नतीजा |
+|---|---|
+| Three-button navigation (48dp bar) | ✅ कुछ नहीं ढका |
+| Font scale 1.3x और 1.8x | ✅ layout reflow हुआ, **एक भी overflow error नहीं** |
+| Nav mode + font बदलते समय (पूरा rebuild) | ✅ ऐप उसी process में ज़िंदा रहा |
+| दूसरी app में जाकर वापस आना (share/photo picker) | ✅ ऐप बचा रहा |
+| दूसरे device से login → session replace | ✅ crash नहीं, साफ़ "Logged out" dialog |
+
+**तीनों sweep का कुल हिसाब:** FATAL **0**, `E/flutter` **0**, ANR **0**, R8 class failure
+**0**, RenderFlex overflow **0**, startup fail **0**, Crashlytics crash report **0**।
+
+> **जो test नहीं हो सका:** Razorpay का checkout। local backend में Razorpay keys हैं ही
+> नहीं, इसलिए order ही नहीं बनता और SDK खुलता नहीं। ऐप ने इसे बिना crash हुए सँभाल लिया,
+> पर **payment का असली रास्ता untested है** — और R8 के लिहाज़ से यही सबसे संवेदनशील जगह है
+> (keep rules लिखे हुए हैं और class के नाम सुरक्षित हैं, पर चलाकर नहीं देखा गया)। Release
+> से पहले Razorpay test keys के साथ एक बार यह ज़रूर चलाकर देखना चाहिए।
+
 ---
 
 ## 6. आगे क्या चाहिए
@@ -273,6 +342,6 @@ balance और pending commission वाले test accounts दे दें, l
 | `mobile/pubspec.yaml` | `firebase_crashlytics: ^4.3.10` |
 | `mobile/lib/core/utils/crash_reporter.dart` | **नई** — crash reporting + global handlers |
 | `mobile/lib/main.dart` | startup hardening, orientation policy, edge-to-edge, push ordering |
-| `mobile/lib/.../location_picker_page.dart` | bottom inset fix |
+| `mobile/lib/.../location_picker_page.dart` | bottom inset (dead code — live bug नहीं था) |
 
 **अभी कुछ भी commit या release नहीं किया गया है।**

@@ -63,7 +63,7 @@ export class AuthService {
 
   // Login step 1: the number must already be registered, then text an OTP.
   async sendLoginOtp(dto: LoginSendOtpDto) {
-    const user = await this.userModel.findOne({ mobile: dto.mobile });
+    const user = await this.findUserByMobile(dto.mobile);
     if (!user) throw new NotFoundException('This number is not registered');
     if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
     if (!user.isActive) throw new UnauthorizedException('Account is inactive');
@@ -76,7 +76,7 @@ export class AuthService {
   async loginWithOtp(dto: LoginVerifyOtpDto) {
     await this.verifyOtp(dto.mobile, dto.otp);
 
-    const user = await this.userModel.findOne({ mobile: dto.mobile });
+    const user = await this.findUserByMobile(dto.mobile);
     if (!user) throw new NotFoundException('This number is not registered');
     if (user.isBlocked) throw new UnauthorizedException('Account has been blocked');
     if (!user.isActive) throw new UnauthorizedException('Account is inactive');
@@ -97,9 +97,35 @@ export class AuthService {
     };
   }
 
+  /**
+   * Every way the same Indian number can be stored.
+   *
+   * One person ends up written two ways. Firebase phone auth hands back E.164,
+   * so accounts created that way are `+919876543210`; the SMS flow stores the
+   * ten digits the user typed, so those are `9876543210`. An exact match on
+   * what they type therefore tells a Firebase-created user that their own
+   * number "is not registered" — and `ensureUnique` then happily lets them
+   * register it a second time, splitting their wallet and trip history across
+   * two accounts. `resolveReferrer` already matches on the last ten digits for
+   * exactly this reason; the login and signup paths did not.
+   */
+  private mobileVariants(mobile: string): string[] {
+    const raw = `${mobile ?? ''}`.trim();
+    const d10 = raw.replace(/\D/g, '').slice(-10);
+    // Too short to be a mobile number — match it literally rather than
+    // widening into something that could collide.
+    if (d10.length < 10) return [raw];
+    return [...new Set([raw, d10, `+91${d10}`, `91${d10}`, `0${d10}`])];
+  }
+
+  /** The account for this number, however it happens to be stored. */
+  private findUserByMobile(mobile: string) {
+    return this.userModel.findOne({ mobile: { $in: this.mobileVariants(mobile) } });
+  }
+
   private async ensureUnique(email: string | undefined, mobile: string) {
     // Email is optional; only include it in the uniqueness check when provided.
-    const or: Record<string, any>[] = [{ mobile }];
+    const or: Record<string, any>[] = [{ mobile: { $in: this.mobileVariants(mobile) } }];
     if (email) or.push({ email: email.toLowerCase() });
 
     const existingUser = await this.userModel.findOne({ $or: or });
@@ -328,7 +354,10 @@ export class AuthService {
     if (!decodedToken) throw new BadRequestException('Invalid Firebase token');
 
     const mobile = decodedToken.phone_number;
-    let user = await this.userModel.findOne({ mobile });
+    // Firebase gives E.164. Look the account up by the number rather than by
+    // that spelling, so a user who already exists as plain ten digits signs in
+    // to the account they have instead of getting a second, empty one.
+    let user = await this.findUserByMobile(mobile);
 
     if (!user) {
       user = await this.userModel.create({

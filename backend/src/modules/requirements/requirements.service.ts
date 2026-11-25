@@ -616,9 +616,20 @@ export class RequirementsService {
           commission >= floor
             ? `This booking's commission is ₹${commission}, so ₹${required} must be in the driver's wallet.`
             : `A minimum wallet balance of ₹${floor} is required (this booking's commission is ₹${commission}).`;
-        throw new BadRequestException(
-          `${why} ${name} has ₹${balance} - ask them to recharge ₹${required - balance} more.`,
-        );
+        // The shortfall rides in `errors` as well as in the sentence, because
+        // the app's "Add Money" button needs the number, not the prose. Parsing
+        // it back out of the message would break the first time the wording
+        // changes. `errors` is the only extra field the global
+        // HttpExceptionFilter forwards — see assertVerifiedPoster.
+        throw new BadRequestException({
+          message: `${why} ${name} has ₹${balance} - ask them to recharge ₹${required - balance} more.`,
+          errors: {
+            code: 'WALLET_TOPUP_REQUIRED',
+            required,
+            balance,
+            shortfall: required - balance,
+          },
+        });
       }
     }
 

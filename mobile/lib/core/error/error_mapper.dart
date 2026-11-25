@@ -95,5 +95,24 @@ class ErrorMapper {
     return (c is String && c.isNotEmpty) ? c : null;
   }
 
+  /// A number the backend tucked inside `errors`, when it sent one.
+  ///
+  /// Same channel as [code] — NestJS strips extra top-level fields, so numbers
+  /// the UI needs to act on (the wallet shortfall on a refused accept, say)
+  /// ride in `errors` beside the code. Reading the number is the point: the
+  /// amount is also in the sentence, but parsing prose breaks the first time
+  /// the wording changes.
+  static int? number(Object error, String key) {
+    if (error is! DioException) return null;
+    final data = error.response?.data;
+    if (data is! Map) return null;
+    final errors = data['errors'];
+    if (errors is! Map) return null;
+    final v = errors[key];
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v.trim());
+    return null;
+  }
+
   static String _clean(String raw) => raw.replaceAll('Exception: ', '').trim();
 }

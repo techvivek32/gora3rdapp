@@ -202,6 +202,30 @@ class CustomerRequestCard extends StatelessWidget {
               Text('$fare', style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             ],
           ]),
+          // TWO different amounts belong to this booking and the card used to
+          // show only the smaller one, bare, directly above a line reading
+          // "GST included" — so the card contradicted itself, and the driver
+          // went in expecting a different number from the one on the
+          // customer's bill. `fare` is what they keep (the fare less our
+          // commission + GST, which already left their wallet); `_total` is
+          // what the customer actually hands them in cash.
+          //
+          // It sits on its own line rather than beside the amount: the row
+          // above already carries vehicle, fuel and transmission, and a
+          // caption this long squeezed into it overflows on a narrow phone.
+          if (fare != 0 && _total > fare) ...[
+            SizedBox(height: 2.h),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'you keep · collect ₹$_total cash',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+              ),
+            ),
+          ],
           // Round-trip return date (so the driver knows when to bring the car back).
           if (returnDate != null) ...[
             SizedBox(height: 8.h),

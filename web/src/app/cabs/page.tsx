@@ -15,6 +15,7 @@ import {
   fareFor,
   isLocalTrip,
   isRoundTrip,
+  localHours,
   localIncludedKm,
   localOffered,
   resolveFuel,
@@ -317,6 +318,24 @@ function CabResults() {
                     {b.minApplied && (
                       <p className="mt-2 text-[11px] font-semibold text-warn">
                         Minimum {Math.round(b.billedKm)} km applies to this cab for your dates.
+                      </p>
+                    )}
+
+                    {/* What happens PAST the allowance. The booking already
+                        records these rates and the driver bills them at trip
+                        end, so leaving them off the page meant a rider could
+                        agree to a fare and then meet an "Extra 150 km" line on
+                        the invoice they had never been shown. The app has said
+                        this all along, in its exclusions list; the site had
+                        not. */}
+                    {Number(cat.extraKmPrice ?? 0) > 0 && !isLocal && (
+                      <p className="mt-2 text-[11px] font-semibold text-muted">
+                        Beyond {Math.round(b.billedKm)} km: ₹{Number(cat.extraKmPrice)}/km extra.
+                      </p>
+                    )}
+                    {isLocal && Number(cat.extraHourPrice ?? 0) > 0 && (
+                      <p className="mt-2 text-[11px] font-semibold text-muted">
+                        Beyond {localHours(trip)} hours: ₹{Number(cat.extraHourPrice)}/hr extra.
                       </p>
                     )}
                   </div>

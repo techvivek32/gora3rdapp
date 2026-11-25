@@ -563,8 +563,16 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
         .clamp(0, fare);
     final showBreakdown = fare > 0 && (gst > 0 || allowance > 0 || toll > 0 || parking > 0 || other > 0 || extraKmCharge > 0 || extraHourCharge > 0);
     final gstPct = (baseFare + allowance) > 0 ? ((gst / (baseFare + allowance)) * 100).round() : 0;
-    // The driver collects the GST-free amount in cash; GST goes to Gora separately.
-    final driverCash = (fare - gst - paid) < 0 ? 0 : (fare - gst - paid);
+    // The driver collects the WHOLE fare in cash, GST included. Gora's
+    // commission and the GST came out of the DRIVER's wallet when the booking
+    // was assigned, so there is nothing for the rider to settle separately.
+    //
+    // This used to subtract the GST and tell the rider to hand over fare - GST.
+    // The driver's own trip summary says "collect the whole fare" and the PDF
+    // invoice bills the whole fare, so on every booking carrying GST the rider,
+    // the driver and the bill each named a different number at the moment of
+    // payment — a guaranteed argument at the end of the ride.
+    final driverCash = (fare - paid) < 0 ? 0 : (fare - paid);
     final nothingToDriver = driverCash == 0 || percent >= 100;
     Widget line(String label, String amount, {bool muted = false}) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 3),
@@ -599,12 +607,12 @@ class _CustomerBookingDetailPageState extends State<CustomerBookingDetailPage> {
           const SizedBox(height: 6),
           Text(
             nothingToDriver
-                ? (gst > 0
-                    ? 'Fully paid. GST ₹$gst is billed by Gora separately — not paid to the driver.'
-                    : 'Fully paid. Nothing more to pay to the driver.')
-                : (gst > 0
-                    ? 'Pay ₹$driverCash to the driver in cash. GST ₹$gst is billed by Gora separately — not paid to the driver.'
-                    : 'Pay ₹$driverCash directly to the driver.'),
+                ? 'Fully paid. Nothing more to pay to the driver.'
+                : paid > 0
+                    ? 'Pay ₹$driverCash to the driver in cash — the balance after your ₹$paid advance.'
+                    : gst > 0
+                        ? 'Pay ₹$driverCash to the driver in cash. That is the full fare, GST included.'
+                        : 'Pay ₹$driverCash directly to the driver.',
             style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, height: 1.35),
           ),
         ],

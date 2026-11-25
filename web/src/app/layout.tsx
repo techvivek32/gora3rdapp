@@ -4,6 +4,7 @@ import './globals.css';
 import { Providers } from './providers';
 import { SiteHeader } from '@/components/SiteHeader';
 import { SiteFooter } from '@/components/SiteFooter';
+import { AppDownloadPrompt } from '@/components/AppDownloadPrompt';
 import { IntroLoader } from '@/components/IntroLoader';
 import { ScrollFx } from '@/components/ScrollFx';
 
@@ -124,6 +125,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <main className="flex-1">{children}</main>
             <SiteFooter />
           </div>
+          {/* Sits outside the column so it pins to the viewport, not the page. */}
+          <AppDownloadPrompt />
         </Providers>
       </body>
     </html>

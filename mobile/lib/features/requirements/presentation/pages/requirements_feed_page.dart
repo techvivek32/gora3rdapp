@@ -8,6 +8,7 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/utils/tab_refresh.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/localization/app_translations.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/constants/vehicle_types.dart';
 import '../../../../core/network/api_client.dart';
@@ -133,13 +134,18 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
       _loadCustomerBookings();
     } catch (e) {
       if (!mounted) return;
-      _showAcceptError(serverMessage(e, fallback: 'Could not accept the booking.'));
+      _showAcceptError(serverMessage(e, fallback: 'Could not accept the booking.'), error: e);
     }
   }
 
   /// Clean popup for accept failures (e.g. low wallet balance for eligibility).
-  void _showAcceptError(String message) {
-    final lowBalance = message.toLowerCase().contains('wallet') || message.toLowerCase().contains('balance');
+  void _showAcceptError(String message, {Object? error}) {
+    // The server names this refusal, so trust the code when it sent one and
+    // only fall back to sniffing the sentence for older builds.
+    final shortfall = error == null ? null : ErrorMapper.number(error, 'shortfall');
+    final lowBalance = (error != null && ErrorMapper.code(error) == 'WALLET_TOPUP_REQUIRED') ||
+        message.toLowerCase().contains('wallet') ||
+        message.toLowerCase().contains('balance');
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -149,8 +155,14 @@ class _RequirementsFeedPageState extends State<RequirementsFeedPage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
           if (lowBalance)
             ElevatedButton(
-              onPressed: () { Navigator.pop(ctx); context.push('/wallet'); },
-              child: const Text('Add Money'),
+              onPressed: () {
+                Navigator.pop(ctx);
+                // Hand the shortfall over so the amount is already in the box.
+                context.push(
+                  shortfall != null && shortfall > 0 ? '/wallet?add=$shortfall' : '/wallet',
+                );
+              },
+              child: Text(shortfall != null && shortfall > 0 ? 'Add ₹$shortfall' : 'Add Money'),
             ),
         ],
       ),

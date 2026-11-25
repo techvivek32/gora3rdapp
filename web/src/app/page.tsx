@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowRight, Building2, Car, CarTaxiFront, CheckCircle2, Clock, FileCheck2,
+  ArrowLeftRight, ArrowRight, Building2, Car, CarTaxiFront, CheckCircle2, Clock, FileCheck2,
   Headphones, Mail, MapPin, MessageCircle, Phone, Search, ShieldCheck,
   Star, ThumbsUp, Users, Wallet,
 } from 'lucide-react';
@@ -758,11 +758,24 @@ function SectionHead({
   );
 }
 
-/** The three things the hero's tabs can switch between. */
-const TABS = [
-  { key: 'cab', label: 'Cab Booking', icon: CarTaxiFront, sub: 'One way · Round · Local' },
-  { key: 'driver', label: 'Hire a Driver', icon: Car, sub: 'Hourly · Full day' },
-  { key: 'pool', label: 'Car Pool', icon: Users, sub: 'Share a ride' },
+/**
+ * The hero books a cab, and only a cab.
+ *
+ * It used to switch between the three services, which put the least-asked-for
+ * two in the most expensive space on the site and made a visitor choose a
+ * product before they could type where they were going. Hiring a driver and
+ * car pooling are still a tap away — in the header, in the footer, and on
+ * their own cards further down — but the first screen now asks the question
+ * almost everyone arrives with.
+ *
+ * So the tabs became the choice that is actually useful this early: which kind
+ * of cab trip. These are the cab page's own `subTypes`, and the one picked here
+ * carries over in the draft rather than being asked again.
+ */
+const TRIP_TYPES = [
+  { key: 'One Way', label: 'One Way', sub: 'Drop-off only' },
+  { key: 'Round Trip', label: 'Round Trip', sub: 'Return in same cab' },
+  { key: 'Local', label: 'Local', sub: 'Hourly rental' },
 ] as const;
 
 /**
@@ -782,14 +795,14 @@ const TABS = [
  */
 function QuickBook() {
   const router = useRouter();
-  const [tab, setTab] = useState<(typeof TABS)[number]['key']>('cab');
+  const [tripType, setTripType] = useState<(typeof TRIP_TYPES)[number]['key']>('One Way');
   const [pickup, setPickup] = useState<Geo | undefined>();
   const [drop, setDrop] = useState<Geo | undefined>();
   const [problem, setProblem] = useState('');
 
-  // Hiring a driver happens at one place — there is no drop to price — so
-  // that tab asks for one field and the others ask for two.
-  const needsDrop = tab !== 'driver';
+  // Local is an in-city hourly package — there is nowhere to drop, so that one
+  // asks for a single place. Same rule the booking page applies.
+  const needsDrop = tripType !== 'Local';
   // The fare is a road distance, so it needs coordinates — typed text that
   // was never resolved to a place cannot be priced.
   const ready = !!pickup?.lat && (!needsDrop || !!drop?.lat);
@@ -799,17 +812,13 @@ function QuickBook() {
       setProblem(
         needsDrop
           ? 'Pick both places from the suggestions so we can price the route.'
-          : 'Pick the location from the suggestions so we can price it.',
+          : 'Pick the pick-up from the suggestions so we can price it.',
       );
       return;
     }
-    if (tab === 'pool') {
-      router.push('/pool');
-      return;
-    }
     tripDraft.set({
-      serviceType: tab === 'driver' ? 'hire_driver' : 'cab',
-      subType: tab === 'driver' ? 'Hourly' : 'One Way',
+      serviceType: 'cab',
+      subType: tripType,
       pickup,
       drop: needsDrop ? drop : undefined,
       pickupCity: pickup?.city || pickup?.address,
@@ -817,7 +826,7 @@ function QuickBook() {
       travelDate: toDateInput(new Date()),
       travelTime: '10:00',
     });
-    router.push(tab === 'driver' ? '/book/hire_driver' : '/book/cab');
+    router.push('/book/cab');
   };
 
   // Not `overflow-hidden`, however much the rounded corners want it: the
@@ -828,23 +837,22 @@ function QuickBook() {
     <div className="mx-auto mt-10 max-w-4xl rounded-card bg-surface p-5 shadow-lift ring-1 ring-hairline/70 sm:p-7">
       {/* The trip-type tabs. The selected one is a solid blue block, which is
           the single loudest element on the first screen and is meant to be:
-          it is the answer to "what are you booking?". */}
+          it is the answer to "what kind of trip?". */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        {TABS.map(({ key, label, icon: Icon, sub }) => {
-          const on = tab === key;
+        {TRIP_TYPES.map(({ key, label, sub }) => {
+          const on = tripType === key;
           return (
             <button
               key={key}
               type="button"
               aria-pressed={on}
-              onClick={() => { setTab(key); setProblem(''); }}
-              className={`flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-tile px-2 py-3 text-center transition ${
+              onClick={() => { setTripType(key); setProblem(''); }}
+              className={`flex min-h-[64px] flex-col items-center justify-center gap-0.5 rounded-tile px-2 py-3 text-center transition ${
                 on
                   ? 'bg-bandblue text-white shadow-[0_6px_18px_rgba(11,116,190,0.3)]'
                   : 'bg-surface text-ink ring-1 ring-hairline hover:bg-sunken'
               }`}
             >
-              <Icon className={`h-5 w-5 ${on ? 'text-white' : 'text-blue'}`} />
               <span className="text-[13px] font-bold leading-tight sm:text-[14px]">{label}</span>
               {/* Full white, not white/80. On this blue that was 3.74:1 —
                   an 11px label is exactly the size that cannot afford it. */}
@@ -856,20 +864,34 @@ function QuickBook() {
         })}
       </div>
 
-      <div className={`mt-6 grid gap-4 ${needsDrop ? 'sm:grid-cols-2' : ''}`}>
+      {/* `relative` so the swap button can sit on the seam between the two
+          fields. It is not decoration: "Jaipur to Delhi" and "Delhi to Jaipur"
+          are different prices, and getting them the wrong way round otherwise
+          means retyping both. */}
+      <div className={`relative mt-6 grid gap-4 ${needsDrop ? 'sm:grid-cols-2' : ''}`}>
         <PlaceInput
-          label={tab === 'driver' ? 'Where is the car' : 'Pickup'}
+          label="Pickup"
           value={pickup}
           onChange={(v) => { setPickup(v); setProblem(''); }}
-          placeholder={tab === 'driver' ? 'Enter your location' : 'Enter pick-up city'}
+          placeholder="Enter pick-up city"
         />
         {needsDrop && (
-          <PlaceInput
-            label="Drop"
-            value={drop}
-            onChange={(v) => { setDrop(v); setProblem(''); }}
-            placeholder="Enter drop city"
-          />
+          <>
+            <PlaceInput
+              label="Drop"
+              value={drop}
+              onChange={(v) => { setDrop(v); setProblem(''); }}
+              placeholder="Enter drop city"
+            />
+            <button
+              type="button"
+              onClick={() => { const p = pickup; setPickup(drop); setDrop(p); setProblem(''); }}
+              aria-label="Swap pick-up and drop"
+              className="absolute left-1/2 top-1/2 z-10 hidden h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-hairline bg-surface text-blue shadow-sm transition hover:bg-bluesoft sm:grid"
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+            </button>
+          </>
         )}
       </div>
 
@@ -878,7 +900,7 @@ function QuickBook() {
         onClick={go}
         className="btn-primary btn-sheen group mt-5 w-full text-[16px]"
       >
-        {tab === 'pool' ? 'Find a ride' : 'Check fare'}
+        Check fare
         <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
       </button>
       {problem && <p className="px-1 pt-2.5 text-[13px] font-semibold text-dangerfg">{problem}</p>}

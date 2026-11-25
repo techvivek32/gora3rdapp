@@ -1417,10 +1417,23 @@ export class CustomerBookingsService {
     // -apply / status-revert races that a load→mutate→save() would allow.
     const held = await this.holdFunds(dId, holdAmount, booking._id);
     if (!held) {
-      throw new BadRequestException(
-        `You need ₹${holdAmount} in your wallet to accept this booking ` +
+      // The hold failed, so read back what they actually have and send the
+      // exact shortfall. The app opens Add Money with this already filled in —
+      // asking a driver to work it out from the sentence is how they top up the
+      // wrong amount and the accept fails a second time.
+      const d: any = await this.userModel.findById(dId).select('walletBalance').lean();
+      const balance = Math.max(0, Math.round(d?.walletBalance || 0));
+      throw new BadRequestException({
+        message:
+          `You need ₹${holdAmount} in your wallet to accept this booking ` +
           `(₹${commission} commission + ₹${gst} GST). Please recharge and try again.`,
-      );
+        errors: {
+          code: 'WALLET_TOPUP_REQUIRED',
+          required: holdAmount,
+          balance,
+          shortfall: Math.max(0, holdAmount - balance),
+        },
+      });
     }
 
     const offer = {
@@ -1491,9 +1504,17 @@ export class CustomerBookingsService {
     const minWallet = Math.max(0, Math.round(settings?.minWalletToAccept || 0));
     const balance = (driver as any)?.walletBalance || 0;
     if (minWallet > 0 && balance < minWallet) {
-      throw new BadRequestException(
-        `A minimum wallet balance of ₹${minWallet} is required to accept bookings. Your balance is ₹${Math.round(balance)}. Please recharge.`,
-      );
+      const have = Math.max(0, Math.round(balance));
+      throw new BadRequestException({
+        message:
+          `A minimum wallet balance of ₹${minWallet} is required to accept bookings. Your balance is ₹${have}. Please recharge.`,
+        errors: {
+          code: 'WALLET_TOPUP_REQUIRED',
+          required: minWallet,
+          balance: have,
+          shortfall: Math.max(0, minWallet - have),
+        },
+      });
     }
 
     const booking = await this.bookingModel.findById(id);
@@ -1514,10 +1535,23 @@ export class CustomerBookingsService {
     if (due > 0) {
       const held = await this.holdFunds(dId, due, booking._id);
       if (!held) {
-        throw new BadRequestException(
-          `You need ₹${due} in your wallet to accept this booking ` +
+        // Read back what they actually have and send the exact shortfall, the
+        // same as the other two wallet gates. The app opens Add Money with this
+        // already filled in — asking a driver to work it out from the sentence
+        // is how they top up the wrong amount and the accept fails a second time.
+        const d: any = await this.userModel.findById(dId).select('walletBalance').lean();
+        const have = Math.max(0, Math.round(d?.walletBalance || 0));
+        throw new BadRequestException({
+          message:
+            `You need ₹${due} in your wallet to accept this booking ` +
             `(₹${commission} commission + ₹${gst} GST). Please recharge and try again.`,
-        );
+          errors: {
+            code: 'WALLET_TOPUP_REQUIRED',
+            required: due,
+            balance: have,
+            shortfall: Math.max(0, due - have),
+          },
+        });
       }
     }
 

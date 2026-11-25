@@ -178,10 +178,13 @@ interface FareLine {
   unit?: string;
   rateValue?: number;
   /**
-   * False for money the driver laid out and is simply being paid back — toll,
-   * parking, and whatever they entered as "other". Those are reimbursements,
-   * not our service, so no tax is charged on them and the figure printed must
-   * be the exact amount the rider handed over.
+   * False for anything no GST was charged on, so it must be printed at exactly
+   * the amount the rider handed over and must stay out of the taxable value:
+   *
+   *   * toll, parking and the driver's "other" — money they laid out and are
+   *     simply being paid back, not our service;
+   *   * extra km and extra hours — measured at trip end and added to the bill
+   *     at face value; the fare engine only ever taxes the agreed fare.
    */
   taxable?: boolean;
 }
@@ -192,6 +195,15 @@ interface FareBreakdown {
   cgst: number;
   sgst: number;
   igst: number;
+  /**
+   * The rates to PRINT, worked back out of the tax this invoice states.
+   *
+   * Not the template's rates: those are today's Pricing Config GST%, and a
+   * booking taxed at 5% must not be billed as 12%. 0 means "print no rate".
+   */
+  cgstPct: number;
+  sgstPct: number;
+  igstPct: number;
   taxTotal: number;
   total: number;
   roundOff: number;
@@ -265,12 +277,22 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
       baseRate = g / billedKm;
     }
   }
-  // Whatever route got us here, the three cells must agree before any of them
-  // is printed: a rate that does not multiply up to the amount is worse than
-  // no rate at all.
-  if (!(billedKm > 0) || Math.abs(billedKm * baseRate - grossBase) > 1) {
+  // The gross and the discount stand on their own — both branches above only
+  // set them from a figure that is at least the charged fare, and the rider is
+  // entitled to see the reduction they were given.
+  //
+  // The RATE is the one cell that has to be re-checked, against the value as it
+  // will be PRINTED rather than the exact one. 73660/737 is 99.9457, which
+  // passed, and then "Rs. 99.95/km" went on the bill — but 737 x 99.95 is
+  // 73,663.15, so the row was out by Rs. 3.15 to anyone with a calculator.
+  // Round first; if it no longer multiplies out, print no rate and keep the
+  // discount, rather than throwing both away.
+  if (!(billedKm > 0)) {
     grossBase = base;
     baseRate = 0;
+  } else {
+    const shownRate = Math.round(baseRate * 100) / 100;
+    baseRate = Math.abs(billedKm * shownRate - grossBase) > 1 ? 0 : shownRate;
   }
   const discount = grossBase > base ? grossBase - base : 0;
 
@@ -286,12 +308,22 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
     lines.push({ label: pct > 0 ? `Discount (${pct}%)` : 'Discount', amount: -discount });
   }
   if (allowance > 0) lines.push({ label: 'Driver allowance', amount: allowance });
+  // Extra km / extra hours are measured at trip end and added to the bill at
+  // the snapshot rate with NO GST on them — the fare engine only ever taxes the
+  // agreed fare. They are marked untaxed for that reason, and it is the one
+  // thing that keeps them honest:
+  //
+  //   * they stay at face value, so "Extra 14 km" bills the 280 the driver
+  //     actually charged. Treated as taxable they were divided by 1+GST% on any
+  //     booking that recorded no GST, and the bill said 250 — the same charge
+  //     printing two different ways depending on a field the rider never sees;
+  //   * the tax rate stays a clean 6% + 6%. With untaxed extras inside the
+  //     taxable value, the stated GST spread across them and printed as 5.85%.
   if (extraKmCharge > 0) {
-    // Extra km is billed at trip end at the snapshot rate and is not discounted.
-    lines.push({ label: `Extra ${data.extraKm} km`, qty: num(data.extraKm), unit: 'km', rateValue: num(data.extraKmPrice), amount: extraKmCharge });
+    lines.push({ label: `Extra ${data.extraKm} km`, qty: num(data.extraKm), unit: 'km', rateValue: num(data.extraKmPrice), amount: extraKmCharge, taxable: false });
   }
   if (extraHrCharge > 0) {
-    lines.push({ label: `Extra ${data.extraHours} hr`, qty: num(data.extraHours), unit: 'hr', rateValue: num(data.extraHourPrice), amount: extraHrCharge });
+    lines.push({ label: `Extra ${data.extraHours} hr`, qty: num(data.extraHours), unit: 'hr', rateValue: num(data.extraHourPrice), amount: extraHrCharge, taxable: false });
   }
   if (toll > 0) lines.push({ label: 'Toll', amount: toll, taxable: false });
   if (parking > 0) lines.push({ label: 'Parking', amount: parking, taxable: false });
@@ -327,12 +359,13 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
     taxTotal = 0;
   }
 
-  // Print the rate the ride was priced at. `rescaled` is the one case where it
-  // cannot be shown: the fare had no GST recorded, so the tax was pulled back
-  // out of every line above and the amounts no longer are qty x rate. Leaving
-  // the cell empty there beats printing a rate that does not multiply out.
+  // Print the rate a line was priced at, but only where it still multiplies out.
+  // On a rescaled invoice the tax was pulled back out of the TAXED lines, so
+  // their amounts are no longer qty x rate and the cell is left empty — better
+  // than a rate that does not multiply. The untaxed lines (toll, parking, extra
+  // km, extra hours) were never rescaled, so they keep their rate either way.
   for (const l of lines) {
-    if (rescaled) { l.rate = undefined; continue; }
+    if (rescaled && l.taxable !== false) { l.rate = undefined; continue; }
     if (!l.qty || l.qty <= 0 || !l.rateValue || l.rateValue <= 0) continue;
     l.rate = `Rs. ${round2(l.rateValue)}/${l.unit || 'km'}`;
   }
@@ -345,6 +378,16 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
     sgst = taxTotal - cgst;
   }
 
+  // The rate printed beside a tax must be the rate that produces it. The
+  // template carries TODAY's GST% from Pricing Config, while the amount comes
+  // from the tax the booking actually charged — so on anything booked under an
+  // older rate the two columns contradicted each other: "CGST 6% ... 512.50"
+  // against a taxable 20,500, where 6% is 1,230 and the real rate was 2.5%.
+  // Dividing the stated tax by the stated taxable value is the same sum the
+  // reader does, so the columns now agree by construction.
+  const pctOf = (amount: number) =>
+    taxable > 0 && amount > 0 ? Math.round((amount / taxable) * 10000) / 100 : 0;
+
   // The reimbursements sit outside the tax but inside what the rider pays.
   const total = taxable + taxTotal + passThrough;
   const rounded = Math.round(total);
@@ -353,7 +396,9 @@ function computeFare(data: InvoiceData, tax: Record<string, any>): FareBreakdown
 
   const advance = Math.max(0, Math.round(num(data.advanceAmount)));
   return {
-    lines, taxable, cgst, sgst, igst, taxTotal, total, roundOff, finalAmount,
+    lines, taxable, cgst, sgst, igst,
+    cgstPct: pctOf(cgst), sgstPct: pctOf(sgst), igstPct: pctOf(igst),
+    taxTotal, total, roundOff, finalAmount,
     advance, balance: Math.max(0, finalAmount - advance),
   };
 }
@@ -640,11 +685,12 @@ export function buildInvoicePdf(data: InvoiceData, template?: InvoiceTemplateLik
 
     for (const l of fare.lines) row(l.label, l.rate || '', money2(l.amount));
 
+    const pct = (v: number) => (v > 0 ? `${round2(v)}%` : '');
     if (tax.mode === 'cgst_sgst' && fare.taxTotal > 0) {
-      row('CGST', `${tax.cgstPercent}%`, money2(fare.cgst));
-      row('SGST', `${tax.sgstPercent}%`, money2(fare.sgst));
+      row('CGST', pct(fare.cgstPct), money2(fare.cgst));
+      row('SGST', pct(fare.sgstPct), money2(fare.sgst));
     } else if (tax.mode === 'igst' && fare.taxTotal > 0) {
-      row('IGST', `${tax.igstPercent}%`, money2(fare.igst));
+      row('IGST', pct(fare.igstPct), money2(fare.igst));
     }
 
     row('Total', '', money2(fare.total), true);

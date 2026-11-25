@@ -345,7 +345,11 @@ class AppRouter {
       // comes from the route the user took to get here.
       GoRoute(
         path: '/wallet',
-        builder: (_, __) => const WalletPage(),
+        // `?add=` pre-fills the amount — used when an accept was refused for a
+        // low balance and the exact shortfall is already known.
+        builder: (_, st) => WalletPage(
+          prefillAmount: int.tryParse(st.uri.queryParameters['add'] ?? ''),
+        ),
       ),
       GoRoute(
         path: '/customer/wallet',

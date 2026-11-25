@@ -209,6 +209,25 @@ function Confirm() {
           </div>
         </dl>
 
+        {/* The last screen before the rider commits is where the allowance has
+            to be spelled out. These rates are recorded on the booking and the
+            driver bills them at trip end, so a rider who is never shown them
+            meets an "Extra 150 km" line for the first time on their invoice —
+            which is exactly the sort of surprise that comes back as a billing
+            complaint. The app already says this in its exclusions list. */}
+        {!cab.isLocal && cab.extraKmPrice > 0 && (
+          <p className="mt-3 text-xs font-semibold text-muted">
+            {Math.round(cab.billedKm)} km are included. Past that, ₹{cab.extraKmPrice}/km is added
+            at the end of the trip, measured by GPS.
+          </p>
+        )}
+        {cab.isLocal && cab.extraHourPrice > 0 && (
+          <p className="mt-3 text-xs font-semibold text-muted">
+            The package covers {cab.packageHours} hours. Past that, ₹{cab.extraHourPrice}/hr is
+            added at the end of the trip.
+          </p>
+        )}
+
         {cab.bestPrice && !cab.isLocal && (
           <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
             Best Price — toll, state tax and parking are paid to the driver during the trip.

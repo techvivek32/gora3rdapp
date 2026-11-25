@@ -21,7 +21,15 @@ class WalletPage extends StatefulWidget {
   /// true → the customer-mode wallet (`customerWalletBalance` on the server).
   final bool customer;
 
-  const WalletPage({super.key, this.customer = false});
+  /// Amount to put in the Add Money box on arrival.
+  ///
+  /// Set when the user was sent here because a booking could not be accepted
+  /// on their balance: the shortfall is already known at that point, and making
+  /// them read it out of an error message and type it back in is how people end
+  /// up adding the wrong amount and failing the accept a second time.
+  final int? prefillAmount;
+
+  const WalletPage({super.key, this.customer = false, this.prefillAmount});
 
   @override
   State<WalletPage> createState() => _WalletPageState();
@@ -54,6 +62,8 @@ class _WalletPageState extends State<WalletPage> {
       _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess);
       _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError);
     }
+    final pre = widget.prefillAmount;
+    if (pre != null && pre > 0) _amountCtrl.text = pre.toString();
     _load();
   }
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/directions_button.dart';
+import '../../../../core/error/error_mapper.dart';
 import '../../../../core/utils/api_error.dart';
 import '../../../../core/utils/contact_launcher.dart';
 import '../../../../core/utils/location_ping.dart';
@@ -137,7 +138,15 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
     } catch (e) {
       if (!mounted) return;
       final message = serverMessage(e, fallback: 'Could not accept the booking.');
-      final lowBalance = message.toLowerCase().contains('wallet') || message.toLowerCase().contains('balance');
+      // The server names this refusal and says exactly how short the wallet is,
+      // so trust the code when it sent one and only fall back to sniffing the
+      // sentence for older builds. Without the amount the driver has to work
+      // the shortfall out themselves, tops up the wrong number, and the accept
+      // fails a second time — the whole complaint behind this screen.
+      final shortfall = ErrorMapper.number(e, 'shortfall');
+      final lowBalance = ErrorMapper.code(e) == 'WALLET_TOPUP_REQUIRED' ||
+          message.toLowerCase().contains('wallet') ||
+          message.toLowerCase().contains('balance');
       showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -147,8 +156,14 @@ class _DriverCustomerRequestsPageState extends State<DriverCustomerRequestsPage>
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
             if (lowBalance)
               ElevatedButton(
-                onPressed: () { Navigator.pop(ctx); context.push('/wallet'); },
-                child: const Text('Add Money'),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  // Hand the shortfall over so the amount is already in the box.
+                  context.push(
+                    shortfall != null && shortfall > 0 ? '/wallet?add=$shortfall' : '/wallet',
+                  );
+                },
+                child: Text(shortfall != null && shortfall > 0 ? 'Add ₹$shortfall' : 'Add Money'),
               ),
           ],
         ),
@@ -473,6 +488,10 @@ class MyOfferCard extends StatelessWidget {
         (((b['estimatedFare'] as num?) ?? (b['finalFare'] as num?) ?? 0)
             - ((b['gstAmount'] as num?) ?? 0));
     final hold = myOffer['holdAmount'] ?? 0;
+    // What the customer actually hands over: the finished bill where there is
+    // one, otherwise the agreed fare.
+    int collectable(Map b) =>
+        ((b['finalFare'] as num?) ?? (b['estimatedFare'] as num?) ?? 0).toInt();
     final offerStatus = (myOffer['status'] ?? '').toString();
     // Won ONLY if THIS driver's offer was the selected one — not merely because
     // some driver was selected (that would light up losing drivers' cards too).
@@ -612,6 +631,19 @@ class MyOfferCard extends StatelessWidget {
             const Spacer(),
             if (hold != 0) Text('Hold: ₹$hold', style: TextStyle(fontSize: 12.sp, color: AppColors.textSecondary)),
           ]),
+          // The number above is the driver's take-home, not the bill. Unlabelled
+          // it reads as the fare, and then the cash the customer hands over and
+          // the total on their invoice are both a different figure. Say which
+          // is which, the same way the feed card does.
+          if (collectable(b) > quoted) ...[
+            SizedBox(height: 2.h),
+            Text(
+              'you keep · collect ₹${collectable(b)} cash',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 10.sp, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            ),
+          ],
           // Customer contact — visible only once this driver is selected.
           if (won && (b['customer'] is Map) && (((b['customer'] as Map)['mobile'] ?? '').toString().isNotEmpty)) ...[
             SizedBox(height: 10.h),
