@@ -84,11 +84,26 @@ export class WhatsappService {
       const value = body?.entry?.[0]?.changes?.[0]?.value;
       const msg = value?.messages?.[0];
       if (!msg) {
-        // Delivery receipts for our own replies — the bulk of the traffic, and
-        // the reason this is not logged at a level that survives production.
+        // Delivery receipts for our own replies. sent/delivered/read are the
+        // bulk of the traffic and stay at debug — but "failed" is the opposite:
+        // the Graph API already returned 200 and a message id, so without this
+        // line a reply that Meta accepted and then refused to deliver looks
+        // exactly like a reply the customer received. That is precisely how an
+        // account-level block went unnoticed while every booking confirmation
+        // silently went nowhere.
         const st = value?.statuses?.[0];
-        if (st) this.logger.debug(`WhatsApp status "${st.status}" for ${st.id}`);
-        else this.logger.debug('WhatsApp webhook with no message and no status');
+        if (st?.status === 'failed') {
+          const why = (st.errors || [])
+            .map((e: any) => [e.code, e.title, e.error_data?.details].filter(Boolean).join(' '))
+            .join(' | ');
+          this.logger.warn(
+            `WhatsApp delivery FAILED to +${st.recipient_id ?? '?'} (${st.id}): ${why || 'no detail from Meta'}`,
+          );
+        } else if (st) {
+          this.logger.debug(`WhatsApp status "${st.status}" for ${st.id}`);
+        } else {
+          this.logger.debug('WhatsApp webhook with no message and no status');
+        }
         return;
       }
       if (msg.type !== 'text') {
