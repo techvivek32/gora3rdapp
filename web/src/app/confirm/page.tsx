@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import { ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { apiPost, errorMessage } from '@/lib/api';
 import { GuestFields, guestReady, type GuestInfo } from '@/components/GuestFields';
-import { formatDate, formatTime12, rupees, shortCity } from '@/lib/format';
+import { formatDate, formatTime12, rupees, shortCity, toDisplayDate } from '@/lib/format';
 import { payBookingAdvance } from '@/lib/razorpay';
 import { selectedCab, tripDraft } from '@/lib/trip-draft';
 import type { Booking, SelectedCab, TripDraft } from '@/lib/types';
@@ -57,7 +57,12 @@ function Confirm() {
     if (pendingRef.current) return pendingRef.current;
     const notes: string[] = [];
     if (trip.notes) notes.push(trip.notes);
-    if (cab.isRound && trip.tripEndDate) notes.push(`Return date: ${trip.tripEndDate}`);
+    // dd-MM-yyyy, the way the apps write it. The date pickers here produce
+    // yyyy-MM-dd, and everything that reads this note back — the driver's card,
+    // the invoice — was written against the app's order, so a website round
+    // trip reached the driver with no return date and no day count on it.
+    // Readers now take either form; this keeps new rows in one shape.
+    if (cab.isRound && trip.tripEndDate) notes.push(`Return date: ${toDisplayDate(trip.tripEndDate)}`);
     notes.push(cab.bestPrice ? 'Best Price — toll, state tax & parking excluded (collect from customer)' : 'All inclusive');
     if (cab.fuel) notes.push(`Fuel: ${cab.fuel}`);
 

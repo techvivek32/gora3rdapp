@@ -181,6 +181,8 @@ export class WhatsappService {
         fuelType: 'any',
         travelDate: parsed.travelDate,
         travelTime: parsed.travelTime,
+        // Only on a round trip, and only when the message actually said so.
+        ...(parsed.returnDate ? { returnDate: parsed.returnDate } : {}),
         numberOfVehicles: 1,
         source: 'whatsapp',
         whatsappMessageId: msg.id, // wamid — idempotency key against redelivery
@@ -298,11 +300,39 @@ export class WhatsappService {
       tripType: this.mapTrip(ai.tripType || ''),
       travelDate,
       travelTime,
+      // When a round trip comes back. The driver's card turns this into the
+      // day count on the ROUND TRIP chip, and with nothing here it shows no
+      // days at all — which is what every WhatsApp round trip did, because
+      // the parser had no field for it (2 of 157 had one, from the strict
+      // fixed-format parser). Resolved through the same date logic as the
+      // travel date so "30 Nov", "30/11" and "kal" all work, and only kept
+      // when it is on or after the travel date.
+      returnDate: this.resolveReturnDate(ai.returnDate || '', travelDate, msgDate, text),
       fare: this.parseAmount(ai.driverEarning),
       commission: this.parseAmount(ai.commission),
       contactNumber: ai.contactNumber || '',
       notes: ai.notes || '',
     };
+  }
+
+  /**
+   * The return date of a round trip, or null.
+   *
+   * Reuses `resolveDateTime` so every spelling the travel date understands
+   * works here too. A date before the trip starts is dropped rather than
+   * shown: a negative day count is worse than none, and it is usually the
+   * model reading the travel date twice.
+   */
+  private resolveReturnDate(raw: string, travelDate: Date, msgDate: Date, text: string): Date | null {
+    if (!`${raw ?? ''}`.trim()) return null;
+    try {
+      const { travelDate: parsed } = this.resolveDateTime(raw, '', msgDate, text);
+      if (!parsed || isNaN(parsed.getTime())) return null;
+      const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      return day(parsed) >= day(travelDate) ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   private defaultTravelDate(): Date {
@@ -551,8 +581,31 @@ export class WhatsappService {
         if (!isNaN(d.getTime())) return d;
       }
     }
+    // "30 Nov", "30 November 2026", "Nov 30" — the way dates are written in
+    // chat when they are not typed as numbers. Without this they fell through
+    // to `new Date(s)`, which cannot read "30 Nov" at all.
+    const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+    const named = /(?:(\d{1,2})\s*(?:st|nd|rd|th)?\s*([a-z]{3,9})|([a-z]{3,9})\s*(\d{1,2})(?:st|nd|rd|th)?)\s*,?\s*(\d{4})?/i.exec(s);
+    if (named) {
+      const dd = parseInt(named[1] ?? named[4], 10);
+      const name = (named[2] ?? named[3] ?? '').toLowerCase().slice(0, 3);
+      const mm = MONTHS.indexOf(name);
+      const yyyy = named[5] ? parseInt(named[5], 10) : new Date().getFullYear();
+      if (mm >= 0 && dd >= 1 && dd <= 31) {
+        return new Date(yyyy, mm, dd, 12, 0, 0, 0);
+      }
+    }
+
     const fallback = new Date(s);
-    return isNaN(fallback.getTime()) ? null : fallback;
+    if (isNaN(fallback.getTime())) return null;
+    // Pin to NOON of the parsed day, like every branch above.
+    //
+    // `new Date('30 November 2026')` is local midnight, and on a server ahead
+    // of UTC that is 18:30 on the 29th — read back as a UTC day it is the
+    // day BEFORE the one the customer asked for. The numeric branch has always
+    // used noon for exactly this reason; this one did not, so a date written
+    // with a month name quietly booked the trip a day early.
+    return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate(), 12, 0, 0, 0);
   }
 
   /**

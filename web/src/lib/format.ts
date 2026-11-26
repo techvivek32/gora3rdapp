@@ -48,6 +48,19 @@ export function toDateInput(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/**
+ * `yyyy-MM-dd` (what a date input gives) -> `dd-MM-yyyy` (what the apps write).
+ *
+ * Only for text the apps read back, such as the "Return date:" line in a
+ * booking's notes — the driver's card and the invoice were both written
+ * against the app's order. Anything unexpected is returned untouched rather
+ * than mangled.
+ */
+export function toDisplayDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso ?? ''));
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : String(iso ?? '');
+}
+
 /** The short city label used on route rows ("Rajkot, Gujarat, India" -> "Rajkot"). */
 export function shortCity(value?: string | null): string {
   const s = String(value ?? '').trim();

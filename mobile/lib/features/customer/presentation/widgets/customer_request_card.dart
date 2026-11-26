@@ -8,6 +8,22 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/directions_button.dart';
 import 'booking_card_ui.dart';
 
+/// The return date as written into the booking's free-text notes.
+///
+/// Only a fallback for rows saved before `tripEndDate` was reliable. It takes
+/// the date in either order because the two clients disagree: the app writes
+/// "Return date: 28-11-2026" and the website "Return date: 2026-11-28".
+/// Which is which is decided by the four-digit part, not by position.
+DateTime? _returnDateFromNotes(String notes) {
+  final m = RegExp(r'Return date:\s*(\d{2,4})-(\d{2})-(\d{2,4})').firstMatch(notes);
+  if (m == null) return null;
+  final a = int.tryParse(m.group(1)!), mid = int.tryParse(m.group(2)!), c = int.tryParse(m.group(3)!);
+  if (a == null || mid == null || c == null) return null;
+  if (m.group(1)!.length == 4) return DateTime(a, mid, c); // yyyy-MM-dd
+  if (m.group(3)!.length == 4) return DateTime(c, mid, a); // dd-MM-yyyy
+  return null;
+}
+
 /// Shared "customer request" card, used by the Customer Rides page. A driver
 /// taps Accept to register interest; an admin then assigns one accepted driver.
 class CustomerRequestCard extends StatelessWidget {
@@ -56,10 +72,16 @@ class CustomerRequestCard extends StatelessWidget {
       _ => null,
     };
 
-    // Round-trip return date is carried in notes as "Return date: dd-MM-yyyy".
-    // Show only the number of days (under the ROUND TRIP chip).
-    final rt = RegExp(r'Return date:\s*(\d{2})-(\d{2})-(\d{4})').firstMatch((b['notes'] ?? '').toString());
-    final returnDate = rt != null ? DateTime(int.parse(rt.group(3)!), int.parse(rt.group(2)!), int.parse(rt.group(1)!)) : null;
+    // When the trip comes back, so the driver can see how many days it is.
+    //
+    // `tripEndDate` is a real field on the booking and is set on every round
+    // trip — read that first. This used to parse the date out of the free-text
+    // notes with a dd-MM-yyyy regex, and the website writes them the other way
+    // round (2026-11-28), so no website round trip ever showed a day count:
+    // measured on production, 66 of 66 app bookings showed it and 0 of 3 web
+    // ones did. The notes stay as a fallback for older rows, now reading
+    // either order.
+    final returnDate = tripDate(b['tripEndDate']) ?? _returnDateFromNotes((b['notes'] ?? '').toString());
     // Inclusive day count (25→26 = 2 days), consistent with the other screens.
     int? days = (returnDate != null && date != null)
         ? returnDate.difference(DateTime(date.year, date.month, date.day)).inDays + 1

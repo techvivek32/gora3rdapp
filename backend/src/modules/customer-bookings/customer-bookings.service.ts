@@ -790,9 +790,24 @@ export class CustomerBookingsService {
     // category name) and read its class/seats/bags/per-km rate from the admin panel.
     const fuelMatch = /fuel[:\s-]*([a-zA-Z]+)/i.exec(booking.notes || '');
     const fuel = fuelMatch ? fuelMatch[1] : '';
-    // Round-trip return date lives only in notes ("Return date: dd-MM-yyyy").
-    const retMatch = /Return date:\s*(\d{2}-\d{2}-\d{4})/i.exec(booking.notes || '');
-    const returnDate = retMatch ? retMatch[1] : '';
+    // When a round trip comes back, printed as dd-MM-yyyy.
+    //
+    // `tripEndDate` is the real field and is set on every round trip, so it is
+    // read first. Scraping it out of the notes was the only source before, with
+    // a dd-MM-yyyy pattern — and the website writes 2026-11-28, so every bill
+    // for a website round trip came out with no return date at all. The notes
+    // remain a fallback for older rows, in either order.
+    const returnDate = (() => {
+      const d = booking.tripEndDate ? new Date(booking.tripEndDate) : null;
+      if (d && !isNaN(d.getTime())) {
+        const p = (n: number) => String(n).padStart(2, '0');
+        return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()}`;
+      }
+      const m = /Return date:\s*(\d{2,4})-(\d{2})-(\d{2,4})/i.exec(booking.notes || '');
+      if (!m) return '';
+      // Whichever side carries four digits is the year.
+      return m[1].length === 4 ? `${m[3]}-${m[2]}-${m[1]}` : `${m[1]}-${m[2]}-${m[3]}`;
+    })();
     let carClass = '';
     let carSeats = 0;
     let carBags = '';

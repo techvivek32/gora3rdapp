@@ -7,6 +7,10 @@ export interface ParsedWhatsappBooking {
   pickupCity: string;
   dropCity: string;
   date: string; // as written, e.g. "15/07/2026", "tomorrow", or ""
+  /** When a round trip comes back, as written. "" when not stated.
+   *  Without this the driver's card has no day count to show — measured on
+   *  production, only 2 of 157 WhatsApp round trips had a return date. */
+  returnDate: string;
   time: string; // e.g. "09:00 PM" or ""
   vehicle: string; // free text e.g. "sedan", "innova crysta", or ""
   tripType: string; // one_way | round_trip | airport | local | outstation | ""
@@ -17,7 +21,7 @@ export interface ParsedWhatsappBooking {
 }
 
 const EMPTY: ParsedWhatsappBooking = {
-  kind: 'unknown', pickupCity: '', dropCity: '', date: '', time: '',
+  kind: 'unknown', pickupCity: '', dropCity: '', date: '', returnDate: '', time: '',
   vehicle: '', tripType: '', driverEarning: '', commission: '', contactNumber: '', notes: '',
 };
 
@@ -29,6 +33,7 @@ const SCHEMA = {
     pickupCity: { type: 'string' },
     dropCity: { type: 'string' },
     date: { type: 'string' },
+    returnDate: { type: 'string' },
     time: { type: 'string' },
     vehicle: { type: 'string' },
     tripType: { type: 'string' },
@@ -38,7 +43,7 @@ const SCHEMA = {
     notes: { type: 'string' },
   },
   required: [
-    'kind', 'pickupCity', 'dropCity', 'date', 'time', 'vehicle',
+    'kind', 'pickupCity', 'dropCity', 'date', 'returnDate', 'time', 'vehicle',
     'tripType', 'driverEarning', 'commission', 'contactNumber', 'notes',
   ],
 };
@@ -53,6 +58,7 @@ Classify "kind":
 Extract, using "" for anything not stated:
 - pickupCity / dropCity: the from and to places (city or area names only).
 - date: the travel date exactly as written ("15/07/2026", "kal", "tomorrow", "aaj").
+- returnDate: for a ROUND TRIP, the date it comes back, exactly as written. Messages give it as a range ("28 to 30 Nov", "28-30 November", "2 days", "3 din"). When only a number of days is given, leave this "" - the notes keep it. "" if not a round trip or not stated.
 - time: travel time if present ("09:00 PM", "9 baje").
 - vehicle: the car/vehicle words as written ("sedan", "innova crysta", "ertiga").
 - tripType: one of one_way, round_trip, airport, local, outstation — only if clearly stated, else "".
