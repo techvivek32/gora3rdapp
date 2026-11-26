@@ -993,8 +993,34 @@ class _WalletPageState extends State<WalletPage> {
     final type = (tx['type'] ?? 'credit').toString();
     final status = (tx['status'] ?? '').toString();
     final isCredit = type == 'credit';
-    final ok = status == 'success';
     final note = (tx['note'] ?? '').toString().trim();
+
+    // The row's state, in words rather than the raw database value.
+    //
+    // A withdrawal is debited the moment it is raised but is not paid out
+    // until an admin approves it, so it sits at `pending` in between. That
+    // wait is the thing people ask about — naming it, in amber, is the
+    // difference between "my money is gone" and "it is being processed".
+    final isWithdrawal = (tx['source'] ?? '').toString() == 'withdrawal';
+    final String statusLabel;
+    final Color statusColor;
+    switch (status) {
+      case 'success':
+        statusLabel = 'Completed'.tr;
+        statusColor = AppColors.success;
+        break;
+      case 'failed':
+        statusLabel = 'Failed'.tr;
+        statusColor = AppColors.error;
+        break;
+      case 'pending':
+        statusLabel = isWithdrawal ? 'Pending approval'.tr : 'Pending'.tr;
+        statusColor = AppColors.warning;
+        break;
+      default:
+        statusLabel = status;
+        statusColor = AppColors.textHint;
+    }
 
     // The trip this money moved for, e.g. "Rajkot → Jamnagar". The server
     // resolves it from the booking; a commission line showing only an id meant
@@ -1044,7 +1070,8 @@ class _WalletPageState extends State<WalletPage> {
                       ),
                     ],
                   ),
-                Text(status, style: TextStyle(fontSize: 11, color: ok ? AppColors.success : AppColors.textHint)),
+                Text(statusLabel,
+                    style: TextStyle(fontSize: 11, color: statusColor, fontWeight: FontWeight.w600)),
               ],
             ),
           ),

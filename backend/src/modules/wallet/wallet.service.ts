@@ -270,7 +270,16 @@ export class WalletService {
     const field = this.balanceField(scope);
     const [user, transactions] = await Promise.all([
       this.userModel.findById(userId).select(`${field} heldBalance`).lean(),
-      // Only completed transactions — pending (abandoned/cancelled) ones are hidden.
+      // Completed transactions, plus withdrawals that have not completed yet.
+      //
+      // `pending` is normally noise — an abandoned Razorpay top-up stays pending
+      // for ever and the user never cared about it. A WITHDRAWAL is the opposite:
+      // the money has already left their balance and they are waiting on an admin,
+      // so it is the row they most want to see. Hiding it would mean ₹500 vanishes
+      // from the balance with nothing in the history to explain where it went.
+      // `failed` is kept for the same reason — a rejected withdrawal should stay
+      // visible next to the refund that put the money back.
+      //
       // Also hide the intermediate booking 'hold' and 'release' ledger rows: a
       // commitment shows to the user only once, as the final 'settle' (commission)
       // if the driver won, or not at all if it was released (net-zero). The amount
@@ -280,8 +289,11 @@ export class WalletService {
       this.txModel
         .find({
           userId: new Types.ObjectId(userId),
-          status: 'success',
           source: { $nin: ['hold', 'release'] },
+          $or: [
+            { status: 'success' },
+            { source: 'withdrawal', status: { $in: ['pending', 'failed'] } },
+          ],
           ...this.walletFilter(scope),
         })
         .populate('counterpartyId', 'fullName agencyName mobile')
@@ -624,12 +636,19 @@ export class WalletService {
     }
 
     // Record the debit only after it actually succeeded (held against the request).
-    await this.txModel.create({
+    //
+    // PENDING, not success. The money has left the balance, but nothing has
+    // been paid out yet — an admin still has to approve it, and a rejection
+    // puts it straight back. Writing "success" here is what made the app show
+    // a withdrawal as complete the instant it was raised, so a user who had
+    // just asked for their money believed it was already sent. The row is
+    // settled in `approveWithdrawal` / `rejectWithdrawal`.
+    const tx = await this.txModel.create({
       userId: new Types.ObjectId(userId),
       wallet: scope,
       amount,
       type: 'debit',
-      status: 'success',
+      status: 'pending',
       note: 'Withdrawal request',
       source: 'withdrawal',
     });
@@ -647,6 +666,7 @@ export class WalletService {
         ? { bankName: dto.bankName, accountNumber: dto.accountNumber, ifsc: dto.ifsc }
         : { upiId: dto.upiId }),
       status: 'pending',
+      transactionId: tx._id,
     });
 
     return {
@@ -770,6 +790,31 @@ export class WalletService {
   }
 
   /** Admin: approve a pending withdrawal (amount was already debited). */
+  /**
+   * Close the ledger row a withdrawal request has been holding.
+   *
+   * Requests raised before `transactionId` existed have no link, and their row
+   * was already written as "success" — those are left exactly as they are
+   * rather than guessed at by matching on amount, which could settle somebody
+   * else's row. Only rows still `pending` are touched, so running this twice
+   * is harmless.
+   */
+  private async settleWithdrawalTx(
+    request: WithdrawalRequestDocument,
+    status: 'success' | 'failed',
+  ): Promise<void> {
+    if (!request.transactionId) return;
+    try {
+      await this.txModel.updateOne(
+        { _id: request.transactionId, status: 'pending' },
+        { status },
+      );
+    } catch {
+      // The ledger label is not worth failing an approval over — the money
+      // movement above/below is what matters.
+    }
+  }
+
   async approveWithdrawal(adminId: string, id: string, franchiseCity?: any) {
     const request = await this.withdrawalModel.findById(id);
     if (!request) throw new NotFoundException('Withdrawal request not found');
@@ -777,6 +822,10 @@ export class WalletService {
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
+    // Settle the ledger row the request has been holding. Only now is the
+    // money actually gone, so only now does the user's history say so.
+    await this.settleWithdrawalTx(request, 'success');
+
     request.status = 'approved';
     request.processedBy = new Types.ObjectId(adminId);
     request.processedAt = new Date();
@@ -792,6 +841,11 @@ export class WalletService {
     if (request.status !== 'pending') {
       throw new BadRequestException(`This request is already ${request.status}.`);
     }
+
+    // The debit never became a payout — close it as failed, then refund.
+    // Leaving it pending would keep the row sitting in the user's history
+    // looking like a withdrawal still on its way.
+    await this.settleWithdrawalTx(request, 'failed');
 
     // Refund the held amount back to the SAME wallet it was debited from.
     const scope = this.scopeOf(request);

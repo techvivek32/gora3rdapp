@@ -46,6 +46,12 @@ export class WithdrawalRequest {
   @Prop({ trim: true })
   rejectionReason: string;
 
+  /** The ledger row this request debited, so approving or rejecting can settle
+   *  the same row instead of leaving it reading "success" from the moment the
+   *  request was raised. Absent on requests created before this existed. */
+  @Prop({ type: Types.ObjectId, ref: 'WalletTransaction' })
+  transactionId: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'User' })
   processedBy: Types.ObjectId;
 
