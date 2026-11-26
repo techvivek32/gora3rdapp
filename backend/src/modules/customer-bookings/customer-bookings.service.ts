@@ -23,6 +23,7 @@ import { UserRole } from '../../common/enums/user-role.enum';
 import { buildInvoicePdf } from './invoice.util';
 import { InvoiceTemplateService } from '../invoice-template/invoice-template.service';
 import { resolveGuestUser } from '../../common/utils/guest-user.util';
+import { assertMobileVerified } from '../../common/utils/mobile-verification.util';
 import { getPaginationParams, buildPaginatedResult } from '../../common/utils/pagination.util';
 import {
   CreateCustomerBookingDto,
@@ -487,6 +488,15 @@ export class CustomerBookingsService {
    * Abuse is bounded only by the global per-IP throttler, so that must stay on.
    */
   async createGuestBooking(dto: CreateGuestBookingDto) {
+    // The number must have answered an OTP first.
+    //
+    // This endpoint is public and creates a customer account from whatever
+    // number it is handed, so without this anyone could file bookings against
+    // a stranger's phone — and a driver would be dispatched to someone who
+    // never asked for a cab. Checking it here rather than only in the website
+    // form means a direct call to the API cannot skip it.
+    assertMobileVerified(dto.guestMobile, dto.verificationToken);
+
     const { userId, created } = await resolveGuestUser(this.userModel, {
       name: dto.guestName,
       mobile: dto.guestMobile,
@@ -496,7 +506,7 @@ export class CustomerBookingsService {
 
     // Strip the guest fields before they reach the booking document — they are
     // routing information for this endpoint, not part of a booking.
-    const { guestName: _n, guestMobile: _m, guestEmail: _e, ...bookingDto } = dto as any;
+    const { guestName: _n, guestMobile: _m, guestEmail: _e, verificationToken: _t, ...bookingDto } = dto as any;
     // Mark where it came from. Nothing else calls this endpoint — the app
     // books with a session — so "guest booking" means "booked on the site",
     // and that decides how the trip code reaches the customer later.

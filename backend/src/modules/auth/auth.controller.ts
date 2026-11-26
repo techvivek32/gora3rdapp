@@ -2,7 +2,9 @@ import {
   Controller, Post, Body, Get, UseGuards, HttpCode, HttpStatus, Req,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { GuestSendOtpDto, GuestVerifyOtpDto } from './dto/guest-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { LoginSendOtpDto, LoginVerifyOtpDto } from './dto/login-otp.dto';
@@ -82,6 +84,30 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify login OTP and issue tokens' })
   loginWithOtp(@Body() dto: LoginVerifyOtpDto) {
     return this.authService.loginWithOtp(dto);
+  }
+
+  // ─── Guest mobile verification (website booking) ───────────────────────────
+  //
+  // Open to the internet and every call spends money on an SMS, so the limit is
+  // deliberately tight: five texts an hour from one caller is plenty for a
+  // person booking a cab and useless to anyone running up our SMS bill.
+
+  @Post('guest/send-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ sustained: { limit: 5, ttl: 3_600_000 } })
+  @ApiOperation({ summary: 'Website guest: text an OTP to verify a mobile number' })
+  sendGuestOtp(@Body() dto: GuestSendOtpDto) {
+    return this.authService.sendGuestOtp(dto.mobile);
+  }
+
+  @Post('guest/verify-otp')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ sustained: { limit: 20, ttl: 3_600_000 } })
+  @ApiOperation({ summary: 'Website guest: verify the OTP and get a booking token' })
+  verifyGuestOtp(@Body() dto: GuestVerifyOtpDto) {
+    return this.authService.verifyGuestOtp(dto.mobile, dto.otp);
   }
 
   @Post('verify-otp')

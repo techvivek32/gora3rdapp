@@ -153,7 +153,7 @@ function BookForm() {
     if ((isRound || isHire) && !endDate) return 'Please select the trip end (return) date';
     // Hire books straight from this page, so a guest's details are needed here.
     // Cab collects them on the confirm page instead, after the fare is shown.
-    if (isHire && !guestReady(guest)) return 'Enter your name and a valid 10-digit mobile number';
+    if (isHire && !guestReady(guest)) return 'Enter your name, then verify your mobile number with the OTP';
     return null;
   };
 
@@ -198,6 +198,9 @@ function BookForm() {
       const booking = await apiPost<Booking>('/customer-bookings/guest', {
         guestName: guest.name.trim(),
         guestMobile: guest.mobile,
+        // Proof the number answered an OTP. The server refuses the booking
+        // without it, so a made-up number can never reach a driver.
+        verificationToken: guest.verificationToken,
         contactName: guest.name.trim(),
         contactMobile: guest.mobile,
         serviceType: 'hire_driver',

@@ -72,6 +72,16 @@ export class CreateGuestBookingDto extends CreateCustomerBookingDto {
   guestMobile: string;
 
   @IsOptional() @IsEmail() guestEmail?: string;
+
+  /**
+   * Proof that `guestMobile` answered an OTP, from `/auth/guest/verify-otp`.
+   *
+   * Required. Without it anyone could post bookings against a stranger's
+   * number — and a driver would be sent to a customer who never asked for a
+   * cab. Optional in the type only so the error comes back as the readable
+   * "verify your mobile number" rather than a bare validation message.
+   */
+  @IsOptional() @IsString() verificationToken?: string;
 }
 
 /** Customer edits an OPEN booking. serviceType cannot change (that's a new booking). */

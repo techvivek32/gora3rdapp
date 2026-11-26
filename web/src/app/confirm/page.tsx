@@ -65,6 +65,9 @@ function Confirm() {
       const booking = await apiPost<Booking>('/customer-bookings/guest', {
         guestName: guest.name.trim(),
         guestMobile: guest.mobile,
+        // Proof the number answered an OTP. The server refuses the booking
+        // without it, so a made-up number can never reach a driver.
+        verificationToken: guest.verificationToken,
         // Who the assigned driver calls for this trip. A real field, not a note:
         // notes are shown to every driver, this is revealed only to the one who
         // actually gets the booking.
@@ -114,7 +117,7 @@ function Confirm() {
 
   const submit = async () => {
     if (!guestReady(guest)) {
-      toast.error('Enter your name and a valid 10-digit mobile number');
+      toast.error('Enter your name, then verify your mobile number with the OTP');
       return;
     }
     setBusy(true);

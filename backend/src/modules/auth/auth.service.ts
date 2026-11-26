@@ -11,6 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { randomInt, randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { signMobileVerification } from '../../common/utils/mobile-verification.util';
 import { User, UserDocument } from '../../database/schemas/user.schema';
 import { Franchise, FranchiseDocument } from '../../database/schemas/franchise.schema';
 import { AuditLog } from '../../database/schemas/audit-log.schema';
@@ -52,6 +53,47 @@ export class AuthService {
     );
 
     await this.smsService.sendOtp(mobile, otp);
+  }
+
+  // ─── Guest mobile verification (website) ───────────────────────────────────
+  //
+  // A visitor books on the website without an account, so neither of the other
+  // two OTP flows fits: login refuses an unregistered number, registration
+  // refuses a registered one, and a guest can be either. This pair verifies the
+  // NUMBER and nothing else — it issues no session, no tokens and no account.
+  //
+  // Same OTP machinery as everywhere else (6 digits, hashed, five minutes, five
+  // attempts, same SMS sender), so there is one OTP implementation to trust.
+
+  /** Text an OTP to any number so a website guest can prove it is theirs. */
+  async sendGuestOtp(mobile: string) {
+    const m = `${mobile ?? ''}`.trim();
+    if (!/^[6-9]\d{9}$/.test(m)) {
+      throw new BadRequestException('Enter a valid 10-digit mobile number');
+    }
+    await this.generateAndSendOtp(m);
+    return { message: 'OTP sent successfully' };
+  }
+
+  /**
+   * Check the OTP and hand back proof the number was verified.
+   *
+   * The proof is a short-lived signed token, not a login: it is presented with
+   * the booking so the server can tell a verified number from one somebody
+   * simply typed into the API.
+   */
+  async verifyGuestOtp(mobile: string, otp: string) {
+    const m = `${mobile ?? ''}`.trim();
+    if (!/^[6-9]\d{9}$/.test(m)) {
+      throw new BadRequestException('Enter a valid 10-digit mobile number');
+    }
+    await this.verifyOtp(m, `${otp ?? ''}`.trim());
+    // Spent — the same code cannot be replayed for a second booking.
+    await this.otpModel.deleteOne({ mobile: m });
+    return {
+      message: 'Mobile number verified',
+      data: { verificationToken: signMobileVerification(m) },
+    };
   }
 
   // Step 1 of registration: validate uniqueness, then text an OTP to the mobile.
