@@ -171,13 +171,26 @@ class PushNotificationService {
     // ring + full-screen popup card. Everything else (driver assigned, trip OTP,
     // trip started/ended, admin messages) is just a quiet notification — no
     // ring, no popup.
-    final isLoud = isLoudAlertType((data['type'] ?? '').toString());
-    // Booking alerts are opt-in: if the user hasn't turned them on, no ring and
-    // no pop-up — not even the loud notification below.
-    // Offline means not working: no popup, no ring, not even the loud
-    // notification - regardless of the alert settings.
+    var isLoud = isLoudAlertType((data['type'] ?? '').toString());
+
+    // Booking alerts are opt-in: if the user hasn't turned them on, nothing at
+    // all — no ring, no pop-up, no notification.
     if (isLoud && !(await alertsEnabled())) return;
-    if (isLoud && !(await isOnline())) return;
+
+    // OFFLINE: no ring and no pop-up, but the booking still arrives as an
+    // ordinary notification.
+    //
+    // This used to `return` here, and that made the foreground case the odd one
+    // out. The server sends a `notification` payload, so when the app is in the
+    // background or closed Android puts the booking in the tray by itself — our
+    // code never gets a say. Only in the FOREGROUND does this method decide, and
+    // returning meant the booking vanished with no trace at all. Same state,
+    // same push, two different outcomes depending on whether the app happened
+    // to be open — which is what "sometimes it doesn't work" was.
+    //
+    // Demoting instead of returning gives one rule everywhere:
+    //   offline → notification only;  online → notification + ring + pop-up.
+    if (isLoud && !(await isOnline())) isLoud = false;
     final ctx = AppRouter.rootNavigatorKey.currentContext;
     if (ctx != null && isLoud) {
       playRequirementRing(kind: RingKind.popup);
