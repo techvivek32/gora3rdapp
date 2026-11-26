@@ -11,7 +11,12 @@ import toast from 'react-hot-toast';
 // the customer booking form.
 const LOCAL_HOURS = [6, 8, 10, 12];
 
-export interface StatePrice { state: string; petrol?: number; diesel?: number; cng?: number }
+export interface StatePrice {
+  state: string;
+  petrol?: number; diesel?: number; cng?: number;
+  /** The same three rates for a ROUND TRIP. Absent = charge the one-way rate. */
+  rtPetrol?: number; rtDiesel?: number; rtCng?: number;
+}
 
 export interface CabCategory {
   _id: string;
@@ -22,6 +27,10 @@ export interface CabCategory {
   pricePerKmPetrol?: number;
   pricePerKmDiesel?: number;
   pricePerKmCng?: number;
+  roundTripPricePerKm?: number;
+  roundTripPricePerKmPetrol?: number;
+  roundTripPricePerKmDiesel?: number;
+  roundTripPricePerKmCng?: number;
   statePricing?: StatePrice[];
   discountPercent?: number;
   allowanceDailyRate?: number;
@@ -59,7 +68,18 @@ const EMPTY_FORM = {
 };
 
 type Fuel = 'petrol' | 'diesel' | 'cng';
-type StateMap = Record<string, { petrol?: number; diesel?: number; cng?: number }>;
+type TripKind = 'oneway' | 'round';
+/** A state row holds BOTH trip types, so one grid can edit either. */
+type StateMap = Record<string, {
+  petrol?: number; diesel?: number; cng?: number;
+  rtPetrol?: number; rtDiesel?: number; rtCng?: number;
+}>;
+
+/** The key a (fuel, trip type) pair writes to on a state row. */
+const rateKey = (fuel: Fuel, trip: TripKind): keyof StateMap[string] =>
+  (trip === 'round'
+    ? (`rt${fuel[0].toUpperCase()}${fuel.slice(1)}`)
+    : fuel) as keyof StateMap[string];
 
 type SectionKey = 'details' | 'pricing' | 'km' | 'allowance' | 'discount' | 'info';
 const SECTIONS: { key: SectionKey; label: string }[] = [
@@ -120,6 +140,9 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
   // Explicit per-state fuel overrides. Empty for a state/fuel = uses the base rate.
   const [statePrices, setStatePrices] = useState<StateMap>({});
   const [stateFuel, setStateFuel] = useState<Fuel>('petrol'); // which fuel column is being edited
+  // One Way or Round Trip — the same grid edits whichever is selected, so the
+  // admin is never looking at six columns of numbers at once.
+  const [stateTrip, setStateTrip] = useState<TripKind>('oneway');
   const [applyAll, setApplyAll] = useState<string>('');       // "apply to all states" input
   const [imgError, setImgError] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -171,7 +194,10 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
     });
     const sp: StateMap = {};
     for (const r of it.statePricing ?? []) {
-      sp[r.state] = { petrol: r.petrol, diesel: r.diesel, cng: r.cng };
+      sp[r.state] = {
+        petrol: r.petrol, diesel: r.diesel, cng: r.cng,
+        rtPetrol: r.rtPetrol, rtDiesel: r.rtDiesel, rtCng: r.rtCng,
+      };
     }
     setStatePrices(sp);
     setPrefilled(true);
@@ -179,15 +205,18 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
 
   // Representative per-fuel rate, derived from the state prices (the first state
   // with a value). Used as the app's fallback + the "which fuels" (>0) signal.
-  const stateBase = (fuel: Fuel): number => {
+  const stateBase = (fuel: Fuel, trip: TripKind = 'oneway'): number => {
+    const key = rateKey(fuel, trip);
     for (const st of INDIAN_STATES) {
-      const v = statePrices[st]?.[fuel];
+      const v = statePrices[st]?.[key];
       if (v && v > 0) return v;
     }
     return 0;
   };
   const isFuelOn = (fuel: Fuel) => fuel === 'petrol' ? fuelActive.petrol : fuel === 'diesel' ? fuelActive.diesel : fuelActive.cng;
   const base = (fuel: Fuel) => (isFuelOn(fuel) ? stateBase(fuel) : 0);
+  /** Round-trip equivalent. 0 means "no round-trip price set" -> one-way rate. */
+  const rtBase = (fuel: Fuel) => (isFuelOn(fuel) ? stateBase(fuel, 'round') : 0);
 
   const activeFuels: Fuel[] = [
     ...(fuelActive.petrol ? ['petrol' as const] : []),
@@ -208,7 +237,8 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
     const v = applyAll === '' ? undefined : Number(applyAll);
     setStatePrices((m) => {
       const next = { ...m };
-      for (const st of INDIAN_STATES) next[st] = { ...next[st], [stateFuel]: v };
+      const key = rateKey(stateFuel, stateTrip);
+      for (const st of INDIAN_STATES) next[st] = { ...next[st], [key]: v };
       return next;
     });
   };
@@ -223,12 +253,22 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
     pricePerKmPetrol: base('petrol'),
     pricePerKmDiesel: base('diesel'),
     pricePerKmCng: base('cng'),
+    // Round Trip. Sent as 0 when the admin has set nothing, and both apps read
+    // a 0 as "charge the One Way rate" — so a category saved without touching
+    // the Round Trip tab prices exactly as it did before.
+    roundTripPricePerKm: rtBase('petrol') || rtBase('diesel') || rtBase('cng') || 0,
+    roundTripPricePerKmPetrol: rtBase('petrol'),
+    roundTripPricePerKmDiesel: rtBase('diesel'),
+    roundTripPricePerKmCng: rtBase('cng'),
     // Every state gets a rate: its explicit override, else the base for that fuel.
     statePricing: INDIAN_STATES.map((st) => ({
       state: st,
       petrol: statePrices[st]?.petrol ?? base('petrol'),
       diesel: statePrices[st]?.diesel ?? base('diesel'),
       cng: statePrices[st]?.cng ?? base('cng'),
+      rtPetrol: statePrices[st]?.rtPetrol ?? rtBase('petrol'),
+      rtDiesel: statePrices[st]?.rtDiesel ?? rtBase('diesel'),
+      rtCng: statePrices[st]?.rtCng ?? rtBase('cng'),
     })),
     discountPercent: Math.min(100, Math.max(0, Number(form.discountPercent) || 0)),
     allowanceDailyRate: Number(form.allowanceDailyRate) || 0,
@@ -462,13 +502,31 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                     <div>
                       <label className={labelCls}>State-wise price/km (₹)</label>
                       <p className="text-xs text-gray-500">
-                        Pick a fuel, then set each state (or use &quot;Apply to all&quot;).
+                        Pick the trip type and a fuel, then set each state (or use &quot;Apply to all&quot;).
                       </p>
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                         A state&apos;s rate <b>overrides the fuel price above</b> for every trip that
                         <b> starts</b> in that state — the drop state never decides the rate. Leave a
                         state blank to fall back to the fuel price.
                       </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <b>One Way and Round Trip are priced separately.</b> Leave the Round Trip
+                        rates empty and a return trip is charged the One Way rate, exactly as before.
+                      </p>
+                    </div>
+                    {/* Trip type — which set of rates the grid below is editing. */}
+                    <div className="flex flex-wrap gap-2" data-testid="trip-type-tabs">
+                      {([['oneway', 'One Way'], ['round', 'Round Trip']] as [TripKind, string][]).map(([k, lbl]) => (
+                        <button key={k} type="button" onClick={() => setStateTrip(k)}
+                          className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${stateTrip === k ? 'bg-emerald-600 text-white' : 'border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                          {lbl}
+                        </button>
+                      ))}
+                      {stateTrip === 'round' && (
+                        <span className="self-center text-xs text-gray-500">
+                          Empty = same as One Way
+                        </span>
+                      )}
                     </div>
                     {/* Fuel sub-tabs (only active fuels) */}
                     <div className="flex flex-wrap gap-2">
@@ -482,8 +540,10 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                     {/* Apply to all states */}
                     <div className="flex items-end gap-2">
                       <div className="flex-1 max-w-[220px]">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Apply to all states (₹/km for {stateFuel})</label>
-                        <input type="number" min={0} placeholder={`e.g. ${base(stateFuel) || 100}`} value={applyAll} onChange={(e) => setApplyAll(e.target.value)} className={inputCls} />
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Apply to all states (₹/km — {stateTrip === 'round' ? 'Round Trip' : 'One Way'}, {stateFuel})
+                        </label>
+                        <input type="number" min={0} placeholder={`e.g. ${(stateTrip === 'round' ? rtBase(stateFuel) : base(stateFuel)) || 100}`} value={applyAll} onChange={(e) => setApplyAll(e.target.value)} className={inputCls} />
                       </div>
                       <button type="button" onClick={applyToAllStates}
                         className="px-4 py-2 rounded-lg text-sm font-semibold bg-brand-600 text-white hover:bg-brand-700 transition-colors">Apply to all</button>
@@ -496,11 +556,12 @@ export default function CabCategoryForm({ categoryId }: { categoryId?: string })
                           <input
                             type="number"
                             min={0}
-                            placeholder={`${base(stateFuel)}`}
-                            value={statePrices[st]?.[stateFuel] ?? ''}
+                            placeholder={`${stateTrip === 'round' ? (rtBase(stateFuel) || base(stateFuel)) : base(stateFuel)}`}
+                            value={statePrices[st]?.[rateKey(stateFuel, stateTrip)] ?? ''}
                             onChange={(e) => {
                               const v = e.target.value;
-                              setStatePrices((m) => ({ ...m, [st]: { ...m[st], [stateFuel]: v === '' ? undefined : Number(v) } }));
+                              const key = rateKey(stateFuel, stateTrip);
+                              setStatePrices((m) => ({ ...m, [st]: { ...m[st], [key]: v === '' ? undefined : Number(v) } }));
                             }}
                             className="w-24 px-2 py-1.5 border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                           />

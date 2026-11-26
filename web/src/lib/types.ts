@@ -37,7 +37,16 @@ export interface CabCategory {
   pricePerKmPetrol?: number;
   pricePerKmDiesel?: number;
   pricePerKmCng?: number;
-  statePricing?: { state?: string; petrol?: number; diesel?: number; cng?: number }[];
+  /** Round Trip rates. 0 / absent = charge the One Way rate above. */
+  roundTripPricePerKm?: number;
+  roundTripPricePerKmPetrol?: number;
+  roundTripPricePerKmDiesel?: number;
+  roundTripPricePerKmCng?: number;
+  statePricing?: {
+    state?: string;
+    petrol?: number; diesel?: number; cng?: number;
+    rtPetrol?: number; rtDiesel?: number; rtCng?: number;
+  }[];
   discountPercent?: number;
   allowanceBaseRate?: number;
   allowanceMaxRate?: number;

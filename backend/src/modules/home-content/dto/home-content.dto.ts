@@ -12,6 +12,11 @@ export class StatePriceDto {
   @IsOptional() @IsNumber() petrol?: number;
   @IsOptional() @IsNumber() diesel?: number;
   @IsOptional() @IsNumber() cng?: number;
+  // The same three rates for a ROUND TRIP in this state. 0 or absent means
+  // "charge the one-way rate", so a state row left as it was keeps working.
+  @IsOptional() @IsNumber() rtPetrol?: number;
+  @IsOptional() @IsNumber() rtDiesel?: number;
+  @IsOptional() @IsNumber() rtCng?: number;
 }
 
 export class CreateShowcaseDto {
@@ -53,6 +58,11 @@ export class CreateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmPetrol?: number;
   @IsOptional() @IsNumber() pricePerKmDiesel?: number;
   @IsOptional() @IsNumber() pricePerKmCng?: number;
+  // Round Trip rates. Each 0 falls back to the One Way rate above.
+  @IsOptional() @IsNumber() roundTripPricePerKm?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmPetrol?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmDiesel?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmCng?: number;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
   @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
   @IsOptional() @IsNumber() allowanceDailyRate?: number;
@@ -82,6 +92,11 @@ export class UpdateCabCategoryDto {
   @IsOptional() @IsNumber() pricePerKmPetrol?: number;
   @IsOptional() @IsNumber() pricePerKmDiesel?: number;
   @IsOptional() @IsNumber() pricePerKmCng?: number;
+  // Round Trip rates. Each 0 falls back to the One Way rate above.
+  @IsOptional() @IsNumber() roundTripPricePerKm?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmPetrol?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmDiesel?: number;
+  @IsOptional() @IsNumber() roundTripPricePerKmCng?: number;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => StatePriceDto) statePricing?: StatePriceDto[];
   @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
   @IsOptional() @IsNumber() allowanceDailyRate?: number;

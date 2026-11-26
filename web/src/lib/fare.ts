@@ -81,11 +81,12 @@ export function pickupState(trip: TripDraft): string {
   return stateFromText(`${trip.pickup?.address ?? ''} ${trip.pickupCity ?? ''}`);
 }
 
-function stateRate(cat: CabCategory, fuel: string, state: string): number {
+function stateRate(cat: CabCategory, fuel: string, state: string, roundTrip = false): number {
   if (!state) return 0;
   const sp = cat.statePricing;
   if (!Array.isArray(sp)) return 0;
-  const key = fuel === 'Diesel' ? 'diesel' : fuel === 'CNG' ? 'cng' : 'petrol';
+  const base = fuel === 'Diesel' ? 'diesel' : fuel === 'CNG' ? 'cng' : 'petrol';
+  const key = roundTrip ? `rt${base[0].toUpperCase()}${base.slice(1)}` : base;
   for (const e of sp) {
     if (e && String(e.state ?? '').toLowerCase() === state.toLowerCase()) {
       return num((e as Record<string, unknown>)[key]);
@@ -94,8 +95,35 @@ function stateRate(cat: CabCategory, fuel: string, state: string): number {
   return 0;
 }
 
-/** Per-km rate: the pickup state's rate first, then the fuel rate, then flat. */
-export function rateForFuel(cat: CabCategory, fuel: string, state: string): number {
+/**
+ * Per-km rate for this cab, fuel, pickup state and trip type.
+ *
+ * One Way:    state rate -> fuel rate -> flat rate.
+ * Round Trip: the same three ROUND-TRIP rates first, and whatever is still
+ *             unset falls through to the One Way chain.
+ *
+ * That fall-through is the whole design. A round trip used to be charged the
+ * one-way rate because there was nowhere else to put a price; now an admin can
+ * set a different one, and a cab they have not got to yet prices exactly as it
+ * did before. No migration, and no cab can end up priced at 0 because somebody
+ * filled in two boxes out of six.
+ */
+export function rateForFuel(cat: CabCategory, fuel: string, state: string, roundTrip = false): number {
+  if (roundTrip) {
+    const sr = fuel ? stateRate(cat, fuel, state, true) : 0;
+    if (sr > 0) return sr;
+    if (fuel) {
+      const rtKey = fuel === 'Diesel'
+        ? 'roundTripPricePerKmDiesel'
+        : fuel === 'CNG' ? 'roundTripPricePerKmCng' : 'roundTripPricePerKmPetrol';
+      const r = num((cat as Record<string, unknown>)[rtKey]);
+      if (r > 0) return r;
+    }
+    const flat = num(cat.roundTripPricePerKm);
+    if (flat > 0) return flat;
+    // Nothing set for round trips on this cab — price it as a one way.
+  }
+
   if (!fuel) return num(cat.pricePerKm);
   const sr = stateRate(cat, fuel, state);
   if (sr > 0) return sr;
@@ -173,9 +201,12 @@ function baseFareForFuel(cat: CabCategory, fuel: string, ctx: FareContext): numb
     const pkg = localPackagePrice(cat, ctx.trip);
     // A packaged price IS the price — it does not move with fuel.
     if (pkg > 0) return pkg;
+    // A Local package is in-city and never a round trip.
     return Math.round(localIncludedKm(cat, ctx.trip, ctx.settings) * rateForFuel(cat, fuel, pickupState(ctx.trip)));
   }
-  return Math.round(billableKmFor(cat, ctx) * rateForFuel(cat, fuel, pickupState(ctx.trip)));
+  return Math.round(
+    billableKmFor(cat, ctx) * rateForFuel(cat, fuel, pickupState(ctx.trip), isRoundTrip(ctx.trip)),
+  );
 }
 
 /** The whole breakdown for one cab + fuel. This is the single entry point. */

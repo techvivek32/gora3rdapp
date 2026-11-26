@@ -139,6 +139,7 @@ export class SettingsService {
     pricePerKm?: number;
     commissionPercent?: number;
     vehiclePrices?: Record<string, number>;
+    vehiclePricesRoundTrip?: Record<string, number>;
     razorpayKeyId?: string;
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;

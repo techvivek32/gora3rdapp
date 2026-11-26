@@ -36,6 +36,17 @@ export class PlatformSettings {
   @Prop({ type: Object, default: DEFAULT_VEHICLE_PRICES })
   vehiclePrices: Record<string, number>;
 
+  /**
+   * The same ₹/km list for a ROUND TRIP duty.
+   *
+   * One list used to serve both, so a return trip was suggested at the one-way
+   * rate and the admin had nowhere to say otherwise. A vehicle missing here —
+   * or set to 0 — is still priced from `vehiclePrices`, so leaving this empty
+   * keeps every existing suggestion exactly as it is.
+   */
+  @Prop({ type: Object, default: {} })
+  vehiclePricesRoundTrip: Record<string, number>;
+
   @Prop({ default: '' })
   razorpayKeyId: string;
 

@@ -30,6 +30,9 @@ const DEFAULT_PRICES: Record<string, number> = {
 
 export default function PricingPage() {
   const [vehiclePrices, setVehiclePrices] = useState<Record<string, number>>(DEFAULT_PRICES);
+  // Round Trip ₹/km. Blank for a vehicle = charge the One Way rate, which is
+  // what every duty did before this column existed.
+  const [vehiclePricesRoundTrip, setVehiclePricesRoundTrip] = useState<Record<string, number>>({});
   const [appSuggestedFare, setAppSuggestedFare] = useState(true);
   const [viewsOn, setViewsOn] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -42,6 +45,7 @@ export default function PricingPage() {
       .then((data: any) => {
         const s = data?.data ?? data;
         setVehiclePrices({ ...DEFAULT_PRICES, ...(s.vehiclePrices ?? {}) });
+        setVehiclePricesRoundTrip({ ...(s.vehiclePricesRoundTrip ?? {}) });
         setAppSuggestedFare(s.appSuggestedFareEnabled !== false);
         setViewsOn(s.viewsEnabled !== false);
       })
@@ -57,7 +61,15 @@ export default function PricingPage() {
     setError('');
     setSaving(true);
     try {
-      await adminApi.updateSettings({ vehiclePrices, appSuggestedFareEnabled: appSuggestedFare, viewsEnabled: viewsOn });
+      await adminApi.updateSettings({
+        vehiclePrices,
+        // Drop blanks/zeros so an untouched vehicle keeps falling back.
+        vehiclePricesRoundTrip: Object.fromEntries(
+          Object.entries(vehiclePricesRoundTrip).filter(([, n]) => Number(n) > 0),
+        ),
+        appSuggestedFareEnabled: appSuggestedFare,
+        viewsEnabled: viewsOn,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (e: any) {
@@ -122,6 +134,10 @@ export default function PricingPage() {
               </button>
             </div>
 
+            <p className="text-xs text-gray-500 -mt-2">
+              <b>One Way and Round Trip are priced separately.</b> Leave a Round Trip box
+              empty and that vehicle is suggested at its One Way rate, exactly as before.
+            </p>
             <div className="grid grid-cols-2 gap-4">
               {[0, 1].map((col) => (
                 <div key={col} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -129,7 +145,8 @@ export default function PricingPage() {
                     <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500">
                       <tr>
                         <th className="px-4 py-2.5 text-left font-medium">Vehicle</th>
-                        <th className="px-4 py-2.5 text-right font-medium w-36">₹ / KM</th>
+                        <th className="px-4 py-2.5 text-right font-medium w-32">One Way ₹/KM</th>
+                        <th className="px-4 py-2.5 text-right font-medium w-32">Round Trip ₹/KM</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -146,6 +163,29 @@ export default function PricingPage() {
                                 value={vehiclePrices[v.value] ?? ''}
                                 onChange={(e) => setPrice(v.value, e.target.value)}
                                 className="w-28 pl-6 pr-2 py-1.5 border border-gray-200 dark:border-gray-700 dark:bg-gray-800 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-orange-500"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="relative flex justify-end">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">₹</span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.5}
+                                placeholder={`${vehiclePrices[v.value] ?? ''}`}
+                                title="Leave empty to charge the One Way rate"
+                                value={vehiclePricesRoundTrip[v.value] ?? ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  setVehiclePricesRoundTrip((m) => {
+                                    const next = { ...m };
+                                    if (raw === '') delete next[v.value];
+                                    else next[v.value] = Number(raw);
+                                    return next;
+                                  });
+                                }}
+                                className="w-28 pl-6 pr-2 py-1.5 border border-emerald-300 dark:border-emerald-800 dark:bg-gray-800 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
                               />
                             </div>
                           </td>

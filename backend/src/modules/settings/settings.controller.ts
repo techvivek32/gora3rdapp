@@ -44,6 +44,7 @@ export class SettingsController {
     pricePerKm?: number;
     commissionPercent?: number;
     vehiclePrices?: Record<string, number>;
+    vehiclePricesRoundTrip?: Record<string, number>;
     razorpayKeyId?: string;
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;

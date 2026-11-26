@@ -339,6 +339,8 @@ export const adminApi = {
     pricePerKm?: number;
     commissionPercent?: number;
     vehiclePrices?: Record<string, number>;
+    /** Round Trip ₹/km per vehicle. Absent vehicle = charge the One Way rate. */
+    vehiclePricesRoundTrip?: Record<string, number>;
     razorpayKeyId?: string;
     razorpayKeySecret?: string;
     razorpayWebhookSecret?: string;

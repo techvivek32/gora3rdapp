@@ -256,11 +256,12 @@ class _CabResultsPageState extends State<CabResultsPage> {
   }
 
   /// State-wise ₹/km override for this cab + fuel, or 0 when none applies.
-  double _stateRate(Map<String, dynamic> cat, String fuel) {
+  double _stateRate(Map<String, dynamic> cat, String fuel, {bool roundTrip = false}) {
     if (_pickupState.isEmpty) return 0;
     final sp = cat['statePricing'];
     if (sp is! List) return 0;
-    final key = fuel == 'Diesel' ? 'diesel' : fuel == 'CNG' ? 'cng' : 'petrol';
+    final base = fuel == 'Diesel' ? 'diesel' : fuel == 'CNG' ? 'cng' : 'petrol';
+    final key = roundTrip ? 'rt${base[0].toUpperCase()}${base.substring(1)}' : base;
     for (final e in sp) {
       if (e is Map && (e['state'] ?? '').toString().toLowerCase() == _pickupState.toLowerCase()) {
         return (e[key] as num?)?.toDouble() ?? 0;
@@ -332,14 +333,43 @@ class _CabResultsPageState extends State<CabResultsPage> {
               : (_localIncludedKm(cat) * _rate(cat)).round())
           : (_billableKmFor(cat) * _rate(cat)).round();
 
-  // Per-fuel rate: pickup state's rate first, then the base fuel rate, then pricePerKm.
+  /// Per-km rate for this cab, fuel, pickup state and trip type.
+  ///
+  /// One Way:    state rate -> fuel rate -> flat rate.
+  /// Round Trip: the same three ROUND-TRIP rates first, and anything still
+  ///             unset falls through to the One Way chain.
+  ///
+  /// The fall-through matters: a round trip used to be charged the one-way
+  /// rate because there was nowhere else to put a price. Now an admin can set
+  /// a different one, and a cab they have not got to yet prices exactly as
+  /// before — so no cab can land on 0 because only some boxes were filled.
+  ///
+  /// Mirrors `rateForFuel` in web/src/lib/fare.ts; the two must agree to the
+  /// rupee or the website and the app quote different fares for one trip.
   double _rateForFuel(Map<String, dynamic> cat, String fuel) {
-    if (fuel.isEmpty) return (cat['pricePerKm'] as num?)?.toDouble() ?? 0;
+    final d = (dynamic v) => (v as num?)?.toDouble() ?? 0;
+
+    if (_isRound) {
+      if (fuel.isNotEmpty) {
+        final sr = _stateRate(cat, fuel, roundTrip: true);
+        if (sr > 0) return sr;
+        final rtKey = fuel == 'Diesel'
+            ? 'roundTripPricePerKmDiesel'
+            : fuel == 'CNG' ? 'roundTripPricePerKmCng' : 'roundTripPricePerKmPetrol';
+        final r = d(cat[rtKey]);
+        if (r > 0) return r;
+      }
+      final flat = d(cat['roundTripPricePerKm']);
+      if (flat > 0) return flat;
+      // Nothing set for round trips on this cab - price it as a one way.
+    }
+
+    if (fuel.isEmpty) return d(cat['pricePerKm']);
     final sr = _stateRate(cat, fuel);
     if (sr > 0) return sr;
     final key = fuel == 'Diesel' ? 'pricePerKmDiesel' : fuel == 'CNG' ? 'pricePerKmCng' : 'pricePerKmPetrol';
-    final r = (cat[key] as num?)?.toDouble() ?? 0;
-    return r > 0 ? r : ((cat['pricePerKm'] as num?)?.toDouble() ?? 0);
+    final r = d(cat[key]);
+    return r > 0 ? r : d(cat['pricePerKm']);
   }
 
   int _baseFareForFuel(Map<String, dynamic> cat, String fuel) =>

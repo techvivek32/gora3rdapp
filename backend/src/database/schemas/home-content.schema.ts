@@ -77,10 +77,36 @@ export class CabCategory {
   @Prop({ default: 0 }) pricePerKmPetrol: number;
   @Prop({ default: 0 }) pricePerKmDiesel: number;
   @Prop({ default: 0 }) pricePerKmCng: number;
+
+  // ── Round Trip per-km rates ────────────────────────────────────────────────
+  //
+  // A return trip is not the same business as a one way — the car comes back
+  // loaded or empty either way, so operators price it lower per km — but both
+  // used the single rate above, and the admin had no way to separate them.
+  //
+  // Every one of these is OPTIONAL: a 0 means "charge the One Way rate", which
+  // is what every cab does until someone fills these in. That is what makes
+  // this safe to ship without touching a single existing category.
+  @Prop({ default: 0 }) roundTripPricePerKm: number;
+  @Prop({ default: 0 }) roundTripPricePerKmPetrol: number;
+  @Prop({ default: 0 }) roundTripPricePerKmDiesel: number;
+  @Prop({ default: 0 }) roundTripPricePerKmCng: number;
+
   // State-wise per-km fuel rates. The app uses the PICKUP state's rate; a state
   // not listed (or a 0) falls back to the base pricePerKm<Fuel> above.
-  @Prop({ type: [{ state: String, petrol: Number, diesel: Number, cng: Number }], default: [] })
-  statePricing: { state: string; petrol: number; diesel: number; cng: number }[];
+  // `rt*` are the same three rates for a round trip, and fall back the same way.
+  @Prop({
+    type: [{
+      state: String, petrol: Number, diesel: Number, cng: Number,
+      rtPetrol: Number, rtDiesel: Number, rtCng: Number,
+    }],
+    default: [],
+  })
+  statePricing: {
+    state: string;
+    petrol: number; diesel: number; cng: number;
+    rtPetrol?: number; rtDiesel?: number; rtCng?: number;
+  }[];
   // Per-cab discount shown in the app (original fare struck through + discounted).
   @Prop({ default: 0 }) discountPercent: number; // 0–100
   // ── Driver allowance (added to the One Way / Round Trip fare total) ──────────

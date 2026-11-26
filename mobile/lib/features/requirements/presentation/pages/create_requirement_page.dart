@@ -54,12 +54,24 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
   // Platform settings (fetched from backend)
   double _ratePerKm = 20.0;
   Map<String, double> _vehiclePrices = {};
+  /// Round-trip ₹/km per vehicle. Empty, or a 0 for a vehicle, means the
+  /// one-way rate is used — which is how every duty was priced before.
+  Map<String, double> _vehiclePricesRoundTrip = {};
   bool _settingsLoading = true;
 
   double get _distance => _computedDistance ?? 0.0;
   
   // Rate for the currently selected vehicle type
+  /// ₹/km for the selected vehicle AND trip type.
+  ///
+  /// A round trip looks up its own list first; anything not priced there falls
+  /// back to the one-way rate, so a vehicle the admin has not set a round-trip
+  /// price for is suggested exactly as before.
   double get _rateForVehicle {
+    if (_tripType == 'round_trip') {
+      final rt = _vehiclePricesRoundTrip[_vehicleType] ?? 0;
+      if (rt > 0) return rt;
+    }
     if (_vehiclePrices.containsKey(_vehicleType)) return _vehiclePrices[_vehicleType]!;
     return _ratePerKm; // fallback to global rate
   }
@@ -175,6 +187,11 @@ class _CreateRequirementPageState extends State<CreateRequirementPage> {
       if (s != null && mounted) {
         setState(() {
           _ratePerKm = (s['pricePerKm'] as num?)?.toDouble() ?? _ratePerKm;
+          final vprt = s['vehiclePricesRoundTrip'];
+          if (vprt is Map) {
+            _vehiclePricesRoundTrip =
+                vprt.map((k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0));
+          }
           final vp = s['vehiclePrices'];
           if (vp is Map) {
             _vehiclePrices = vp.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
