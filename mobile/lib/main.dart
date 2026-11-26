@@ -50,26 +50,43 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       // Respect the user's alert toggle even from the background/terminated
       // isolate — no overlay, no ring when alerts are off.
       if (!await alertsEnabled()) return;
-      // Same gate in the background isolate - going offline has to hold even
-      // when the app is not running.
-      if (!await isOnline()) return;
-      // Each alert wakes its own isolate, and they all drive ONE native overlay
-      // window. Let a single alert through at a time, and a given booking only
-      // once — four at once left two isolates hung on the overlay call forever,
-      // which is what Android reports as the app "keeps stopping". A repeat
-      // still arrives in the tray; it just does not fight for the window.
+
+      // The same booking arriving twice is a repeat: it has already been seen
+      // and heard, so drop it outright. This is the ONLY case that is silent.
       final key = '${data['requirementId'] ?? data['bookingId'] ?? ''}';
-      if (!await AlertGate.claim(key)) return;
-      try {
-        // Overlay first so it appears immediately, then hold this isolate open
-        // for the ring — it is killed as soon as this handler returns. Uses the
-        // user's chosen NOTIFICATION tone (the tray channel is silent, the app
-        // plays the sound).
-        await showRequirementOverlay(Map<String, dynamic>.from(data));
-      } finally {
-        // Freed as soon as the card is up, so a genuinely new booking seconds
-        // later still rings instead of waiting out the lease.
-        await AlertGate.release();
+      if (await AlertGate.isDuplicate(key)) return;
+
+      // Everything below decides whether to show a CARD. The tone is played
+      // either way, and that is the point.
+      //
+      // The tray entry the server posts lands on a channel the app creates
+      // with `playSound: false`, because when the card shows, the app plays
+      // the user's chosen tone and two sounds at once is worse than one. The
+      // cost was that every path which skipped the tone left the booking
+      // completely mute — offline, and a second booking refused the window.
+      // That is what "sometimes there is no sound" was: not a lost push, a
+      // silent one.
+      //
+      //   offline              → tone, no card   (the "I'm not working" switch
+      //                                           silences the pop-up, not the
+      //                                           notification)
+      //   window already busy  → tone, no card   (one overlay window to go
+      //                                           round; the audio player is
+      //                                           per-isolate and never was
+      //                                           part of the hang this gate
+      //                                           was written to stop)
+      //   otherwise            → tone + card
+      final showCard = await isOnline() && await AlertGate.takeWindow();
+      if (showCard) {
+        try {
+          // Overlay first so it appears immediately, then hold this isolate
+          // open for the ring — it is killed as soon as this handler returns.
+          await showRequirementOverlay(Map<String, dynamic>.from(data));
+        } finally {
+          // Freed as soon as the card is up, so a genuinely new booking
+          // seconds later still gets a card instead of waiting out the lease.
+          await AlertGate.release();
+        }
       }
       await playRequirementRing(awaitEnd: true, kind: RingKind.notification);
     }

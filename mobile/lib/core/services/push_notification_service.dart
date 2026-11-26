@@ -198,6 +198,11 @@ class PushNotificationService {
       return;
     }
 
+    // Past that `return`, no card is being shown — either the user is offline
+    // or there is no navigator yet (startup, or between routes). So this
+    // notification has to carry the alert on its own, which means it has to be
+    // AUDIBLE; see the channel choice below.
+
     final title = n?.title ?? '🚕 New Vehicle Booking';
     final mobile = (data['posterMobile'] ?? '').toString();
 
@@ -223,17 +228,17 @@ class PushNotificationService {
       body: body,
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
-          isLoud ? _channel.id : _updatesChannel.id,
-          isLoud ? _channel.name : _updatesChannel.name,
-          channelDescription: isLoud ? _channel.description : _updatesChannel.description,
+          // Always the audible updates channel: the only way to reach here is
+          // with no card on screen, and a card is the one thing that would
+          // have supplied the sound. The silent booking channel belongs to the
+          // card, not to this.
+          _updatesChannel.id,
+          _updatesChannel.name,
+          channelDescription: _updatesChannel.description,
           importance: Importance.high,
           priority: Priority.high,
-          // New-work alerts pop over the lock screen like a call but stay SILENT
-          // here — the app plays the chosen notification tone itself. Other updates
-          // use the normal system sound.
-          fullScreenIntent: isLoud,
-          category: isLoud ? AndroidNotificationCategory.call : AndroidNotificationCategory.message,
-          playSound: !isLoud,
+          category: AndroidNotificationCategory.message,
+          playSound: true,
           sound: null,
           styleInformation: BigTextStyleInformation(body),
           actions: mobile.isEmpty

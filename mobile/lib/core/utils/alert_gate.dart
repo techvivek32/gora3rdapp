@@ -19,10 +19,20 @@ import 'dart:io';
 /// exists, and that check-and-create is a single operation in the OS — which is
 /// the guarantee this needs.
 ///
-/// Two separate guards, because they answer different questions:
-///   * the same booking twice  → the second is a duplicate, drop it outright;
-///   * a different booking while one is still showing → let the tray
-///     notification carry it rather than fighting for the overlay window.
+/// Two separate guards, because they answer different questions — and the
+/// caller asks them separately, because only ONE of them is about the window:
+///   * [isDuplicate] — the same booking twice: drop it outright, it has
+///     already been seen and heard;
+///   * [takeWindow] — a different booking while one is still showing: skip the
+///     card, because there is only one overlay window to go round.
+///
+/// A booking that loses [takeWindow] must still RING. The tray channel the
+/// server posts on is deliberately silent (the app owns the tone), so a second
+/// booking that was refused the window and refused the tone arrived completely
+/// mute — which is what "sometimes there is no sound" turned out to be. The
+/// hang this gate exists to prevent came from several isolates driving the one
+/// native overlay window; the audio player is per-isolate and was never part
+/// of it, so letting the tone through costs nothing it was protecting.
 class AlertGate {
   /// How long a claim is held if nobody releases it. The overlay call takes
   /// about four seconds normally; this only has to outlast that, and be short
@@ -38,14 +48,25 @@ class AlertGate {
   static File _seen(String key) =>
       File('${_dir.path}/gora_alert_${key.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.seen');
 
-  /// True if this alert may show its card. Call [release] once it has.
-  static Future<bool> claim(String bookingKey) async {
+  /// True when this exact booking has already alerted inside [_dedupWindow],
+  /// so this copy should be ignored entirely — no card, no tone.
+  static Future<bool> isDuplicate(String bookingKey) async {
+    if (bookingKey.isEmpty) return false;
     try {
-      if (bookingKey.isNotEmpty && _isRepeat(bookingKey)) return false;
-      if (!_takeLock()) return false;
-      return true;
+      return _isRepeat(bookingKey);
     } catch (_) {
       // Storage unavailable: let the alert through rather than silencing it.
+      return false;
+    }
+  }
+
+  /// Takes the single overlay-window slot. False means another alert is
+  /// mid-card — ring anyway, just do not show one. Call [release] once the
+  /// card is up.
+  static Future<bool> takeWindow() async {
+    try {
+      return _takeLock();
+    } catch (_) {
       return true;
     }
   }
