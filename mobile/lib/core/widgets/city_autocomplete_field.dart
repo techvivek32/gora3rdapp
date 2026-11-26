@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../theme/app_theme.dart';
+import 'clear_field_button.dart';
 
 class _CityResult {
   final String city;
@@ -64,6 +65,40 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
     super.dispose();
   }
 
+  /// Empty the field and tell the parent nothing is chosen any more.
+  ///
+  /// The parent keeps the city (and sometimes the state) from the last
+  /// selection, so clearing only the text would leave a booking pointing at a
+  /// city the box no longer shows.
+  /// Spinner, clear button, or both.
+  ///
+  /// They are not alternatives: the search starts on the keystroke, so a
+  /// suffix that showed only the spinner hid the clear button for as long as
+  /// the network took — which on a slow connection is exactly when someone
+  /// wants to wipe the field and start again.
+  Widget? _suffix() {
+    final spinner = Padding(
+      padding: EdgeInsets.all(12.r),
+      child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2)),
+    );
+    final clear = ClearFieldButton(tooltip: 'Clear ${widget.label}', onPressed: _clear);
+    if (_ctrl.text.isEmpty) return _loading ? spinner : null;
+    if (!_loading) return clear;
+    return Row(mainAxisSize: MainAxisSize.min, children: [spinner, clear]);
+  }
+
+  void _clear() {
+    _ctrl.clear();
+    _debounce?.cancel();
+    _justSelected = false;
+    setState(() {
+      _results = [];
+      _loading = false;
+    });
+    widget.onChanged('', null);
+    _focus.requestFocus();
+  }
+
   void _onChanged(String q) {
     // Report raw text immediately (state cleared until a suggestion is chosen).
     widget.onChanged(q.trim(), null);
@@ -76,6 +111,9 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
       setState(() => _results = []);
       return;
     }
+    // Keeps the clear button in step with the text (the search is debounced,
+    // so without this the button lagged behind by a few hundred milliseconds).
+    setState(() {});
     _debounce = Timer(const Duration(milliseconds: 400), () => _search(q.trim()));
   }
 
@@ -134,12 +172,7 @@ class _CityAutocompleteFieldState extends State<CityAutocompleteField> {
           decoration: InputDecoration(
             labelText: widget.label,
             prefixIcon: Icon(widget.icon, color: AppColors.primary),
-            suffixIcon: _loading
-                ? Padding(
-                    padding: EdgeInsets.all(12.r),
-                    child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                : null,
+            suffixIcon: _suffix(),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),

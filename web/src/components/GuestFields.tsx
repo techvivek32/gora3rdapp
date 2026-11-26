@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Phone, User2, ShieldCheck, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiPost, errorMessage } from '@/lib/api';
+import { ClearButton } from './ClearButton';
 
 export interface GuestInfo {
   name: string;
@@ -109,11 +110,14 @@ export function GuestFields({
           <div className="relative">
             <User2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
-              className="field pl-9"
+              className="field pl-9 pr-9"
               placeholder="Full name"
               value={value.name}
               onChange={(e) => onChange({ ...value, name: e.target.value })}
             />
+            {value.name && (
+              <ClearButton label="Clear your name" onClick={() => onChange({ ...value, name: '' })} />
+            )}
           </div>
         </div>
 
@@ -123,7 +127,7 @@ export function GuestFields({
             <div className="relative flex-1">
               <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
               <input
-                className="field pl-9"
+                className="field pl-9 pr-9"
                 inputMode="numeric"
                 maxLength={10}
                 placeholder="10-digit mobile number"
@@ -131,6 +135,9 @@ export function GuestFields({
                 onChange={(e) => setMobile(e.target.value)}
                 readOnly={verified}
               />
+              {value.mobile && !verified && (
+                <ClearButton label="Clear mobile number" onClick={() => setMobile('')} />
+              )}
             </div>
             {verified ? (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-50 px-3 text-xs font-bold text-emerald-700">

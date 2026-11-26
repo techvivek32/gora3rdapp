@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../config/env.dart';
 import '../theme/app_theme.dart';
+import 'clear_field_button.dart';
 
 class _Prediction {
   final String city; // "Udaipur"
@@ -68,6 +69,40 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
     super.dispose();
   }
 
+  /// Empty the field and tell the parent nothing is chosen any more.
+  ///
+  /// The parent keeps the city (and sometimes the state) from the last
+  /// selection, so clearing only the text would leave a booking pointing at a
+  /// city the box no longer shows.
+  /// Spinner, clear button, or both.
+  ///
+  /// They are not alternatives: the search starts on the keystroke, so a
+  /// suffix that showed only the spinner hid the clear button for as long as
+  /// the network took — which on a slow connection is exactly when someone
+  /// wants to wipe the field and start again.
+  Widget? _suffix() {
+    final spinner = Padding(
+      padding: EdgeInsets.all(12.r),
+      child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2)),
+    );
+    final clear = ClearFieldButton(tooltip: 'Clear ${widget.label}', onPressed: _clear);
+    if (_ctrl.text.isEmpty) return _loading ? spinner : null;
+    if (!_loading) return clear;
+    return Row(mainAxisSize: MainAxisSize.min, children: [spinner, clear]);
+  }
+
+  void _clear() {
+    _ctrl.clear();
+    _debounce?.cancel();
+    _justSelected = false;
+    setState(() {
+      _results = [];
+      _loading = false;
+    });
+    widget.onChanged('', null);
+    _focus.requestFocus();
+  }
+
   void _onChanged(String q) {
     widget.onChanged(q.trim(), null); // free text until a suggestion is picked
     if (_justSelected) {
@@ -79,6 +114,9 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
       setState(() => _results = []);
       return;
     }
+    // Keeps the clear button in step with the text (the search is debounced,
+    // so without this the button lagged behind by a few hundred milliseconds).
+    setState(() {});
     setState(() => _loading = true);
     _debounce = Timer(const Duration(milliseconds: 350), () => _search(q.trim()));
   }
@@ -138,12 +176,7 @@ class _PlacesCityFieldState extends State<PlacesCityField> {
           decoration: InputDecoration(
             labelText: widget.label,
             prefixIcon: Icon(widget.icon, color: Colors.grey.shade600),
-            suffixIcon: _loading
-                ? Padding(
-                    padding: EdgeInsets.all(12.r),
-                    child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2)),
-                  )
-                : null,
+            suffixIcon: _suffix(),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: const BorderSide(color: AppColors.border)),

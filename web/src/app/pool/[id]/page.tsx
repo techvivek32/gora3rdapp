@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { ClearButton } from '@/components/ClearButton';
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -107,13 +108,18 @@ function PoolRideDetail() {
           </div>
           <div>
             <label className="label">Pickup point (optional)</label>
-            <input
-              className="field"
-              placeholder="Where should the driver pick you up?"
-              value={pickupPoint}
-              disabled={isFull}
-              onChange={(e) => setPickupPoint(e.target.value)}
-            />
+            <div className="relative">
+              <input
+                className="field pr-9"
+                placeholder="Where should the driver pick you up?"
+                value={pickupPoint}
+                disabled={isFull}
+                onChange={(e) => setPickupPoint(e.target.value)}
+              />
+              {pickupPoint && !isFull && (
+                <ClearButton label="Clear pickup point" onClick={() => setPickupPoint('')} />
+              )}
+            </div>
           </div>
         </div>
 

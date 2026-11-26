@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../di/injection.dart';
 import '../network/api_client.dart';
 import '../theme/app_theme.dart';
+import 'clear_field_button.dart';
 
 /// A typeable address field: the user types (e.g. "cosmo") and picks from live
 /// Google Places suggestions (proxied through our backend so the key stays
@@ -52,12 +53,47 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
     super.dispose();
   }
 
+  /// Spinner, clear button, or both — see the note in `places_city_field`.
+  /// The caller's own suffix only shows while the field is empty.
+  Widget? _suffix() {
+    final spinner = Padding(
+      padding: const EdgeInsets.all(12),
+      child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+    );
+    final clear = ClearFieldButton(tooltip: 'Clear ${widget.label}', onPressed: _clear);
+    if (widget.controller.text.isEmpty) return _loading ? spinner : widget.suffix;
+    if (!_loading) return clear;
+    return Row(mainAxisSize: MainAxisSize.min, children: [spinner, clear]);
+  }
+
+  /// Empty the field and forget the place that was resolved for it.
+  ///
+  /// The text alone is not the state: the parent is holding coordinates from
+  /// the last selection, and leaving those behind would book a trip to an
+  /// address the box no longer shows. Reported as an empty selection so the
+  /// parent drops them.
+  void _clear() {
+    widget.controller.clear();
+    _debounce?.cancel();
+    setState(() {
+      _suggestions = [];
+      _open = false;
+      _loading = false;
+    });
+    widget.onSelected('', 0, 0, null);
+    _focus.requestFocus();
+  }
+
   void _onChanged(String v) {
     _debounce?.cancel();
     if (v.trim().length < 2) {
       setState(() { _suggestions = []; _open = false; });
       return;
     }
+    // Rebuild on every keystroke, not only when the suggestions change: the
+    // clear button appears and disappears with the text, and without this it
+    // waited for the 350ms search to land before showing up.
+    setState(() {});
     _debounce = Timer(const Duration(milliseconds: 350), () => _search(v.trim()));
   }
 
@@ -117,12 +153,11 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
             hintText: widget.hintText ?? 'Type an address or place…',
             prefixIcon: widget.prefixWidget ?? Icon(widget.prefixIcon, color: AppColors.primary),
             prefixIconConstraints: widget.prefixWidget != null ? BoxConstraints(minWidth: 44.w, minHeight: 44.w) : null,
-            suffixIcon: _loading
-                ? Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SizedBox(width: 16.w, height: 16.w, child: const CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
-                  )
-                : widget.suffix,
+            // Loading beats everything; otherwise offer to empty the field in
+            // one tap. Clearing a long address by holding backspace is the
+            // slowest thing in the booking form, and the caller's own suffix
+            // (if any) still shows once the field is empty.
+            suffixIcon: _suffix(),
             filled: true,
             fillColor: Colors.grey[50],
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide(color: AppColors.border)),

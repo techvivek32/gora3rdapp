@@ -8,6 +8,7 @@ import { ArrowRight, BadgeIndianRupee, Loader2, Plus, ShieldCheck, Sparkles, Tra
 import { apiGet, apiPost, errorMessage } from '@/lib/api';
 import { GuestFields, guestReady, type GuestInfo } from '@/components/GuestFields';
 import { PageHero } from '@/components/PageHero';
+import { ClearButton } from '@/components/ClearButton';
 import { PlaceInput } from '@/components/PlaceInput';
 import { rupees, toDateInput } from '@/lib/format';
 import { tripDraft } from '@/lib/trip-draft';
@@ -381,12 +382,23 @@ function BookForm() {
 
           <div className="reveal" style={rise()}>
             <label className="label">Notes for the driver (optional)</label>
-            <textarea
-              className="field min-h-[88px] resize-y"
-              placeholder="Anything the driver should know"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                className="field min-h-[88px] resize-y pr-9"
+                placeholder="Anything the driver should know"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+              {notes && (
+                <ClearButton
+                  label="Clear notes"
+                  onClick={() => setNotes('')}
+                  /* Pinned near the top: a textarea grows, and a vertically
+                     centred button would drift down the box as it does. */
+                  className="!top-3 !translate-y-0"
+                />
+              )}
+            </div>
           </div>
 
           {/* Hire shows its price here because there is no cab-picking step. */}
