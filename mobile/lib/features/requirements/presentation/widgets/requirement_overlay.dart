@@ -61,6 +61,69 @@ Future<void> requestOverlayPermission() async {
 /// persist the payload and read it back when the overlay boots).
 const _kOverlayPayloadKey = 'gora_overlay_payload';
 
+/// Monotonic counter bumped on every payload write.
+///
+/// Both writers re-broadcast their payload several times over a few seconds to
+/// beat the overlay engine's startup race. Those loops used to overlap: the
+/// bubble re-sends at 0/0.4/1.4s, the alert card at 0/0.5/1.7/3.9s, so a
+/// booking landing within a second of the bubble appearing got a STALE bubble
+/// broadcast on top of it — the full card turned back into the little icon.
+/// Every write now takes a sequence number, every re-broadcast checks it is
+/// still the newest, and the overlay ignores anything older than what it has.
+const _kOverlaySeqKey = 'gora_overlay_seq';
+
+/// Writes `payload` as the current overlay content and returns its sequence.
+Future<int> _publishPayload(String payload) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final seq = (prefs.getInt(_kOverlaySeqKey) ?? 0) + 1;
+    await prefs.setInt(_kOverlaySeqKey, seq);
+    await prefs.setString(_kOverlayPayloadKey, payload);
+    return seq;
+  } catch (_) {
+    return 0;
+  }
+}
+
+/// True while `seq` is still the most recent write — i.e. nothing newer has
+/// replaced this payload while our re-broadcast loop was sleeping.
+Future<bool> _stillCurrent(int seq) async {
+  if (seq == 0) return true; // prefs unavailable; nothing better to go on
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    return (prefs.getInt(_kOverlaySeqKey) ?? 0) <= seq;
+  } catch (_) {
+    return true;
+  }
+}
+
+/// Re-broadcast `payload` on the live channel at each delay, giving up as soon
+/// as a newer payload has been published.
+Future<void> _broadcast(String payload, int seq, List<int> delaysMs) async {
+  final tagged = _withSeq(payload, seq);
+  for (final ms in delaysMs) {
+    await Future.delayed(Duration(milliseconds: ms));
+    if (!await _stillCurrent(seq)) return;
+    try {
+      await FlutterOverlayWindow.shareData(tagged);
+    } catch (_) {}
+  }
+}
+
+/// Stamp the sequence into the JSON so the receiving side can order it too —
+/// `shareData` has no ordering guarantee of its own.
+String _withSeq(String payload, int seq) {
+  try {
+    final m = Map<String, dynamic>.from(jsonDecode(payload) as Map);
+    m['_seq'] = seq;
+    return jsonEncode(m);
+  } catch (_) {
+    return payload;
+  }
+}
+
 /// Native channel registered on the overlay engine (see MainActivity). The
 /// overlay runs in its own engine with no plugins/Activity, so url_launcher
 /// can't launch the dialer/WhatsApp from here — we go through native instead.
@@ -74,17 +137,22 @@ const _primaryLight = Color(0xFFFFE0B2);
 /// Safe to call from the FCM **background isolate**. No-ops silently if the
 /// user hasn't granted the "Display over other apps" permission.
 Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
+  // A booking outranks the bubble. This only cancels a bubble started in the
+  // SAME isolate — and in practice this function runs in the FCM background
+  // isolate while the bubble is raised from the UI one, so the counter does
+  // not reach it. What actually orders those two is the sequence number in
+  // shared preferences, which every isolate can see (`_publishPayload`).
+  // The bump is kept for the day something calls this from the UI isolate.
+  _bubbleGen++;
   try {
     if (!Platform.isAndroid) return;
     final granted = await FlutterOverlayWindow.isPermissionGranted();
     if (!granted) return;
 
     final payload = jsonEncode(data);
-    // Reliable channel: persist first so the overlay can read it on boot.
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kOverlayPayloadKey, payload);
-    } catch (_) {}
+    // Reliable channel: persist first so the overlay can read it on boot. The
+    // sequence makes this write win over any bubble broadcast still in flight.
+    final seq = await _publishPayload(payload);
 
     if (await FlutterOverlayWindow.isActive()) {
       await FlutterOverlayWindow.closeOverlay();
@@ -122,12 +190,8 @@ Future<void> showRequirementOverlay(Map<String, dynamic> data) async {
 
     // Live channel: push the data a few times over a wider window to beat the
     // overlay-engine startup race (the prefs read is the reliable fallback).
-    for (final ms in [0, 500, 1200, 2200]) {
-      await Future.delayed(Duration(milliseconds: ms));
-      try {
-        await FlutterOverlayWindow.shareData(payload);
-      } catch (_) {}
-    }
+    // Stops early if a newer payload replaced this one meanwhile.
+    await _broadcast(payload, seq, [0, 500, 1200, 2200]);
   } catch (_) {
     // Overlay is best-effort; the system notification is the fallback.
   }
@@ -141,6 +205,14 @@ const _kBubblePayload = '{"_bubble":true}';
 /// sized from this (see `showOnlineBubble`) so the two always match.
 const double _kBubbleDiameter = 58;
 
+/// Bumped by anything that should cancel an in-flight `showOnlineBubble`.
+///
+/// Showing the bubble takes six awaits; hiding it takes one. Whoever asked
+/// last must win, or the bubble reappears after it was told to go — over our
+/// own UI, where it eats taps. UI-isolate only, which is where both the
+/// lifecycle hooks and the online toggle live.
+int _bubbleGen = 0;
+
 /// Float a small Gora logo over other apps while the partner is ONLINE.
 ///
 /// It is the same overlay window the alert card uses — the plugin allows one at
@@ -151,28 +223,55 @@ const double _kBubbleDiameter = 58;
 /// No-ops without the "Display over other apps" permission, like every other
 /// overlay call here.
 Future<void> showOnlineBubble() async {
+  // Claim this attempt. Anything that supersedes it — going offline, the app
+  // coming back to the front, a booking card — bumps the counter, and every
+  // await below then bails out.
+  //
+  // Without this the bubble ends up ON TOP OF OUR OWN HOME SCREEN: the app is
+  // backgrounded so this starts, the user comes straight back, `hideOnlineBubble`
+  // closes the window, and then this function — still waiting on one of its six
+  // awaits — happily opens it again. A system overlay over our own UI swallows
+  // taps on whatever is under it, which is the "I tap something else and the
+  // icon gets tapped" report.
+  final gen = ++_bubbleGen;
+  bool superseded() => gen != _bubbleGen;
+
   try {
     if (!Platform.isAndroid) return;
-    if (!await FlutterOverlayWindow.isPermissionGranted()) return;
-    if (!await isOnline()) return;
+    if (!await FlutterOverlayWindow.isPermissionGranted() || superseded()) return;
+    if (!await isOnline() || superseded()) return;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kOverlayPayloadKey, _kBubblePayload);
-    } catch (_) {}
+    final seq = await _publishPayload(_kBubblePayload);
+    if (superseded()) return;
 
     if (await FlutterOverlayWindow.isActive()) await FlutterOverlayWindow.closeOverlay();
+    if (superseded()) return;
 
-    // Size the WINDOW to the bubble. The plugin takes device pixels while the
-    // widget is drawn in logical ones, so a fixed 200x200 was a window roughly
-    // a third wider than the 58dp circle — and that invisible margin sits on
-    // top of the app and swallows taps. It ate the "Secure this booking"
-    // switch on the edit form, which just looked like a dead button.
+    // Size the WINDOW to the bubble, exactly.
     //
-    // A few px of slack for the drop shadow, and a floor in case the view is
-    // not ready and the ratio comes back as 0.
-    final ratio = ui.PlatformDispatcher.instance.views.first.devicePixelRatio;
-    final side = ((_kBubbleDiameter + 6) * (ratio > 0 ? ratio : 1)).round().clamp(120, 400);
+    // This window is a SQUARE that sits on top of whatever app is in front, and
+    // every pixel of it swallows a tap — the circle you can see is only the part
+    // that looks clickable. So any slack here shows up as taps landing on the
+    // bubble when the user aimed at the app underneath, which is what makes a
+    // button feel dead. A fixed 200x200 did it first; then +6dp of shadow slack
+    // and a 120px floor kept a thinner ring of it.
+    //
+    // Now: no slack, and the floor is derived from the circle rather than a
+    // magic number, so it can never exceed the circle on a low-density screen.
+    // The drop shadow is gone from the widget for the same reason (see
+    // `_buildBubble`) — a shadow is not worth a dead zone around the icon.
+    //
+    // `views` is EMPTY inside the FCM background isolate, where `.first` throws
+    // and the bubble silently never appeared; fall back the same way the alert
+    // card does.
+    double ratio = 0;
+    try {
+      final views = ui.PlatformDispatcher.instance.views;
+      if (views.isNotEmpty) ratio = views.first.devicePixelRatio;
+      if (ratio <= 0) ratio = ui.PlatformDispatcher.instance.implicitView?.devicePixelRatio ?? 0;
+    } catch (_) {}
+    if (ratio <= 0) ratio = 3; // a modern phone; better to guess high than clip
+    final side = (_kBubbleDiameter * ratio).round().clamp(_kBubbleDiameter.round(), 400);
 
     await FlutterOverlayWindow.showOverlay(
       height: side,
@@ -186,19 +285,27 @@ Future<void> showOnlineBubble() async {
       overlayTitle: 'Gora Taxi',
       overlayContent: 'You are online',
     );
-    for (final ms in [0, 400, 1000]) {
-      await Future.delayed(Duration(milliseconds: ms));
+    // The window is open now. If the answer changed while it was opening — the
+    // app came back to the front, or they went offline — take it straight back
+    // down rather than leaving a tap-eating circle on screen.
+    if (superseded()) {
       try {
-        await FlutterOverlayWindow.shareData(_kBubblePayload);
+        await FlutterOverlayWindow.closeOverlay();
       } catch (_) {}
+      return;
     }
+    // Gives up the moment an alert card is published, so a booking that lands
+    // while this loop is still running is never overwritten by the bubble.
+    await _broadcast(_kBubblePayload, seq, [0, 400, 1000]);
   } catch (_) {
     // Best effort — being online must never depend on the bubble appearing.
   }
 }
 
-/// Take the bubble away (going offline, or signing out).
+/// Take the bubble away (going offline, signing out, or the app coming back to
+/// the front). Cancels any `showOnlineBubble` still working through its awaits.
 Future<void> hideOnlineBubble() async {
+  _bubbleGen++;
   try {
     if (!Platform.isAndroid) return;
     if (await FlutterOverlayWindow.isActive()) await FlutterOverlayWindow.closeOverlay();
@@ -233,8 +340,7 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     super.initState();
     _loadFromPrefs();
     FlutterOverlayWindow.overlayListener.listen((event) {
-      final parsed = _parse(event);
-      if (parsed.isNotEmpty && mounted) setState(() => _data = parsed);
+      _accept(_parse(event));
     });
   }
 
@@ -252,7 +358,10 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
         await prefs.reload();
         final parsed = _parse(prefs.getString(_kOverlayPayloadKey));
         if (parsed.isNotEmpty) {
-          if (mounted) setState(() => _data = parsed);
+          // Carry the stored sequence so a disk read can't undo a newer
+          // payload that already arrived on the live channel.
+          parsed['_seq'] ??= prefs.getInt(_kOverlaySeqKey) ?? 0;
+          _accept(parsed);
           break;
         }
         if (_data.isNotEmpty) break; // shareData already delivered it
@@ -265,6 +374,20 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
       final canContact = prefs.getBool(kOverlayCanContactKey) ?? false;
       if (mounted) setState(() => _userCanContact = canContact);
     } catch (_) {}
+  }
+
+  /// Take a payload only if it is not older than the one already on screen.
+  ///
+  /// Two writers re-broadcast on overlapping schedules, and the disk read races
+  /// both. Without this ordering, a bubble broadcast queued a second earlier
+  /// could land after the alert card and replace a live booking with the idle
+  /// icon — the glitch where the popup turned back into the little logo.
+  void _accept(Map<String, dynamic> parsed) {
+    if (parsed.isEmpty || !mounted) return;
+    final incoming = (parsed['_seq'] as num?)?.toInt() ?? 0;
+    final current = (_data['_seq'] as num?)?.toInt() ?? 0;
+    if (incoming > 0 && current > 0 && incoming < current) return; // stale
+    setState(() => _data = parsed);
   }
 
   Map<String, dynamic> _parse(dynamic v) {
@@ -400,23 +523,26 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
     await restoreOnlineBubble();
   }
 
-  /// The floating Gora logo shown while the partner is online. Deliberately
-  /// small and transparent around the edges so it sits over other apps like a
-  /// chat head rather than blocking them.
+  /// The floating Gora logo shown while the partner is online.
+  ///
+  /// It fills its window edge to edge on purpose. The window is a square laid
+  /// over whatever app is in front and it eats every tap that lands in it, so
+  /// any gap between the window and the circle is a dead zone the user cannot
+  /// see — they aim at a button underneath and the bubble takes the tap. Hence
+  /// no outer padding, no margin, and no drop shadow (the shadow is what the
+  /// old window padding was reserving room for).
   Widget _buildBubble() {
     return Material(
       color: Colors.transparent,
-      child: Center(
+      child: SizedBox.expand(
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: _openApp,
           child: Container(
-            width: _kBubbleDiameter,
-            height: _kBubbleDiameter,
             decoration: BoxDecoration(
               color: Colors.white,
               shape: BoxShape.circle,
               border: Border.all(color: _primary, width: 2),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
             ),
             padding: const EdgeInsets.all(4),
             child: ClipOval(
