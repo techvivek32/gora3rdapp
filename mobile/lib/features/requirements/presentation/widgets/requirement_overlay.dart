@@ -384,6 +384,24 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
   /// icon — the glitch where the popup turned back into the little logo.
   void _accept(Map<String, dynamic> parsed) {
     if (parsed.isEmpty || !mounted) return;
+
+    // A bubble may never take over a live booking card, whatever the sequence
+    // says. Ordering cannot decide this one, and that is what made the icon
+    // fill the screen:
+    //
+    //   the card opens the window at 60% of the screen, then `showOnlineBubble`
+    //   — raised by the app going to the background, or by a card that closed a
+    //   moment earlier — publishes the bubble with a NEWER sequence. The check
+    //   below reads it as fresher news, swaps the card for the bubble, and
+    //   `_buildBubble` expands a 58dp icon to fill a card-sized window.
+    //
+    // A card is dismissed by the person looking at it, never by a background
+    // broadcast, so precedence settles it. Every real "card → bubble" path
+    // (`_close`, `_acceptBooking`, `_chatWithPoster`) closes the overlay first,
+    // which tears down this engine — the bubble then arrives in a fresh one
+    // with nothing on screen and is accepted normally.
+    if (parsed['_bubble'] == true && _data.isNotEmpty && _data['_bubble'] != true) return;
+
     final incoming = (parsed['_seq'] as num?)?.toInt() ?? 0;
     final current = (_data['_seq'] as num?)?.toInt() ?? 0;
     if (incoming > 0 && current > 0 && incoming < current) return; // stale
@@ -525,33 +543,47 @@ class _RequirementOverlayState extends State<RequirementOverlay> {
 
   /// The floating Gora logo shown while the partner is online.
   ///
-  /// It fills its window edge to edge on purpose. The window is a square laid
-  /// over whatever app is in front and it eats every tap that lands in it, so
-  /// any gap between the window and the circle is a dead zone the user cannot
-  /// see — they aim at a button underneath and the bubble takes the tap. Hence
-  /// no outer padding, no margin, and no drop shadow (the shadow is what the
-  /// old window padding was reserving room for).
+  /// Sized to exactly [_kBubbleDiameter], which is also what `showOnlineBubble`
+  /// sizes the WINDOW to — so in the window this belongs to it still fills the
+  /// square edge to edge, with no outer padding, margin or drop shadow. That
+  /// matters: the window is laid over whatever app is in front and eats every
+  /// tap inside it, so a gap between window and circle is a dead zone the user
+  /// cannot see.
+  ///
+  /// The size is a cap rather than `SizedBox.expand` because this widget is
+  /// also reachable in the alert card's window, which is 60% of the screen.
+  /// Expanding there is what drew the logo across half the display.
   Widget _buildBubble() {
     return Material(
       color: Colors.transparent,
-      child: SizedBox.expand(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: _openApp,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              border: Border.all(color: _primary, width: 2),
-            ),
-            padding: const EdgeInsets.all(4),
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/gora_logo_white.png',
-                fit: BoxFit.contain,
-                // The overlay engine loads assets from the same bundle, but if
-                // anything goes wrong a blank circle would look broken.
-                errorBuilder: (_, __, ___) => const Icon(Icons.local_taxi_rounded, color: _primary, size: 28),
+      // Capped, not merely expanded. In the window this is meant for the cap
+      // and the window are the same 58dp, so nothing changes — but the same
+      // widget is reachable in the card's much larger window, and `expand`
+      // there drew the logo across most of the screen. A size limit means the
+      // worst case is a small icon in the wrong place rather than a giant one.
+      child: Center(
+        child: SizedBox(
+          width: _kBubbleDiameter,
+          height: _kBubbleDiameter,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _openApp,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: _primary, width: 2),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/gora_logo_white.png',
+                  fit: BoxFit.contain,
+                  // The overlay engine loads assets from the same bundle, but if
+                  // anything goes wrong a blank circle would look broken.
+                  errorBuilder: (_, __, ___) =>
+                      const Icon(Icons.local_taxi_rounded, color: _primary, size: 28),
+                ),
               ),
             ),
           ),
