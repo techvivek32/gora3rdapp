@@ -101,6 +101,28 @@ export const metadata: Metadata = {
   // Without this the browser asks for /favicon.ico on every page, gets a 404
   // and shows a blank tab. The mark is the one already in the header.
   icons: { icon: '/gora-logo.png', apple: '/gora-logo.png' },
+
+  /**
+   * Proof to Google and Bing that whoever is asking for this site's search data
+   * controls the site.
+   *
+   * Read from the environment rather than written in, so claiming the site in
+   * Search Console is one line in `.env` and a restart — not a code change, a
+   * commit and a deploy. Both are left out of the HTML entirely when unset,
+   * which is why an empty value is filtered rather than rendered blank.
+   *
+   * Only needed for the HTML-tag method. Verifying the DOMAIN property with a
+   * DNS TXT record is better — it covers www, the apex and every subdomain at
+   * once — and needs nothing here at all.
+   */
+  verification: {
+    ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION }
+      : {}),
+    ...(process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION
+      ? { other: { 'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } }
+      : {}),
+  },
 };
 
 /**
