@@ -7,6 +7,9 @@ import { SiteFooter } from '@/components/SiteFooter';
 import { AppDownloadPrompt } from '@/components/AppDownloadPrompt';
 import { IntroLoader } from '@/components/IntroLoader';
 import { ScrollFx } from '@/components/ScrollFx';
+import { JsonLd } from '@/components/JsonLd';
+import { SITE_URL } from '@/lib/seo';
+import { COMPANY } from '@/lib/company';
 
 /**
  * Headlines. Montserrat.
@@ -48,12 +51,93 @@ const poppins = Poppins({
 
 
 export const metadata: Metadata = {
-  title: 'Gora Taxi — Book a cab, hire a driver, share a ride',
+  // Every page's canonical, Open Graph and JSON-LD URL is resolved against
+  // this. Without it Next emits relative canonicals, which a search engine
+  // reads against whatever host served the page — so a site reachable at both
+  // the apex and www ends up competing with itself.
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: 'Gora Taxi — Outstation & Local Cab Booking in India',
+    // Pages set the part before the dash; the brand is appended once, here, so
+    // no page has to remember to add it and none of them says it twice.
+    template: '%s | Gora Taxi',
+  },
   description:
-    'Book outstation and local cabs, hire a driver for your own car, or share a ride across India. India Ka Apna App.',
+    'Book outstation and local cabs at a fixed, distance-based fare — one way, round trip or hourly. Verified drivers, no hidden charges, free cancellation.',
+  applicationName: COMPANY.brand,
+  keywords: [
+    'cab booking',
+    'outstation cab',
+    'taxi service',
+    'one way cab',
+    'round trip taxi',
+    'local cab rental',
+    'intercity taxi India',
+  ],
+  alternates: { canonical: '/' },
+  openGraph: {
+    type: 'website',
+    siteName: COMPANY.brand,
+    locale: 'en_IN',
+    url: SITE_URL,
+    title: 'Gora Taxi — Outstation & Local Cab Booking in India',
+    description:
+      'Fixed, distance-based cab fares across India. One way, round trip and hourly rentals with verified drivers.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Gora Taxi — Outstation & Local Cab Booking in India',
+    description:
+      'Fixed, distance-based cab fares across India. One way, round trip and hourly rentals with verified drivers.',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    // Let Google show a full-size preview and as long a text snippet as it
+    // likes. The default caps the snippet, which on a fare page means the
+    // price — the one thing a searcher is deciding on — gets cut off.
+    googleBot: { index: true, follow: true, 'max-snippet': -1, 'max-image-preview': 'large', 'max-video-preview': -1 },
+  },
   // Without this the browser asks for /favicon.ico on every page, gets a 404
   // and shows a blank tab. The mark is the one already in the header.
   icons: { icon: '/gora-logo.png', apple: '/gora-logo.png' },
+};
+
+/**
+ * Who the site belongs to, said once for the whole site.
+ *
+ * Carried on every page so a search engine can tie the brand, the registered
+ * company, the address and the app listing together into one entity instead of
+ * guessing that the "Gora Taxi" on a route page is the same business as the
+ * one in the footer.
+ */
+const ORGANISATION_JSONLD = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  '@id': `${SITE_URL}/#organization`,
+  name: COMPANY.brand,
+  legalName: COMPANY.legalName,
+  url: SITE_URL,
+  logo: `${SITE_URL}/gora-logo.png`,
+  slogan: COMPANY.tagline,
+  address: {
+    '@type': 'PostalAddress',
+    streetAddress: COMPANY.address,
+    addressCountry: 'IN',
+  },
+  taxID: COMPANY.gstin,
+  areaServed: { '@type': 'Country', name: 'India' },
+  sameAs: [COMPANY.playStoreUrl].filter(Boolean),
+};
+
+const WEBSITE_JSONLD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  '@id': `${SITE_URL}/#website`,
+  url: SITE_URL,
+  name: COMPANY.brand,
+  publisher: { '@id': `${SITE_URL}/#organization` },
+  inLanguage: 'en-IN',
 };
 
 export const viewport: Viewport = {
@@ -112,9 +196,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // `suppressHydrationWarning`: the scripts below set data-js and data-intro
     // on this very element before React hydrates, so the attributes it finds
     // will not match the server's. That difference is the point.
-    <html lang="en" className={`${poppins.variable} ${montserrat.variable}`} suppressHydrationWarning>
+    // `en-IN`, not plain `en`: the fares are rupees, the cities are Indian and
+    // the audience is searching from India. It costs nothing and tells a search
+    // engine which English this is.
+    <html lang="en-IN" className={`${poppins.variable} ${montserrat.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: JS_FLAG + INTRO_BOOTSTRAP }} />
+        <JsonLd data={[ORGANISATION_JSONLD, WEBSITE_JSONLD]} />
       </head>
       <body className="min-h-screen font-sans">
         <Providers>
